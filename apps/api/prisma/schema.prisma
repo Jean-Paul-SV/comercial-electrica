@@ -1,0 +1,387 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum RoleName {
+  ADMIN
+  USER
+}
+
+enum CustomerDocType {
+  CC
+  CE
+  NIT
+  PASSPORT
+  OTHER
+}
+
+enum InventoryMovementType {
+  IN
+  OUT
+  ADJUST
+}
+
+enum SaleStatus {
+  DRAFT
+  PAID
+  CANCELLED
+}
+
+enum QuoteStatus {
+  DRAFT
+  SENT
+  EXPIRED
+  CONVERTED
+  CANCELLED
+}
+
+enum InvoiceStatus {
+  DRAFT
+  ISSUED
+  VOIDED
+}
+
+enum CashMovementType {
+  IN
+  OUT
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  TRANSFER
+  OTHER
+}
+
+enum DianEnvironment {
+  HABILITACION
+  PRODUCCION
+}
+
+enum DianDocumentType {
+  FE
+  NC
+  ND
+}
+
+enum DianDocumentStatus {
+  DRAFT
+  SIGNED
+  SENT
+  ACCEPTED
+  REJECTED
+}
+
+model User {
+  id           String   @id @default(uuid()) @db.Uuid
+  email        String   @unique
+  passwordHash String
+  role         RoleName @default(USER)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  auditLogs AuditLog[]
+}
+
+model Category {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  products Product[]
+}
+
+model Product {
+  id           String   @id @default(uuid()) @db.Uuid
+  internalCode String   @unique
+  name         String
+  categoryId   String?  @db.Uuid
+  cost         Decimal  @db.Decimal(18, 2)
+  price        Decimal  @db.Decimal(18, 2)
+  taxRate      Decimal  @db.Decimal(5, 2) @default(0)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  category Category? @relation(fields: [categoryId], references: [id])
+  stock    StockBalance?
+
+  saleItems              SaleItem[]
+  quoteItems             QuoteItem[]
+  inventoryMovementItems InventoryMovementItem[]
+
+  @@index([name])
+  @@index([categoryId])
+}
+
+model StockBalance {
+  productId   String   @id @db.Uuid
+  qtyOnHand   Int      @default(0)
+  qtyReserved Int      @default(0)
+  updatedAt   DateTime @updatedAt
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
+
+model InventoryMovement {
+  id        String                @id @default(uuid()) @db.Uuid
+  type      InventoryMovementType
+  reason    String?
+  createdBy String?               @db.Uuid
+  createdAt DateTime              @default(now())
+
+  items InventoryMovementItem[]
+
+  @@index([createdAt])
+  @@index([type])
+}
+
+model InventoryMovementItem {
+  id          String   @id @default(uuid()) @db.Uuid
+  movementId  String   @db.Uuid
+  productId   String   @db.Uuid
+  qty         Int
+  unitCost    Decimal? @db.Decimal(18, 2)
+  createdAt   DateTime @default(now())
+
+  movement InventoryMovement @relation(fields: [movementId], references: [id], onDelete: Cascade)
+  product  Product           @relation(fields: [productId], references: [id])
+
+  @@index([movementId])
+  @@index([productId])
+}
+
+model Customer {
+  id        String          @id @default(uuid()) @db.Uuid
+  docType   CustomerDocType
+  docNumber String
+  name      String
+  email     String?
+  phone     String?
+  address   String?
+  cityCode  String?
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  sales    Sale[]
+  quotes   Quote[]
+  invoices Invoice[]
+
+  @@unique([docType, docNumber])
+  @@index([name])
+}
+
+model Sale {
+  id            String     @id @default(uuid()) @db.Uuid
+  customerId    String?    @db.Uuid
+  status        SaleStatus @default(DRAFT)
+  soldAt        DateTime   @default(now())
+  subtotal      Decimal    @db.Decimal(18, 2) @default(0)
+  taxTotal      Decimal    @db.Decimal(18, 2) @default(0)
+  discountTotal Decimal    @db.Decimal(18, 2) @default(0)
+  grandTotal    Decimal    @db.Decimal(18, 2) @default(0)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  customer Customer? @relation(fields: [customerId], references: [id])
+  items    SaleItem[]
+
+  cashMovements CashMovement[]
+  invoices      Invoice[]
+
+  @@index([soldAt])
+  @@index([customerId])
+  @@index([status])
+}
+
+model SaleItem {
+  id        String   @id @default(uuid()) @db.Uuid
+  saleId    String   @db.Uuid
+  productId String   @db.Uuid
+  qty       Int
+  unitPrice Decimal  @db.Decimal(18, 2)
+  taxRate   Decimal  @db.Decimal(5, 2) @default(0)
+  lineTotal Decimal  @db.Decimal(18, 2)
+
+  sale    Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+
+  @@index([saleId])
+  @@index([productId])
+}
+
+model CashSession {
+  id            String   @id @default(uuid()) @db.Uuid
+  openedAt      DateTime @default(now())
+  closedAt      DateTime?
+  openingAmount Decimal  @db.Decimal(18, 2) @default(0)
+  closingAmount Decimal  @db.Decimal(18, 2) @default(0)
+  openedBy      String?  @db.Uuid
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  movements CashMovement[]
+
+  @@index([openedAt])
+  @@index([closedAt])
+}
+
+model CashMovement {
+  id          String           @id @default(uuid()) @db.Uuid
+  sessionId   String           @db.Uuid
+  type        CashMovementType
+  method      PaymentMethod
+  amount      Decimal          @db.Decimal(18, 2)
+  reference   String?
+  relatedSaleId String?        @db.Uuid
+  createdAt   DateTime         @default(now())
+
+  session CashSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  relatedSale Sale?   @relation(fields: [relatedSaleId], references: [id])
+
+  @@index([sessionId])
+  @@index([createdAt])
+  @@index([relatedSaleId])
+}
+
+model Quote {
+  id            String      @id @default(uuid()) @db.Uuid
+  customerId    String?     @db.Uuid
+  status        QuoteStatus @default(DRAFT)
+  validUntil    DateTime?
+  subtotal      Decimal     @db.Decimal(18, 2) @default(0)
+  taxTotal      Decimal     @db.Decimal(18, 2) @default(0)
+  discountTotal Decimal     @db.Decimal(18, 2) @default(0)
+  grandTotal    Decimal     @db.Decimal(18, 2) @default(0)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  customer Customer? @relation(fields: [customerId], references: [id])
+  items    QuoteItem[]
+
+  @@index([createdAt])
+  @@index([customerId])
+  @@index([status])
+}
+
+model QuoteItem {
+  id        String   @id @default(uuid()) @db.Uuid
+  quoteId   String   @db.Uuid
+  productId String   @db.Uuid
+  qty       Int
+  unitPrice Decimal  @db.Decimal(18, 2)
+  taxRate   Decimal  @db.Decimal(5, 2) @default(0)
+  lineTotal Decimal  @db.Decimal(18, 2)
+
+  quote   Quote   @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+
+  @@index([quoteId])
+  @@index([productId])
+}
+
+model Invoice {
+  id         String        @id @default(uuid()) @db.Uuid
+  saleId     String?       @db.Uuid
+  customerId String?       @db.Uuid
+  number     String        @unique
+  issuedAt   DateTime      @default(now())
+  status     InvoiceStatus @default(DRAFT)
+  subtotal      Decimal    @db.Decimal(18, 2) @default(0)
+  taxTotal      Decimal    @db.Decimal(18, 2) @default(0)
+  discountTotal Decimal    @db.Decimal(18, 2) @default(0)
+  grandTotal    Decimal    @db.Decimal(18, 2) @default(0)
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  sale     Sale?     @relation(fields: [saleId], references: [id])
+  customer Customer? @relation(fields: [customerId], references: [id])
+
+  dianDocument DianDocument?
+
+  @@index([issuedAt])
+  @@index([customerId])
+  @@index([saleId])
+}
+
+model DianConfig {
+  id         String          @id @default(uuid()) @db.Uuid
+  env        DianEnvironment @default(HABILITACION)
+  softwareId String
+  softwarePin String
+  resolutionNumber String?
+  prefix     String?
+  rangeFrom  Int?
+  rangeTo    Int?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model DianDocument {
+  id        String            @id @default(uuid()) @db.Uuid
+  invoiceId String            @unique @db.Uuid
+  type      DianDocumentType  @default(FE)
+  cufe      String?
+  xmlPath   String?
+  pdfPath   String?
+  status    DianDocumentStatus @default(DRAFT)
+  lastError String?
+  sentAt    DateTime?
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  events  DianEvent[]
+
+  @@index([status])
+  @@index([sentAt])
+}
+
+model DianEvent {
+  id            String   @id @default(uuid()) @db.Uuid
+  dianDocumentId String  @db.Uuid
+  eventType     String
+  payload       Json
+  createdAt     DateTime @default(now())
+
+  dianDocument DianDocument @relation(fields: [dianDocumentId], references: [id], onDelete: Cascade)
+
+  @@index([dianDocumentId])
+  @@index([createdAt])
+}
+
+model AuditLog {
+  id        String   @id @default(uuid()) @db.Uuid
+  actorId   String?  @db.Uuid
+  entity    String
+  entityId  String
+  action    String
+  diff      Json?
+  createdAt DateTime @default(now())
+
+  actor User? @relation(fields: [actorId], references: [id])
+
+  @@index([createdAt])
+  @@index([entity, entityId])
+}
+
+model BackupRun {
+  id          String   @id @default(uuid()) @db.Uuid
+  startedAt   DateTime @default(now())
+  finishedAt  DateTime?
+  status      String
+  storagePath String?
+  checksum    String?
+  createdAt   DateTime @default(now())
+
+  @@index([startedAt])
+  @@index([status])
+}

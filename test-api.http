@@ -1,0 +1,125 @@
+### Archivo de pruebas HTTP (para VS Code REST Client o similar)
+### También puedes usar estos ejemplos con curl o Postman
+
+@baseUrl = http://localhost:3000
+@token = TU_ACCESS_TOKEN_AQUI
+
+### 1. Bootstrap Admin (solo primera vez)
+POST {{baseUrl}}/auth/bootstrap-admin
+Content-Type: application/json
+
+{
+  "email": "admin@example.com",
+  "password": "Admin123!"
+}
+
+### 2. Login
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@example.com",
+  "password": "Admin123!"
+}
+
+### 3. Crear Categoría
+POST {{baseUrl}}/categories
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Cables"
+}
+
+### 4. Listar Categorías
+GET {{baseUrl}}/categories
+Authorization: Bearer {{token}}
+
+### 5. Crear Producto
+POST {{baseUrl}}/products
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "internalCode": "CABLE-001",
+  "name": "Cable THWN 12 AWG",
+  "cost": 5000,
+  "price": 8000,
+  "taxRate": 19
+}
+
+### 6. Listar Productos
+GET {{baseUrl}}/products
+Authorization: Bearer {{token}}
+
+### 7. Agregar Stock (Movimiento IN)
+POST {{baseUrl}}/inventory/movements
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "type": "IN",
+  "reason": "Compra inicial",
+  "items": [
+    {
+      "productId": "REEMPLAZAR_CON_ID_REAL",
+      "qty": 100,
+      "unitCost": 5000
+    }
+  ]
+}
+
+### 8. Crear Cliente
+POST {{baseUrl}}/customers
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "docType": "CC",
+  "docNumber": "1234567890",
+  "name": "Juan Pérez",
+  "email": "juan@example.com",
+  "phone": "3001234567"
+}
+
+### 9. Listar Clientes
+GET {{baseUrl}}/customers
+Authorization: Bearer {{token}}
+
+### 10. Abrir Sesión de Caja
+POST {{baseUrl}}/cash/sessions
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "openingAmount": 100000
+}
+
+### 11. Listar Sesiones de Caja
+GET {{baseUrl}}/cash/sessions
+Authorization: Bearer {{token}}
+
+### 12. Crear Venta
+POST {{baseUrl}}/sales
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "customerId": "REEMPLAZAR_CON_ID_REAL",
+  "cashSessionId": "REEMPLAZAR_CON_ID_REAL",
+  "paymentMethod": "CASH",
+  "items": [
+    {
+      "productId": "REEMPLAZAR_CON_ID_REAL",
+      "qty": 5
+    }
+  ]
+}
+
+### 13. Listar Ventas
+GET {{baseUrl}}/sales
+Authorization: Bearer {{token}}
+
+### 14. Ver Movimientos de Inventario
+GET {{baseUrl}}/inventory/movements
+Authorization: Bearer {{token}}

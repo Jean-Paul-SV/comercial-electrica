@@ -1,0 +1,33 @@
+{
+  "name": "comercial-electrica",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Sistema de gestión (inventario, ventas, caja, documentos) para ferretería eléctrica.",
+  "packageManager": "npm@10.9.3",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -n api,web -c blue,green \"npm run dev:api\" \"npm run dev:web\"",
+    "dev:api": "npm run start:dev -w api",
+    "dev:web": "npm run dev -w web",
+    "lint": "npm run lint -ws",
+    "format": "prettier -w .",
+    "db:up": "docker compose -f infra/docker-compose.yml up -d",
+    "db:down": "docker compose -f infra/docker-compose.yml down",
+    "test": "echo \"No tests yet\"",
+    "test:api": "node scripts/test-api.js"
+  },
+  "keywords": [
+    "inventario",
+    "facturacion",
+    "colombia",
+    "dian"
+  ],
+  "author": "Jean Paul Serrato Violeth",
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "prettier": "^3.6.2"
+  }
+}
