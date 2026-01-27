@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import {
   DianDocumentStatus,
   DianDocumentType,
@@ -30,12 +35,17 @@ export class SalesService {
   ) {}
 
   async createSale(dto: CreateSaleDto, createdByUserId?: string) {
-    this.logger.log(`Creando venta para usuario ${createdByUserId || 'anónimo'}`);
-    if (!dto.items || dto.items.length === 0) throw new BadRequestException('Debe incluir items.');
+    this.logger.log(
+      `Creando venta para usuario ${createdByUserId || 'anónimo'}`,
+    );
+    if (!dto.items || dto.items.length === 0)
+      throw new BadRequestException('Debe incluir items.');
 
     // Validar que la sesión de caja existe y está abierta
     if (!dto.cashSessionId) {
-      throw new BadRequestException('cashSessionId requerido para registrar caja.');
+      throw new BadRequestException(
+        'cashSessionId requerido para registrar caja.',
+      );
     }
 
     const cashSession = await this.prisma.cashSession.findUnique({
@@ -43,7 +53,9 @@ export class SalesService {
     });
 
     if (!cashSession) {
-      throw new NotFoundException(`Sesión de caja con id ${dto.cashSessionId} no encontrada.`);
+      throw new NotFoundException(
+        `Sesión de caja con id ${dto.cashSessionId} no encontrada.`,
+      );
     }
 
     if (cashSession.closedAt) {
@@ -58,131 +70,137 @@ export class SalesService {
         where: { id: dto.customerId },
       });
       if (!customer) {
-        throw new NotFoundException(`Cliente con id ${dto.customerId} no encontrado.`);
+        throw new NotFoundException(
+          `Cliente con id ${dto.customerId} no encontrado.`,
+        );
       }
     }
 
-    return this.prisma.$transaction(
-      async (tx) => {
-        const products = await tx.product.findMany({
-          where: { id: { in: dto.items.map((i) => i.productId) } },
-          include: { stock: true },
-        });
-        if (products.length !== dto.items.length) {
-          throw new BadRequestException('Uno o más productos no existen.');
-        }
-
-        let subtotal = 0;
-        let taxTotal = 0;
-        const saleItems = dto.items.map((i) => {
-          const p = products.find((pp) => pp.id === i.productId)!;
-          const unitPrice = i.unitPrice ?? Number(p.price);
-          const lineSubtotal = unitPrice * i.qty;
-          const lineTax = (lineSubtotal * Number(p.taxRate ?? 0)) / 100;
-          const lineTotal = lineSubtotal + lineTax;
-          subtotal += lineSubtotal;
-          taxTotal += lineTax;
-          return {
-            productId: p.id,
-            qty: i.qty,
-            unitPrice,
-            taxRate: Number(p.taxRate ?? 0),
-            lineTotal,
-          };
-        });
-
-        const grandTotal = subtotal + taxTotal;
-
-        // Stock check + update
-        for (const it of dto.items) {
-          const bal = await tx.stockBalance.upsert({
-            where: { productId: it.productId },
-            create: { productId: it.productId, qtyOnHand: 0, qtyReserved: 0 },
-            update: {},
+    return this.prisma
+      .$transaction(
+        async (tx) => {
+          const products = await tx.product.findMany({
+            where: { id: { in: dto.items.map((i) => i.productId) } },
+            include: { stock: true },
           });
-          if (bal.qtyOnHand < it.qty) {
-            throw new BadRequestException(
-              `Stock insuficiente para productId=${it.productId}. Disponible=${bal.qtyOnHand}, requerido=${it.qty}.`,
-            );
+          if (products.length !== dto.items.length) {
+            throw new BadRequestException('Uno o más productos no existen.');
           }
-          await tx.stockBalance.update({
-            where: { productId: it.productId },
-            data: { qtyOnHand: bal.qtyOnHand - it.qty },
+
+          let subtotal = 0;
+          let taxTotal = 0;
+          const saleItems = dto.items.map((i) => {
+            const p = products.find((pp) => pp.id === i.productId)!;
+            const unitPrice = i.unitPrice ?? Number(p.price);
+            const lineSubtotal = unitPrice * i.qty;
+            const lineTax = (lineSubtotal * Number(p.taxRate ?? 0)) / 100;
+            const lineTotal = lineSubtotal + lineTax;
+            subtotal += lineSubtotal;
+            taxTotal += lineTax;
+            return {
+              productId: p.id,
+              qty: i.qty,
+              unitPrice,
+              taxRate: Number(p.taxRate ?? 0),
+              lineTotal,
+            };
           });
-        }
 
-        const sale = await tx.sale.create({
-          data: {
-            customerId: dto.customerId ?? null,
-            status: SaleStatus.PAID,
-            subtotal,
-            taxTotal,
-            discountTotal: 0,
-            grandTotal,
-            items: { create: saleItems },
-          },
-          include: { items: true },
-        });
+          const grandTotal = subtotal + taxTotal;
 
-        await tx.cashMovement.create({
-          data: {
-            sessionId: dto.cashSessionId!, // Ya validado arriba, seguro que existe
-            type: 'IN',
-            method: dto.paymentMethod ?? PaymentMethod.CASH,
-            amount: grandTotal,
-            relatedSaleId: sale.id,
-          },
-        });
+          // Stock check + update
+          for (const it of dto.items) {
+            const bal = await tx.stockBalance.upsert({
+              where: { productId: it.productId },
+              create: { productId: it.productId, qtyOnHand: 0, qtyReserved: 0 },
+              update: {},
+            });
+            if (bal.qtyOnHand < it.qty) {
+              throw new BadRequestException(
+                `Stock insuficiente para productId=${it.productId}. Disponible=${bal.qtyOnHand}, requerido=${it.qty}.`,
+              );
+            }
+            await tx.stockBalance.update({
+              where: { productId: it.productId },
+              data: { qtyOnHand: bal.qtyOnHand - it.qty },
+            });
+          }
 
-        const invoice = await tx.invoice.create({
-          data: {
-            saleId: sale.id,
-            customerId: sale.customerId,
-            number: makeInvoiceNumber(),
-            issuedAt: new Date(),
-            status: InvoiceStatus.ISSUED,
-            subtotal,
-            taxTotal,
-            discountTotal: 0,
-            grandTotal,
-          },
-        });
+          const sale = await tx.sale.create({
+            data: {
+              customerId: dto.customerId ?? null,
+              status: SaleStatus.PAID,
+              subtotal,
+              taxTotal,
+              discountTotal: 0,
+              grandTotal,
+              items: { create: saleItems },
+            },
+            include: { items: true },
+          });
 
-        const dianDoc = await tx.dianDocument.create({
-          data: {
-            invoiceId: invoice.id,
-            type: DianDocumentType.FE,
-            status: DianDocumentStatus.DRAFT,
-          },
-        });
+          await tx.cashMovement.create({
+            data: {
+              sessionId: dto.cashSessionId!, // Ya validado arriba, seguro que existe
+              type: 'IN',
+              method: dto.paymentMethod ?? PaymentMethod.CASH,
+              amount: grandTotal,
+              relatedSaleId: sale.id,
+            },
+          });
 
-        // Audit minimal (placeholder)
-        await tx.auditLog.create({
-          data: {
-            actorId: createdByUserId ?? null,
-            entity: 'sale',
-            entityId: sale.id,
-            action: 'create',
-            diff: { invoiceId: invoice.id, dianDocumentId: dianDoc.id },
-          },
-        });
+          const invoice = await tx.invoice.create({
+            data: {
+              saleId: sale.id,
+              customerId: sale.customerId,
+              number: makeInvoiceNumber(),
+              issuedAt: new Date(),
+              status: InvoiceStatus.ISSUED,
+              subtotal,
+              taxTotal,
+              discountTotal: 0,
+              grandTotal,
+            },
+          });
 
+          const dianDoc = await tx.dianDocument.create({
+            data: {
+              invoiceId: invoice.id,
+              type: DianDocumentType.FE,
+              status: DianDocumentStatus.DRAFT,
+            },
+          });
+
+          // Audit minimal (placeholder)
+          await tx.auditLog.create({
+            data: {
+              actorId: createdByUserId ?? null,
+              entity: 'sale',
+              entityId: sale.id,
+              action: 'create',
+              diff: { invoiceId: invoice.id, dianDocumentId: dianDoc.id },
+            },
+          });
+
+          this.logger.log(
+            `Venta creada exitosamente: ${sale.id}, Total: ${Number(sale.grandTotal)}, Factura: ${invoice.number}`,
+          );
+          return { sale, invoice, dianDocument: dianDoc };
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      )
+      .then(async (result) => {
+        // enqueue DIAN processing after commit
         this.logger.log(
-          `Venta creada exitosamente: ${sale.id}, Total: ${sale.grandTotal}, Factura: ${invoice.number}`,
+          `Encolando procesamiento DIAN para documento ${result.dianDocument.id}`,
         );
-        return { sale, invoice, dianDocument: dianDoc };
-      },
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
-    ).then(async (result) => {
-      // enqueue DIAN processing after commit
-      this.logger.log(`Encolando procesamiento DIAN para documento ${result.dianDocument.id}`);
-      await this.dianQueue.add(
-        'send',
-        { dianDocumentId: result.dianDocument.id },
-        { attempts: 10, backoff: { type: 'exponential', delay: 5000 } },
-      );
-      return result;
-    });
+        await this.dianQueue.add(
+          'send',
+          { dianDocumentId: result.dianDocument.id },
+          { attempts: 10, backoff: { type: 'exponential', delay: 5000 } },
+        );
+        return result;
+      });
   }
 
   listSales() {
@@ -193,4 +211,3 @@ export class SalesService {
     });
   }
 }
-

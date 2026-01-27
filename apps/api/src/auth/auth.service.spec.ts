@@ -107,8 +107,12 @@ describe('AuthService', () => {
 
       prisma.user.count = jest.fn().mockResolvedValue(1);
 
-      await expect(service.bootstrapAdmin(dto)).rejects.toThrow(BadRequestException);
-      await expect(service.bootstrapAdmin(dto)).rejects.toThrow('Bootstrap ya fue realizado.');
+      await expect(service.bootstrapAdmin(dto)).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(service.bootstrapAdmin(dto)).rejects.toThrow(
+        'Bootstrap ya fue realizado.',
+      );
       expect(prisma.user.create).not.toHaveBeenCalled();
     });
 
@@ -207,7 +211,9 @@ describe('AuthService', () => {
       prisma.user.findUnique = jest.fn().mockResolvedValue(mockUser);
 
       await expect(service.register(dto)).rejects.toThrow(BadRequestException);
-      await expect(service.register(dto)).rejects.toThrow('Email ya registrado.');
+      await expect(service.register(dto)).rejects.toThrow(
+        'Email ya registrado.',
+      );
       expect(prisma.user.create).not.toHaveBeenCalled();
     });
   });
@@ -235,7 +241,10 @@ describe('AuthService', () => {
       expect(prisma.user.findUnique).toHaveBeenCalledWith({
         where: { email: 'admin@test.com' },
       });
-      expect(argon2.verify).toHaveBeenCalledWith('hashed-password', 'Admin123!');
+      expect(argon2.verify).toHaveBeenCalledWith(
+        'hashed-password',
+        'Admin123!',
+      );
       expect(jwt.signAsync).toHaveBeenCalledWith(mockPayload);
     });
 
@@ -248,7 +257,9 @@ describe('AuthService', () => {
       prisma.user.findUnique = jest.fn().mockResolvedValue(null);
 
       await expect(service.login(dto)).rejects.toThrow(UnauthorizedException);
-      await expect(service.login(dto)).rejects.toThrow('Credenciales inválidas.');
+      await expect(service.login(dto)).rejects.toThrow(
+        'Credenciales inválidas.',
+      );
       expect(argon2.verify).not.toHaveBeenCalled();
     });
 
@@ -266,7 +277,9 @@ describe('AuthService', () => {
       prisma.user.findUnique = jest.fn().mockResolvedValue(inactiveUser);
 
       await expect(service.login(dto)).rejects.toThrow(UnauthorizedException);
-      await expect(service.login(dto)).rejects.toThrow('Credenciales inválidas.');
+      await expect(service.login(dto)).rejects.toThrow(
+        'Credenciales inválidas.',
+      );
     });
 
     it('debe lanzar error si la contraseña es incorrecta', async () => {
@@ -279,7 +292,9 @@ describe('AuthService', () => {
       (argon2.verify as jest.Mock).mockResolvedValue(false);
 
       await expect(service.login(dto)).rejects.toThrow(UnauthorizedException);
-      await expect(service.login(dto)).rejects.toThrow('Credenciales inválidas.');
+      await expect(service.login(dto)).rejects.toThrow(
+        'Credenciales inválidas.',
+      );
       expect(jwt.signAsync).not.toHaveBeenCalled();
     });
 

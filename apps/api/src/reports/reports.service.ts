@@ -63,7 +63,8 @@ export class ReportsService {
       },
       summary: {
         ...totals,
-        averageSale: totals.totalSales > 0 ? totals.totalAmount / totals.totalSales : 0,
+        averageSale:
+          totals.totalSales > 0 ? totals.totalAmount / totals.totalSales : 0,
       },
       sales,
     };
@@ -102,7 +103,9 @@ export class ReportsService {
     // Calcular estadísticas
     const stats = {
       totalProducts: products.length,
-      productsWithStock: products.filter((p) => p.stock && p.stock.qtyOnHand > 0).length,
+      productsWithStock: products.filter(
+        (p) => p.stock && p.stock.qtyOnHand > 0,
+      ).length,
       productsLowStock: products.filter(
         (p) => !p.stock || p.stock.qtyOnHand <= (dto.lowStockThreshold ?? 10),
       ).length,
@@ -267,16 +270,21 @@ export class ReportsService {
     });
 
     // Agrupar por cliente y calcular estadísticas
-    const customerStats = new Map<
-      string,
-      {
-        customer: any;
-        totalSales: number;
-        totalAmount: number;
-        averageSale: number;
-        lastSaleDate: Date | null;
-      }
-    >();
+    type CustomerStat = {
+      customer: {
+        id: string;
+        name: string;
+        docType: string | null;
+        docNumber: string;
+        email: string | null;
+      };
+      totalSales: number;
+      totalAmount: number;
+      averageSale: number;
+      lastSaleDate: Date | null;
+    };
+
+    const customerStats = new Map<string, CustomerStat>();
 
     sales.forEach((sale) => {
       if (!sale.customerId || !sale.customer) return;
@@ -336,7 +344,11 @@ export class ReportsService {
 
   async getDashboard() {
     const now = new Date();
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const todayStart = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate(),
+    );
     const todayEnd = new Date(todayStart);
     todayEnd.setDate(todayEnd.getDate() + 1);
 

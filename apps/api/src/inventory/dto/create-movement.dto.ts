@@ -1,5 +1,13 @@
 import { Type } from 'class-transformer';
-import { IsArray, IsEnum, IsInt, IsOptional, IsString, MinLength, ValidateNested } from 'class-validator';
+import {
+  IsArray,
+  IsEnum,
+  IsInt,
+  IsOptional,
+  IsString,
+  MinLength,
+  ValidateNested,
+} from 'class-validator';
 import { InventoryMovementType } from '@prisma/client';
 
 class MovementItemDto {
@@ -29,4 +37,3 @@ export class CreateMovementDto {
   @Type(() => MovementItemDto)
   items!: MovementItemDto[];
 }
-

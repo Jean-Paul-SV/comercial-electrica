@@ -30,11 +30,18 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
       if (typeof exceptionResponse === 'string') {
         message = exceptionResponse;
-      } else if (typeof exceptionResponse === 'object') {
-        const responseObj = exceptionResponse as any;
-        message = responseObj.message || exception.message;
-        error = responseObj.error || exception.name;
-        details = responseObj.details;
+      } else if (
+        typeof exceptionResponse === 'object' &&
+        exceptionResponse !== null
+      ) {
+        const responseObj = exceptionResponse as Record<string, unknown>;
+        message = (
+          Array.isArray(responseObj.message)
+            ? responseObj.message
+            : (responseObj.message as string) || exception.message
+        ) as string | string[];
+        error = (responseObj.error as string) || exception.name;
+        details = responseObj.details as Record<string, unknown> | undefined;
       } else {
         message = exception.message;
       }
@@ -54,26 +61,32 @@ export class AllExceptionsFilter implements ExceptionFilter {
     };
 
     // Logging estructurado
+    const requestWithUser = request as Request & { user?: { sub?: string } };
     const logContext = {
       statusCode: status,
       path: request.url,
       method: request.method,
-      userId: (request as any).user?.sub,
+      userId: requestWithUser.user?.sub,
       ip: request.ip,
-      userAgent: request.get('user-agent'),
+      userAgent: request.get('user-agent') || undefined,
     };
 
-    if (status >= 500) {
+    const messageStr = Array.isArray(message) ? message.join(', ') : message;
+    const statusCode = Number(status);
+
+    if (statusCode >= 500) {
       // Errores del servidor - log completo con stack trace
       this.logger.error(
-        `${request.method} ${request.url} - ${status} - ${message}`,
-        exception instanceof Error ? exception.stack : JSON.stringify(exception),
+        `${request.method} ${request.url} - ${statusCode} - ${messageStr}`,
+        exception instanceof Error
+          ? exception.stack
+          : JSON.stringify(exception),
         JSON.stringify(logContext),
       );
-    } else if (status >= 400) {
+    } else if (statusCode >= 400) {
       // Errores del cliente - log de advertencia
       this.logger.warn(
-        `${request.method} ${request.url} - ${status} - ${message}`,
+        `${request.method} ${request.url} - ${status} - ${messageStr}`,
         JSON.stringify(logContext),
       );
     }

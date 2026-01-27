@@ -44,13 +44,11 @@ export class QuotesController {
   })
   @ApiResponse({
     status: 400,
-    description: 'Error de validación (productos inexistentes, items vacíos, etc.)',
+    description:
+      'Error de validación (productos inexistentes, items vacíos, etc.)',
   })
   @ApiResponse({ status: 401, description: 'No autenticado' })
-  create(
-    @Body() dto: CreateQuoteDto,
-    @Req() req: { user?: { sub?: string } },
-  ) {
+  create(@Body() dto: CreateQuoteDto, @Req() req: { user?: { sub?: string } }) {
     return this.quotesService.createQuote(dto, req.user?.sub);
   }
 
@@ -113,7 +111,10 @@ export class QuotesController {
       'Actualiza una cotización. No se pueden actualizar cotizaciones convertidas o canceladas.',
   })
   @ApiParam({ name: 'id', description: 'ID de la cotización' })
-  @ApiResponse({ status: 200, description: 'Cotización actualizada exitosamente' })
+  @ApiResponse({
+    status: 200,
+    description: 'Cotización actualizada exitosamente',
+  })
   @ApiResponse({
     status: 400,
     description: 'Error de validación o cotización no puede ser actualizada',

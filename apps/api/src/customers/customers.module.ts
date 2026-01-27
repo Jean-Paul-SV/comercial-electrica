@@ -7,4 +7,3 @@ import { CustomersController } from './customers.controller';
   controllers: [CustomersController],
 })
 export class CustomersModule {}
-

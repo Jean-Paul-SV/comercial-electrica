@@ -1,5 +1,11 @@
 import { Controller, Get, Param, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiParam,
+} from '@nestjs/swagger';
 import { DianService } from './dian.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
@@ -58,7 +64,7 @@ export class DianController {
   })
   async getDocumentStatus(@Param('id') id: string) {
     const status = await this.dianService.queryDocumentStatus(id);
-    
+
     // Obtener información adicional del documento
     const doc = await this.dianService['prisma'].dianDocument.findUnique({
       where: { id },

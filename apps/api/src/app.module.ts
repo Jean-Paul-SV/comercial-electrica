@@ -24,8 +24,8 @@ import { DianModule } from './dian/dian.module';
       // Intenta diferentes ubicaciones posibles
       envFilePath: [
         resolve(process.cwd(), '../../.env'), // Desde apps/api/
-        resolve(process.cwd(), '../.env'),    // Desde apps/
-        resolve(process.cwd(), '.env'),        // Desde raíz
+        resolve(process.cwd(), '../.env'), // Desde apps/
+        resolve(process.cwd(), '.env'), // Desde raíz
       ],
     }),
     ScheduleModule.forRoot(),

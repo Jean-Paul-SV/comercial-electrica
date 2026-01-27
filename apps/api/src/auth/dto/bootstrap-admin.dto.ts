@@ -8,4 +8,3 @@ export class BootstrapAdminDto {
   @MinLength(8)
   password!: string;
 }
-

@@ -1,5 +1,20 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiParam,
+} from '@nestjs/swagger';
 import { CatalogService } from './catalog.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
@@ -17,7 +32,10 @@ export class CatalogController {
 
   @Get('products')
   @ApiBearerAuth('JWT-auth')
-  @ApiOperation({ summary: 'Listar productos', description: 'Obtiene todos los productos activos' })
+  @ApiOperation({
+    summary: 'Listar productos',
+    description: 'Obtiene todos los productos activos',
+  })
   @ApiResponse({ status: 200, description: 'Lista de productos' })
   @ApiResponse({ status: 401, description: 'No autenticado' })
   listProducts() {
@@ -26,7 +44,10 @@ export class CatalogController {
 
   @Get('products/:id')
   @ApiBearerAuth('JWT-auth')
-  @ApiOperation({ summary: 'Obtener producto por ID', description: 'Obtiene los detalles de un producto específico' })
+  @ApiOperation({
+    summary: 'Obtener producto por ID',
+    description: 'Obtiene los detalles de un producto específico',
+  })
   @ApiParam({ name: 'id', description: 'ID del producto' })
   @ApiResponse({ status: 200, description: 'Producto encontrado' })
   @ApiResponse({ status: 404, description: 'Producto no encontrado' })
@@ -38,7 +59,10 @@ export class CatalogController {
   @Roles(RoleName.ADMIN)
   @Post('products')
   @ApiBearerAuth('JWT-auth')
-  @ApiOperation({ summary: 'Crear producto', description: 'Crea un nuevo producto (requiere rol ADMIN)' })
+  @ApiOperation({
+    summary: 'Crear producto',
+    description: 'Crea un nuevo producto (requiere rol ADMIN)',
+  })
   @ApiResponse({ status: 201, description: 'Producto creado exitosamente' })
   @ApiResponse({ status: 400, description: 'Error de validación' })
   @ApiResponse({ status: 401, description: 'No autenticado' })
@@ -50,9 +74,15 @@ export class CatalogController {
   @Roles(RoleName.ADMIN)
   @Patch('products/:id')
   @ApiBearerAuth('JWT-auth')
-  @ApiOperation({ summary: 'Actualizar producto', description: 'Actualiza un producto existente (requiere rol ADMIN)' })
+  @ApiOperation({
+    summary: 'Actualizar producto',
+    description: 'Actualiza un producto existente (requiere rol ADMIN)',
+  })
   @ApiParam({ name: 'id', description: 'ID del producto' })
-  @ApiResponse({ status: 200, description: 'Producto actualizado exitosamente' })
+  @ApiResponse({
+    status: 200,
+    description: 'Producto actualizado exitosamente',
+  })
   @ApiResponse({ status: 404, description: 'Producto no encontrado' })
   @ApiResponse({ status: 401, description: 'No autenticado' })
   @ApiResponse({ status: 403, description: 'No autorizado (requiere ADMIN)' })
@@ -63,9 +93,15 @@ export class CatalogController {
   @Roles(RoleName.ADMIN)
   @Delete('products/:id')
   @ApiBearerAuth('JWT-auth')
-  @ApiOperation({ summary: 'Desactivar producto', description: 'Desactiva un producto (requiere rol ADMIN)' })
+  @ApiOperation({
+    summary: 'Desactivar producto',
+    description: 'Desactiva un producto (requiere rol ADMIN)',
+  })
   @ApiParam({ name: 'id', description: 'ID del producto' })
-  @ApiResponse({ status: 200, description: 'Producto desactivado exitosamente' })
+  @ApiResponse({
+    status: 200,
+    description: 'Producto desactivado exitosamente',
+  })
   @ApiResponse({ status: 404, description: 'Producto no encontrado' })
   @ApiResponse({ status: 401, description: 'No autenticado' })
   @ApiResponse({ status: 403, description: 'No autorizado (requiere ADMIN)' })
@@ -75,7 +111,10 @@ export class CatalogController {
 
   @Get('categories')
   @ApiBearerAuth('JWT-auth')
-  @ApiOperation({ summary: 'Listar categorías', description: 'Obtiene todas las categorías' })
+  @ApiOperation({
+    summary: 'Listar categorías',
+    description: 'Obtiene todas las categorías',
+  })
   @ApiResponse({ status: 200, description: 'Lista de categorías' })
   @ApiResponse({ status: 401, description: 'No autenticado' })
   listCategories() {
@@ -85,7 +124,10 @@ export class CatalogController {
   @Roles(RoleName.ADMIN)
   @Post('categories')
   @ApiBearerAuth('JWT-auth')
-  @ApiOperation({ summary: 'Crear categoría', description: 'Crea una nueva categoría (requiere rol ADMIN)' })
+  @ApiOperation({
+    summary: 'Crear categoría',
+    description: 'Crea una nueva categoría (requiere rol ADMIN)',
+  })
   @ApiResponse({ status: 201, description: 'Categoría creada exitosamente' })
   @ApiResponse({ status: 400, description: 'Error de validación' })
   @ApiResponse({ status: 401, description: 'No autenticado' })
@@ -94,4 +136,3 @@ export class CatalogController {
     return this.catalog.createCategory(dto);
   }
 }
-

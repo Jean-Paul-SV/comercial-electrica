@@ -16,7 +16,9 @@ describe('AppController', () => {
 
   describe('root', () => {
     it('should return welcome message', () => {
-      expect(appController.getHello()).toBe('Sistema Comercial Eléctrica API - Bienvenido!');
+      expect(appController.getHello()).toBe(
+        'Sistema Comercial Eléctrica API - Bienvenido!',
+      );
     });
   });
 

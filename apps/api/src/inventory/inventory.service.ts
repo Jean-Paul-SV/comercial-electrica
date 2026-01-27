@@ -27,7 +27,12 @@ export class InventoryService {
     }
 
     const type = dto.type;
-    const sign = type === InventoryMovementType.IN ? 1 : type === InventoryMovementType.OUT ? -1 : 1;
+    const sign =
+      type === InventoryMovementType.IN
+        ? 1
+        : type === InventoryMovementType.OUT
+          ? -1
+          : 1;
 
     return this.prisma.$transaction(
       async (tx) => {
@@ -84,4 +89,3 @@ export class InventoryService {
     });
   }
 }
-

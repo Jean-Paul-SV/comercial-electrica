@@ -7,4 +7,3 @@ import { CashController } from './cash.controller';
   controllers: [CashController],
 })
 export class CashModule {}
-

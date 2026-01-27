@@ -5,7 +5,7 @@ import { DianService } from './dian.service';
 
 /**
  * Processor/Worker para procesar la cola DIAN
- * 
+ *
  * Este worker procesa los trabajos encolados en la cola 'dian'
  * y ejecuta el procesamiento completo de documentos DIAN
  */
@@ -20,19 +20,23 @@ export class DianProcessor extends WorkerHost {
   /**
    * Procesa trabajos de tipo 'send' de la cola DIAN
    * Este método es llamado automáticamente por BullMQ cuando hay trabajos en la cola
-   * 
+   *
    * @param job - Trabajo que contiene el dianDocumentId a procesar
    */
   async process(job: Job<{ dianDocumentId: string }>) {
     const { dianDocumentId } = job.data;
 
-    this.logger.log(`[Job ${job.id}] Procesando documento DIAN: ${dianDocumentId}`);
+    this.logger.log(
+      `[Job ${job.id}] Procesando documento DIAN: ${dianDocumentId}`,
+    );
 
     try {
       // Procesar el documento completo
       await this.dianService.processDocument(dianDocumentId);
 
-      this.logger.log(`[Job ${job.id}] Documento ${dianDocumentId} procesado exitosamente`);
+      this.logger.log(
+        `[Job ${job.id}] Documento ${dianDocumentId} procesado exitosamente`,
+      );
 
       return {
         success: true,
@@ -40,9 +44,13 @@ export class DianProcessor extends WorkerHost {
         processedAt: new Date().toISOString(),
       };
     } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      const errorStack = error instanceof Error ? error.stack : undefined;
+
       this.logger.error(
-        `[Job ${job.id}] Error procesando documento ${dianDocumentId}: ${error.message}`,
-        error.stack,
+        `[Job ${job.id}] Error procesando documento ${dianDocumentId}: ${errorMessage}`,
+        errorStack,
       );
 
       // El error se propaga para que BullMQ maneje los reintentos

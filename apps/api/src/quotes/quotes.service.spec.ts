@@ -7,14 +7,7 @@ import { Queue } from 'bullmq';
 import { CreateQuoteDto } from './dto/create-quote.dto';
 import { UpdateQuoteDto } from './dto/update-quote.dto';
 import { ConvertQuoteDto } from './dto/convert-quote.dto';
-import {
-  QuoteStatus,
-  DianDocumentStatus,
-  DianDocumentType,
-  InvoiceStatus,
-  SaleStatus,
-  PaymentMethod,
-} from '@prisma/client';
+import { QuoteStatus, SaleStatus, PaymentMethod } from '@prisma/client';
 
 describe('QuotesService', () => {
   let service: QuotesService;
@@ -125,7 +118,9 @@ describe('QuotesService', () => {
     dianQueue = module.get(getQueueToken('dian'));
 
     // Mocks por defecto
-    prisma.cashSession.findUnique = jest.fn().mockResolvedValue(mockCashSession);
+    prisma.cashSession.findUnique = jest
+      .fn()
+      .mockResolvedValue(mockCashSession);
     prisma.customer.findUnique = jest.fn().mockResolvedValue(mockCustomer);
     prisma.product.findMany = jest.fn().mockResolvedValue([mockProduct]);
     dianQueue.add = jest.fn().mockResolvedValue({ id: 'job-1' });
@@ -179,16 +174,26 @@ describe('QuotesService', () => {
         items: [],
       };
 
-      await expect(service.createQuote(dtoSinItems)).rejects.toThrow(BadRequestException);
-      await expect(service.createQuote(dtoSinItems)).rejects.toThrow('Debe incluir items.');
+      await expect(service.createQuote(dtoSinItems)).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(service.createQuote(dtoSinItems)).rejects.toThrow(
+        'Debe incluir items.',
+      );
     });
 
     it('debe lanzar error si el cliente no existe', async () => {
       prisma.customer.findUnique = jest.fn().mockResolvedValue(null);
 
-      await expect(service.createQuote(createQuoteDto)).rejects.toThrow(NotFoundException);
-      await expect(service.createQuote(createQuoteDto)).rejects.toThrow('Cliente');
-      await expect(service.createQuote(createQuoteDto)).rejects.toThrow('no encontrado');
+      await expect(service.createQuote(createQuoteDto)).rejects.toThrow(
+        NotFoundException,
+      );
+      await expect(service.createQuote(createQuoteDto)).rejects.toThrow(
+        'Cliente',
+      );
+      await expect(service.createQuote(createQuoteDto)).rejects.toThrow(
+        'no encontrado',
+      );
     });
 
     it('debe permitir crear cotización sin cliente', async () => {
@@ -203,7 +208,9 @@ describe('QuotesService', () => {
             findMany: jest.fn().mockResolvedValue([mockProduct]),
           },
           quote: {
-            create: jest.fn().mockResolvedValue({ ...mockQuote, customerId: null }),
+            create: jest
+              .fn()
+              .mockResolvedValue({ ...mockQuote, customerId: null }),
           },
           quoteItem: {
             createMany: jest.fn().mockResolvedValue({ count: 1 }),
@@ -241,7 +248,9 @@ describe('QuotesService', () => {
             findMany: jest.fn().mockResolvedValue([mockProduct]),
           },
           quote: {
-            update: jest.fn().mockResolvedValue({ ...mockQuote, ...updateQuoteDto }),
+            update: jest
+              .fn()
+              .mockResolvedValue({ ...mockQuote, ...updateQuoteDto }),
           },
           quoteItem: {
             deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
@@ -261,9 +270,9 @@ describe('QuotesService', () => {
     it('debe lanzar error si la cotización no existe', async () => {
       prisma.quote.findUnique = jest.fn().mockResolvedValue(null);
 
-      await expect(service.updateQuote('quote-inexistente', updateQuoteDto)).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(
+        service.updateQuote('quote-inexistente', updateQuoteDto),
+      ).rejects.toThrow(NotFoundException);
     });
 
     it('debe lanzar error si intenta actualizar cotización convertida', async () => {
@@ -274,20 +283,24 @@ describe('QuotesService', () => {
 
       prisma.quote.findUnique = jest.fn().mockResolvedValue(quoteConvertida);
 
-      await expect(service.updateQuote('quote-1', updateQuoteDto)).rejects.toThrow(
-        BadRequestException,
-      );
-      await expect(service.updateQuote('quote-1', updateQuoteDto)).rejects.toThrow('CONVERTED');
+      await expect(
+        service.updateQuote('quote-1', updateQuoteDto),
+      ).rejects.toThrow(BadRequestException);
+      await expect(
+        service.updateQuote('quote-1', updateQuoteDto),
+      ).rejects.toThrow('CONVERTED');
     });
 
     it('debe lanzar error si el cliente actualizado no existe', async () => {
       prisma.quote.findUnique = jest.fn().mockResolvedValue(mockQuote);
       prisma.customer.findUnique = jest.fn().mockResolvedValue(null);
 
-      await expect(service.updateQuote('quote-1', updateQuoteDto)).rejects.toThrow(
-        NotFoundException,
-      );
-      await expect(service.updateQuote('quote-1', updateQuoteDto)).rejects.toThrow('Cliente');
+      await expect(
+        service.updateQuote('quote-1', updateQuoteDto),
+      ).rejects.toThrow(NotFoundException);
+      await expect(
+        service.updateQuote('quote-1', updateQuoteDto),
+      ).rejects.toThrow('Cliente');
     });
   });
 
@@ -387,9 +400,9 @@ describe('QuotesService', () => {
     it('debe lanzar error si la cotización no existe', async () => {
       prisma.quote.findUnique = jest.fn().mockResolvedValue(null);
 
-      await expect(service.convertQuoteToSale('quote-inexistente', convertDto)).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(
+        service.convertQuoteToSale('quote-inexistente', convertDto),
+      ).rejects.toThrow(NotFoundException);
     });
 
     it('debe lanzar error si la cotización ya está convertida', async () => {
@@ -400,22 +413,24 @@ describe('QuotesService', () => {
 
       prisma.quote.findUnique = jest.fn().mockResolvedValue(quoteConvertida);
 
-      await expect(service.convertQuoteToSale('quote-1', convertDto)).rejects.toThrow(
-        BadRequestException,
-      );
-      await expect(service.convertQuoteToSale('quote-1', convertDto)).rejects.toThrow('convertida');
+      await expect(
+        service.convertQuoteToSale('quote-1', convertDto),
+      ).rejects.toThrow(BadRequestException);
+      await expect(
+        service.convertQuoteToSale('quote-1', convertDto),
+      ).rejects.toThrow('convertida');
     });
 
     it('debe lanzar error si la sesión de caja no existe', async () => {
       prisma.quote.findUnique = jest.fn().mockResolvedValue(mockQuote);
       prisma.cashSession.findUnique = jest.fn().mockResolvedValue(null);
 
-      await expect(service.convertQuoteToSale('quote-1', convertDto)).rejects.toThrow(
-        NotFoundException,
-      );
-      await expect(service.convertQuoteToSale('quote-1', convertDto)).rejects.toThrow(
-        'Sesión de caja',
-      );
+      await expect(
+        service.convertQuoteToSale('quote-1', convertDto),
+      ).rejects.toThrow(NotFoundException);
+      await expect(
+        service.convertQuoteToSale('quote-1', convertDto),
+      ).rejects.toThrow('Sesión de caja');
     });
 
     it('debe lanzar error si la sesión de caja está cerrada', async () => {
@@ -425,12 +440,16 @@ describe('QuotesService', () => {
       };
 
       prisma.quote.findUnique = jest.fn().mockResolvedValue(mockQuote);
-      prisma.cashSession.findUnique = jest.fn().mockResolvedValue(sessionCerrada);
+      prisma.cashSession.findUnique = jest
+        .fn()
+        .mockResolvedValue(sessionCerrada);
 
-      await expect(service.convertQuoteToSale('quote-1', convertDto)).rejects.toThrow(
-        BadRequestException,
-      );
-      await expect(service.convertQuoteToSale('quote-1', convertDto)).rejects.toThrow('cerrada');
+      await expect(
+        service.convertQuoteToSale('quote-1', convertDto),
+      ).rejects.toThrow(BadRequestException);
+      await expect(
+        service.convertQuoteToSale('quote-1', convertDto),
+      ).rejects.toThrow('cerrada');
     });
 
     it('debe lanzar error si cashSessionId no se proporciona', async () => {
@@ -440,12 +459,12 @@ describe('QuotesService', () => {
         paymentMethod: PaymentMethod.CASH,
       };
 
-      await expect(service.convertQuoteToSale('quote-1', dtoSinCaja)).rejects.toThrow(
-        BadRequestException,
-      );
-      await expect(service.convertQuoteToSale('quote-1', dtoSinCaja)).rejects.toThrow(
-        'cashSessionId requerido',
-      );
+      await expect(
+        service.convertQuoteToSale('quote-1', dtoSinCaja),
+      ).rejects.toThrow(BadRequestException);
+      await expect(
+        service.convertQuoteToSale('quote-1', dtoSinCaja),
+      ).rejects.toThrow('cashSessionId requerido');
     });
   });
 
@@ -477,7 +496,10 @@ describe('QuotesService', () => {
 
       prisma.$transaction = mockTransaction;
 
-      const result = await service.updateQuoteStatus('quote-1', QuoteStatus.SENT);
+      const result = await service.updateQuoteStatus(
+        'quote-1',
+        QuoteStatus.SENT,
+      );
 
       expect(result.status).toBe(QuoteStatus.SENT);
     });

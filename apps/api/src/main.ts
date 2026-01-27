@@ -23,13 +23,15 @@ for (const envPath of envPaths) {
       console.log(`✓ Loaded .env from: ${envPath}`);
       break;
     }
-  } catch (error) {
+  } catch {
     continue;
   }
 }
 
 if (!envLoaded) {
-  console.warn('⚠ Warning: .env file not found. Make sure DATABASE_URL is set in environment variables.');
+  console.warn(
+    '⚠ Warning: .env file not found. Make sure DATABASE_URL is set in environment variables.',
+  );
 }
 
 async function bootstrap() {
@@ -72,7 +74,9 @@ async function bootstrap() {
   // Configurar Swagger/OpenAPI
   const swaggerConfig = new DocumentBuilder()
     .setTitle('Sistema Comercial Eléctrica API')
-    .setDescription('API para gestión de inventario, ventas, caja, clientes y facturación electrónica DIAN')
+    .setDescription(
+      'API para gestión de inventario, ventas, caja, clientes y facturación electrónica DIAN',
+    )
     .setVersion('1.0')
     .addBearerAuth(
       {
@@ -106,7 +110,11 @@ async function bootstrap() {
   });
 
   await app.listen(process.env.PORT ?? 3000);
-  console.log(`🚀 API corriendo en: http://localhost:${process.env.PORT ?? 3000}`);
-  console.log(`📚 Documentación Swagger: http://localhost:${process.env.PORT ?? 3000}/api/docs`);
+  console.log(
+    `🚀 API corriendo en: http://localhost:${process.env.PORT ?? 3000}`,
+  );
+  console.log(
+    `📚 Documentación Swagger: http://localhost:${process.env.PORT ?? 3000}/api/docs`,
+  );
 }
-bootstrap();
+void bootstrap();

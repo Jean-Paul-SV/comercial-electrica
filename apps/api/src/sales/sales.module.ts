@@ -9,4 +9,3 @@ import { QueueModule } from '../queue/queue.module';
   controllers: [SalesController],
 })
 export class SalesModule {}
-

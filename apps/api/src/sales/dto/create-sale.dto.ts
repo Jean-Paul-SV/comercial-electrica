@@ -1,5 +1,13 @@
 import { Type } from 'class-transformer';
-import { IsArray, IsEnum, IsInt, IsOptional, IsString, MinLength, ValidateNested } from 'class-validator';
+import {
+  IsArray,
+  IsEnum,
+  IsInt,
+  IsOptional,
+  IsString,
+  MinLength,
+  ValidateNested,
+} from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { PaymentMethod } from '@prisma/client';
 
@@ -14,24 +22,38 @@ class SaleItemInputDto {
   @IsInt()
   qty!: number;
 
-  @ApiPropertyOptional({ example: 2500, description: 'Precio unitario personalizado (opcional, usa precio del producto si no se proporciona)' })
+  @ApiPropertyOptional({
+    example: 2500,
+    description:
+      'Precio unitario personalizado (opcional, usa precio del producto si no se proporciona)',
+  })
   @IsOptional()
   @Type(() => Number)
   unitPrice?: number;
 }
 
 export class CreateSaleDto {
-  @ApiPropertyOptional({ example: 'customer-uuid-123', description: 'ID del cliente (opcional)' })
+  @ApiPropertyOptional({
+    example: 'customer-uuid-123',
+    description: 'ID del cliente (opcional)',
+  })
   @IsOptional()
   @IsString()
   customerId?: string;
 
-  @ApiProperty({ example: 'session-uuid-123', description: 'ID de la sesión de caja (requerido)' })
+  @ApiProperty({
+    example: 'session-uuid-123',
+    description: 'ID de la sesión de caja (requerido)',
+  })
   @IsOptional()
   @IsString()
   cashSessionId?: string;
 
-  @ApiProperty({ enum: PaymentMethod, example: PaymentMethod.CASH, description: 'Método de pago' })
+  @ApiProperty({
+    enum: PaymentMethod,
+    example: PaymentMethod.CASH,
+    description: 'Método de pago',
+  })
   @IsEnum(PaymentMethod)
   paymentMethod!: PaymentMethod;
 
@@ -41,4 +63,3 @@ export class CreateSaleDto {
   @Type(() => SaleItemInputDto)
   items!: SaleItemInputDto[];
 }
-

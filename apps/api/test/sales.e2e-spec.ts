@@ -12,7 +12,6 @@ describe('Sales (e2e)', () => {
   let userId: string;
   let customerId: string;
   let productId: string;
-  let categoryId: string;
   let cashSessionId: string;
 
   beforeAll(async () => {
@@ -51,12 +50,10 @@ describe('Sales (e2e)', () => {
     // Crear usuario admin usando bootstrap (si no existe)
     const userCount = await prisma.user.count();
     if (userCount === 0) {
-      await request(app.getHttpServer())
-        .post('/auth/bootstrap-admin')
-        .send({
-          email: 'test@example.com',
-          password: 'Test123!',
-        });
+      await request(app.getHttpServer()).post('/auth/bootstrap-admin').send({
+        email: 'test@example.com',
+        password: 'Test123!',
+      });
     }
 
     // Login para obtener token
@@ -85,7 +82,7 @@ describe('Sales (e2e)', () => {
     const category = await prisma.category.create({
       data: { name: `Test Category ${Date.now()}` },
     });
-    categoryId = category.id;
+    // Categoría creada para el producto
 
     const product = await prisma.product.create({
       data: {
@@ -131,7 +128,15 @@ describe('Sales (e2e)', () => {
 
   afterEach(async () => {
     // Limpiar datos de cada test
-    await prisma.saleItem.deleteMany({ where: { saleId: { in: await prisma.sale.findMany({ select: { id: true } }).then((s) => s.map((s) => s.id)) } } });
+    await prisma.saleItem.deleteMany({
+      where: {
+        saleId: {
+          in: await prisma.sale
+            .findMany({ select: { id: true } })
+            .then((s) => s.map((s) => s.id)),
+        },
+      },
+    });
     await prisma.sale.deleteMany();
     await prisma.invoice.deleteMany();
     await prisma.dianDocument.deleteMany();

@@ -98,7 +98,9 @@ describe('SalesService', () => {
     dianQueue = module.get(getQueueToken('dian'));
 
     // Mock por defecto para sesión de caja abierta
-    prisma.cashSession.findUnique = jest.fn().mockResolvedValue(mockCashSession);
+    prisma.cashSession.findUnique = jest
+      .fn()
+      .mockResolvedValue(mockCashSession);
   });
 
   afterEach(() => {
@@ -129,7 +131,9 @@ describe('SalesService', () => {
           },
           stockBalance: {
             upsert: jest.fn().mockResolvedValue(mockProduct.stock),
-            update: jest.fn().mockResolvedValue({ ...mockProduct.stock, qtyOnHand: 95 }),
+            update: jest
+              .fn()
+              .mockResolvedValue({ ...mockProduct.stock, qtyOnHand: 95 }),
           },
           sale: {
             create: jest.fn().mockResolvedValue({
@@ -236,8 +240,12 @@ describe('SalesService', () => {
         items: [],
       };
 
-      await expect(service.createSale(dtoSinItems)).rejects.toThrow(BadRequestException);
-      await expect(service.createSale(dtoSinItems)).rejects.toThrow('Debe incluir items.');
+      await expect(service.createSale(dtoSinItems)).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(service.createSale(dtoSinItems)).rejects.toThrow(
+        'Debe incluir items.',
+      );
     });
 
     it('debe lanzar error si producto no existe', async () => {
@@ -255,8 +263,12 @@ describe('SalesService', () => {
 
       prisma.$transaction = mockTransaction;
 
-      await expect(service.createSale(createSaleDto)).rejects.toThrow(BadRequestException);
-      await expect(service.createSale(createSaleDto)).rejects.toThrow('Uno o más productos no existen.');
+      await expect(service.createSale(createSaleDto)).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(service.createSale(createSaleDto)).rejects.toThrow(
+        'Uno o más productos no existen.',
+      );
     });
 
     it('debe lanzar error si stock es insuficiente', async () => {
@@ -285,8 +297,12 @@ describe('SalesService', () => {
 
       prisma.$transaction = mockTransaction;
 
-      await expect(service.createSale(createSaleDto)).rejects.toThrow(BadRequestException);
-      await expect(service.createSale(createSaleDto)).rejects.toThrow('Stock insuficiente');
+      await expect(service.createSale(createSaleDto)).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(service.createSale(createSaleDto)).rejects.toThrow(
+        'Stock insuficiente',
+      );
     });
 
     it('debe lanzar error si no hay cashSessionId', async () => {
@@ -325,8 +341,12 @@ describe('SalesService', () => {
 
       prisma.$transaction = mockTransaction;
 
-      await expect(service.createSale(dtoSinCaja)).rejects.toThrow(BadRequestException);
-      await expect(service.createSale(dtoSinCaja)).rejects.toThrow('cashSessionId requerido');
+      await expect(service.createSale(dtoSinCaja)).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(service.createSale(dtoSinCaja)).rejects.toThrow(
+        'cashSessionId requerido',
+      );
     });
 
     it('debe lanzar error si la sesión de caja no existe', async () => {
@@ -334,8 +354,12 @@ describe('SalesService', () => {
         findUnique: jest.fn().mockResolvedValue(null),
       } as any;
 
-      await expect(service.createSale(createSaleDto)).rejects.toThrow('Sesión de caja');
-      await expect(service.createSale(createSaleDto)).rejects.toThrow('no encontrada');
+      await expect(service.createSale(createSaleDto)).rejects.toThrow(
+        'Sesión de caja',
+      );
+      await expect(service.createSale(createSaleDto)).rejects.toThrow(
+        'no encontrada',
+      );
     });
 
     it('debe lanzar error si la sesión de caja está cerrada', async () => {
@@ -348,8 +372,12 @@ describe('SalesService', () => {
         findUnique: jest.fn().mockResolvedValue(sessionCerrada),
       } as any;
 
-      await expect(service.createSale(createSaleDto)).rejects.toThrow(BadRequestException);
-      await expect(service.createSale(createSaleDto)).rejects.toThrow('está cerrada');
+      await expect(service.createSale(createSaleDto)).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(service.createSale(createSaleDto)).rejects.toThrow(
+        'está cerrada',
+      );
     });
 
     it('debe lanzar error si el cliente no existe', async () => {
@@ -365,8 +393,12 @@ describe('SalesService', () => {
         findUnique: jest.fn().mockResolvedValue(null),
       } as any;
 
-      await expect(service.createSale(dtoConClienteInexistente)).rejects.toThrow('Cliente');
-      await expect(service.createSale(dtoConClienteInexistente)).rejects.toThrow('no encontrado');
+      await expect(
+        service.createSale(dtoConClienteInexistente),
+      ).rejects.toThrow('Cliente');
+      await expect(
+        service.createSale(dtoConClienteInexistente),
+      ).rejects.toThrow('no encontrado');
     });
 
     it('debe calcular correctamente los totales con impuestos', async () => {
@@ -424,8 +456,9 @@ describe('SalesService', () => {
 
       // Verificar que se calculó correctamente
       const createCall = mockTransaction.mock.results[0].value;
-      const saleCreateCall = await createCall.then((tx: any) => tx.sale.create);
-      
+      // Verificar que se llamó create
+      await createCall;
+
       expect(result.sale.grandTotal).toBe(11900);
       expect(result.sale.subtotal).toBe(10000);
       expect(result.sale.taxTotal).toBe(1900);

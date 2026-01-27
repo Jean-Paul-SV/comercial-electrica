@@ -1,19 +1,13 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException, BadRequestException } from '@nestjs/common';
+import { NotFoundException } from '@nestjs/common';
 import { DianService } from './dian.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
-import {
-  DianDocumentStatus,
-  DianDocumentType,
-  DianEnvironment,
-  InvoiceStatus,
-} from '@prisma/client';
+import { DianDocumentStatus, DianEnvironment } from '@prisma/client';
 
 describe('DianService', () => {
   let service: DianService;
   let prisma: jest.Mocked<PrismaService>;
-  let config: jest.Mocked<ConfigService>;
 
   const mockDianDocument = {
     id: 'dian-doc-1',
@@ -81,8 +75,8 @@ describe('DianService', () => {
     };
 
     const mockConfig = {
-      get: jest.fn((key: string, defaultValue?: any) => {
-        const configMap: Record<string, any> = {
+      get: jest.fn((key: string, defaultValue?: unknown) => {
+        const configMap: Record<string, unknown> = {
           DIAN_ENV: DianEnvironment.HABILITACION,
           DIAN_SOFTWARE_ID: 'test-software-id',
           DIAN_SOFTWARE_PIN: 'test-pin',
@@ -91,7 +85,7 @@ describe('DianService', () => {
           DIAN_RANGE_FROM: 1,
           DIAN_RANGE_TO: 999999,
         };
-        return configMap[key] || defaultValue;
+        return configMap[key] ?? defaultValue;
       }),
     };
 
@@ -111,7 +105,6 @@ describe('DianService', () => {
 
     service = module.get<DianService>(DianService);
     prisma = module.get(PrismaService);
-    config = module.get(ConfigService);
   });
 
   afterEach(() => {
@@ -120,7 +113,9 @@ describe('DianService', () => {
 
   describe('processDocument', () => {
     it('debe procesar documento exitosamente', async () => {
-      prisma.dianDocument.findUnique = jest.fn().mockResolvedValue(mockDianDocument);
+      prisma.dianDocument.findUnique = jest
+        .fn()
+        .mockResolvedValue(mockDianDocument);
       prisma.dianDocument.update = jest.fn().mockResolvedValue({
         ...mockDianDocument,
         status: DianDocumentStatus.SENT,
@@ -128,8 +123,12 @@ describe('DianService', () => {
       prisma.dianEvent.create = jest.fn().mockResolvedValue({});
 
       // Mock de los métodos internos
-      jest.spyOn(service as any, 'generateXML').mockResolvedValue('<xml>test</xml>');
-      jest.spyOn(service as any, 'signDocument').mockResolvedValue('<xml signed>test</xml>');
+      jest
+        .spyOn(service as any, 'generateXML')
+        .mockResolvedValue('<xml>test</xml>');
+      jest
+        .spyOn(service as any, 'signDocument')
+        .mockResolvedValue('<xml signed>test</xml>');
       jest.spyOn(service as any, 'sendToDian').mockResolvedValue({
         success: true,
         cufe: 'CUFE-TEST-123',
@@ -137,8 +136,12 @@ describe('DianService', () => {
         message: 'Documento aceptado',
         timestamp: new Date().toISOString(),
       });
-      jest.spyOn(service as any, 'handleDianResponse').mockResolvedValue(undefined);
-      jest.spyOn(service as any, 'generatePDF').mockResolvedValue('pdf/test.pdf');
+      jest
+        .spyOn(service as any, 'handleDianResponse')
+        .mockResolvedValue(undefined);
+      jest
+        .spyOn(service as any, 'generatePDF')
+        .mockResolvedValue('pdf/test.pdf');
 
       await service.processDocument('dian-doc-1');
 
@@ -151,12 +154,12 @@ describe('DianService', () => {
     it('debe lanzar error si el documento no existe', async () => {
       prisma.dianDocument.findUnique = jest.fn().mockResolvedValue(null);
 
-      await expect(service.processDocument('dian-doc-inexistente')).rejects.toThrow(
-        NotFoundException,
-      );
-      await expect(service.processDocument('dian-doc-inexistente')).rejects.toThrow(
-        'no encontrado',
-      );
+      await expect(
+        service.processDocument('dian-doc-inexistente'),
+      ).rejects.toThrow(NotFoundException);
+      await expect(
+        service.processDocument('dian-doc-inexistente'),
+      ).rejects.toThrow('no encontrado');
     });
 
     it('debe retornar sin procesar si el documento ya está aceptado', async () => {
@@ -174,7 +177,9 @@ describe('DianService', () => {
     });
 
     it('debe manejar errores y actualizar estado a REJECTED', async () => {
-      prisma.dianDocument.findUnique = jest.fn().mockResolvedValue(mockDianDocument);
+      prisma.dianDocument.findUnique = jest
+        .fn()
+        .mockResolvedValue(mockDianDocument);
       prisma.dianDocument.update = jest.fn().mockResolvedValue({
         ...mockDianDocument,
         status: DianDocumentStatus.REJECTED,
@@ -182,10 +187,15 @@ describe('DianService', () => {
       });
       prisma.dianEvent.create = jest.fn().mockResolvedValue({});
 
-      // Mock que lanza error
-      jest.spyOn(service as any, 'generateXML').mockRejectedValue(new Error('Error de prueba'));
+      // Mock que lanza error - usar any para evitar problemas de tipos en tests
 
-      await expect(service.processDocument('dian-doc-1')).rejects.toThrow('Error de prueba');
+      jest
+        .spyOn(service as any, 'generateXML')
+        .mockRejectedValue(new Error('Error de prueba'));
+
+      await expect(service.processDocument('dian-doc-1')).rejects.toThrow(
+        'Error de prueba',
+      );
 
       expect(prisma.dianDocument.update).toHaveBeenCalledWith({
         where: { id: 'dian-doc-1' },
@@ -199,7 +209,9 @@ describe('DianService', () => {
 
   describe('queryDocumentStatus', () => {
     it('debe retornar el estado del documento', async () => {
-      prisma.dianDocument.findUnique = jest.fn().mockResolvedValue(mockDianDocument);
+      prisma.dianDocument.findUnique = jest
+        .fn()
+        .mockResolvedValue(mockDianDocument);
 
       const status = await service.queryDocumentStatus('dian-doc-1');
 
@@ -212,15 +224,15 @@ describe('DianService', () => {
     it('debe lanzar error si el documento no existe', async () => {
       prisma.dianDocument.findUnique = jest.fn().mockResolvedValue(null);
 
-      await expect(service.queryDocumentStatus('dian-doc-inexistente')).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(
+        service.queryDocumentStatus('dian-doc-inexistente'),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 
   describe('getDianConfig', () => {
-    it('debe retornar configuración desde variables de entorno', async () => {
-      const config = await service['getDianConfig']();
+    it('debe retornar configuración desde variables de entorno', () => {
+      const config = service['getDianConfig']();
 
       expect(config.env).toBe(DianEnvironment.HABILITACION);
       expect(config.softwareId).toBe('test-software-id');

@@ -25,7 +25,8 @@ class QuoteItemInputDto {
 
   @ApiPropertyOptional({
     example: 2500,
-    description: 'Precio unitario personalizado (opcional, usa precio del producto si no se proporciona)',
+    description:
+      'Precio unitario personalizado (opcional, usa precio del producto si no se proporciona)',
   })
   @IsOptional()
   @Type(() => Number)
@@ -43,7 +44,8 @@ export class CreateQuoteDto {
 
   @ApiPropertyOptional({
     example: '2026-02-15T00:00:00Z',
-    description: 'Fecha de validez de la cotización (opcional, por defecto 30 días desde hoy)',
+    description:
+      'Fecha de validez de la cotización (opcional, por defecto 30 días desde hoy)',
   })
   @IsOptional()
   @IsDateString()

@@ -1,6 +1,6 @@
 import { PartialType } from '@nestjs/mapped-types';
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsDateString, IsEnum, IsOptional, IsString } from 'class-validator';
+import { IsDateString, IsEnum, IsOptional } from 'class-validator';
 import { QuoteStatus } from '@prisma/client';
 import { CreateQuoteDto } from './create-quote.dto';
 

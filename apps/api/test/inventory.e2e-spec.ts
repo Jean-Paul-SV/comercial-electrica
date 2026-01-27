@@ -10,7 +10,6 @@ describe('Inventory (e2e)', () => {
   let prisma: PrismaService;
   let authToken: string;
   let productId: string;
-  let categoryId: string;
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -40,12 +39,10 @@ describe('Inventory (e2e)', () => {
     // Crear usuario y obtener token
     const userCount = await prisma.user.count();
     if (userCount === 0) {
-      await request(app.getHttpServer())
-        .post('/auth/bootstrap-admin')
-        .send({
-          email: 'test@example.com',
-          password: 'Test123!',
-        });
+      await request(app.getHttpServer()).post('/auth/bootstrap-admin').send({
+        email: 'test@example.com',
+        password: 'Test123!',
+      });
     }
 
     const loginResponse = await request(app.getHttpServer())
@@ -65,7 +62,7 @@ describe('Inventory (e2e)', () => {
     const category = await prisma.category.create({
       data: { name: `Test Category ${Date.now()}` },
     });
-    categoryId = category.id;
+    // Categoría creada para el producto
 
     const product = await prisma.product.create({
       data: {

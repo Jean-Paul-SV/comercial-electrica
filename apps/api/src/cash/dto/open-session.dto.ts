@@ -10,4 +10,3 @@ export class OpenSessionDto {
   @IsString()
   note?: string;
 }
-

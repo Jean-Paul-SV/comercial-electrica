@@ -7,4 +7,3 @@ import { InventoryController } from './inventory.controller';
   controllers: [InventoryController],
 })
 export class InventoryModule {}
-

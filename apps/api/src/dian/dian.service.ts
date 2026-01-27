@@ -1,16 +1,16 @@
-import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
 import {
-  DianDocumentStatus,
-  DianDocumentType,
-  DianEnvironment,
-  Prisma,
-} from '@prisma/client';
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
+import { DianDocumentStatus, DianEnvironment, Prisma } from '@prisma/client';
 import { ConfigService } from '@nestjs/config';
 
 /**
  * Servicio para procesamiento de documentos DIAN
- * 
+ *
  * Responsabilidades:
  * - Generar XML según estándar DIAN
  * - Firmar documentos digitalmente
@@ -30,12 +30,18 @@ export class DianService {
     private readonly config: ConfigService,
   ) {
     // Cargar configuración desde variables de entorno
-    this.dianEnv = (this.config.get<string>('DIAN_ENV', 'HABILITACION') as DianEnvironment) || DianEnvironment.HABILITACION;
+    this.dianEnv =
+      (this.config.get<string>(
+        'DIAN_ENV',
+        'HABILITACION',
+      ) as DianEnvironment) || DianEnvironment.HABILITACION;
     this.softwareId = this.config.get<string>('DIAN_SOFTWARE_ID', '') || '';
     this.softwarePin = this.config.get<string>('DIAN_SOFTWARE_PIN', '') || '';
 
     if (!this.softwareId || !this.softwarePin) {
-      this.logger.warn('⚠️ DIAN_SOFTWARE_ID o DIAN_SOFTWARE_PIN no configurados. El procesamiento DIAN no funcionará.');
+      this.logger.warn(
+        '⚠️ DIAN_SOFTWARE_ID o DIAN_SOFTWARE_PIN no configurados. El procesamiento DIAN no funcionará.',
+      );
     }
   }
 
@@ -69,7 +75,9 @@ export class DianService {
     });
 
     if (!dianDoc) {
-      throw new NotFoundException(`Documento DIAN ${dianDocumentId} no encontrado.`);
+      throw new NotFoundException(
+        `Documento DIAN ${dianDocumentId} no encontrado.`,
+      );
     }
 
     if (dianDoc.status === DianDocumentStatus.ACCEPTED) {
@@ -101,14 +109,20 @@ export class DianService {
 
       this.logger.log(`Documento ${dianDocumentId} procesado exitosamente`);
     } catch (error) {
-      this.logger.error(`Error procesando documento ${dianDocumentId}: ${error.message}`, error.stack);
-      
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      this.logger.error(
+        `Error procesando documento ${dianDocumentId}: ${errorMessage}`,
+        errorStack,
+      );
+
       // Actualizar estado a REJECTED (error en procesamiento)
       await this.prisma.dianDocument.update({
         where: { id: dianDocumentId },
         data: {
           status: DianDocumentStatus.REJECTED,
-          lastError: error.message,
+          lastError: errorMessage,
         },
       });
 
@@ -118,8 +132,8 @@ export class DianService {
           dianDocumentId,
           eventType: 'ERROR',
           payload: {
-            error: error.message,
-            stack: error.stack,
+            error: errorMessage,
+            stack: errorStack,
             timestamp: new Date().toISOString(),
           },
         },
@@ -154,7 +168,9 @@ export class DianService {
     });
 
     if (!dianDoc || !dianDoc.invoice) {
-      throw new NotFoundException(`Factura asociada al documento DIAN ${dianDocumentId} no encontrada.`);
+      throw new NotFoundException(
+        `Factura asociada al documento DIAN ${dianDocumentId} no encontrada.`,
+      );
     }
 
     const invoice = dianDoc.invoice;
@@ -162,7 +178,7 @@ export class DianService {
     const customer = invoice.customer || sale?.customer;
 
     // Obtener configuración DIAN
-    const config = await this.getDianConfig();
+    const config = this.getDianConfig();
 
     // Generar XML básico según estándar DIAN
     // NOTA: Este es un XML simplificado. En producción debe seguir la especificación completa
@@ -191,7 +207,9 @@ export class DianService {
   </cac:AccountingSupplierParty>
   
   <!-- Cliente -->
-  ${customer ? `
+  ${
+    customer
+      ? `
   <cac:AccountingCustomerParty>
     <cac:Party>
       <cac:PartyIdentification>
@@ -202,11 +220,16 @@ export class DianService {
       </cac:PartyName>
     </cac:Party>
   </cac:AccountingCustomerParty>
-  ` : ''}
+  `
+      : ''
+  }
   
   <!-- Items -->
   <cac:InvoiceLine>
-    ${sale?.items.map((item, index) => `
+    ${
+      sale?.items
+        .map(
+          (item, index) => `
     <cac:InvoiceLine>
       <cbc:ID>${index + 1}</cbc:ID>
       <cbc:InvoicedQuantity unitCode="C62">${item.qty}</cbc:InvoicedQuantity>
@@ -218,26 +241,29 @@ export class DianService {
         </cac:StandardItemIdentification>
       </cac:Item>
       <cac:Price>
-        <cbc:PriceAmount currencyID="COP">${item.unitPrice}</cbc:PriceAmount>
+        <cbc:PriceAmount currencyID="COP">${Number(item.unitPrice)}</cbc:PriceAmount>
       </cac:Price>
     </cac:InvoiceLine>
-    `).join('') || ''}
+    `,
+        )
+        .join('') || ''
+    }
   </cac:InvoiceLine>
   
   <!-- Totales -->
   <cac:LegalMonetaryTotal>
-    <cbc:LineExtensionAmount currencyID="COP">${invoice.subtotal}</cbc:LineExtensionAmount>
-    <cbc:TaxExclusiveAmount currencyID="COP">${invoice.subtotal}</cbc:TaxExclusiveAmount>
-    <cbc:TaxInclusiveAmount currencyID="COP">${invoice.grandTotal}</cbc:TaxInclusiveAmount>
-    <cbc:PayableAmount currencyID="COP">${invoice.grandTotal}</cbc:PayableAmount>
+    <cbc:LineExtensionAmount currencyID="COP">${Number(invoice.subtotal)}</cbc:LineExtensionAmount>
+    <cbc:TaxExclusiveAmount currencyID="COP">${Number(invoice.subtotal)}</cbc:TaxExclusiveAmount>
+    <cbc:TaxInclusiveAmount currencyID="COP">${Number(invoice.grandTotal)}</cbc:TaxInclusiveAmount>
+    <cbc:PayableAmount currencyID="COP">${Number(invoice.grandTotal)}</cbc:PayableAmount>
   </cac:LegalMonetaryTotal>
   
   <!-- Impuestos -->
   <cac:TaxTotal>
-    <cbc:TaxAmount currencyID="COP">${invoice.taxTotal}</cbc:TaxAmount>
+    <cbc:TaxAmount currencyID="COP">${Number(invoice.taxTotal)}</cbc:TaxAmount>
     <cac:TaxSubtotal>
-      <cbc:TaxableAmount currencyID="COP">${invoice.subtotal}</cbc:TaxableAmount>
-      <cbc:TaxAmount currencyID="COP">${invoice.taxTotal}</cbc:TaxAmount>
+      <cbc:TaxableAmount currencyID="COP">${Number(invoice.subtotal)}</cbc:TaxableAmount>
+      <cbc:TaxAmount currencyID="COP">${Number(invoice.taxTotal)}</cbc:TaxAmount>
       <cac:TaxCategory>
         <cbc:Percent>19</cbc:Percent>
         <cac:TaxScheme>
@@ -268,14 +294,17 @@ export class DianService {
     this.logger.log(`Firmando documento ${dianDocumentId}`);
 
     // TODO: Implementar firma digital real
+    await Promise.resolve(); // Placeholder para mantener async
     // Requiere:
     // - Certificado digital (.p12 o .pfx)
     // - Librería de firma XML (xml-crypto, xmldsigjs, etc.)
     // - Validación de certificado
-    
+
     // Por ahora retornamos el XML sin firmar
     // En producción esto debe firmarse correctamente
-    this.logger.warn(`⚠️ Firma digital no implementada. Retornando XML sin firmar.`);
+    this.logger.warn(
+      `⚠️ Firma digital no implementada. Retornando XML sin firmar.`,
+    );
 
     return xml;
   }
@@ -284,8 +313,13 @@ export class DianService {
    * Envía el documento firmado a DIAN
    * Por ahora simula el envío - debe implementarse con API real de DIAN
    */
-  async sendToDian(signedXml: string, dianDocumentId: string): Promise<DianResponse> {
-    this.logger.log(`Enviando documento ${dianDocumentId} a DIAN (ambiente: ${this.dianEnv})`);
+  async sendToDian(
+    signedXml: string,
+    dianDocumentId: string,
+  ): Promise<DianResponse> {
+    this.logger.log(
+      `Enviando documento ${dianDocumentId} a DIAN (ambiente: ${this.dianEnv})`,
+    );
 
     // Validar configuración
     if (!this.softwareId || !this.softwarePin) {
@@ -302,7 +336,9 @@ export class DianService {
     // - Reintentos automáticos
 
     // Por ahora simulamos una respuesta exitosa
-    this.logger.warn(`⚠️ Envío a DIAN no implementado. Simulando respuesta exitosa.`);
+    this.logger.warn(
+      `⚠️ Envío a DIAN no implementado. Simulando respuesta exitosa.`,
+    );
 
     // Simular respuesta de DIAN
     const mockResponse: DianResponse = {
@@ -337,7 +373,10 @@ export class DianService {
   /**
    * Procesa la respuesta de DIAN y actualiza el estado del documento
    */
-  async handleDianResponse(dianDocumentId: string, response: DianResponse): Promise<void> {
+  async handleDianResponse(
+    dianDocumentId: string,
+    response: DianResponse,
+  ): Promise<void> {
     if (response.success) {
       // Documento aceptado
       await this.prisma.dianDocument.update({
@@ -366,7 +405,9 @@ export class DianService {
         },
       });
 
-      this.logger.log(`Documento ${dianDocumentId} aceptado por DIAN. CUFE: ${response.cufe}`);
+      this.logger.log(
+        `Documento ${dianDocumentId} aceptado por DIAN. CUFE: ${response.cufe}`,
+      );
     } else {
       // Documento rechazado
       await this.prisma.dianDocument.update({
@@ -391,7 +432,9 @@ export class DianService {
         },
       });
 
-      this.logger.error(`Documento ${dianDocumentId} rechazado por DIAN: ${response.message}`);
+      this.logger.error(
+        `Documento ${dianDocumentId} rechazado por DIAN: ${response.message}`,
+      );
     }
   }
 
@@ -416,7 +459,9 @@ export class DianService {
       data: { pdfPath },
     });
 
-    this.logger.warn(`⚠️ Generación de PDF no implementada. Ruta simulada: ${pdfPath}`);
+    this.logger.warn(
+      `⚠️ Generación de PDF no implementada. Ruta simulada: ${pdfPath}`,
+    );
 
     return pdfPath;
   }
@@ -424,7 +469,7 @@ export class DianService {
   /**
    * Obtiene la configuración DIAN activa
    */
-  async getDianConfig() {
+  getDianConfig() {
     // Por ahora usa variables de entorno
     // En el futuro puede leer de la tabla DianConfig
     return {
@@ -441,13 +486,17 @@ export class DianService {
   /**
    * Consulta el estado de un documento en DIAN
    */
-  async queryDocumentStatus(dianDocumentId: string): Promise<DianDocumentStatus> {
+  async queryDocumentStatus(
+    dianDocumentId: string,
+  ): Promise<DianDocumentStatus> {
     const doc = await this.prisma.dianDocument.findUnique({
       where: { id: dianDocumentId },
     });
 
     if (!doc) {
-      throw new NotFoundException(`Documento DIAN ${dianDocumentId} no encontrado.`);
+      throw new NotFoundException(
+        `Documento DIAN ${dianDocumentId} no encontrado.`,
+      );
     }
 
     // TODO: Implementar consulta real a DIAN

@@ -4,7 +4,6 @@ import {
   ApiOperation,
   ApiResponse,
   ApiBearerAuth,
-  ApiQuery,
 } from '@nestjs/swagger';
 import { ReportsService } from './reports.service';
 import { SalesReportDto } from './dto/sales-report.dto';

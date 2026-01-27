@@ -227,8 +227,12 @@ describe('InventoryService', () => {
         items: [],
       };
 
-      await expect(service.createMovement(dtoSinItems)).rejects.toThrow(BadRequestException);
-      await expect(service.createMovement(dtoSinItems)).rejects.toThrow('Debe incluir items.');
+      await expect(service.createMovement(dtoSinItems)).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(service.createMovement(dtoSinItems)).rejects.toThrow(
+        'Debe incluir items.',
+      );
     });
 
     it('debe lanzar error si uno o más productos no existen', async () => {
@@ -254,7 +258,9 @@ describe('InventoryService', () => {
         findMany: jest.fn().mockResolvedValue([mockProduct]),
       } as any;
 
-      await expect(service.createMovement(dto)).rejects.toThrow(BadRequestException);
+      await expect(service.createMovement(dto)).rejects.toThrow(
+        BadRequestException,
+      );
       await expect(service.createMovement(dto)).rejects.toThrow('no existen');
     });
 
@@ -296,8 +302,12 @@ describe('InventoryService', () => {
 
       prisma.$transaction = mockTransaction;
 
-      await expect(service.createMovement(dto)).rejects.toThrow(BadRequestException);
-      await expect(service.createMovement(dto)).rejects.toThrow('Stock insuficiente');
+      await expect(service.createMovement(dto)).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(service.createMovement(dto)).rejects.toThrow(
+        'Stock insuficiente',
+      );
     });
 
     it('debe manejar múltiples items en un movimiento', async () => {
@@ -325,7 +335,9 @@ describe('InventoryService', () => {
         name: 'Producto Test 2',
       };
 
-      prisma.product.findMany = jest.fn().mockResolvedValue([mockProduct, mockProduct2]);
+      prisma.product.findMany = jest
+        .fn()
+        .mockResolvedValue([mockProduct, mockProduct2]);
 
       const mockTransaction = jest.fn(async (callback) => {
         const mockTx = {
@@ -443,7 +455,9 @@ describe('InventoryService', () => {
         },
       ];
 
-      prisma.inventoryMovement.findMany = jest.fn().mockResolvedValue(mockMovements);
+      prisma.inventoryMovement.findMany = jest
+        .fn()
+        .mockResolvedValue(mockMovements);
 
       const result = await service.listMovements();
 

@@ -10,7 +10,10 @@ function parseRedis(urlStr: string) {
     port: u.port ? Number(u.port) : 6379,
     password: u.password || undefined,
     username: u.username || undefined,
-    db: u.pathname && u.pathname !== '/' ? Number(u.pathname.replace('/', '')) : undefined,
+    db:
+      u.pathname && u.pathname !== '/'
+        ? Number(u.pathname.replace('/', ''))
+        : undefined,
   };
 }
 
@@ -21,7 +24,10 @@ function parseRedis(urlStr: string) {
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
-        const redisUrl = config.get<string>('REDIS_URL', 'redis://localhost:6379');
+        const redisUrl = config.get<string>(
+          'REDIS_URL',
+          'redis://localhost:6379',
+        );
         const conn = parseRedis(redisUrl);
         return {
           connection: conn,
@@ -37,4 +43,3 @@ function parseRedis(urlStr: string) {
   exports: [BullModule],
 })
 export class QueueModule {}
-

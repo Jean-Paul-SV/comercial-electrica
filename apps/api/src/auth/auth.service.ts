@@ -1,4 +1,8 @@
-import { Injectable, UnauthorizedException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  UnauthorizedException,
+  BadRequestException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
 import { RoleName } from '@prisma/client';
@@ -56,13 +60,17 @@ export class AuthService {
   async login(dto: LoginDto) {
     const email = dto.email.toLowerCase();
     const user = await this.prisma.user.findUnique({ where: { email } });
-    if (!user || !user.isActive) throw new UnauthorizedException('Credenciales inválidas.');
+    if (!user || !user.isActive)
+      throw new UnauthorizedException('Credenciales inválidas.');
     const ok = await argon2.verify(user.passwordHash, dto.password);
     if (!ok) throw new UnauthorizedException('Credenciales inválidas.');
 
-    const payload: JwtPayload = { sub: user.id, email: user.email, role: user.role };
+    const payload: JwtPayload = {
+      sub: user.id,
+      email: user.email,
+      role: user.role,
+    };
     const accessToken = await this.jwt.signAsync(payload);
     return { accessToken };
   }
 }
-

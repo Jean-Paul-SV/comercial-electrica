@@ -9,7 +9,6 @@ describe('Cash (e2e)', () => {
   let app: INestApplication<App>;
   let prisma: PrismaService;
   let authToken: string;
-  let userId: string;
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -36,12 +35,10 @@ describe('Cash (e2e)', () => {
     // Crear usuario y obtener token
     const userCount = await prisma.user.count();
     if (userCount === 0) {
-      await request(app.getHttpServer())
-        .post('/auth/bootstrap-admin')
-        .send({
-          email: 'test@example.com',
-          password: 'Test123!',
-        });
+      await request(app.getHttpServer()).post('/auth/bootstrap-admin').send({
+        email: 'test@example.com',
+        password: 'Test123!',
+      });
     }
 
     const loginResponse = await request(app.getHttpServer())
@@ -59,7 +56,7 @@ describe('Cash (e2e)', () => {
       where: { email: 'test@example.com' },
     });
     if (user) {
-      userId = user.id;
+      // Usuario creado para autenticación
     }
   });
 

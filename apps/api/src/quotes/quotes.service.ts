@@ -15,7 +15,6 @@ import { Queue } from 'bullmq';
 import {
   DianDocumentStatus,
   DianDocumentType,
-  InvoiceStatus,
   SaleStatus,
 } from '@prisma/client';
 
@@ -39,7 +38,9 @@ export class QuotesService {
         where: { id: dto.customerId },
       });
       if (!customer) {
-        throw new NotFoundException(`Cliente con id ${dto.customerId} no encontrado.`);
+        throw new NotFoundException(
+          `Cliente con id ${dto.customerId} no encontrado.`,
+        );
       }
     }
 
@@ -159,7 +160,10 @@ export class QuotesService {
     const quote = await this.getQuoteById(id);
 
     // No permitir actualizar cotizaciones convertidas o canceladas
-    if (quote.status === QuoteStatus.CONVERTED || quote.status === QuoteStatus.CANCELLED) {
+    if (
+      quote.status === QuoteStatus.CONVERTED ||
+      quote.status === QuoteStatus.CANCELLED
+    ) {
       throw new BadRequestException(
         `No se puede actualizar una cotización con estado ${quote.status}.`,
       );
@@ -171,7 +175,9 @@ export class QuotesService {
         where: { id: dto.customerId },
       });
       if (!customer) {
-        throw new NotFoundException(`Cliente con id ${dto.customerId} no encontrado.`);
+        throw new NotFoundException(
+          `Cliente con id ${dto.customerId} no encontrado.`,
+        );
       }
     }
 
@@ -273,24 +279,34 @@ export class QuotesService {
 
     // Validar que la cotización pueda ser convertida
     if (quote.status === QuoteStatus.CONVERTED) {
-      throw new BadRequestException('Esta cotización ya fue convertida a venta.');
+      throw new BadRequestException(
+        'Esta cotización ya fue convertida a venta.',
+      );
     }
 
     if (quote.status === QuoteStatus.CANCELLED) {
-      throw new BadRequestException('No se puede convertir una cotización cancelada.');
+      throw new BadRequestException(
+        'No se puede convertir una cotización cancelada.',
+      );
     }
 
     if (quote.status === QuoteStatus.EXPIRED) {
-      throw new BadRequestException('No se puede convertir una cotización expirada.');
+      throw new BadRequestException(
+        'No se puede convertir una cotización expirada.',
+      );
     }
 
     if (quote.validUntil && quote.validUntil < new Date()) {
-      throw new BadRequestException('No se puede convertir una cotización vencida.');
+      throw new BadRequestException(
+        'No se puede convertir una cotización vencida.',
+      );
     }
 
     // Validar que la sesión de caja existe y está abierta
     if (!dto.cashSessionId) {
-      throw new BadRequestException('cashSessionId requerido para convertir cotización a venta.');
+      throw new BadRequestException(
+        'cashSessionId requerido para convertir cotización a venta.',
+      );
     }
 
     const cashSession = await this.prisma.cashSession.findUnique({
@@ -298,7 +314,9 @@ export class QuotesService {
     });
 
     if (!cashSession) {
-      throw new NotFoundException(`Sesión de caja con id ${dto.cashSessionId} no encontrada.`);
+      throw new NotFoundException(
+        `Sesión de caja con id ${dto.cashSessionId} no encontrada.`,
+      );
     }
 
     if (cashSession.closedAt) {
@@ -307,134 +325,146 @@ export class QuotesService {
       );
     }
 
-    return this.prisma.$transaction(
-      async (tx) => {
-        // Crear la venta desde la cotización
-        const sale = await tx.sale.create({
-          data: {
-            customerId: quote.customerId ?? null,
-            status: SaleStatus.PAID,
-            subtotal: Number(quote.subtotal),
-            taxTotal: Number(quote.taxTotal),
-            discountTotal: Number(quote.discountTotal),
-            grandTotal: Number(quote.grandTotal),
-            items: {
-              create: quote.items.map((item) => ({
-                productId: item.productId,
-                qty: item.qty,
-                unitPrice: item.unitPrice,
-                taxRate: item.taxRate,
-                lineTotal: item.lineTotal,
-              })),
+    return this.prisma
+      .$transaction(
+        async (tx) => {
+          // Crear la venta desde la cotización
+          const sale = await tx.sale.create({
+            data: {
+              customerId: quote.customerId ?? null,
+              status: SaleStatus.PAID,
+              subtotal: Number(quote.subtotal),
+              taxTotal: Number(quote.taxTotal),
+              discountTotal: Number(quote.discountTotal),
+              grandTotal: Number(quote.grandTotal),
+              items: {
+                create: quote.items.map((item) => ({
+                  productId: item.productId,
+                  qty: item.qty,
+                  unitPrice: item.unitPrice,
+                  taxRate: item.taxRate,
+                  lineTotal: item.lineTotal,
+                })),
+              },
             },
-          },
-        });
-
-        // Validar y actualizar stock
-        for (const item of quote.items) {
-          const bal = await tx.stockBalance.upsert({
-            where: { productId: item.productId },
-            create: { productId: item.productId, qtyOnHand: 0, qtyReserved: 0 },
-            update: {},
           });
 
-          if (bal.qtyOnHand < item.qty) {
-            throw new BadRequestException(
-              `Stock insuficiente para producto ${item.productId}. Disponible=${bal.qtyOnHand}, requerido=${item.qty}.`,
-            );
+          // Validar y actualizar stock
+          for (const item of quote.items) {
+            const bal = await tx.stockBalance.upsert({
+              where: { productId: item.productId },
+              create: {
+                productId: item.productId,
+                qtyOnHand: 0,
+                qtyReserved: 0,
+              },
+              update: {},
+            });
+
+            if (bal.qtyOnHand < item.qty) {
+              throw new BadRequestException(
+                `Stock insuficiente para producto ${item.productId}. Disponible=${bal.qtyOnHand}, requerido=${item.qty}.`,
+              );
+            }
+
+            await tx.stockBalance.update({
+              where: { productId: item.productId },
+              data: { qtyOnHand: bal.qtyOnHand - item.qty },
+            });
           }
 
-          await tx.stockBalance.update({
-            where: { productId: item.productId },
-            data: { qtyOnHand: bal.qtyOnHand - item.qty },
+          // Crear movimiento de caja
+          await tx.cashMovement.create({
+            data: {
+              sessionId: dto.cashSessionId,
+              type: 'IN',
+              method: dto.paymentMethod,
+              amount: quote.grandTotal,
+              relatedSaleId: sale.id,
+            },
           });
-        }
 
-        // Crear movimiento de caja
-        await tx.cashMovement.create({
-          data: {
-            sessionId: dto.cashSessionId,
-            type: 'IN',
-            method: dto.paymentMethod,
-            amount: quote.grandTotal,
-            relatedSaleId: sale.id,
-          },
-        });
+          // Crear factura
+          const invoice = await tx.invoice.create({
+            data: {
+              saleId: sale.id,
+              customerId: sale.customerId,
+              number: this.makeInvoiceNumber(),
+              issuedAt: new Date(),
+              status: 'ISSUED',
+              subtotal: Number(quote.subtotal),
+              taxTotal: Number(quote.taxTotal),
+              discountTotal: Number(quote.discountTotal),
+              grandTotal: Number(quote.grandTotal),
+            },
+          });
 
-        // Crear factura
-        const invoice = await tx.invoice.create({
-          data: {
-            saleId: sale.id,
-            customerId: sale.customerId,
-            number: this.makeInvoiceNumber(),
-            issuedAt: new Date(),
-            status: 'ISSUED',
-            subtotal: Number(quote.subtotal),
-            taxTotal: Number(quote.taxTotal),
-            discountTotal: Number(quote.discountTotal),
-            grandTotal: Number(quote.grandTotal),
-          },
-        });
+          // Crear documento DIAN
+          const dianDoc = await tx.dianDocument.create({
+            data: {
+              invoiceId: invoice.id,
+              type: DianDocumentType.FE,
+              status: DianDocumentStatus.DRAFT,
+            },
+          });
 
-        // Crear documento DIAN
-        const dianDoc = await tx.dianDocument.create({
-          data: {
-            invoiceId: invoice.id,
-            type: DianDocumentType.FE,
-            status: DianDocumentStatus.DRAFT,
-          },
-        });
-
-        // Actualizar cotización a CONVERTED
-        await tx.quote.update({
-          where: { id },
-          data: { status: QuoteStatus.CONVERTED },
-        });
-
-        // Audit logs
-        await tx.auditLog.create({
-          data: {
-            actorId: convertedByUserId ?? null,
-            entity: 'quote',
-            entityId: id,
-            action: 'convert',
-            diff: { saleId: sale.id, invoiceId: invoice.id },
-          },
-        });
-
-        await tx.auditLog.create({
-          data: {
-            actorId: convertedByUserId ?? null,
-            entity: 'sale',
-            entityId: sale.id,
-            action: 'create',
-            diff: { fromQuote: id },
-          },
-        });
-
-        return {
-          quote: await tx.quote.findUnique({
+          // Actualizar cotización a CONVERTED
+          await tx.quote.update({
             where: { id },
-            include: { items: { include: { product: true } }, customer: true },
-          }),
-          sale: await tx.sale.findUnique({
-            where: { id: sale.id },
-            include: { items: { include: { product: true } }, customer: true },
-          }),
-          invoice,
-          dianDocument: dianDoc,
-        };
-      },
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
-    ).then(async (result) => {
-      // Encolar procesamiento DIAN después del commit
-      await this.dianQueue.add(
-        'send',
-        { dianDocumentId: result.dianDocument.id },
-        { attempts: 10, backoff: { type: 'exponential', delay: 5000 } },
-      );
-      return result;
-    });
+            data: { status: QuoteStatus.CONVERTED },
+          });
+
+          // Audit logs
+          await tx.auditLog.create({
+            data: {
+              actorId: convertedByUserId ?? null,
+              entity: 'quote',
+              entityId: id,
+              action: 'convert',
+              diff: { saleId: sale.id, invoiceId: invoice.id },
+            },
+          });
+
+          await tx.auditLog.create({
+            data: {
+              actorId: convertedByUserId ?? null,
+              entity: 'sale',
+              entityId: sale.id,
+              action: 'create',
+              diff: { fromQuote: id },
+            },
+          });
+
+          return {
+            quote: await tx.quote.findUnique({
+              where: { id },
+              include: {
+                items: { include: { product: true } },
+                customer: true,
+              },
+            }),
+            sale: await tx.sale.findUnique({
+              where: { id: sale.id },
+              include: {
+                items: { include: { product: true } },
+                customer: true,
+              },
+            }),
+            invoice,
+            dianDocument: dianDoc,
+          };
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      )
+      .then(async (result) => {
+        // Encolar procesamiento DIAN después del commit
+        await this.dianQueue.add(
+          'send',
+          { dianDocumentId: result.dianDocument.id },
+          { attempts: 10, backoff: { type: 'exponential', delay: 5000 } },
+        );
+        return result;
+      });
   }
 
   async updateQuoteStatus(
@@ -446,17 +476,32 @@ export class QuotesService {
 
     // Validaciones de cambio de estado
     if (quote.status === QuoteStatus.CONVERTED) {
-      throw new BadRequestException('No se puede cambiar el estado de una cotización convertida.');
+      throw new BadRequestException(
+        'No se puede cambiar el estado de una cotización convertida.',
+      );
     }
 
-    if (quote.status === QuoteStatus.CANCELLED && status !== QuoteStatus.CANCELLED) {
-      throw new BadRequestException('No se puede reactivar una cotización cancelada.');
+    if (
+      quote.status === QuoteStatus.CANCELLED &&
+      status !== QuoteStatus.CANCELLED
+    ) {
+      throw new BadRequestException(
+        'No se puede reactivar una cotización cancelada.',
+      );
     }
 
     // Validar transiciones de estado válidas
     const validTransitions: Record<QuoteStatus, QuoteStatus[]> = {
-      [QuoteStatus.DRAFT]: [QuoteStatus.SENT, QuoteStatus.CANCELLED, QuoteStatus.EXPIRED],
-      [QuoteStatus.SENT]: [QuoteStatus.DRAFT, QuoteStatus.CANCELLED, QuoteStatus.EXPIRED],
+      [QuoteStatus.DRAFT]: [
+        QuoteStatus.SENT,
+        QuoteStatus.CANCELLED,
+        QuoteStatus.EXPIRED,
+      ],
+      [QuoteStatus.SENT]: [
+        QuoteStatus.DRAFT,
+        QuoteStatus.CANCELLED,
+        QuoteStatus.EXPIRED,
+      ],
       [QuoteStatus.EXPIRED]: [QuoteStatus.CANCELLED], // Solo se puede cancelar una expirada
       [QuoteStatus.CONVERTED]: [], // No se puede cambiar desde convertida
       [QuoteStatus.CANCELLED]: [], // No se puede cambiar desde cancelada

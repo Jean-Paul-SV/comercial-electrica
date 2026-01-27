@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException, BadRequestException } from '@nestjs/common';
+import { NotFoundException } from '@nestjs/common';
 import { CashService } from './cash.service';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -81,7 +81,9 @@ describe('CashService', () => {
         openedBy: null,
       };
 
-      prisma.cashSession.create = jest.fn().mockResolvedValue(sessionSinUsuario);
+      prisma.cashSession.create = jest
+        .fn()
+        .mockResolvedValue(sessionSinUsuario);
 
       const result = await service.openSession(50000);
 
@@ -103,7 +105,9 @@ describe('CashService', () => {
         closingAmount: 61900,
       };
 
-      prisma.cashSession.findUnique = jest.fn().mockResolvedValue(mockCashSession);
+      prisma.cashSession.findUnique = jest
+        .fn()
+        .mockResolvedValue(mockCashSession);
       prisma.cashSession.update = jest.fn().mockResolvedValue(sessionCerrada);
 
       const result = await service.closeSession('session-1', 61900);
@@ -122,12 +126,12 @@ describe('CashService', () => {
     it('debe lanzar error si la sesión no existe', async () => {
       prisma.cashSession.findUnique = jest.fn().mockResolvedValue(null);
 
-      await expect(service.closeSession('session-inexistente', 50000)).rejects.toThrow(
-        NotFoundException,
-      );
-      await expect(service.closeSession('session-inexistente', 50000)).rejects.toThrow(
-        'Caja no encontrada.',
-      );
+      await expect(
+        service.closeSession('session-inexistente', 50000),
+      ).rejects.toThrow(NotFoundException);
+      await expect(
+        service.closeSession('session-inexistente', 50000),
+      ).rejects.toThrow('Caja no encontrada.');
     });
 
     it('debe lanzar error si la sesión ya está cerrada', async () => {
@@ -138,7 +142,9 @@ describe('CashService', () => {
         closingAmount: 61900,
       };
 
-      prisma.cashSession.findUnique = jest.fn().mockResolvedValue(sessionCerrada);
+      prisma.cashSession.findUnique = jest
+        .fn()
+        .mockResolvedValue(sessionCerrada);
 
       await expect(service.closeSession('session-1', 61900)).rejects.toThrow(
         BadRequestException,
@@ -151,7 +157,9 @@ describe('CashService', () => {
 
   describe('getSession', () => {
     it('debe obtener una sesión existente', async () => {
-      prisma.cashSession.findUnique = jest.fn().mockResolvedValue(mockCashSession);
+      prisma.cashSession.findUnique = jest
+        .fn()
+        .mockResolvedValue(mockCashSession);
 
       const result = await service.getSession('session-1');
 
@@ -164,8 +172,12 @@ describe('CashService', () => {
     it('debe lanzar error si la sesión no existe', async () => {
       prisma.cashSession.findUnique = jest.fn().mockResolvedValue(null);
 
-      await expect(service.getSession('session-inexistente')).rejects.toThrow(NotFoundException);
-      await expect(service.getSession('session-inexistente')).rejects.toThrow('Caja no encontrada.');
+      await expect(service.getSession('session-inexistente')).rejects.toThrow(
+        NotFoundException,
+      );
+      await expect(service.getSession('session-inexistente')).rejects.toThrow(
+        'Caja no encontrada.',
+      );
     });
   });
 

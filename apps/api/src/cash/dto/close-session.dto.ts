@@ -6,4 +6,3 @@ export class CloseSessionDto {
   @IsNumber()
   closingAmount!: number;
 }
-
