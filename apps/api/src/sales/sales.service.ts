@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import {
   DianDocumentStatus,
   DianDocumentType,
@@ -22,13 +22,45 @@ function makeInvoiceNumber(now = new Date()) {
 
 @Injectable()
 export class SalesService {
+  private readonly logger = new Logger(SalesService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     @InjectQueue('dian') private readonly dianQueue: Queue,
   ) {}
 
   async createSale(dto: CreateSaleDto, createdByUserId?: string) {
+    this.logger.log(`Creando venta para usuario ${createdByUserId || 'anónimo'}`);
     if (!dto.items || dto.items.length === 0) throw new BadRequestException('Debe incluir items.');
+
+    // Validar que la sesión de caja existe y está abierta
+    if (!dto.cashSessionId) {
+      throw new BadRequestException('cashSessionId requerido para registrar caja.');
+    }
+
+    const cashSession = await this.prisma.cashSession.findUnique({
+      where: { id: dto.cashSessionId },
+    });
+
+    if (!cashSession) {
+      throw new NotFoundException(`Sesión de caja con id ${dto.cashSessionId} no encontrada.`);
+    }
+
+    if (cashSession.closedAt) {
+      throw new BadRequestException(
+        `No se puede crear venta. La sesión de caja ${dto.cashSessionId} está cerrada.`,
+      );
+    }
+
+    // Validar que el cliente existe si se proporciona
+    if (dto.customerId) {
+      const customer = await this.prisma.customer.findUnique({
+        where: { id: dto.customerId },
+      });
+      if (!customer) {
+        throw new NotFoundException(`Cliente con id ${dto.customerId} no encontrado.`);
+      }
+    }
 
     return this.prisma.$transaction(
       async (tx) => {
@@ -92,13 +124,9 @@ export class SalesService {
           include: { items: true },
         });
 
-        if (!dto.cashSessionId) {
-          throw new BadRequestException('cashSessionId requerido para registrar caja.');
-        }
-
         await tx.cashMovement.create({
           data: {
-            sessionId: dto.cashSessionId,
+            sessionId: dto.cashSessionId!, // Ya validado arriba, seguro que existe
             type: 'IN',
             method: dto.paymentMethod ?? PaymentMethod.CASH,
             amount: grandTotal,
@@ -139,11 +167,15 @@ export class SalesService {
           },
         });
 
+        this.logger.log(
+          `Venta creada exitosamente: ${sale.id}, Total: ${sale.grandTotal}, Factura: ${invoice.number}`,
+        );
         return { sale, invoice, dianDocument: dianDoc };
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     ).then(async (result) => {
       // enqueue DIAN processing after commit
+      this.logger.log(`Encolando procesamiento DIAN para documento ${result.dianDocument.id}`);
       await this.dianQueue.add(
         'send',
         { dianDocumentId: result.dianDocument.id },

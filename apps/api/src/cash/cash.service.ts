@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -29,7 +29,16 @@ export class CashService {
   }
 
   async closeSession(id: string, closingAmount: number) {
-    await this.getSession(id);
+    const session = await this.getSession(id);
+
+    // Validar que la sesión no esté ya cerrada
+    if (session.closedAt) {
+      throw new BadRequestException(`La sesión de caja ${id} ya está cerrada.`);
+    }
+
+    // Validar que no haya ventas pendientes (opcional según reglas de negocio)
+    // Por ahora solo validamos que la sesión esté abierta
+
     return this.prisma.cashSession.update({
       where: { id },
       data: {

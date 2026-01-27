@@ -15,8 +15,19 @@ describe('AppController', () => {
   });
 
   describe('root', () => {
-    it('should return "Hello World!"', () => {
-      expect(appController.getHello()).toBe('Hello World!');
+    it('should return welcome message', () => {
+      expect(appController.getHello()).toBe('Sistema Comercial Eléctrica API - Bienvenido!');
+    });
+  });
+
+  describe('health', () => {
+    it('should return health status', () => {
+      const health = appController.getHealth();
+      expect(health).toHaveProperty('status', 'ok');
+      expect(health).toHaveProperty('timestamp');
+      expect(health).toHaveProperty('uptime');
+      expect(health).toHaveProperty('environment');
+      expect(health).toHaveProperty('version');
     });
   });
 });

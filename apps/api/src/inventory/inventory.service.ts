@@ -12,6 +12,20 @@ export class InventoryService {
       throw new BadRequestException('Debe incluir items.');
     }
 
+    // Validar que todos los productos existen antes de iniciar la transacción
+    const productIds = dto.items.map((it) => it.productId);
+    const products = await this.prisma.product.findMany({
+      where: { id: { in: productIds } },
+    });
+
+    if (products.length !== productIds.length) {
+      const foundIds = products.map((p) => p.id);
+      const missingIds = productIds.filter((id) => !foundIds.includes(id));
+      throw new BadRequestException(
+        `Uno o más productos no existen: ${missingIds.join(', ')}`,
+      );
+    }
+
     const type = dto.type;
     const sign = type === InventoryMovementType.IN ? 1 : type === InventoryMovementType.OUT ? -1 : 1;
 
