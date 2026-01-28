@@ -16,7 +16,7 @@ Para el detalle técnico y el plan de acción, usa estos documentos:
 - **Fuente de verdad (estado actual)**: `ESTADO_ACTUAL_2026-01-28.md` ⭐
 - **Estado y evaluación**: `EVALUACION_FINAL_SENIOR.md` (principal)
 - **Pendientes priorizados**: `RECUENTO_PENDIENTES.md`
-- **Plan por fases**: `PLAN_ACCION_POST_TEST.md`
+- **Plan por fases**: `historico/PLAN_ACCION_POST_TEST.md` (ver nota abajo)
 
 ---
 
@@ -60,65 +60,36 @@ Para el detalle técnico y el plan de acción, usa estos documentos:
   - Configuración requerida
   - Métricas de mejora
 
-- **[🎯 Plan de Acción Post-Test](./PLAN_ACCION_POST_TEST.md)** ⭐
-  - Fases de implementación
-  - Checklist de tareas
-  - Métricas de éxito
-  - Plan de acción específico
+- **[🎯 Plan de Acción Post-Test](./historico/PLAN_ACCION_POST_TEST.md)** 📚
+  - Plan histórico (gran parte ya ejecutado)
+  - Ver `ESTADO_ACTUAL_2026-01-28.md` para estado actual
 
-#### 📚 **Referencia Histórica** (Información similar, pero menos actualizada)
+#### 📚 **Referencia Histórica** (En `historico/`)
 
-- **[📊 Evaluación del Proyecto - Perspectiva Senior](./EVALUACION_PROYECTO_SENIOR.md)** 📚
-  - Evaluación anterior del estado del proyecto
-  - Similar a OPINION_SENIOR_ACTUAL.md pero menos actualizado
-  - Mantener como referencia histórica
-
-- **[📋 Análisis del Estado Actual](./ANALISIS_ESTADO_ACTUAL.md)** 📚
-  - Análisis anterior del estado
-  - Información similar pero menos actualizada
-  - Mantener como referencia histórica
+Ver `historico/README.md` para lista completa de documentos históricos.
 
 ---
 
 ### 📦 **Módulos Implementados**
 
-- **[📋 Módulo de Cotizaciones](./RESUMEN_MODULO_COTIZACIONES.md)**
-  - Funcionalidades implementadas
-  - Endpoints disponibles
-  - Ejemplos de uso
-
-- **[📊 Módulo de Reportes](./RESUMEN_MODULO_REPORTES.md)**
-  - Tipos de reportes disponibles
-  - Dashboard ejecutivo
-  - Filtros y parámetros
-
-- **[🛡️ Manejo de Errores Mejorado](./RESUMEN_MANEJO_ERRORES.md)**
+- **[🛡️ Manejo de Errores Mejorado](./RESUMEN_MANEJO_ERRORES.md)** ⭐
   - Exception filters globales
   - Logging estructurado
   - Respuestas consistentes
+  - Mapeo Prisma → HTTP
 
-- **[🛡️ Validaciones Robustas](./RESUMEN_VALIDACIONES_ROBUSTAS.md)**
+- **[🛡️ Validaciones Robustas](./RESUMEN_VALIDACIONES_ROBUSTAS.md)** ⭐
   - Validaciones de reglas de negocio
   - Validaciones de integridad referencial
   - Validaciones de estados y transiciones
+  - Validaciones en DTOs
 
-- **[📄 Módulo DIAN (Estructura Básica)](./RESUMEN_MODULO_DIAN.md)**
-  - Estructura completa del procesador DIAN
-  - Worker para procesamiento asíncrono
-  - Flujo completo implementado
-  - Pendiente: Integración real con servicios DIAN
-
-- **[🧪 Tests Implementados y Actualizados](./RESUMEN_TESTS_IMPLEMENTADOS.md)**
-  - Tests actualizados para validaciones robustas
-  - Tests nuevos para QuotesService y DianService
-  - Cobertura completa de validaciones
-  - Guía de ejecución de tests
-
-- **[🔧 Correcciones de Tests](./CORRECCIONES_TESTS.md)** ⭐ **NUEVO**
-  - Resumen de correcciones aplicadas a tests
-  - Errores encontrados y soluciones
-  - Estado actual de los tests
-  - Guía de troubleshooting
+**Resúmenes históricos de módulos** (en `historico/`):
+- `historico/RESUMEN_MODULO_COTIZACIONES.md` - Módulo ya implementado
+- `historico/RESUMEN_MODULO_REPORTES.md` - Módulo ya implementado
+- `historico/RESUMEN_MODULO_DIAN.md` - Estructura básica (pendiente integración real)
+- `historico/RESUMEN_TESTS_IMPLEMENTADOS.md` - Tests actualizados
+- `historico/CORRECCIONES_TESTS.md` - Correcciones aplicadas
 
 ---
 
@@ -155,17 +126,10 @@ Para el detalle técnico y el plan de acción, usa estos documentos:
   - Guía específica para Windows/OneDrive
   - **Documento esencial - Consultar si hay problemas con Prisma**
 
-#### 📚 **Referencia Histórica** (Información también disponible en README principal)
+#### 📚 **Referencia Histórica** (En `historico/`)
 
-- **[🔧 Solución a Errores de Instalación](./SOLUCION_ERRORES_INSTALACION.md)** 📚
-  - Errores comunes y soluciones
-  - Problemas de permisos
-  - Compatibilidad de versiones
-  - **Nota:** Información similar disponible en README principal
-
-- **[🚀 Pasos para Instalar Dependencias](./PASOS_INSTALACION.md)** 📚
-  - Guía paso a paso anterior
-  - **Nota:** La guía completa está ahora en el README principal - Sección "Inicio Rápido"
+- `historico/SOLUCION_ERRORES_INSTALACION.md` - Guía antigua de instalación
+- `historico/PASOS_INSTALACION.md` - Pasos antiguos (la guía actual está en README principal)
 
 ---
 
@@ -191,10 +155,10 @@ Para el detalle técnico y el plan de acción, usa estos documentos:
 
 ### **🚀 Para Desarrolladores Nuevos - Ruta Rápida:**
 
-1. **Primero:** Lee [Opinión Senior - Estado Actual](./OPINION_SENIOR_ACTUAL.md) ⭐ - Entiende el estado general del proyecto
+1. **Primero:** Lee [Estado Actual](./ESTADO_ACTUAL_2026-01-28.md) ⭐ - Entiende la fase actual del proyecto
 2. **Segundo:** Revisa el [README principal](../README.md) - Sección "Inicio Rápido" para configurar
-3. **Tercero:** Consulta los resúmenes de módulos según lo que necesites entender
-4. **Cuarto:** Revisa [Plan de Acción Post-Test](./PLAN_ACCION_POST_TEST.md) para ver próximos pasos
+3. **Tercero:** Consulta los resúmenes técnicos según lo que necesites entender
+4. **Cuarto:** Revisa [Recuento de Pendientes](./RECUENTO_PENDIENTES.md) para ver qué falta
 
 ### **⚙️ Para Configurar el Proyecto:**
 
@@ -231,16 +195,16 @@ Los documentos marcados con 📚 contienen información útil pero menos actuali
 2. **[🎯 Evaluación Final del Proyecto](./EVALUACION_FINAL_SENIOR.md)** ⭐ - Evaluación completa y final
 3. **[📋 Recuento Completo: Pendientes](./RECUENTO_PENDIENTES.md)** ⭐ - TODO lo que falta implementar
 4. **[README Principal](../README.md)** ⭐ - Guía de instalación y uso
-5. **[Plan de Acción Post-Test](./PLAN_ACCION_POST_TEST.md)** ⭐ - Próximos pasos
 
 ### **Consulta Según Necesidad:**
-- Resúmenes de módulos (Cotizaciones, Reportes, DIAN, Tests, Validaciones, Manejo de Errores)
+- Resúmenes técnicos: `RESUMEN_MANEJO_ERRORES.md`, `RESUMEN_VALIDACIONES_ROBUSTAS.md`
 - [Solución Error EPERM](./SOLUCION_ERROR_EPERM_PRISMA.md) ⚠️ - Si tienes problemas con Prisma
 - [CHANGELOG.md](./CHANGELOG.md) - Historial de cambios
-- [Correcciones de Tests](./CORRECCIONES_TESTS.md) - Referencia técnica
+- [MEJORAS_IMPLEMENTADAS.md](./MEJORAS_IMPLEMENTADAS.md) - Resumen de mejoras recientes
 
 ### **Referencia Histórica (📚):**
-- Documentos marcados con 📚 son útiles pero menos actualizados
+- Documentos en `historico/` son útiles pero menos actualizados o redundantes
+- Consulta `historico/README.md` para ver qué contiene esa carpeta
 - Úsalos como referencia complementaria si necesitas detalles históricos
 
 ---
