@@ -227,10 +227,11 @@ Los documentos marcados con 📚 contienen información útil pero menos actuali
 ## 📋 Documentos Esenciales (⭐ Principales)
 
 ### **Debes Leer:**
-1. **[💼 Opinión Senior - Estado Actual](./OPINION_SENIOR_ACTUAL.md)** ⭐ - Estado actual del proyecto
-2. **[📋 Recuento Completo: Pendientes](./RECUENTO_PENDIENTES.md)** ⭐ - TODO lo que falta implementar
-3. **[README Principal](../README.md)** ⭐ - Guía de instalación y uso
-4. **[Plan de Acción Post-Test](./PLAN_ACCION_POST_TEST.md)** ⭐ - Próximos pasos
+1. **[📌 Estado Actual (resumen)](./ESTADO_ACTUAL_2026-01-28.md)** ⭐ - Fase actual, qué está listo y qué falta
+2. **[🎯 Evaluación Final del Proyecto](./EVALUACION_FINAL_SENIOR.md)** ⭐ - Evaluación completa y final
+3. **[📋 Recuento Completo: Pendientes](./RECUENTO_PENDIENTES.md)** ⭐ - TODO lo que falta implementar
+4. **[README Principal](../README.md)** ⭐ - Guía de instalación y uso
+5. **[Plan de Acción Post-Test](./PLAN_ACCION_POST_TEST.md)** ⭐ - Próximos pasos
 
 ### **Consulta Según Necesidad:**
 - Resúmenes de módulos (Cotizaciones, Reportes, DIAN, Tests, Validaciones, Manejo de Errores)
