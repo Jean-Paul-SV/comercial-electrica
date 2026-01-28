@@ -3,7 +3,12 @@ import { NotFoundException } from '@nestjs/common';
 import { DianService } from './dian.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
-import { DianDocumentStatus, DianEnvironment } from '@prisma/client';
+import {
+  DianDocumentStatus,
+  DianDocumentType,
+  DianEnvironment,
+  InvoiceStatus,
+} from '@prisma/client';
 
 describe('DianService', () => {
   let service: DianService;

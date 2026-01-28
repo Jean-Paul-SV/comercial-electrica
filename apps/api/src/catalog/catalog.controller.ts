@@ -3,9 +3,12 @@ import {
   Controller,
   Delete,
   Get,
+  ParseUUIDPipe,
   Param,
   Patch,
   Post,
+  Query,
+  Req,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -16,6 +19,7 @@ import {
   ApiParam,
 } from '@nestjs/swagger';
 import { CatalogService } from './catalog.service';
+import { PaginationDto } from '../common/dto/pagination.dto';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { CreateCategoryDto } from './dto/create-category.dto';
@@ -24,7 +28,7 @@ import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { RoleName } from '@prisma/client';
 
-@ApiTags('products', 'categories')
+@ApiTags('catalog')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller()
 export class CatalogController {
@@ -34,12 +38,38 @@ export class CatalogController {
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Listar productos',
-    description: 'Obtiene todos los productos activos',
+    description: 'Obtiene todos los productos activos. Respuesta paginada.',
   })
-  @ApiResponse({ status: 200, description: 'Lista de productos' })
+  @ApiResponse({
+    status: 200,
+    description: 'Lista paginada de productos',
+    schema: {
+      type: 'object',
+      properties: {
+        data: {
+          type: 'array',
+          items: { type: 'object' },
+        },
+        meta: {
+          type: 'object',
+          properties: {
+            total: { type: 'number' },
+            page: { type: 'number' },
+            limit: { type: 'number' },
+            totalPages: { type: 'number' },
+            hasNextPage: { type: 'boolean' },
+            hasPreviousPage: { type: 'boolean' },
+          },
+        },
+      },
+    },
+  })
   @ApiResponse({ status: 401, description: 'No autenticado' })
-  listProducts() {
-    return this.catalog.listProducts();
+  listProducts(@Query() pagination?: PaginationDto) {
+    return this.catalog.listProducts({
+      page: pagination?.page,
+      limit: pagination?.limit,
+    });
   }
 
   @Get('products/:id')
@@ -52,7 +82,7 @@ export class CatalogController {
   @ApiResponse({ status: 200, description: 'Producto encontrado' })
   @ApiResponse({ status: 404, description: 'Producto no encontrado' })
   @ApiResponse({ status: 401, description: 'No autenticado' })
-  getProduct(@Param('id') id: string) {
+  getProduct(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string) {
     return this.catalog.getProduct(id);
   }
 
@@ -67,8 +97,11 @@ export class CatalogController {
   @ApiResponse({ status: 400, description: 'Error de validación' })
   @ApiResponse({ status: 401, description: 'No autenticado' })
   @ApiResponse({ status: 403, description: 'No autorizado (requiere ADMIN)' })
-  createProduct(@Body() dto: CreateProductDto) {
-    return this.catalog.createProduct(dto);
+  createProduct(
+    @Body() dto: CreateProductDto,
+    @Req() req: { user?: { sub?: string } },
+  ) {
+    return this.catalog.createProduct(dto, req.user?.sub);
   }
 
   @Roles(RoleName.ADMIN)
@@ -86,8 +119,12 @@ export class CatalogController {
   @ApiResponse({ status: 404, description: 'Producto no encontrado' })
   @ApiResponse({ status: 401, description: 'No autenticado' })
   @ApiResponse({ status: 403, description: 'No autorizado (requiere ADMIN)' })
-  updateProduct(@Param('id') id: string, @Body() dto: UpdateProductDto) {
-    return this.catalog.updateProduct(id, dto);
+  updateProduct(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @Body() dto: UpdateProductDto,
+    @Req() req: { user?: { sub?: string } },
+  ) {
+    return this.catalog.updateProduct(id, dto, req.user?.sub);
   }
 
   @Roles(RoleName.ADMIN)
@@ -105,7 +142,7 @@ export class CatalogController {
   @ApiResponse({ status: 404, description: 'Producto no encontrado' })
   @ApiResponse({ status: 401, description: 'No autenticado' })
   @ApiResponse({ status: 403, description: 'No autorizado (requiere ADMIN)' })
-  deactivate(@Param('id') id: string) {
+  deactivate(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string) {
     return this.catalog.deactivateProduct(id);
   }
 
@@ -132,7 +169,10 @@ export class CatalogController {
   @ApiResponse({ status: 400, description: 'Error de validación' })
   @ApiResponse({ status: 401, description: 'No autenticado' })
   @ApiResponse({ status: 403, description: 'No autorizado (requiere ADMIN)' })
-  createCategory(@Body() dto: CreateCategoryDto) {
-    return this.catalog.createCategory(dto);
+  createCategory(
+    @Body() dto: CreateCategoryDto,
+    @Req() req: { user?: { sub?: string } },
+  ) {
+    return this.catalog.createCategory(dto, req.user?.sub);
   }
 }

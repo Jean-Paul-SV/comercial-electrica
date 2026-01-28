@@ -120,6 +120,8 @@ model Product {
 
   @@index([name])
   @@index([categoryId])
+  @@index([isActive])
+  @@index([createdAt])
 }
 
 model StockBalance {
@@ -142,6 +144,7 @@ model InventoryMovement {
 
   @@index([createdAt])
   @@index([type])
+  @@index([createdBy])
 }
 
 model InventoryMovementItem {
@@ -343,6 +346,7 @@ model DianDocument {
 
   @@index([status])
   @@index([sentAt])
+  @@index([createdAt])
 }
 
 model DianEvent {
@@ -371,6 +375,8 @@ model AuditLog {
 
   @@index([createdAt])
   @@index([entity, entityId])
+  @@index([actorId])
+  @@index([action])
 }
 
 model BackupRun {

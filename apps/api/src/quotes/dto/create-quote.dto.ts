@@ -1,10 +1,12 @@
 import { Type } from 'class-transformer';
 import {
+  ArrayMinSize,
   IsArray,
   IsDateString,
   IsInt,
   IsOptional,
   IsString,
+  IsUUID,
   Min,
   MinLength,
   ValidateNested,
@@ -13,8 +15,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 class QuoteItemInputDto {
   @ApiProperty({ example: 'product-uuid-123', description: 'ID del producto' })
-  @IsString()
-  @MinLength(1)
+  @IsUUID()
   productId!: string;
 
   @ApiProperty({ example: 5, description: 'Cantidad cotizada', minimum: 1 })
@@ -39,7 +40,7 @@ export class CreateQuoteDto {
     description: 'ID del cliente (opcional)',
   })
   @IsOptional()
-  @IsString()
+  @IsUUID()
   customerId?: string;
 
   @ApiPropertyOptional({
@@ -56,6 +57,7 @@ export class CreateQuoteDto {
     description: 'Items de la cotización',
   })
   @IsArray()
+  @ArrayMinSize(1)
   @ValidateNested({ each: true })
   @Type(() => QuoteItemInputDto)
   items!: QuoteItemInputDto[];

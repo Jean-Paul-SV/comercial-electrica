@@ -1,4 +1,4 @@
-import { Body, Controller, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Post, Req, UseGuards } from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
@@ -61,7 +61,10 @@ export class AuthController {
   @ApiResponse({ status: 400, description: 'Email ya registrado' })
   @ApiResponse({ status: 401, description: 'No autenticado' })
   @ApiResponse({ status: 403, description: 'No autorizado (requiere ADMIN)' })
-  register(@Body() dto: RegisterUserDto) {
-    return this.auth.register(dto);
+  register(
+    @Body() dto: RegisterUserDto,
+    @Req() req: { user?: { sub?: string } },
+  ) {
+    return this.auth.register(dto, req.user?.sub);
   }
 }

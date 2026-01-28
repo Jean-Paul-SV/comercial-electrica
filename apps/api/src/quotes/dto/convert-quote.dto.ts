@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEnum, IsString } from 'class-validator';
+import { IsEnum, IsUUID } from 'class-validator';
 import { PaymentMethod } from '@prisma/client';
 
 export class ConvertQuoteDto {
@@ -7,7 +7,7 @@ export class ConvertQuoteDto {
     example: 'session-uuid-123',
     description: 'ID de la sesión de caja (requerido)',
   })
-  @IsString()
+  @IsUUID()
   cashSessionId!: string;
 
   @ApiProperty({

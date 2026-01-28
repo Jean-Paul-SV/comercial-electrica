@@ -7,6 +7,7 @@ import { RoleName } from '@prisma/client';
 import { LoginDto } from './dto/login.dto';
 import { RegisterUserDto } from './dto/register-user.dto';
 import { BootstrapAdminDto } from './dto/bootstrap-admin.dto';
+import { AuditService } from '../common/services/audit.service';
 import * as argon2 from 'argon2';
 
 // Mock argon2
@@ -53,6 +54,13 @@ describe('AuthService', () => {
         {
           provide: JwtService,
           useValue: mockJwt,
+        },
+        {
+          provide: AuditService,
+          useValue: {
+            logAuth: jest.fn().mockResolvedValue(undefined),
+            logCreate: jest.fn().mockResolvedValue(undefined),
+          },
         },
       ],
     }).compile();

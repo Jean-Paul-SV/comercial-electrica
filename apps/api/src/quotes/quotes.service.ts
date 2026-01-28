@@ -17,6 +17,10 @@ import {
   DianDocumentType,
   SaleStatus,
 } from '@prisma/client';
+import { ValidationLimitsService } from '../common/services/validation-limits.service';
+import { AuditService } from '../common/services/audit.service';
+import { CacheService } from '../common/services/cache.service';
+import { createPaginatedResponse } from '../common/interfaces/pagination.interface';
 
 @Injectable()
 export class QuotesService {
@@ -25,11 +29,26 @@ export class QuotesService {
   constructor(
     private readonly prisma: PrismaService,
     @InjectQueue('dian') private readonly dianQueue: Queue,
+    private readonly limits: ValidationLimitsService,
+    private readonly audit: AuditService,
+    private readonly cache: CacheService,
   ) {}
 
   async createQuote(dto: CreateQuoteDto, createdByUserId?: string) {
     if (!dto.items || dto.items.length === 0) {
       throw new BadRequestException('Debe incluir items.');
+    }
+
+    // Validar límites
+    this.limits.validateItemsCount(dto.items.length, 'quote');
+    for (const item of dto.items) {
+      this.limits.validateItemQty(item.qty);
+    }
+
+    // Validar fecha de validez si se proporciona
+    if (dto.validUntil) {
+      const validUntilDate = new Date(dto.validUntil);
+      this.limits.validateQuoteValidUntil(validUntilDate);
     }
 
     // Validar que el cliente existe si se proporciona
@@ -100,27 +119,48 @@ export class QuotesService {
           },
         });
 
-        // Audit log
+        // Audit log mejorado
         await tx.auditLog.create({
           data: {
             actorId: createdByUserId ?? null,
             entity: 'quote',
             entityId: quote.id,
             action: 'create',
+            diff: {
+              customerId: quote.customerId,
+              grandTotal: Number(quote.grandTotal),
+              itemsCount: quote.items.length,
+              validUntil: quote.validUntil?.toISOString(),
+            },
           },
         });
 
         return quote;
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
-    );
+    ).then(async (quote) => {
+      // Invalidar caché de listados
+      await this.cache.deletePattern('cache:quotes:*');
+      return quote;
+    });
   }
 
-  async listQuotes(filters?: {
-    status?: QuoteStatus;
-    customerId?: string;
-    limit?: number;
-  }) {
+  async listQuotes(
+    filters?: {
+      status?: QuoteStatus;
+      customerId?: string;
+    },
+    pagination?: { page?: number; limit?: number },
+  ) {
+    // Cachear listados frecuentes (sin filtros o con filtros comunes)
+    if (!filters || (!filters.status && !filters.customerId)) {
+      const cacheKey = this.cache.buildKey('quotes', 'list', pagination?.page, pagination?.limit);
+      const cached = await this.cache.get(cacheKey);
+      if (cached) {
+        this.logger.debug('Quotes list retrieved from cache');
+        return cached;
+      }
+    }
     const where: Prisma.QuoteWhereInput = {};
     if (filters?.status) {
       where.status = filters.status;
@@ -129,15 +169,33 @@ export class QuotesService {
       where.customerId = filters.customerId;
     }
 
-    return this.prisma.quote.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-      include: {
-        items: { include: { product: true } },
-        customer: true,
-      },
-      take: filters?.limit ?? 200,
-    });
+    const page = pagination?.page ?? 1;
+    const limit = pagination?.limit ?? 20;
+    const skip = (page - 1) * limit;
+
+    const [data, total] = await Promise.all([
+      this.prisma.quote.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          items: { include: { product: true } },
+          customer: true,
+        },
+        skip,
+        take: limit,
+      }),
+      this.prisma.quote.count({ where }),
+    ]);
+
+    const result = createPaginatedResponse(data, total, page, limit);
+
+    // Cachear si no hay filtros
+    if (!filters || (!filters.status && !filters.customerId)) {
+      const cacheKey = this.cache.buildKey('quotes', 'list', page, limit);
+      await this.cache.set(cacheKey, result, 300); // 5 minutos
+    }
+
+    return result;
   }
 
   async getQuoteById(id: string) {
@@ -267,7 +325,11 @@ export class QuotesService {
         return updatedQuote;
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
-    );
+    ).then(async (updated) => {
+      // Invalidar caché de listados
+      await this.cache.deletePattern('cache:quotes:*');
+      return updated;
+    });
   }
 
   async convertQuoteToSale(
@@ -535,6 +597,10 @@ export class QuotesService {
       });
 
       return updatedQuote;
+    }).then(async (updated) => {
+      // Invalidar caché de listados
+      await this.cache.deletePattern('cache:quotes:*');
+      return updated;
     });
   }
 

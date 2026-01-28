@@ -4,6 +4,9 @@ import { QuotesService } from './quotes.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { getQueueToken } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
+import { ValidationLimitsService } from '../common/services/validation-limits.service';
+import { AuditService } from '../common/services/audit.service';
+import { CacheService } from '../common/services/cache.service';
 import { CreateQuoteDto } from './dto/create-quote.dto';
 import { UpdateQuoteDto } from './dto/update-quote.dto';
 import { ConvertQuoteDto } from './dto/convert-quote.dto';
@@ -110,6 +113,30 @@ describe('QuotesService', () => {
           provide: getQueueToken('dian'),
           useValue: mockQueue,
         },
+        {
+          provide: ValidationLimitsService,
+          useValue: {
+            validateItemsCount: jest.fn().mockResolvedValue(undefined),
+            validateItemQty: jest.fn().mockResolvedValue(undefined),
+            validateQuoteValidUntil: jest.fn().mockResolvedValue(undefined),
+          },
+        },
+        {
+          provide: AuditService,
+          useValue: {
+            logCreate: jest.fn().mockResolvedValue(undefined),
+            logUpdate: jest.fn().mockResolvedValue(undefined),
+          },
+        },
+        {
+          provide: CacheService,
+          useValue: {
+            deletePattern: jest.fn().mockResolvedValue(undefined),
+            buildKey: jest.fn((...args) => `cache:${args.join(':')}`),
+            get: jest.fn().mockResolvedValue(null),
+            set: jest.fn().mockResolvedValue(undefined),
+          },
+        },
       ],
     }).compile();
 
@@ -153,6 +180,9 @@ describe('QuotesService', () => {
           },
           quoteItem: {
             createMany: jest.fn().mockResolvedValue({ count: 1 }),
+          },
+          auditLog: {
+            create: jest.fn().mockResolvedValue({}),
           },
         };
         return callback(mockTx);
@@ -215,6 +245,9 @@ describe('QuotesService', () => {
           quoteItem: {
             createMany: jest.fn().mockResolvedValue({ count: 1 }),
           },
+          auditLog: {
+            create: jest.fn().mockResolvedValue({}),
+          },
         };
         return callback(mockTx);
       });
@@ -240,7 +273,15 @@ describe('QuotesService', () => {
     };
 
     it('debe actualizar una cotización exitosamente', async () => {
-      prisma.quote.findUnique = jest.fn().mockResolvedValue(mockQuote);
+      const quoteWithIncludes = {
+        ...mockQuote,
+        items: mockQuote.items.map((item) => ({
+          ...item,
+          product: mockProduct,
+        })),
+        customer: mockCustomer,
+      };
+      prisma.quote.findUnique = jest.fn().mockResolvedValue(quoteWithIncludes);
 
       const mockTransaction = jest.fn(async (callback) => {
         const mockTx = {
@@ -250,11 +291,14 @@ describe('QuotesService', () => {
           quote: {
             update: jest
               .fn()
-              .mockResolvedValue({ ...mockQuote, ...updateQuoteDto }),
+              .mockResolvedValue({ ...quoteWithIncludes, ...updateQuoteDto }),
           },
           quoteItem: {
             deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
             createMany: jest.fn().mockResolvedValue({ count: 1 }),
+          },
+          auditLog: {
+            create: jest.fn().mockResolvedValue({}),
           },
         };
         return callback(mockTx);
@@ -279,6 +323,11 @@ describe('QuotesService', () => {
       const quoteConvertida = {
         ...mockQuote,
         status: QuoteStatus.CONVERTED,
+        items: mockQuote.items.map((item) => ({
+          ...item,
+          product: mockProduct,
+        })),
+        customer: mockCustomer,
       };
 
       prisma.quote.findUnique = jest.fn().mockResolvedValue(quoteConvertida);
@@ -292,7 +341,15 @@ describe('QuotesService', () => {
     });
 
     it('debe lanzar error si el cliente actualizado no existe', async () => {
-      prisma.quote.findUnique = jest.fn().mockResolvedValue(mockQuote);
+      const quoteWithIncludes = {
+        ...mockQuote,
+        items: mockQuote.items.map((item) => ({
+          ...item,
+          product: mockProduct,
+        })),
+        customer: mockCustomer,
+      };
+      prisma.quote.findUnique = jest.fn().mockResolvedValue(quoteWithIncludes);
       prisma.customer.findUnique = jest.fn().mockResolvedValue(null);
 
       await expect(
@@ -311,10 +368,15 @@ describe('QuotesService', () => {
     };
 
     it('debe convertir cotización a venta exitosamente', async () => {
-      prisma.quote.findUnique = jest.fn().mockResolvedValue({
+      const quoteWithIncludes = {
         ...mockQuote,
-        items: mockQuote.items,
-      });
+        items: mockQuote.items.map((item) => ({
+          ...item,
+          product: mockProduct,
+        })),
+        customer: mockCustomer,
+      };
+      prisma.quote.findUnique = jest.fn().mockResolvedValue(quoteWithIncludes);
 
       const mockSale = {
         id: 'sale-1',
@@ -341,7 +403,7 @@ describe('QuotesService', () => {
             create: jest.fn().mockResolvedValue(mockSale),
             findUnique: jest.fn().mockResolvedValue({
               ...mockSale,
-              items: mockQuote.items.map((item) => ({
+              items: quoteWithIncludes.items.map((item) => ({
                 ...item,
                 saleId: 'sale-1',
                 product: mockProduct,
@@ -367,17 +429,12 @@ describe('QuotesService', () => {
           },
           quote: {
             update: jest.fn().mockResolvedValue({
-              ...mockQuote,
+              ...quoteWithIncludes,
               status: QuoteStatus.CONVERTED,
             }),
             findUnique: jest.fn().mockResolvedValue({
-              ...mockQuote,
+              ...quoteWithIncludes,
               status: QuoteStatus.CONVERTED,
-              items: mockQuote.items.map((item) => ({
-                ...item,
-                product: mockProduct,
-              })),
-              customer: mockCustomer,
             }),
           },
           auditLog: {
@@ -409,6 +466,11 @@ describe('QuotesService', () => {
       const quoteConvertida = {
         ...mockQuote,
         status: QuoteStatus.CONVERTED,
+        items: mockQuote.items.map((item) => ({
+          ...item,
+          product: mockProduct,
+        })),
+        customer: mockCustomer,
       };
 
       prisma.quote.findUnique = jest.fn().mockResolvedValue(quoteConvertida);
@@ -422,7 +484,15 @@ describe('QuotesService', () => {
     });
 
     it('debe lanzar error si la sesión de caja no existe', async () => {
-      prisma.quote.findUnique = jest.fn().mockResolvedValue(mockQuote);
+      const quoteWithIncludes = {
+        ...mockQuote,
+        items: mockQuote.items.map((item) => ({
+          ...item,
+          product: mockProduct,
+        })),
+        customer: mockCustomer,
+      };
+      prisma.quote.findUnique = jest.fn().mockResolvedValue(quoteWithIncludes);
       prisma.cashSession.findUnique = jest.fn().mockResolvedValue(null);
 
       await expect(
@@ -439,7 +509,15 @@ describe('QuotesService', () => {
         closedAt: new Date(),
       };
 
-      prisma.quote.findUnique = jest.fn().mockResolvedValue(mockQuote);
+      const quoteWithIncludes = {
+        ...mockQuote,
+        items: mockQuote.items.map((item) => ({
+          ...item,
+          product: mockProduct,
+        })),
+        customer: mockCustomer,
+      };
+      prisma.quote.findUnique = jest.fn().mockResolvedValue(quoteWithIncludes);
       prisma.cashSession.findUnique = jest
         .fn()
         .mockResolvedValue(sessionCerrada);
@@ -453,7 +531,15 @@ describe('QuotesService', () => {
     });
 
     it('debe lanzar error si cashSessionId no se proporciona', async () => {
-      prisma.quote.findUnique = jest.fn().mockResolvedValue(mockQuote);
+      const quoteWithIncludes = {
+        ...mockQuote,
+        items: mockQuote.items.map((item) => ({
+          ...item,
+          product: mockProduct,
+        })),
+        customer: mockCustomer,
+      };
+      prisma.quote.findUnique = jest.fn().mockResolvedValue(quoteWithIncludes);
 
       const dtoSinCaja: ConvertQuoteDto = {
         paymentMethod: PaymentMethod.CASH,
@@ -470,16 +556,19 @@ describe('QuotesService', () => {
 
   describe('updateQuoteStatus', () => {
     it('debe actualizar estado exitosamente', async () => {
-      prisma.quote.findUnique = jest.fn().mockResolvedValue(mockQuote);
-
-      const updatedQuote = {
+      const quoteWithIncludes = {
         ...mockQuote,
-        status: QuoteStatus.SENT,
         items: mockQuote.items.map((item) => ({
           ...item,
           product: mockProduct,
         })),
         customer: mockCustomer,
+      };
+      prisma.quote.findUnique = jest.fn().mockResolvedValue(quoteWithIncludes);
+
+      const updatedQuote = {
+        ...quoteWithIncludes,
+        status: QuoteStatus.SENT,
       };
 
       const mockTransaction = jest.fn(async (callback) => {
@@ -501,6 +590,7 @@ describe('QuotesService', () => {
         QuoteStatus.SENT,
       );
 
+      expect(result).toBeDefined();
       expect(result.status).toBe(QuoteStatus.SENT);
     });
 
@@ -508,6 +598,11 @@ describe('QuotesService', () => {
       const quoteConvertida = {
         ...mockQuote,
         status: QuoteStatus.CONVERTED,
+        items: mockQuote.items.map((item) => ({
+          ...item,
+          product: mockProduct,
+        })),
+        customer: mockCustomer,
       };
 
       prisma.quote.findUnique = jest.fn().mockResolvedValue(quoteConvertida);
@@ -524,6 +619,11 @@ describe('QuotesService', () => {
       const quoteCancelada = {
         ...mockQuote,
         status: QuoteStatus.CANCELLED,
+        items: mockQuote.items.map((item) => ({
+          ...item,
+          product: mockProduct,
+        })),
+        customer: mockCustomer,
       };
 
       prisma.quote.findUnique = jest.fn().mockResolvedValue(quoteCancelada);
@@ -540,6 +640,11 @@ describe('QuotesService', () => {
       const quoteExpirada = {
         ...mockQuote,
         status: QuoteStatus.EXPIRED,
+        items: mockQuote.items.map((item) => ({
+          ...item,
+          product: mockProduct,
+        })),
+        customer: mockCustomer,
       };
 
       prisma.quote.findUnique = jest.fn().mockResolvedValue(quoteExpirada);

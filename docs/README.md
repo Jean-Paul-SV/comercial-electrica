@@ -4,6 +4,22 @@ Esta carpeta contiene toda la documentación técnica y de análisis del proyect
 
 ---
 
+## 🧭 Fase Actual del Proyecto (Enero 2026)
+
+- **Fase**: ✅ **Core API lista (inventario/ventas/caja/cotizaciones/reportes) + hardening de producción en progreso**
+- **Pendiente crítico**: 🔴 **DIAN real** (XML UBL 2.1, firma digital, envío real, CUFE, PDF/QR, trazabilidad)
+- **Pendiente importante**: 🟡 **Frontend**
+- **Checklist de producción (en curso)**: CORS por entorno, validación/fail-fast de envs, health check completo, observabilidad (métricas/alertas)
+- **Ya implementado (básico)**: `GET /metrics` + header `x-request-id`, health check incluye DB/Redis/colas
+
+Para el detalle técnico y el plan de acción, usa estos documentos:
+- **Fuente de verdad (estado actual)**: `ESTADO_ACTUAL_2026-01-28.md` ⭐
+- **Estado y evaluación**: `EVALUACION_FINAL_SENIOR.md` (principal)
+- **Pendientes priorizados**: `RECUENTO_PENDIENTES.md`
+- **Plan por fases**: `PLAN_ACCION_POST_TEST.md`
+
+---
+
 ## 📋 Índice de Documentación
 
 > **💡 Tip:** Los documentos marcados con ⭐ son los **principales y más actualizados**. Los marcados con 📚 son referencia histórica.
@@ -12,12 +28,37 @@ Esta carpeta contiene toda la documentación técnica y de análisis del proyect
 
 ### 🎯 **Análisis y Evaluación** ⭐ **DOCUMENTOS PRINCIPALES**
 
-- **[💼 Opinión Senior - Estado Actual](./OPINION_SENIOR_ACTUAL.md)** ⭐ **PRINCIPAL - LEER PRIMERO**
-  - Evaluación completa del estado actual del proyecto
-  - Calificación: 8.5/10 - EXCELENTE
+- **[🎯 Evaluación Final del Proyecto](./EVALUACION_FINAL_SENIOR.md)** ⭐ **PRINCIPAL - MÁS ACTUALIZADO**
+  - Evaluación completa y final del estado actual del proyecto
+  - Calificación: 9.2/10 - EXCELENTE
   - Fortalezas destacadas y áreas de mejora
+  - Comparativa antes vs. ahora
+  - Progreso reciente y mejoras implementadas
   - Recomendaciones priorizadas para producción
   - **Este es el documento más actualizado y completo**
+
+- **[📊 Evaluación del Estado - Actualizada](./EVALUACION_ESTADO_ACTUALIZADA.md)** 📚
+  - Evaluación anterior del estado del proyecto
+  - Calificación: 9.0/10 - EXCELENTE
+  - Mantener como referencia histórica
+
+- **[💼 Opinión Senior - Estado Actual](./OPINION_SENIOR_ACTUAL.md)** 📚
+  - Evaluación anterior del estado del proyecto
+  - Calificación: 8.5/10 - EXCELENTE
+  - Mantener como referencia histórica
+
+- **[📋 Recuento Completo: Pendientes por Implementar](./RECUENTO_PENDIENTES.md)** ⭐ **NUEVO**
+  - Lista detallada de TODO lo que falta por implementar
+  - Organizado por prioridad (CRÍTICO, ALTA, MEDIA, OPCIONAL)
+  - Tiempos estimados para cada tarea
+  - Estado actual vs. lo que falta
+  - **Documento esencial para planificación**
+
+- **[🚀 Mejoras Implementadas - Sesión Actual](./MEJORAS_IMPLEMENTADAS.md)** ⭐ **NUEVO**
+  - Resumen completo de mejoras implementadas
+  - Caché, backups automáticos, tests E2E, índices
+  - Configuración requerida
+  - Métricas de mejora
 
 - **[🎯 Plan de Acción Post-Test](./PLAN_ACCION_POST_TEST.md)** ⭐
   - Fases de implementación
@@ -187,8 +228,9 @@ Los documentos marcados con 📚 contienen información útil pero menos actuali
 
 ### **Debes Leer:**
 1. **[💼 Opinión Senior - Estado Actual](./OPINION_SENIOR_ACTUAL.md)** ⭐ - Estado actual del proyecto
-2. **[README Principal](../README.md)** ⭐ - Guía de instalación y uso
-3. **[Plan de Acción Post-Test](./PLAN_ACCION_POST_TEST.md)** ⭐ - Próximos pasos
+2. **[📋 Recuento Completo: Pendientes](./RECUENTO_PENDIENTES.md)** ⭐ - TODO lo que falta implementar
+3. **[README Principal](../README.md)** ⭐ - Guía de instalación y uso
+4. **[Plan de Acción Post-Test](./PLAN_ACCION_POST_TEST.md)** ⭐ - Próximos pasos
 
 ### **Consulta Según Necesidad:**
 - Resúmenes de módulos (Cotizaciones, Reportes, DIAN, Tests, Validaciones, Manejo de Errores)

@@ -1,11 +1,14 @@
 import { Type } from 'class-transformer';
 import {
+  ArrayMinSize,
   IsArray,
   IsEnum,
   IsInt,
+  IsNumber,
   IsOptional,
-  IsString,
-  MinLength,
+  IsUUID,
+  Min,
+  IsPositive,
   ValidateNested,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
@@ -13,13 +16,13 @@ import { PaymentMethod } from '@prisma/client';
 
 class SaleItemInputDto {
   @ApiProperty({ example: 'product-uuid-123', description: 'ID del producto' })
-  @IsString()
-  @MinLength(1)
+  @IsUUID()
   productId!: string;
 
   @ApiProperty({ example: 5, description: 'Cantidad a vender', minimum: 1 })
   @Type(() => Number)
   @IsInt()
+  @Min(1)
   qty!: number;
 
   @ApiPropertyOptional({
@@ -29,6 +32,8 @@ class SaleItemInputDto {
   })
   @IsOptional()
   @Type(() => Number)
+  @IsNumber()
+  @IsPositive()
   unitPrice?: number;
 }
 
@@ -38,16 +43,15 @@ export class CreateSaleDto {
     description: 'ID del cliente (opcional)',
   })
   @IsOptional()
-  @IsString()
+  @IsUUID()
   customerId?: string;
 
   @ApiProperty({
     example: 'session-uuid-123',
     description: 'ID de la sesión de caja (requerido)',
   })
-  @IsOptional()
-  @IsString()
-  cashSessionId?: string;
+  @IsUUID()
+  cashSessionId!: string;
 
   @ApiProperty({
     enum: PaymentMethod,
@@ -59,6 +63,7 @@ export class CreateSaleDto {
 
   @ApiProperty({ type: [SaleItemInputDto], description: 'Items de la venta' })
   @IsArray()
+  @ArrayMinSize(1)
   @ValidateNested({ each: true })
   @Type(() => SaleItemInputDto)
   items!: SaleItemInputDto[];

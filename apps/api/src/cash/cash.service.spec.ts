@@ -1,7 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException } from '@nestjs/common';
+import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { CashService } from './cash.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { ValidationLimitsService } from '../common/services/validation-limits.service';
+import { AuditService } from '../common/services/audit.service';
 
 describe('CashService', () => {
   let service: CashService;
@@ -36,9 +38,14 @@ describe('CashService', () => {
         findUnique: jest.fn(),
         create: jest.fn(),
         update: jest.fn(),
+        count: jest.fn(),
       },
       cashMovement: {
         findMany: jest.fn(),
+        count: jest.fn(),
+      },
+      sale: {
+        count: jest.fn(),
       },
     };
 
@@ -48,6 +55,19 @@ describe('CashService', () => {
         {
           provide: PrismaService,
           useValue: mockPrisma,
+        },
+        {
+          provide: ValidationLimitsService,
+          useValue: {
+            validateCashAmount: jest.fn().mockResolvedValue(undefined),
+          },
+        },
+        {
+          provide: AuditService,
+          useValue: {
+            logCreate: jest.fn().mockResolvedValue(undefined),
+            logUpdate: jest.fn().mockResolvedValue(undefined),
+          },
         },
       ],
     }).compile();
@@ -108,6 +128,7 @@ describe('CashService', () => {
       prisma.cashSession.findUnique = jest
         .fn()
         .mockResolvedValue(mockCashSession);
+      prisma.sale.count = jest.fn().mockResolvedValue(0);
       prisma.cashSession.update = jest.fn().mockResolvedValue(sessionCerrada);
 
       const result = await service.closeSession('session-1', 61900);
@@ -135,7 +156,6 @@ describe('CashService', () => {
     });
 
     it('debe lanzar error si la sesión ya está cerrada', async () => {
-      const { BadRequestException } = await import('@nestjs/common');
       const sessionCerrada = {
         ...mockCashSession,
         closedAt: new Date('2026-01-22T18:00:00Z'),
@@ -199,15 +219,16 @@ describe('CashService', () => {
       ];
 
       prisma.cashSession.findMany = jest.fn().mockResolvedValue(mockSessions);
+      prisma.cashSession.count = jest.fn().mockResolvedValue(2);
 
       const result = await service.listSessions();
 
-      expect(result).toEqual(mockSessions);
-      expect(prisma.cashSession.findMany).toHaveBeenCalledWith({
-        orderBy: { openedAt: 'desc' },
-        take: 100,
-        include: { movements: { orderBy: { createdAt: 'desc' }, take: 50 } },
-      });
+      expect(result).toHaveProperty('data');
+      expect(result).toHaveProperty('meta');
+      expect(result.data).toEqual(mockSessions);
+      expect(result.meta.total).toBe(2);
+      expect(prisma.cashSession.findMany).toHaveBeenCalled();
+      expect(prisma.cashSession.count).toHaveBeenCalled();
     });
   });
 
@@ -224,15 +245,16 @@ describe('CashService', () => {
       ];
 
       prisma.cashMovement.findMany = jest.fn().mockResolvedValue(mockMovements);
+      prisma.cashMovement.count = jest.fn().mockResolvedValue(2);
 
       const result = await service.listMovements('session-1');
 
-      expect(result).toEqual(mockMovements);
-      expect(prisma.cashMovement.findMany).toHaveBeenCalledWith({
-        where: { sessionId: 'session-1' },
-        orderBy: { createdAt: 'desc' },
-        take: 500,
-      });
+      expect(result).toHaveProperty('data');
+      expect(result).toHaveProperty('meta');
+      expect(result.data).toEqual(mockMovements);
+      expect(result.meta.total).toBe(2);
+      expect(prisma.cashMovement.findMany).toHaveBeenCalled();
+      expect(prisma.cashMovement.count).toHaveBeenCalled();
     });
   });
 });

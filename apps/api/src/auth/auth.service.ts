@@ -10,6 +10,7 @@ import * as argon2 from 'argon2';
 import { LoginDto } from './dto/login.dto';
 import { RegisterUserDto } from './dto/register-user.dto';
 import { BootstrapAdminDto } from './dto/bootstrap-admin.dto';
+import { AuditService } from '../common/services/audit.service';
 
 export type JwtPayload = {
   sub: string;
@@ -22,6 +23,7 @@ export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
+    private readonly audit: AuditService,
   ) {}
 
   async bootstrapAdmin(dto: BootstrapAdminDto) {
@@ -38,10 +40,14 @@ export class AuthService {
       },
       select: { id: true, email: true, role: true, createdAt: true },
     });
+    await this.audit.logCreate('user', user.id, null, {
+      email: user.email,
+      role: user.role,
+    });
     return user;
   }
 
-  async register(dto: RegisterUserDto) {
+  async register(dto: RegisterUserDto, createdByUserId?: string) {
     const email = dto.email.toLowerCase();
     const existing = await this.prisma.user.findUnique({ where: { email } });
     if (existing) throw new BadRequestException('Email ya registrado.');
@@ -54,16 +60,25 @@ export class AuthService {
       },
       select: { id: true, email: true, role: true, createdAt: true },
     });
+    await this.audit.logCreate('user', user.id, createdByUserId, {
+      email: user.email,
+      role: user.role,
+    });
     return user;
   }
 
   async login(dto: LoginDto) {
     const email = dto.email.toLowerCase();
     const user = await this.prisma.user.findUnique({ where: { email } });
-    if (!user || !user.isActive)
+    if (!user || !user.isActive) {
+      await this.audit.logAuth('login_failed', null, { email });
       throw new UnauthorizedException('Credenciales inválidas.');
+    }
     const ok = await argon2.verify(user.passwordHash, dto.password);
-    if (!ok) throw new UnauthorizedException('Credenciales inválidas.');
+    if (!ok) {
+      await this.audit.logAuth('login_failed', user.id, { email });
+      throw new UnauthorizedException('Credenciales inválidas.');
+    }
 
     const payload: JwtPayload = {
       sub: user.id,
@@ -71,6 +86,7 @@ export class AuthService {
       role: user.role,
     };
     const accessToken = await this.jwt.signAsync(payload);
+    await this.audit.logAuth('login', user.id, { email, role: user.role });
     return { accessToken };
   }
 }

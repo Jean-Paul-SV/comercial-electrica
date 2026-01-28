@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  ParseUUIDPipe,
   Param,
   Patch,
   Post,
@@ -24,6 +25,7 @@ import { ConvertQuoteDto } from './dto/convert-quote.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { QuoteStatus } from '@prisma/client';
+import { PaginationDto } from '../common/dto/pagination.dto';
 
 @ApiTags('quotes')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -57,7 +59,7 @@ export class QuotesController {
   @ApiOperation({
     summary: 'Listar cotizaciones',
     description:
-      'Obtiene todas las cotizaciones con filtros opcionales por estado y cliente',
+      'Obtiene todas las cotizaciones con filtros opcionales por estado y cliente. Respuesta paginada.',
   })
   @ApiQuery({
     name: 'status',
@@ -70,23 +72,40 @@ export class QuotesController {
     required: false,
     description: 'Filtrar por ID de cliente',
   })
-  @ApiQuery({
-    name: 'limit',
-    required: false,
-    description: 'Límite de resultados (por defecto 200)',
+  @ApiResponse({
+    status: 200,
+    description: 'Lista paginada de cotizaciones',
+    schema: {
+      type: 'object',
+      properties: {
+        data: {
+          type: 'array',
+          items: { type: 'object' },
+        },
+        meta: {
+          type: 'object',
+          properties: {
+            total: { type: 'number' },
+            page: { type: 'number' },
+            limit: { type: 'number' },
+            totalPages: { type: 'number' },
+            hasNextPage: { type: 'boolean' },
+            hasPreviousPage: { type: 'boolean' },
+          },
+        },
+      },
+    },
   })
-  @ApiResponse({ status: 200, description: 'Lista de cotizaciones' })
   @ApiResponse({ status: 401, description: 'No autenticado' })
   list(
     @Query('status') status?: QuoteStatus,
     @Query('customerId') customerId?: string,
-    @Query('limit') limit?: number,
+    @Query() pagination?: PaginationDto,
   ) {
-    return this.quotesService.listQuotes({
-      status,
-      customerId,
-      limit: limit ? Number(limit) : undefined,
-    });
+    return this.quotesService.listQuotes(
+      { status, customerId },
+      { page: pagination?.page, limit: pagination?.limit },
+    );
   }
 
   @Get(':id')
@@ -99,7 +118,7 @@ export class QuotesController {
   @ApiResponse({ status: 200, description: 'Cotización encontrada' })
   @ApiResponse({ status: 404, description: 'Cotización no encontrada' })
   @ApiResponse({ status: 401, description: 'No autenticado' })
-  getById(@Param('id') id: string) {
+  getById(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string) {
     return this.quotesService.getQuoteById(id);
   }
 
@@ -122,7 +141,7 @@ export class QuotesController {
   @ApiResponse({ status: 404, description: 'Cotización no encontrada' })
   @ApiResponse({ status: 401, description: 'No autenticado' })
   update(
-    @Param('id') id: string,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Body() dto: UpdateQuoteDto,
     @Req() req: { user?: { sub?: string } },
   ) {
@@ -149,7 +168,7 @@ export class QuotesController {
   @ApiResponse({ status: 404, description: 'Cotización no encontrada' })
   @ApiResponse({ status: 401, description: 'No autenticado' })
   convert(
-    @Param('id') id: string,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Body() dto: ConvertQuoteDto,
     @Req() req: { user?: { sub?: string } },
   ) {
@@ -172,7 +191,7 @@ export class QuotesController {
   @ApiResponse({ status: 404, description: 'Cotización no encontrada' })
   @ApiResponse({ status: 401, description: 'No autenticado' })
   updateStatus(
-    @Param('id') id: string,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Body('status') status: QuoteStatus,
     @Req() req: { user?: { sub?: string } },
   ) {

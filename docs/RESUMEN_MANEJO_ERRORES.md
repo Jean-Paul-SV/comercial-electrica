@@ -33,6 +33,7 @@
 **Formato de respuesta:**
 ```json
 {
+  "requestId": "2b7b6b3a-3b5b-4f5a-9b1c-5a4f1a6d0c2e",
   "statusCode": 400,
   "error": "Bad Request",
   "message": "Debe incluir items.",
@@ -61,9 +62,9 @@ Si envías datos inválidos:
   "statusCode": 400,
   "error": "Validation Error",
   "message": [
-    "productId debe ser un UUID válido",
-    "qty debe ser un número entero",
-    "items debe contener al menos 1 elemento"
+    "items[0].productId: productId debe ser un UUID válido",
+    "items[0].qty: qty debe ser un número entero",
+    "items: items debe contener al menos 1 elemento"
   ],
   "timestamp": "2026-01-26T12:00:00.000Z",
   "path": "/sales"
@@ -83,6 +84,7 @@ Si envías datos inválidos:
   - Status code
   - Ruta y método HTTP
   - Usuario (si está autenticado)
+  - Request ID (correlación)
   - IP del cliente
   - User-Agent
 
@@ -97,6 +99,7 @@ Context: {
   "path": "/sales",
   "method": "POST",
   "userId": "user-uuid",
+  "requestId": "2b7b6b3a-3b5b-4f5a-9b1c-5a4f1a6d0c2e",
   "ip": "127.0.0.1",
   "userAgent": "Mozilla/5.0..."
 }
@@ -152,6 +155,19 @@ this.logger.log(`Encolando procesamiento DIAN para documento ${dianDocumentId}`)
 - ✅ Fácil identificar patrones de errores
 - ✅ Métricas de errores por ruta
 - ✅ Tracking de usuarios con problemas
+- ✅ Correlación por request (requestId)
+
+---
+
+## 🧠 Prisma → HTTP (mapeo)
+
+Para evitar 500 “raros”, los errores típicos de Prisma se convierten en HTTP claros en el filtro global:
+
+- **409 Conflict**: `P2002` (unique), `P2034` (deadlock/write conflict)
+- **404 Not Found**: `P2025`, `P2001` (no encontrado)
+- **400 Bad Request**: `P2003` (FK), `P2000` (valor muy largo), `P2011` (null), `P2012` (faltan requeridos)
+- **503 Service Unavailable**: `PrismaClientInitializationError` (DB no disponible)
+- **500 Internal**: `P2021/P2022` (esquema) y otros internos
 
 ---
 

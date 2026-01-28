@@ -1,5 +1,8 @@
 # 💼 Opinión Senior - Estado Actual del Proyecto
 
+> ⚠️ **ESTE DOCUMENTO ES HISTÓRICO**  
+> Para el estado más reciente, usa: `ESTADO_ACTUAL_2026-01-28.md` + `EVALUACION_FINAL_SENIOR.md`.
+
 > **Fecha:** Enero 2026  
 > **Evaluador:** Senior Developer  
 > **Proyecto:** Sistema Comercial Eléctrica

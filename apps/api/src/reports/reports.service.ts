@@ -1,16 +1,39 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { SalesReportDto } from './dto/sales-report.dto';
 import { InventoryReportDto } from './dto/inventory-report.dto';
 import { CashReportDto } from './dto/cash-report.dto';
 import { CustomersReportDto } from './dto/customers-report.dto';
 import { Prisma } from '@prisma/client';
+import { CacheService } from '../common/services/cache.service';
 
 @Injectable()
 export class ReportsService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(ReportsService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly cache: CacheService,
+  ) {}
 
   async getSalesReport(dto: SalesReportDto) {
+    // Validar rango de fechas (máximo 1 año)
+    if (dto.startDate && dto.endDate) {
+      const start = new Date(dto.startDate);
+      const end = new Date(dto.endDate);
+      const diffDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+      if (diffDays > 365) {
+        throw new BadRequestException(
+          'El rango de fechas no puede ser mayor a 1 año',
+        );
+      }
+      if (start > end) {
+        throw new BadRequestException(
+          'La fecha de inicio no puede ser mayor a la fecha de fin',
+        );
+      }
+    }
+
     const where: Prisma.SaleWhereInput = {
       status: 'PAID', // Solo ventas pagadas
     };
@@ -29,6 +52,13 @@ export class ReportsService {
       where.customerId = dto.customerId;
     }
 
+    // Validar límite máximo
+    const limit = Math.min(dto.limit ?? 200, 1000);
+    if (limit < 1) {
+      throw new BadRequestException('El límite debe ser mayor a 0');
+    }
+
+    const startTime = Date.now();
     const sales = await this.prisma.sale.findMany({
       where,
       include: {
@@ -37,8 +67,10 @@ export class ReportsService {
         invoices: true,
       },
       orderBy: { soldAt: 'desc' },
-      take: dto.limit ?? 200,
+      take: limit,
     });
+    const queryTime = Date.now() - startTime;
+    this.logger.debug(`Sales report query took ${queryTime}ms`);
 
     // Calcular totales
     const totals = sales.reduce(
@@ -143,6 +175,23 @@ export class ReportsService {
   }
 
   async getCashReport(dto: CashReportDto) {
+    // Validar rango de fechas (máximo 1 año)
+    if (dto.startDate && dto.endDate) {
+      const start = new Date(dto.startDate);
+      const end = new Date(dto.endDate);
+      const diffDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+      if (diffDays > 365) {
+        throw new BadRequestException(
+          'El rango de fechas no puede ser mayor a 1 año',
+        );
+      }
+      if (start > end) {
+        throw new BadRequestException(
+          'La fecha de inicio no puede ser mayor a la fecha de fin',
+        );
+      }
+    }
+
     const where: Prisma.CashSessionWhereInput = {};
 
     if (dto.sessionId) {
@@ -243,6 +292,23 @@ export class ReportsService {
   }
 
   async getCustomersReport(dto: CustomersReportDto) {
+    // Validar rango de fechas (máximo 1 año)
+    if (dto.startDate && dto.endDate) {
+      const start = new Date(dto.startDate);
+      const end = new Date(dto.endDate);
+      const diffDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+      if (diffDays > 365) {
+        throw new BadRequestException(
+          'El rango de fechas no puede ser mayor a 1 año',
+        );
+      }
+      if (start > end) {
+        throw new BadRequestException(
+          'La fecha de inicio no puede ser mayor a la fecha de fin',
+        );
+      }
+    }
+
     const where: Prisma.SaleWhereInput = {
       status: 'PAID',
     };
@@ -343,6 +409,15 @@ export class ReportsService {
   }
 
   async getDashboard() {
+    // Cachear dashboard por 1 minuto (cambia frecuentemente pero no necesita ser en tiempo real)
+    const cacheKey = this.cache.buildKey('dashboard', 'main');
+    const cached = await this.cache.get(cacheKey);
+    if (cached) {
+      this.logger.debug('Dashboard retrieved from cache');
+      return cached;
+    }
+
+    const startTime = Date.now();
     const now = new Date();
     const todayStart = new Date(
       now.getFullYear(),
@@ -428,7 +503,7 @@ export class ReportsService {
     // Total de clientes
     const totalCustomers = await this.prisma.customer.count();
 
-    return {
+    const dashboard = {
       date: now.toISOString(),
       sales: {
         today: {
@@ -463,5 +538,12 @@ export class ReportsService {
         total: totalCustomers,
       },
     };
+
+    const queryTime = Date.now() - startTime;
+    this.logger.debug(`Dashboard query took ${queryTime}ms`);
+
+    // Cachear por 1 minuto
+    await this.cache.set(cacheKey, dashboard, 60);
+    return dashboard;
   }
 }

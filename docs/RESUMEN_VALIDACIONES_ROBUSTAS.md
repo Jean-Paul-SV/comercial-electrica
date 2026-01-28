@@ -220,6 +220,23 @@ Respuesta:
 
 ---
 
+## ✅ Validaciones en DTOs (Swagger + 400 consistentes)
+
+Además de validaciones de negocio en servicios, se reforzaron DTOs para mejorar Swagger y reducir errores ambiguos:
+
+- **Items requeridos (mínimo 1)**:
+  - `CreateSaleDto.items`
+  - `CreateQuoteDto.items`
+  - `CreateMovementDto.items`
+
+- **Campos numéricos**:
+  - `unitPrice`/`unitCost` validados como números positivos cuando aplica.
+
+- **Consistencia de required/optional**:
+  - `CreateSaleDto.cashSessionId` es requerido también a nivel DTO (no solo en servicio).
+
+---
+
 ## 🎯 **Beneficios**
 
 ### **1. Prevención de Errores**

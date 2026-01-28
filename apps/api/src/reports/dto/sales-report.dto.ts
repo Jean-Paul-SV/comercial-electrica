@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsDateString, IsOptional, IsInt, Min } from 'class-validator';
+import { IsDateString, IsOptional, IsInt, Min, IsUUID } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class SalesReportDto {
@@ -24,6 +24,7 @@ export class SalesReportDto {
     description: 'Filtrar por ID de cliente',
   })
   @IsOptional()
+  @IsUUID()
   customerId?: string;
 
   @ApiPropertyOptional({

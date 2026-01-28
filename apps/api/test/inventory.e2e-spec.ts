@@ -1,8 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { INestApplication } from '@nestjs/common';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
-import * as request from 'supertest';
+import { setupTestModule, setupTestApp } from './test-helpers';
+import request from 'supertest';
 import { App } from 'supertest/types';
 
 describe('Inventory (e2e)', () => {
@@ -12,55 +13,25 @@ describe('Inventory (e2e)', () => {
   let productId: string;
 
   beforeAll(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
-    }).compile();
-
-    app = moduleFixture.createNestApplication();
-    app.useGlobalPipes(
-      new ValidationPipe({
-        whitelist: true,
-        transform: true,
-        forbidNonWhitelisted: true,
+    const moduleFixture: TestingModule = await setupTestModule(
+      Test.createTestingModule({
+        imports: [AppModule],
       }),
-    );
-    await app.init();
+    ).compile();
 
-    prisma = moduleFixture.get<PrismaService>(PrismaService);
-
-    // Limpiar base de datos
-    await prisma.inventoryMovementItem.deleteMany();
-    await prisma.inventoryMovement.deleteMany();
-    await prisma.stockBalance.deleteMany();
-    await prisma.product.deleteMany();
-    await prisma.category.deleteMany();
-    await prisma.user.deleteMany();
-
-    // Crear usuario y obtener token
-    const userCount = await prisma.user.count();
-    if (userCount === 0) {
-      await request(app.getHttpServer()).post('/auth/bootstrap-admin').send({
-        email: 'test@example.com',
-        password: 'Test123!',
-      });
-    }
-
-    const loginResponse = await request(app.getHttpServer())
-      .post('/auth/login')
-      .send({
-        email: 'test@example.com',
-        password: 'Test123!',
-      });
-
-    if (loginResponse.status === 200) {
-      authToken = loginResponse.body.accessToken;
-    }
+    // Setup simplificado usando helper común
+    const setup = await setupTestApp(moduleFixture, 'inventory-test@example.com');
+    ({ app, prisma, authToken } = setup);
   });
 
   beforeEach(async () => {
     // Crear categoría y producto para cada test
-    const category = await prisma.category.create({
-      data: { name: `Test Category ${Date.now()}` },
+    // Usar nombre único para evitar conflictos
+    const categoryName = `Test Category ${Date.now()}`;
+    const category = await prisma.category.upsert({
+      where: { name: categoryName },
+      update: {},
+      create: { name: categoryName },
     });
     // Categoría creada para el producto
 
@@ -78,14 +49,18 @@ describe('Inventory (e2e)', () => {
   });
 
   afterEach(async () => {
+    // Limpiar solo tablas de inventario creadas en cada test.
+    // No eliminamos productos/categorías aquí para evitar errores de FK
+    // cuando otras suites (por ejemplo, quotes) han creado datos relacionados.
     await prisma.inventoryMovementItem.deleteMany();
     await prisma.inventoryMovement.deleteMany();
     await prisma.stockBalance.deleteMany();
-    await prisma.product.deleteMany();
-    await prisma.category.deleteMany();
   });
 
   afterAll(async () => {
+    // Limpiar logs de auditoría (no auditar en tests)
+    // Orden correcto: primero las tablas que tienen foreign keys, luego las referenciadas
+    await prisma.auditLog.deleteMany();
     await prisma.user.deleteMany();
     await prisma.$disconnect();
     await app.close();
@@ -199,8 +174,8 @@ describe('Inventory (e2e)', () => {
     });
 
     it('debe crear un ajuste (ADJUST) correctamente', async () => {
-      // Agregar stock inicial
-      await request(app.getHttpServer())
+      // Agregar stock inicial y esperar a que se complete
+      const initialMovement = await request(app.getHttpServer())
         .post('/inventory/movements')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
@@ -213,7 +188,16 @@ describe('Inventory (e2e)', () => {
               unitCost: 1000,
             },
           ],
-        });
+        })
+        .expect(201);
+
+      expect(initialMovement.body.type).toBe('IN');
+
+      // Verificar que el stock inicial se creó correctamente
+      const stockBeforeAdjust = await prisma.stockBalance.findUnique({
+        where: { productId },
+      });
+      expect(stockBeforeAdjust?.qtyOnHand).toBe(50);
 
       // Hacer ajuste
       const response = await request(app.getHttpServer())
@@ -235,10 +219,19 @@ describe('Inventory (e2e)', () => {
       expect(response.body.type).toBe('ADJUST');
 
       // Verificar que el stock se ajustó (ADJUST suma)
+      // Esperar un poco para asegurar que la transacción se complete
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      
       const stock = await prisma.stockBalance.findUnique({
         where: { productId },
       });
-      expect(stock?.qtyOnHand).toBe(75); // 50 + 25
+      
+      // Verificar que el producto aún existe (puede haber sido eliminado por otra suite)
+      if (!stock) {
+        throw new Error(`StockBalance no encontrado para productId=${productId}. El producto puede haber sido eliminado por otra suite de tests.`);
+      }
+      
+      expect(stock.qtyOnHand).toBe(75); // 50 + 25
     });
 
     it('debe fallar si no hay items', async () => {
@@ -277,8 +270,10 @@ describe('Inventory (e2e)', () => {
         .set('Authorization', `Bearer ${authToken}`)
         .expect(200);
 
-      expect(Array.isArray(response.body)).toBe(true);
-      expect(response.body.length).toBeGreaterThan(0);
+      expect(response.body.data).toBeDefined();
+      expect(Array.isArray(response.body.data)).toBe(true);
+      expect(response.body.data.length).toBeGreaterThan(0);
+      expect(response.body.meta).toBeDefined();
     });
   });
 });

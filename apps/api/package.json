@@ -21,7 +21,9 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "jest --config ./test/jest-e2e.json"
+    "test:e2e": "jest --config ./test/jest-e2e.json",
+    "test:e2e:serial": "jest --config ./test/jest-e2e.json --runInBand",
+    "db:purge": "cd ../.. && node scripts/purgar-db-test.js"
   },
   "dependencies": {
     "@nestjs/bullmq": "^11.0.4",
@@ -34,7 +36,8 @@
     "@nestjs/platform-express": "^11.0.1",
     "@nestjs/schedule": "^6.1.0",
     "@nestjs/swagger": "^11.0.0",
-    "@prisma/client": "^5.20.0",
+    "@nestjs/throttler": "^6.5.0",
+    "@prisma/client": "^5.22.0",
     "argon2": "^0.44.0",
     "bullmq": "^5.66.5",
     "class-transformer": "^0.5.1",

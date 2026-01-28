@@ -1,4 +1,4 @@
-import { Controller, Get, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, ParseUUIDPipe, UseGuards } from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
@@ -62,7 +62,9 @@ export class DianController {
     status: 404,
     description: 'Documento DIAN no encontrado',
   })
-  async getDocumentStatus(@Param('id') id: string) {
+  async getDocumentStatus(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+  ) {
     const status = await this.dianService.queryDocumentStatus(id);
 
     // Obtener información adicional del documento

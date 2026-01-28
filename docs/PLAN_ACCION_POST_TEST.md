@@ -6,6 +6,13 @@
 
 ## 📊 **ANÁLISIS DEL ESTADO ACTUAL**
 
+> **Actualización 2026-01-28:** gran parte de este plan ya fue ejecutado.  
+> - ✅ Tests unitarios y E2E implementados y estables  
+> - ✅ Swagger implementado (`/api/docs`)  
+> - ✅ Validaciones robustas (DTO + negocio) y manejo de errores consistente (incluye Prisma → HTTP)  
+> - ✅ CI configurado (GitHub Actions con Postgres + Redis)  
+> - ✅ Hardening/operación: CORS por entorno, fail-fast de envs, health check DB/Redis/colas, `x-request-id`, `GET /metrics` (ADMIN)
+
 ### ✅ **Lo que está funcionando:**
 - ✅ Script de prueba manual (`test-api.js`) valida flujo completo end-to-end
 - ✅ API funcional con módulos core implementados
@@ -14,19 +21,17 @@
 - ✅ Integración básica con DIAN (estructura preparada)
 - ✅ Sistema de colas (BullMQ) configurado
 
-### ⚠️ **Áreas de mejora identificadas:**
-- ⚠️ **Tests automatizados insuficientes** (solo tests básicos de ejemplo)
-- ⚠️ **Falta cobertura de tests unitarios** para lógica de negocio crítica
-- ⚠️ **Falta tests de integración** para flujos complejos
-- ⚠️ **Manejo de errores** puede mejorarse
-- ⚠️ **Validaciones** pueden ser más robustas
-- ⚠️ **Documentación de API** (Swagger/OpenAPI) no implementada
+### ⚠️ **Áreas de mejora identificadas (pendiente hoy):**
+- 🔴 **DIAN real** (requisito legal): XML UBL + firma + envío real + PDF/QR + CUFE
+- 🟡 **Frontend** para operación real
+- 🟡 **Observabilidad avanzada**: Prometheus/alertas/dashboards, logs estructurados JSON, tracing
+- 🟢 **Políticas de despliegue**: checklist de producción, backups/restore verificados en ambientes reales
 
 ---
 
 ## 🚀 **FASE 1: FORTALECER FUNDAMENTOS** (Prioridad CRÍTICA)
 
-### **1.1 Implementar Suite de Tests Automatizados**
+### **1.1 Implementar Suite de Tests Automatizados** ✅ (COMPLETADO)
 
 **Objetivo:** Garantizar que el código funciona correctamente y prevenir regresiones.
 
@@ -83,7 +88,7 @@
 
 ---
 
-### **1.2 Configurar CI/CD Básico**
+### **1.2 Configurar CI/CD Básico** ✅ (COMPLETADO)
 
 **Objetivo:** Automatizar ejecución de tests en cada commit.
 
@@ -130,7 +135,7 @@ jobs:
 
 ---
 
-### **1.3 Documentación de API (Swagger/OpenAPI)**
+### **1.3 Documentación de API (Swagger/OpenAPI)** ✅ (COMPLETADO)
 
 **Objetivo:** Documentar endpoints para facilitar integración y mantenimiento.
 

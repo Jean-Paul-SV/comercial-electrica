@@ -1,15 +1,35 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { Prisma, InventoryMovementType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateMovementDto } from './dto/create-movement.dto';
+import { ValidationLimitsService } from '../common/services/validation-limits.service';
+import { AuditService } from '../common/services/audit.service';
 
 @Injectable()
 export class InventoryService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(InventoryService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly limits: ValidationLimitsService,
+    private readonly audit: AuditService,
+  ) {}
 
   async createMovement(dto: CreateMovementDto, createdByUserId?: string) {
+    const startTime = Date.now();
+    this.logger.log(`Creando movimiento de inventario tipo ${dto.type}`, {
+      type: dto.type,
+      itemsCount: dto.items?.length ?? 0,
+      userId: createdByUserId,
+    });
+
     if (!dto.items || dto.items.length === 0) {
       throw new BadRequestException('Debe incluir items.');
+    }
+
+    // Validar límites de cantidad
+    for (const item of dto.items) {
+      this.limits.validateInventoryQty(item.qty, dto.type);
     }
 
     // Validar que todos los productos existen antes de iniciar la transacción
@@ -21,6 +41,10 @@ export class InventoryService {
     if (products.length !== productIds.length) {
       const foundIds = products.map((p) => p.id);
       const missingIds = productIds.filter((id) => !foundIds.includes(id));
+      this.logger.warn(`Productos no encontrados: ${missingIds.join(', ')}`, {
+        missingIds,
+        requestedIds: productIds,
+      });
       throw new BadRequestException(
         `Uno o más productos no existen: ${missingIds.join(', ')}`,
       );
@@ -34,58 +58,96 @@ export class InventoryService {
           ? -1
           : 1;
 
-    return this.prisma.$transaction(
-      async (tx) => {
-        const movement = await tx.inventoryMovement.create({
-          data: {
-            type,
-            reason: dto.reason,
-            createdBy: createdByUserId,
-            items: {
-              create: dto.items.map((it) => ({
-                productId: it.productId,
-                qty: it.qty,
-                unitCost: it.unitCost,
-              })),
+    return this.prisma
+      .$transaction(
+        async (tx) => {
+          const movement = await tx.inventoryMovement.create({
+            data: {
+              type,
+              reason: dto.reason,
+              createdBy: createdByUserId,
+              items: {
+                create: dto.items.map((it) => ({
+                  productId: it.productId,
+                  qty: it.qty,
+                  unitCost: it.unitCost,
+                })),
+              },
             },
-          },
-          include: { items: true },
-        });
-
-        for (const it of dto.items) {
-          const delta = sign * it.qty;
-
-          // Ensure balance row exists
-          const current = await tx.stockBalance.upsert({
-            where: { productId: it.productId },
-            create: { productId: it.productId, qtyOnHand: 0, qtyReserved: 0 },
-            update: {},
+            include: { items: true },
           });
 
-          const next = current.qtyOnHand + delta;
-          if (next < 0) {
-            throw new BadRequestException(
-              `Stock insuficiente para productId=${it.productId}. Disponible=${current.qtyOnHand}, requerido=${Math.abs(delta)}.`,
-            );
+          for (const it of dto.items) {
+            const delta = sign * it.qty;
+
+            // Ensure balance row exists
+            const current = await tx.stockBalance.upsert({
+              where: { productId: it.productId },
+              create: { productId: it.productId, qtyOnHand: 0, qtyReserved: 0 },
+              update: {},
+            });
+
+            const next = current.qtyOnHand + delta;
+            if (next < 0) {
+              throw new BadRequestException(
+                `Stock insuficiente para productId=${it.productId}. Disponible=${current.qtyOnHand}, requerido=${Math.abs(delta)}.`,
+              );
+            }
+
+            await tx.stockBalance.update({
+              where: { productId: it.productId },
+              data: { qtyOnHand: next },
+            });
           }
 
-          await tx.stockBalance.update({
-            where: { productId: it.productId },
-            data: { qtyOnHand: next },
-          });
-        }
+          return movement;
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      )
+      .then(async (movement) => {
+        // Audit logging (después de la transacción)
+        await this.audit.logCreate(
+          'inventoryMovement',
+          movement.id,
+          createdByUserId,
+          {
+            type: dto.type,
+            reason: dto.reason,
+            itemsCount: dto.items.length,
+          },
+        );
 
         return movement;
-      },
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
-    );
+      });
   }
 
-  listMovements() {
-    return this.prisma.inventoryMovement.findMany({
-      orderBy: { createdAt: 'desc' },
-      include: { items: true },
-      take: 200,
-    });
+  async listMovements(pagination?: { page?: number; limit?: number }) {
+    const page = pagination?.page ?? 1;
+    const limit = pagination?.limit ?? 20;
+    const skip = (page - 1) * limit;
+
+    const [data, total] = await Promise.all([
+      this.prisma.inventoryMovement.findMany({
+        orderBy: { createdAt: 'desc' },
+        include: { items: true },
+        skip,
+        take: limit,
+      }),
+      this.prisma.inventoryMovement.count(),
+    ]);
+
+    const totalPages = Math.ceil(total / limit);
+
+    return {
+      data,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPreviousPage: page > 1,
+      },
+    };
   }
 }

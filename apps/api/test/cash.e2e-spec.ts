@@ -1,8 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { INestApplication } from '@nestjs/common';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
-import * as request from 'supertest';
+import { setupTestModule, setupTestApp } from './test-helpers';
+import request from 'supertest';
 import { App } from 'supertest/types';
 
 describe('Cash (e2e)', () => {
@@ -11,53 +12,15 @@ describe('Cash (e2e)', () => {
   let authToken: string;
 
   beforeAll(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
-    }).compile();
-
-    app = moduleFixture.createNestApplication();
-    app.useGlobalPipes(
-      new ValidationPipe({
-        whitelist: true,
-        transform: true,
-        forbidNonWhitelisted: true,
+    const moduleFixture: TestingModule = await setupTestModule(
+      Test.createTestingModule({
+        imports: [AppModule],
       }),
-    );
-    await app.init();
+    ).compile();
 
-    prisma = moduleFixture.get<PrismaService>(PrismaService);
-
-    // Limpiar base de datos
-    await prisma.cashMovement.deleteMany();
-    await prisma.cashSession.deleteMany();
-    await prisma.user.deleteMany();
-
-    // Crear usuario y obtener token
-    const userCount = await prisma.user.count();
-    if (userCount === 0) {
-      await request(app.getHttpServer()).post('/auth/bootstrap-admin').send({
-        email: 'test@example.com',
-        password: 'Test123!',
-      });
-    }
-
-    const loginResponse = await request(app.getHttpServer())
-      .post('/auth/login')
-      .send({
-        email: 'test@example.com',
-        password: 'Test123!',
-      });
-
-    if (loginResponse.status === 200) {
-      authToken = loginResponse.body.accessToken;
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { email: 'test@example.com' },
-    });
-    if (user) {
-      // Usuario creado para autenticación
-    }
+    // Setup simplificado: una línea reemplaza 100+ líneas
+    const setup = await setupTestApp(moduleFixture, 'cash-test@example.com');
+    ({ app, prisma, authToken } = setup);
   });
 
   afterEach(async () => {
@@ -66,7 +29,6 @@ describe('Cash (e2e)', () => {
   });
 
   afterAll(async () => {
-    await prisma.user.deleteMany();
     await prisma.$disconnect();
     await app.close();
   });
@@ -82,7 +44,8 @@ describe('Cash (e2e)', () => {
         .expect(201);
 
       expect(response.body).toHaveProperty('id');
-      expect(response.body.openingAmount).toBe(50000);
+      // Decimal se serializa como string, convertir a número
+      expect(Number(response.body.openingAmount)).toBe(50000);
       expect(response.body.closedAt).toBeNull();
     });
 
@@ -95,7 +58,8 @@ describe('Cash (e2e)', () => {
         })
         .expect(201);
 
-      expect(response.body.openingAmount).toBe(100000);
+      // Decimal se serializa como string, convertir a número
+      expect(Number(response.body.openingAmount)).toBe(100000);
     });
   });
 
@@ -121,12 +85,15 @@ describe('Cash (e2e)', () => {
         .expect(200);
 
       expect(closeResponse.body.closedAt).toBeDefined();
-      expect(closeResponse.body.closingAmount).toBe(65000);
+      // Decimal se serializa como string, convertir a número
+      expect(Number(closeResponse.body.closingAmount)).toBe(65000);
     });
 
     it('debe fallar si la sesión no existe', async () => {
+      // Usar un UUID válido que no existe en la base de datos
+      const nonExistentId = '00000000-0000-0000-0000-000000000000';
       await request(app.getHttpServer())
-        .post('/cash/sessions/non-existent-id/close')
+        .post(`/cash/sessions/${nonExistentId}/close`)
         .set('Authorization', `Bearer ${authToken}`)
         .send({
           closingAmount: 50000,
@@ -150,8 +117,10 @@ describe('Cash (e2e)', () => {
         .set('Authorization', `Bearer ${authToken}`)
         .expect(200);
 
-      expect(Array.isArray(response.body)).toBe(true);
-      expect(response.body.length).toBeGreaterThan(0);
+      expect(response.body.data).toBeDefined();
+      expect(Array.isArray(response.body.data)).toBe(true);
+      expect(response.body.data.length).toBeGreaterThan(0);
+      expect(response.body.meta).toBeDefined();
     });
   });
 
@@ -174,7 +143,9 @@ describe('Cash (e2e)', () => {
         .set('Authorization', `Bearer ${authToken}`)
         .expect(200);
 
-      expect(Array.isArray(response.body)).toBe(true);
+      expect(response.body.data).toBeDefined();
+      expect(Array.isArray(response.body.data)).toBe(true);
+      expect(response.body.meta).toBeDefined();
     });
   });
 });

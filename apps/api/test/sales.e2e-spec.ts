@@ -1,8 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { INestApplication } from '@nestjs/common';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
-import * as request from 'supertest';
+import { setupTestModule, setupTestApp } from './test-helpers';
+import request from 'supertest';
 import { App } from 'supertest/types';
 
 describe('Sales (e2e)', () => {
@@ -15,72 +16,25 @@ describe('Sales (e2e)', () => {
   let cashSessionId: string;
 
   beforeAll(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
-    }).compile();
-
-    app = moduleFixture.createNestApplication();
-    app.useGlobalPipes(
-      new ValidationPipe({
-        whitelist: true,
-        transform: true,
-        forbidNonWhitelisted: true,
+    const moduleFixture: TestingModule = await setupTestModule(
+      Test.createTestingModule({
+        imports: [AppModule],
       }),
-    );
-    await app.init();
+    ).compile();
 
-    prisma = moduleFixture.get<PrismaService>(PrismaService);
-
-    // Limpiar base de datos de prueba
-    await prisma.auditLog.deleteMany();
-    await prisma.dianDocument.deleteMany();
-    await prisma.invoice.deleteMany();
-    await prisma.saleItem.deleteMany();
-    await prisma.sale.deleteMany();
-    await prisma.cashMovement.deleteMany();
-    await prisma.cashSession.deleteMany();
-    await prisma.inventoryMovementItem.deleteMany();
-    await prisma.inventoryMovement.deleteMany();
-    await prisma.stockBalance.deleteMany();
-    await prisma.product.deleteMany();
-    await prisma.category.deleteMany();
-    await prisma.customer.deleteMany();
-    await prisma.user.deleteMany();
-
-    // Crear usuario admin usando bootstrap (si no existe)
-    const userCount = await prisma.user.count();
-    if (userCount === 0) {
-      await request(app.getHttpServer()).post('/auth/bootstrap-admin').send({
-        email: 'test@example.com',
-        password: 'Test123!',
-      });
-    }
-
-    // Login para obtener token
-    const loginResponse = await request(app.getHttpServer())
-      .post('/auth/login')
-      .send({
-        email: 'test@example.com',
-        password: 'Test123!',
-      });
-
-    if (loginResponse.status === 200) {
-      authToken = loginResponse.body.accessToken;
-    }
-
-    // Obtener userId
-    const user = await prisma.user.findUnique({
-      where: { email: 'test@example.com' },
-    });
-    if (user) {
-      userId = user.id;
-    }
+    // Setup simplificado: una línea reemplaza 100+ líneas
+    const setup = await setupTestApp(moduleFixture, 'sales-test@example.com');
+    ({ app, prisma, authToken, userId } = setup);
   });
 
   beforeEach(async () => {
     // Crear datos de prueba para cada test
-    const category = await prisma.category.create({
-      data: { name: `Test Category ${Date.now()}` },
+    // Usar nombre único con timestamp para evitar conflictos
+    const categoryName = `Test Category ${Date.now()}`;
+    const category = await prisma.category.upsert({
+      where: { name: categoryName },
+      update: {},
+      create: { name: categoryName },
     });
     // Categoría creada para el producto
 
@@ -127,30 +81,21 @@ describe('Sales (e2e)', () => {
   });
 
   afterEach(async () => {
-    // Limpiar datos de cada test
-    await prisma.saleItem.deleteMany({
-      where: {
-        saleId: {
-          in: await prisma.sale
-            .findMany({ select: { id: true } })
-            .then((s) => s.map((s) => s.id)),
-        },
-      },
-    });
+    // Limpiar datos relacionados a ventas creados en cada test.
+    // No eliminamos productos/categorías/clientes aquí para evitar conflictos
+    // con otras suites (p.ej. quotes) que también crean datos relacionados.
+    await prisma.saleItem.deleteMany();
     await prisma.sale.deleteMany();
     await prisma.invoice.deleteMany();
     await prisma.dianDocument.deleteMany();
     await prisma.cashMovement.deleteMany();
     await prisma.cashSession.deleteMany();
+    await prisma.inventoryMovementItem.deleteMany();
+    await prisma.inventoryMovement.deleteMany();
     await prisma.stockBalance.deleteMany();
-    await prisma.product.deleteMany();
-    await prisma.category.deleteMany();
-    await prisma.customer.deleteMany();
   });
 
   afterAll(async () => {
-    // Limpieza final
-    await prisma.user.deleteMany();
     await prisma.$disconnect();
     await app.close();
   });
@@ -179,7 +124,8 @@ describe('Sales (e2e)', () => {
 
       // Verificar que la venta se creó correctamente
       expect(response.body.sale.status).toBe('PAID');
-      expect(response.body.sale.grandTotal).toBeGreaterThan(0);
+      // Decimal se serializa como string, convertir a número
+      expect(Number(response.body.sale.grandTotal)).toBeGreaterThan(0);
 
       // Verificar que se creó la factura
       expect(response.body.invoice.status).toBe('ISSUED');
@@ -201,7 +147,8 @@ describe('Sales (e2e)', () => {
       });
       expect(cashMovements.length).toBeGreaterThan(0);
       expect(cashMovements[0].type).toBe('IN');
-      expect(cashMovements[0].amount).toBe(response.body.sale.grandTotal);
+      // Decimal se serializa como string, convertir a número
+      expect(Number(cashMovements[0].amount)).toBe(Number(response.body.sale.grandTotal));
     });
 
     it('debe fallar si no hay stock suficiente', async () => {
@@ -257,9 +204,10 @@ describe('Sales (e2e)', () => {
         })
         .expect(201);
 
-      expect(response.body.sale.subtotal).toBe(20000);
-      expect(response.body.sale.taxTotal).toBe(3800);
-      expect(response.body.sale.grandTotal).toBe(23800);
+      // Decimal se serializa como string, convertir a número
+      expect(Number(response.body.sale.subtotal)).toBe(20000);
+      expect(Number(response.body.sale.taxTotal)).toBe(3800);
+      expect(Number(response.body.sale.grandTotal)).toBe(23800);
     });
   });
 
@@ -281,8 +229,10 @@ describe('Sales (e2e)', () => {
         .set('Authorization', `Bearer ${authToken}`)
         .expect(200);
 
-      expect(Array.isArray(response.body)).toBe(true);
-      expect(response.body.length).toBeGreaterThan(0);
+      expect(response.body.data).toBeDefined();
+      expect(Array.isArray(response.body.data)).toBe(true);
+      expect(response.body.data.length).toBeGreaterThan(0);
+      expect(response.body.meta).toBeDefined();
     });
   });
 });

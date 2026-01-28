@@ -7,6 +7,34 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [Sin Versión] - 2026-01-28
+
+### ✅ Agregado
+- **Observabilidad básica**
+  - `GET /metrics` (requiere JWT + rol ADMIN; se puede deshabilitar con `METRICS_ENABLED=false`)
+  - Header `x-request-id` para correlación de requests (incluido en respuestas de error)
+- **Health check mejorado**: `GET /health` ahora incluye **DB + Redis + colas** (BullMQ)
+- **Documento de estado**: `docs/ESTADO_ACTUAL_2026-01-28.md` como fuente de verdad del estado actual
+
+### 🛡️ Seguridad / Hardening
+- **CORS por entorno**: producción restringida con `ALLOWED_ORIGINS`
+- **Validación/fail-fast de envs críticos** al arrancar (producción más segura)
+- **JWT sin fallbacks inseguros** (falla si falta `JWT_ACCESS_SECRET`)
+
+### 🧩 Calidad
+- **Manejo de errores más profesional**
+  - Mapeo ampliado de errores Prisma → HTTP (409/404/400/503/500)
+  - Mensajes de validación anidados con rutas (`items[0].qty`)
+- **Swagger/DTOs**: mejoras en ejemplos, required/optional consistentes y validaciones de arrays (`ArrayMinSize(1)`)
+
+### ⚡ Performance/Operación
+- **Redis**: invalidación por patrón sin `KEYS` (se usa `SCAN` para evitar bloqueo)
+
+### 📚 Documentación
+- README y `docs/README.md` actualizados con fase y enlaces al documento de estado
+
+---
+
 ## [Sin Versión] - 2026-01-27
 
 ### ✅ Agregado

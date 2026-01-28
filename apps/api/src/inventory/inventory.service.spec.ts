@@ -4,6 +4,8 @@ import { InventoryService } from './inventory.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateMovementDto } from './dto/create-movement.dto';
 import { InventoryMovementType } from '@prisma/client';
+import { ValidationLimitsService } from '../common/services/validation-limits.service';
+import { AuditService } from '../common/services/audit.service';
 
 describe('InventoryService', () => {
   let service: InventoryService;
@@ -20,6 +22,7 @@ describe('InventoryService', () => {
       $transaction: jest.fn(),
       inventoryMovement: {
         findMany: jest.fn(),
+        count: jest.fn(),
       },
       product: {
         findMany: jest.fn(),
@@ -32,6 +35,18 @@ describe('InventoryService', () => {
         {
           provide: PrismaService,
           useValue: mockPrisma,
+        },
+        {
+          provide: ValidationLimitsService,
+          useValue: {
+            validateInventoryQty: jest.fn().mockResolvedValue(undefined),
+          },
+        },
+        {
+          provide: AuditService,
+          useValue: {
+            logCreate: jest.fn().mockResolvedValue(undefined),
+          },
         },
       ],
     }).compile();
@@ -458,15 +473,16 @@ describe('InventoryService', () => {
       prisma.inventoryMovement.findMany = jest
         .fn()
         .mockResolvedValue(mockMovements);
+      prisma.inventoryMovement.count = jest.fn().mockResolvedValue(2);
 
       const result = await service.listMovements();
 
-      expect(result).toEqual(mockMovements);
-      expect(prisma.inventoryMovement.findMany).toHaveBeenCalledWith({
-        orderBy: { createdAt: 'desc' },
-        include: { items: true },
-        take: 200,
-      });
+      expect(result).toHaveProperty('data');
+      expect(result).toHaveProperty('meta');
+      expect(result.data).toEqual(mockMovements);
+      expect(result.meta.total).toBe(2);
+      expect(prisma.inventoryMovement.findMany).toHaveBeenCalled();
+      expect(prisma.inventoryMovement.count).toHaveBeenCalled();
     });
   });
 });

@@ -1,6 +1,15 @@
-import { Controller, Get } from '@nestjs/common';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { Controller, Get, UseGuards } from '@nestjs/common';
+import {
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 import { AppService } from './app.service';
+import { JwtAuthGuard } from './auth/jwt-auth.guard';
+import { RolesGuard } from './auth/roles.guard';
+import { Roles } from './auth/roles.decorator';
+import { RoleName } from '@prisma/client';
 
 @Controller()
 @ApiTags('health')
@@ -15,10 +24,13 @@ export class AppController {
   }
 
   @Get('health')
-  @ApiOperation({ summary: 'Health check - Verificar estado de la API' })
+  @ApiOperation({
+    summary: 'Health check - Verificar estado de la API y servicios',
+    description: 'Verifica el estado de la API, base de datos y servicios',
+  })
   @ApiResponse({
     status: 200,
-    description: 'API funcionando correctamente',
+    description: 'Estado de salud del sistema',
     schema: {
       type: 'object',
       properties: {
@@ -26,10 +38,37 @@ export class AppController {
         timestamp: { type: 'string', example: '2026-01-27T04:54:36.456Z' },
         uptime: { type: 'number', example: 123.456 },
         environment: { type: 'string', example: 'development' },
+        services: {
+          type: 'object',
+          properties: {
+            database: { type: 'string', example: 'connected' },
+            redis: { type: 'string', example: 'connected' },
+            queues: { type: 'object' },
+            responseTime: { type: 'string', example: '5ms' },
+          },
+        },
       },
     },
   })
   getHealth() {
     return this.appService.getHealth();
+  }
+
+  @Get('stats')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(RoleName.ADMIN)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Estadísticas generales del sistema',
+    description: 'Obtiene estadísticas generales del sistema (requiere ADMIN)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Estadísticas del sistema',
+  })
+  @ApiResponse({ status: 401, description: 'No autenticado' })
+  @ApiResponse({ status: 403, description: 'No autorizado (requiere ADMIN)' })
+  getStats() {
+    return this.appService.getStats();
   }
 }

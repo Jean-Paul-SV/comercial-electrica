@@ -16,6 +16,9 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateSaleDto } from './dto/create-sale.dto';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
+import { ValidationLimitsService } from '../common/services/validation-limits.service';
+import { AuditService } from '../common/services/audit.service';
+import { CacheService } from '../common/services/cache.service';
 
 function makeInvoiceNumber(now = new Date()) {
   const yyyy = String(now.getFullYear());
@@ -32,6 +35,9 @@ export class SalesService {
   constructor(
     private readonly prisma: PrismaService,
     @InjectQueue('dian') private readonly dianQueue: Queue,
+    private readonly limits: ValidationLimitsService,
+    private readonly audit: AuditService,
+    private readonly cache: CacheService,
   ) {}
 
   async createSale(dto: CreateSaleDto, createdByUserId?: string) {
@@ -40,6 +46,12 @@ export class SalesService {
     );
     if (!dto.items || dto.items.length === 0)
       throw new BadRequestException('Debe incluir items.');
+
+    // Validar límites
+    this.limits.validateItemsCount(dto.items.length, 'sale');
+    for (const item of dto.items) {
+      this.limits.validateItemQty(item.qty);
+    }
 
     // Validar que la sesión de caja existe y está abierta
     if (!dto.cashSessionId) {
@@ -171,14 +183,20 @@ export class SalesService {
             },
           });
 
-          // Audit minimal (placeholder)
+          // Audit logging mejorado
           await tx.auditLog.create({
             data: {
               actorId: createdByUserId ?? null,
               entity: 'sale',
               entityId: sale.id,
               action: 'create',
-              diff: { invoiceId: invoice.id, dianDocumentId: dianDoc.id },
+              diff: {
+                invoiceId: invoice.id,
+                dianDocumentId: dianDoc.id,
+                customerId: sale.customerId,
+                grandTotal: Number(sale.grandTotal),
+                itemsCount: sale.items.length,
+              },
             },
           });
 
@@ -199,15 +217,45 @@ export class SalesService {
           { dianDocumentId: result.dianDocument.id },
           { attempts: 10, backoff: { type: 'exponential', delay: 5000 } },
         );
+        // Invalidar caché de listados
+        await this.cache.deletePattern('cache:sales:*');
         return result;
       });
   }
 
-  listSales() {
-    return this.prisma.sale.findMany({
-      orderBy: { soldAt: 'desc' },
-      include: { items: true, customer: true, invoices: true },
-      take: 200,
-    });
+  async listSales(pagination?: { page?: number; limit?: number }) {
+    const page = pagination?.page ?? 1;
+    const limit = pagination?.limit ?? 20;
+    const skip = (page - 1) * limit;
+
+    const [data, total] = await Promise.all([
+      this.prisma.sale.findMany({
+        orderBy: { soldAt: 'desc' },
+        include: { items: true, customer: true, invoices: true },
+        skip,
+        take: limit,
+      }),
+      this.prisma.sale.count(),
+    ]);
+
+    const totalPages = Math.ceil(total / limit);
+
+    const result = {
+      data,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPreviousPage: page > 1,
+      },
+    };
+
+    // Cachear listados (sin filtros complejos por ahora)
+    const cacheKey = this.cache.buildKey('sales', 'list', page, limit);
+    await this.cache.set(cacheKey, result, 180); // 3 minutos
+
+    return result;
   }
 }

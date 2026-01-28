@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Post,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
@@ -7,6 +15,7 @@ import {
 } from '@nestjs/swagger';
 import { SalesService } from './sales.service';
 import { CreateSaleDto } from './dto/create-sale.dto';
+import { PaginationDto } from '../common/dto/pagination.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 
@@ -20,12 +29,39 @@ export class SalesController {
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Listar ventas',
-    description: 'Obtiene todas las ventas ordenadas por fecha descendente',
+    description:
+      'Obtiene todas las ventas ordenadas por fecha descendente. Respuesta paginada.',
   })
-  @ApiResponse({ status: 200, description: 'Lista de ventas' })
+  @ApiResponse({
+    status: 200,
+    description: 'Lista paginada de ventas',
+    schema: {
+      type: 'object',
+      properties: {
+        data: {
+          type: 'array',
+          items: { type: 'object' },
+        },
+        meta: {
+          type: 'object',
+          properties: {
+            total: { type: 'number' },
+            page: { type: 'number' },
+            limit: { type: 'number' },
+            totalPages: { type: 'number' },
+            hasNextPage: { type: 'boolean' },
+            hasPreviousPage: { type: 'boolean' },
+          },
+        },
+      },
+    },
+  })
   @ApiResponse({ status: 401, description: 'No autenticado' })
-  list() {
-    return this.sales.listSales();
+  list(@Query() pagination?: PaginationDto) {
+    return this.sales.listSales({
+      page: pagination?.page,
+      limit: pagination?.limit,
+    });
   }
 
   @Post()

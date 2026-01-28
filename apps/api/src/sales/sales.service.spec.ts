@@ -4,6 +4,9 @@ import { SalesService } from './sales.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { getQueueToken } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
+import { ValidationLimitsService } from '../common/services/validation-limits.service';
+import { AuditService } from '../common/services/audit.service';
+import { CacheService } from '../common/services/cache.service';
 import { CreateSaleDto } from './dto/create-sale.dto';
 import {
   SaleStatus,
@@ -66,12 +69,13 @@ describe('SalesService', () => {
       $transaction: jest.fn(),
       sale: {
         findMany: jest.fn(),
+        count: jest.fn(),
       },
       cashSession: {
         findUnique: jest.fn(),
       },
       customer: {
-        findUnique: jest.fn(),
+        findUnique: jest.fn().mockResolvedValue(mockCustomer),
       },
     };
 
@@ -89,6 +93,27 @@ describe('SalesService', () => {
         {
           provide: getQueueToken('dian'),
           useValue: mockQueue,
+        },
+        {
+          provide: ValidationLimitsService,
+          useValue: {
+            validateItemsCount: jest.fn().mockResolvedValue(undefined),
+            validateItemQty: jest.fn().mockResolvedValue(undefined),
+          },
+        },
+        {
+          provide: AuditService,
+          useValue: {
+            logCreate: jest.fn().mockResolvedValue(undefined),
+          },
+        },
+        {
+          provide: CacheService,
+          useValue: {
+            deletePattern: jest.fn().mockResolvedValue(undefined),
+            buildKey: jest.fn((...args) => `cache:${args.join(':')}`),
+            set: jest.fn().mockResolvedValue(undefined),
+          },
         },
       ],
     }).compile();
@@ -552,15 +577,16 @@ describe('SalesService', () => {
       ];
 
       prisma.sale.findMany = jest.fn().mockResolvedValue(mockSales);
+      prisma.sale.count = jest.fn().mockResolvedValue(2);
 
       const result = await service.listSales();
 
-      expect(result).toEqual(mockSales);
-      expect(prisma.sale.findMany).toHaveBeenCalledWith({
-        orderBy: { soldAt: 'desc' },
-        include: { items: true, customer: true, invoices: true },
-        take: 200,
-      });
+      expect(result).toHaveProperty('data');
+      expect(result).toHaveProperty('meta');
+      expect(result.data).toEqual(mockSales);
+      expect(result.meta.total).toBe(2);
+      expect(prisma.sale.findMany).toHaveBeenCalled();
+      expect(prisma.sale.count).toHaveBeenCalled();
     });
   });
 });

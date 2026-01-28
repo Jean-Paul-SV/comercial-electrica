@@ -5,6 +5,8 @@ import { config } from 'dotenv';
 import { resolve } from 'path';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AllExceptionsFilter } from './common/filters/http-exception.filter';
+import { randomUUID } from 'crypto';
+import type { Request, Response, NextFunction } from 'express';
 
 // Cargar .env manualmente antes de que NestJS inicie
 // Intenta diferentes ubicaciones
@@ -36,8 +38,28 @@ if (!envLoaded) {
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  const isProd = process.env.NODE_ENV === 'production';
+  const allowedOrigins = (process.env.ALLOWED_ORIGINS ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  // Correlation / Request ID (útil para debugging y trazabilidad)
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    const r = req as Request & { requestId?: string };
+    const headerId =
+      req.get('x-request-id') ||
+      (typeof req.headers['x-request-id'] === 'string'
+        ? req.headers['x-request-id']
+        : undefined);
+    const requestId = headerId && headerId.trim().length > 0 ? headerId : randomUUID();
+    r.requestId = requestId;
+    res.setHeader('x-request-id', requestId);
+    next();
+  });
+
   app.enableCors({
-    origin: true,
+    origin: isProd ? allowedOrigins : true,
     credentials: true,
   });
   // Filtro global de excepciones para respuestas consistentes
@@ -52,13 +74,33 @@ async function bootstrap() {
         enableImplicitConversion: true,
       },
       exceptionFactory: (errors) => {
-        // Personalizar mensajes de validación
-        const messages = errors.map((error) => {
-          const constraints = Object.values(error.constraints || {});
-          return constraints.length > 0
-            ? constraints.join(', ')
-            : `${error.property} tiene un valor inválido`;
-        });
+        // Personalizar mensajes de validación (incluye DTOs anidados: items[0].qty, etc.)
+        const joinPath = (parent: string, prop: string) => {
+          if (!parent) return prop;
+          return /^\d+$/.test(prop) ? `${parent}[${prop}]` : `${parent}.${prop}`;
+        };
+
+        const flatten = (
+          errs: typeof errors,
+          parentPath = '',
+        ): string[] => {
+          return errs.flatMap((err) => {
+            const path = joinPath(parentPath, err.property);
+            const constraints = Object.values(err.constraints || {}).map(
+              (msg) => `${path}: ${msg}`,
+            );
+            const children = err.children?.length
+              ? flatten(err.children as typeof errors, path)
+              : [];
+            return constraints.length > 0
+              ? [...constraints, ...children]
+              : children.length > 0
+                ? children
+                : [`${path} tiene un valor inválido`];
+          });
+        };
+
+        const messages = flatten(errors);
         return new HttpException(
           {
             message: messages,
@@ -90,8 +132,7 @@ async function bootstrap() {
       'JWT-auth', // Este nombre se usará en los decoradores @ApiBearerAuth()
     )
     .addTag('auth', 'Endpoints de autenticación')
-    .addTag('products', 'Gestión de productos y catálogo')
-    .addTag('categories', 'Gestión de categorías')
+    .addTag('catalog', 'Gestión de catálogo (productos y categorías)')
     .addTag('customers', 'Gestión de clientes')
     .addTag('inventory', 'Gestión de inventario y movimientos de stock')
     .addTag('cash', 'Gestión de caja y sesiones')
@@ -99,6 +140,8 @@ async function bootstrap() {
     .addTag('quotes', 'Gestión de cotizaciones')
     .addTag('reports', 'Reportes y analytics')
     .addTag('dian', 'Procesamiento de documentos DIAN')
+    .addTag('backups', 'Gestión de backups')
+    .addTag('audit', 'Logs de auditoría')
     .addTag('health', 'Health check y estado del sistema')
     .build();
 
