@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { QueryClientProvider } from '@shared/providers/QueryClientProvider';
 import { AuthProvider } from '@shared/providers/AuthProvider';
+import { Toaster } from '@shared/components/Toaster';
 import './globals.css';
 
 export const metadata = {
@@ -13,6 +14,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <body>
         <AuthProvider>
           <QueryClientProvider>{children}</QueryClientProvider>
+          <Toaster />
         </AuthProvider>
       </body>
     </html>

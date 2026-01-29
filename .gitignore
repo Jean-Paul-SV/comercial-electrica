@@ -20,6 +20,8 @@ lerna-debug.log*
 coverage
 *.tgz
 *.tar.gz
+.next
+out
 
 # IDE
 .vscode/*

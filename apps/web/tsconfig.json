@@ -1,5 +1,6 @@
 {
   "compilerOptions": {
+    "baseUrl": ".",
     "target": "ES2022",
     "lib": [
       "dom",
@@ -18,15 +19,10 @@
     "jsx": "preserve",
     "incremental": true,
     "paths": {
-      "@features/*": [
-        "src/features/*"
-      ],
-      "@shared/*": [
-        "src/shared/*"
-      ],
-      "@infrastructure/*": [
-        "src/infrastructure/*"
-      ]
+      "@features/*": ["src/features/*"],
+      "@shared/*": ["src/shared/*"],
+      "@infrastructure/*": ["src/infrastructure/*"],
+      "@lib/*": ["src/lib/*"]
     },
     "plugins": [
       {

@@ -1,39 +1,60 @@
 'use client';
 
 import { useAuth } from '@shared/providers/AuthProvider';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@shared/components/ui/card';
+import { LayoutDashboard, ShoppingCart, Package } from 'lucide-react';
+import Link from 'next/link';
 
 export default function DashboardPage() {
   const { user } = useAuth();
 
   return (
-    <div style={{ display: 'grid', gap: '0.75rem' }}>
-      <h2 style={{ margin: 0 }}>Dashboard</h2>
-      <div style={{ color: '#94a3b8' }}>
-        Sesión activa: {user?.email} ({user?.role})
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-semibold">Dashboard</h1>
+        <p className="text-muted-foreground text-sm mt-1">
+          Sesión: {user?.email} · {user?.role}
+        </p>
       </div>
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-          gap: '0.75rem',
-        }}
-      >
-        <div style={{ border: '1px solid #1e293b', borderRadius: 12, padding: 16 }}>
-          <div style={{ color: '#94a3b8', fontSize: 12 }}>Módulo</div>
-          <div style={{ fontWeight: 700, marginTop: 4 }}>Ventas</div>
-          <div style={{ color: '#94a3b8', fontSize: 12, marginTop: 8 }}>
-            Listado paginado desde API
-          </div>
-        </div>
-        <div style={{ border: '1px solid #1e293b', borderRadius: 12, padding: 16 }}>
-          <div style={{ color: '#94a3b8', fontSize: 12 }}>Siguiente</div>
-          <div style={{ fontWeight: 700, marginTop: 4 }}>Inventario</div>
-          <div style={{ color: '#94a3b8', fontSize: 12, marginTop: 8 }}>
-            Pendiente de montar pantallas
-          </div>
-        </div>
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <Link href="/sales">
+          <Card className="hover:border-primary/50 transition-colors cursor-pointer h-full">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <ShoppingCart className="h-4 w-4" />
+                Ventas
+              </CardTitle>
+              <CardDescription>
+                Listado paginado desde API
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        </Link>
+        <Link href="/products">
+          <Card className="hover:border-primary/50 transition-colors cursor-pointer h-full">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Package className="h-4 w-4" />
+                Productos
+              </CardTitle>
+              <CardDescription>
+                Catálogo y categorías
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        </Link>
+        <Card className="opacity-80">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <LayoutDashboard className="h-4 w-4" />
+              Más módulos
+            </CardTitle>
+            <CardDescription>
+              Clientes, Caja, Reportes en el menú
+            </CardDescription>
+          </CardHeader>
+        </Card>
       </div>
     </div>
   );
 }
-
