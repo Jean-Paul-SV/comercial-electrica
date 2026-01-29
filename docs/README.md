@@ -101,6 +101,10 @@ Ver `historico/README.md` para lista completa de documentos históricos.
   - Solución de problemas
   - **Swagger ya está configurado - Disponible en `/api/docs`**
 
+- **[🧾 Guía: Proveedores, Compras y Cuentas por Pagar](./GUIA_PROVEEDORES_COMPRAS_CUENTAS_POR_PAGAR.md)** ⭐
+  - Proveedor → Pedido → Recepción (inventario IN) → Factura con `dueDate` → Pagos → Pendientes/Vencidas
+  - Request bodies listos para Swagger y `curl.exe` (PowerShell)
+
 #### 📚 **Referencia Histórica** (Información adicional sobre Swagger)
 
 - **[🔍 ¿Qué Hace Realmente Swagger?](./COMO_FUNCIONA_SWAGGER.md)** 📚

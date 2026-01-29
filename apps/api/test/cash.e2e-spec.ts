@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
-import { setupTestModule, setupTestApp } from './test-helpers';
+import { setupTestModule, setupTestApp, shutdownTestApp } from './test-helpers';
 import request from 'supertest';
 import { App } from 'supertest/types';
 
@@ -29,8 +29,7 @@ describe('Cash (e2e)', () => {
   });
 
   afterAll(async () => {
-    await prisma.$disconnect();
-    await app.close();
+    await shutdownTestApp({ app, prisma });
   });
 
   describe('POST /cash/sessions', () => {
@@ -91,7 +90,8 @@ describe('Cash (e2e)', () => {
 
     it('debe fallar si la sesión no existe', async () => {
       // Usar un UUID válido que no existe en la base de datos
-      const nonExistentId = '00000000-0000-0000-0000-000000000000';
+      // UUID v4 válido pero inexistente (evita 400 del ParseUUIDPipe version '4')
+      const nonExistentId = '11111111-1111-4111-8111-111111111111';
       await request(app.getHttpServer())
         .post(`/cash/sessions/${nonExistentId}/close`)
         .set('Authorization', `Bearer ${authToken}`)

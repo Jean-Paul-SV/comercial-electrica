@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
-import { setupTestModule, setupTestApp } from './test-helpers';
+import { setupTestModule, setupTestApp, shutdownTestApp } from './test-helpers';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { exec } from 'child_process';
@@ -42,8 +42,7 @@ describe('Backups (e2e)', () => {
   });
 
   afterAll(async () => {
-    await prisma.$disconnect();
-    await app.close();
+    await shutdownTestApp({ app, prisma });
   });
 
   describe('POST /backups', () => {
@@ -136,7 +135,8 @@ describe('Backups (e2e)', () => {
     });
 
     it('debe retornar 404 para backup inexistente', async () => {
-      const fakeId = '00000000-0000-0000-0000-000000000000';
+      // UUID v4 válido pero inexistente (evita 400 del ParseUUIDPipe version '4')
+      const fakeId = '11111111-1111-4111-8111-111111111111';
       await request(app.getHttpServer())
         .get(`/backups/${fakeId}`)
         .set('Authorization', `Bearer ${authToken}`)

@@ -5,6 +5,8 @@ import { RoleName } from '@prisma/client';
 import * as argon2 from 'argon2';
 import request from 'supertest';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { getQueueToken } from '@nestjs/bullmq';
+import type { Queue } from 'bullmq';
 
 /**
  * Mock del AuditService que no hace nada
@@ -40,6 +42,11 @@ export async function cleanDatabase(prisma: PrismaService): Promise<void> {
   const cleanupOperations = [
     () => prisma.auditLog.deleteMany(),
     () => prisma.dianEvent.deleteMany(),
+    // Proveedores / compras / cuentas por pagar (FK -> padres)
+    () => prisma.supplierPayment.deleteMany(),
+    () => prisma.supplierInvoice.deleteMany(),
+    () => prisma.purchaseOrderItem.deleteMany(),
+    () => prisma.purchaseOrder.deleteMany(),
     () => prisma.quoteItem.deleteMany(),
     () => prisma.quote.deleteMany(),
     () => prisma.saleItem.deleteMany(),
@@ -55,6 +62,7 @@ export async function cleanDatabase(prisma: PrismaService): Promise<void> {
     () => prisma.product.deleteMany(),
     () => prisma.category.deleteMany(),
     () => prisma.customer.deleteMany(),
+    () => prisma.supplier.deleteMany(),
     () => prisma.user.deleteMany(),
   ];
 
@@ -160,4 +168,32 @@ export async function setupTestApp(
     authToken: token,
     userId,
   };
+}
+
+/**
+ * Cierra conexiones BullMQ/Redis para que Jest pueda finalizar sin forceExit.
+ * En suites E2E, esto evita "Jest did not exit one second after..." por handles abiertos.
+ */
+export async function closeTestQueues(app: INestApplication): Promise<void> {
+  const queueNames = ['dian', 'backup', 'reports'] as const;
+
+  for (const name of queueNames) {
+    try {
+      const queue = app.get<Queue>(getQueueToken(name), { strict: false } as any);
+      if (queue && typeof (queue as any).close === 'function') {
+        await queue.close();
+      }
+    } catch {
+      // Ignorar si el queue/provider no existe en este contexto
+    }
+  }
+}
+
+export async function shutdownTestApp(setup: {
+  app: INestApplication;
+  prisma: PrismaService;
+}): Promise<void> {
+  await closeTestQueues(setup.app);
+  await setup.prisma.$disconnect();
+  await setup.app.close();
 }

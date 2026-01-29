@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
-import { setupTestModule, setupTestApp } from './test-helpers';
+import { setupTestModule, setupTestApp, shutdownTestApp } from './test-helpers';
 import request from 'supertest';
 import { App } from 'supertest/types';
 
@@ -116,8 +116,7 @@ describe('Reports (e2e)', () => {
     await prisma.sale.deleteMany();
     await prisma.cashMovement.deleteMany();
     await prisma.cashSession.deleteMany();
-    await prisma.$disconnect();
-    await app.close();
+    await shutdownTestApp({ app, prisma });
   });
 
   describe('GET /reports/dashboard', () => {

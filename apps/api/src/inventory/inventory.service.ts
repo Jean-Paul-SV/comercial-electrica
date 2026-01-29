@@ -27,6 +27,30 @@ export class InventoryService {
       throw new BadRequestException('Debe incluir items.');
     }
 
+    // Validar que supplierId solo se use en movimientos IN
+    if (dto.supplierId && dto.type !== InventoryMovementType.IN) {
+      throw new BadRequestException(
+        'El proveedor solo puede especificarse en movimientos de entrada (IN).',
+      );
+    }
+
+    // Validar que el proveedor existe si se proporciona
+    if (dto.supplierId) {
+      const supplier = await this.prisma.supplier.findUnique({
+        where: { id: dto.supplierId },
+      });
+      if (!supplier) {
+        throw new BadRequestException(
+          `Proveedor con ID ${dto.supplierId} no encontrado.`,
+        );
+      }
+      if (!supplier.isActive) {
+        throw new BadRequestException(
+          `El proveedor ${supplier.name} está inactivo.`,
+        );
+      }
+    }
+
     // Validar límites de cantidad
     for (const item of dto.items) {
       this.limits.validateInventoryQty(item.qty, dto.type);
@@ -65,6 +89,7 @@ export class InventoryService {
             data: {
               type,
               reason: dto.reason,
+              supplierId: dto.supplierId,
               createdBy: createdByUserId,
               items: {
                 create: dto.items.map((it) => ({
@@ -74,7 +99,7 @@ export class InventoryService {
                 })),
               },
             },
-            include: { items: true },
+            include: { items: true, supplier: true },
           });
 
           for (const it of dto.items) {
@@ -129,7 +154,7 @@ export class InventoryService {
     const [data, total] = await Promise.all([
       this.prisma.inventoryMovement.findMany({
         orderBy: { createdAt: 'desc' },
-        include: { items: true },
+        include: { items: true, supplier: true },
         skip,
         take: limit,
       }),

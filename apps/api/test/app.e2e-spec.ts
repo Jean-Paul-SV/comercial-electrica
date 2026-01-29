@@ -3,6 +3,7 @@ import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
+import { closeTestQueues } from './test-helpers';
 
 describe('AppController (e2e)', () => {
   let app: INestApplication<App>;
@@ -14,6 +15,12 @@ describe('AppController (e2e)', () => {
 
     app = moduleFixture.createNestApplication();
     await app.init();
+  });
+
+  afterEach(async () => {
+    // Cerrar colas BullMQ/Redis para que Jest no quede con handles abiertos
+    await closeTestQueues(app);
+    await app.close();
   });
 
   it('/ (GET)', () => {

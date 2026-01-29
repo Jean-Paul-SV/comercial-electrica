@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
-import { setupTestModule, setupTestApp } from './test-helpers';
+import { setupTestModule, setupTestApp, shutdownTestApp } from './test-helpers';
 import request from 'supertest';
 import { App } from 'supertest/types';
 
@@ -74,8 +74,7 @@ describe('Quotes (e2e) - Flujo Completo', () => {
     // para evitar conflictos con otras suites
     await prisma.quoteItem.deleteMany();
     await prisma.quote.deleteMany();
-    await prisma.$disconnect();
-    await app.close();
+    await shutdownTestApp({ app, prisma });
   });
 
   describe('Flujo Completo de Cotizaciones', () => {

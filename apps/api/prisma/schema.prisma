@@ -78,6 +78,23 @@ enum DianDocumentStatus {
   REJECTED
 }
 
+enum PurchaseOrderStatus {
+  DRAFT
+  SENT
+  RECEIVED
+  PARTIALLY_RECEIVED
+  COMPLETED
+  CANCELLED
+}
+
+enum SupplierInvoiceStatus {
+  PENDING
+  PARTIALLY_PAID
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
 model User {
   id           String   @id @default(uuid()) @db.Uuid
   email        String   @unique
@@ -117,6 +134,7 @@ model Product {
   saleItems              SaleItem[]
   quoteItems             QuoteItem[]
   inventoryMovementItems InventoryMovementItem[]
+  purchaseOrderItems     PurchaseOrderItem[]
 
   @@index([name])
   @@index([categoryId])
@@ -137,14 +155,17 @@ model InventoryMovement {
   id        String                @id @default(uuid()) @db.Uuid
   type      InventoryMovementType
   reason    String?
+  supplierId String?              @db.Uuid
   createdBy String?               @db.Uuid
   createdAt DateTime              @default(now())
 
-  items InventoryMovementItem[]
+  supplier Supplier? @relation(fields: [supplierId], references: [id])
+  items    InventoryMovementItem[]
 
   @@index([createdAt])
   @@index([type])
   @@index([createdBy])
+  @@index([supplierId])
 }
 
 model InventoryMovementItem {
@@ -180,6 +201,117 @@ model Customer {
 
   @@unique([docType, docNumber])
   @@index([name])
+}
+
+model Supplier {
+  id        String   @id @default(uuid()) @db.Uuid
+  nit       String   @unique
+  name      String
+  email     String?
+  phone     String?
+  address   String?
+  cityCode  String?
+  contactPerson String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  inventoryMovements InventoryMovement[]
+  purchaseOrders     PurchaseOrder[]
+  invoices           SupplierInvoice[]
+
+  @@index([name])
+  @@index([nit])
+  @@index([isActive])
+}
+
+model PurchaseOrder {
+  id            String              @id @default(uuid()) @db.Uuid
+  supplierId    String              @db.Uuid
+  orderNumber   String              @unique
+  status        PurchaseOrderStatus @default(DRAFT)
+  orderDate     DateTime            @default(now())
+  expectedDate  DateTime?
+  receivedDate  DateTime?
+  notes         String?
+  subtotal      Decimal             @db.Decimal(18, 2) @default(0)
+  taxTotal      Decimal             @db.Decimal(18, 2) @default(0)
+  discountTotal Decimal             @db.Decimal(18, 2) @default(0)
+  grandTotal    Decimal             @db.Decimal(18, 2) @default(0)
+  createdBy     String?             @db.Uuid
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  supplier Supplier            @relation(fields: [supplierId], references: [id])
+  items    PurchaseOrderItem[]
+  invoices SupplierInvoice[]
+
+  @@index([supplierId])
+  @@index([status])
+  @@index([orderDate])
+  @@index([expectedDate])
+}
+
+model PurchaseOrderItem {
+  id            String   @id @default(uuid()) @db.Uuid
+  purchaseOrderId String  @db.Uuid
+  productId     String   @db.Uuid
+  qty           Int
+  unitCost      Decimal  @db.Decimal(18, 2)
+  taxRate       Decimal  @db.Decimal(5, 2) @default(0)
+  lineTotal     Decimal  @db.Decimal(18, 2)
+  receivedQty   Int      @default(0)
+
+  purchaseOrder PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  product        Product      @relation(fields: [productId], references: [id])
+
+  @@index([purchaseOrderId])
+  @@index([productId])
+}
+
+model SupplierInvoice {
+  id            String                @id @default(uuid()) @db.Uuid
+  supplierId    String                @db.Uuid
+  purchaseOrderId String?             @db.Uuid
+  invoiceNumber String                @unique
+  invoiceDate   DateTime              @default(now())
+  dueDate       DateTime
+  status        SupplierInvoiceStatus @default(PENDING)
+  subtotal      Decimal               @db.Decimal(18, 2) @default(0)
+  taxTotal      Decimal               @db.Decimal(18, 2) @default(0)
+  discountTotal Decimal               @db.Decimal(18, 2) @default(0)
+  grandTotal    Decimal               @db.Decimal(18, 2) @default(0)
+  paidAmount    Decimal               @db.Decimal(18, 2) @default(0)
+  notes         String?
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+
+  supplier      Supplier         @relation(fields: [supplierId], references: [id])
+  purchaseOrder PurchaseOrder?    @relation(fields: [purchaseOrderId], references: [id])
+  payments      SupplierPayment[]
+
+  @@index([supplierId])
+  @@index([purchaseOrderId])
+  @@index([status])
+  @@index([dueDate])
+  @@index([invoiceDate])
+}
+
+model SupplierPayment {
+  id              String        @id @default(uuid()) @db.Uuid
+  supplierInvoiceId String      @db.Uuid
+  amount          Decimal       @db.Decimal(18, 2)
+  paymentDate     DateTime      @default(now())
+  paymentMethod   PaymentMethod
+  reference       String?
+  notes           String?
+  createdBy       String?       @db.Uuid
+  createdAt       DateTime      @default(now())
+
+  supplierInvoice SupplierInvoice @relation(fields: [supplierInvoiceId], references: [id], onDelete: Cascade)
+
+  @@index([supplierInvoiceId])
+  @@index([paymentDate])
 }
 
 model Sale {

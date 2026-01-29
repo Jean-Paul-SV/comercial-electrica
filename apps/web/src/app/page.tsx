@@ -1,5 +1,22 @@
 'use client';
 
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@shared/providers/AuthProvider';
+
+export default function Home() {
+  const router = useRouter();
+  const { isAuthenticated } = useAuth();
+
+  useEffect(() => {
+    router.replace(isAuthenticated ? '/app' : '/login');
+  }, [isAuthenticated, router]);
+
+  return null;
+}
+
+'use client';
+
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';

@@ -25,11 +25,15 @@ async function request<T>(
   const body = isJson ? await res.json() : await res.text();
 
   if (!res.ok) {
+    const rawMessage = isJson ? body?.message ?? body?.error : body;
+    const message = Array.isArray(rawMessage)
+      ? rawMessage.join('\n')
+      : typeof rawMessage === 'string'
+        ? rawMessage
+        : 'Error en la solicitud';
     throw {
       status: res.status,
-      message:
-        (isJson && (body?.message ?? body?.error)) ||
-        (typeof body === 'string' ? body : 'Error en la solicitud'),
+      message,
     };
   }
 

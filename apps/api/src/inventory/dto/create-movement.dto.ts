@@ -56,6 +56,14 @@ export class CreateMovementDto {
   @IsString()
   reason?: string;
 
+  @ApiPropertyOptional({
+    example: 'supplier-uuid-123',
+    description: 'ID del proveedor (opcional, solo para movimientos IN)',
+  })
+  @IsOptional()
+  @IsUUID()
+  supplierId?: string;
+
   @ApiProperty({
     type: [MovementItemDto],
     description: 'Items del movimiento (mínimo 1)',

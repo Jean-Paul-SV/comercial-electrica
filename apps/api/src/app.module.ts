@@ -12,6 +12,9 @@ import { QueueModule } from './queue/queue.module';
 import { AuthModule } from './auth/auth.module';
 import { CatalogModule } from './catalog/catalog.module';
 import { CustomersModule } from './customers/customers.module';
+import { SuppliersModule } from './suppliers/suppliers.module';
+import { PurchasesModule } from './purchases/purchases.module';
+import { SupplierInvoicesModule } from './supplier-invoices/supplier-invoices.module';
 import { InventoryModule } from './inventory/inventory.module';
 import { CashModule } from './cash/cash.module';
 import { SalesModule } from './sales/sales.module';
@@ -63,6 +66,9 @@ import { RequestMetricsInterceptor } from './metrics/request-metrics.interceptor
     AuthModule,
     CatalogModule,
     CustomersModule,
+    SuppliersModule,
+    PurchasesModule,
+    SupplierInvoicesModule,
     InventoryModule,
     CashModule,
     SalesModule,

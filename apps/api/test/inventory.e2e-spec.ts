@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
-import { setupTestModule, setupTestApp } from './test-helpers';
+import { setupTestModule, setupTestApp, shutdownTestApp } from './test-helpers';
 import request from 'supertest';
 import { App } from 'supertest/types';
 
@@ -62,8 +62,7 @@ describe('Inventory (e2e)', () => {
     // Orden correcto: primero las tablas que tienen foreign keys, luego las referenciadas
     await prisma.auditLog.deleteMany();
     await prisma.user.deleteMany();
-    await prisma.$disconnect();
-    await app.close();
+    await shutdownTestApp({ app, prisma });
   });
 
   describe('POST /inventory/movements', () => {
