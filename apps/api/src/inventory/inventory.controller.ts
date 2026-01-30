@@ -14,7 +14,7 @@ import {
   ApiBearerAuth,
 } from '@nestjs/swagger';
 import { InventoryService } from './inventory.service';
-import { CreateMovementDto } from './dto/create-movement.dto';
+import { CreateInventoryMovementDto } from './dto/create-movement.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { PaginationDto } from '../common/dto/pagination.dto';
@@ -78,7 +78,7 @@ export class InventoryController {
   })
   @ApiResponse({ status: 401, description: 'No autenticado' })
   createMovement(
-    @Body() dto: CreateMovementDto,
+    @Body() dto: CreateInventoryMovementDto,
     @Req() req: { user?: { sub?: string } },
   ) {
     return this.inventory.createMovement(dto, req.user?.sub);

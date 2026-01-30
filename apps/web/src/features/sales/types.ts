@@ -20,3 +20,16 @@ export type SaleListItem = {
   invoices?: Array<{ id: string; number: string }>;
 };
 
+export type CreateSaleItemPayload = {
+  productId: string;
+  qty: number;
+  unitPrice?: number;
+};
+
+export type CreateSalePayload = {
+  customerId?: string;
+  cashSessionId: string;
+  paymentMethod: 'CASH' | 'CARD' | 'TRANSFER' | 'OTHER';
+  items: CreateSaleItemPayload[];
+};
+

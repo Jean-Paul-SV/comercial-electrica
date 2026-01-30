@@ -96,7 +96,14 @@ export class SalesService {
             include: { stock: true },
           });
           if (products.length !== dto.items.length) {
-            throw new BadRequestException('Uno o más productos no existen.');
+            const foundIds = new Set(products.map((p) => p.id));
+            const missingProductIds = dto.items
+              .map((i) => i.productId)
+              .filter((id) => !foundIds.has(id));
+            throw new BadRequestException({
+              message: 'Uno o más productos no existen o están inactivos.',
+              missingProductIds,
+            });
           }
 
           let subtotal = 0;
@@ -128,8 +135,10 @@ export class SalesService {
               update: {},
             });
             if (bal.qtyOnHand < it.qty) {
+              const product = products.find((p) => p.id === it.productId);
+              const name = product?.name ?? it.productId;
               throw new BadRequestException(
-                `Stock insuficiente para productId=${it.productId}. Disponible=${bal.qtyOnHand}, requerido=${it.qty}.`,
+                `Stock insuficiente para "${name}". Disponible: ${bal.qtyOnHand}, requerido: ${it.qty}.`,
               );
             }
             await tx.stockBalance.update({
@@ -231,7 +240,7 @@ export class SalesService {
     const [data, total] = await Promise.all([
       this.prisma.sale.findMany({
         orderBy: { soldAt: 'desc' },
-        include: { items: true, customer: true, invoices: true },
+        include: { items: { include: { product: true } }, customer: true, invoices: true },
         skip,
         take: limit,
       }),

@@ -17,7 +17,9 @@ import { PurchasesModule } from './purchases/purchases.module';
 import { SupplierInvoicesModule } from './supplier-invoices/supplier-invoices.module';
 import { InventoryModule } from './inventory/inventory.module';
 import { CashModule } from './cash/cash.module';
+import { ExpensesModule } from './expenses/expenses.module';
 import { SalesModule } from './sales/sales.module';
+import { ReturnsModule } from './returns/returns.module';
 import { QuotesModule } from './quotes/quotes.module';
 import { ReportsModule } from './reports/reports.module';
 import { DianModule } from './dian/dian.module';
@@ -71,7 +73,9 @@ import { RequestMetricsInterceptor } from './metrics/request-metrics.interceptor
     SupplierInvoicesModule,
     InventoryModule,
     CashModule,
+    ExpensesModule,
     SalesModule,
+    ReturnsModule,
     QuotesModule,
     ReportsModule,
     DianModule,

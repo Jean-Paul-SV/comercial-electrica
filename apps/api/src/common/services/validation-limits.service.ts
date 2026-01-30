@@ -40,6 +40,10 @@ export class ValidationLimitsService {
     return this.config.get<number>('MAX_ITEMS_PER_QUOTE', 100);
   }
 
+  private get MAX_ITEMS_PER_PURCHASE(): number {
+    return this.config.get<number>('MAX_ITEMS_PER_PURCHASE', 100);
+  }
+
   private get MAX_QTY_PER_ITEM(): number {
     return this.config.get<number>('MAX_QTY_PER_ITEM', 10000);
   }
@@ -87,11 +91,18 @@ export class ValidationLimitsService {
   }
 
   /**
-   * Valida cantidad de items en venta/cotización
+   * Valida cantidad de items en venta/cotización/pedido de compra
    */
-  validateItemsCount(count: number, type: 'sale' | 'quote'): void {
+  validateItemsCount(
+    count: number,
+    type: 'sale' | 'quote' | 'purchase',
+  ): void {
     const max =
-      type === 'sale' ? this.MAX_ITEMS_PER_SALE : this.MAX_ITEMS_PER_QUOTE;
+      type === 'sale'
+        ? this.MAX_ITEMS_PER_SALE
+        : type === 'quote'
+          ? this.MAX_ITEMS_PER_QUOTE
+          : this.MAX_ITEMS_PER_PURCHASE;
     if (count > max) {
       throw new BadRequestException(
         `El máximo de items permitidos es ${max} (tipo: ${type})`,

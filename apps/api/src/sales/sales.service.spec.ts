@@ -288,11 +288,15 @@ describe('SalesService', () => {
 
       prisma.$transaction = mockTransaction;
 
-      await expect(service.createSale(createSaleDto)).rejects.toThrow(
-        BadRequestException,
-      );
-      await expect(service.createSale(createSaleDto)).rejects.toThrow(
-        'Uno o más productos no existen.',
+      const err = await service.createSale(createSaleDto).catch((e) => e);
+      expect(err).toBeInstanceOf(BadRequestException);
+      const response = (err as BadRequestException).getResponse();
+      expect(response).toMatchObject({
+        message: 'Uno o más productos no existen o están inactivos.',
+        missingProductIds: expect.any(Array),
+      });
+      expect((response as { missingProductIds: string[] }).missingProductIds).toContain(
+        createSaleDto.items[0].productId,
       );
     });
 

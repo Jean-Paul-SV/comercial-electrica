@@ -39,7 +39,7 @@ class MovementItemDto {
   unitCost?: number;
 }
 
-export class CreateMovementDto {
+export class CreateInventoryMovementDto {
   @ApiProperty({
     enum: InventoryMovementType,
     example: InventoryMovementType.IN,

@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException } from '@nestjs/common';
 import { InventoryService } from './inventory.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreateMovementDto } from './dto/create-movement.dto';
+import { CreateInventoryMovementDto } from './dto/create-movement.dto';
 import { InventoryMovementType } from '@prisma/client';
 import { ValidationLimitsService } from '../common/services/validation-limits.service';
 import { AuditService } from '../common/services/audit.service';
@@ -64,7 +64,7 @@ describe('InventoryService', () => {
 
   describe('createMovement', () => {
     it('debe crear un movimiento de entrada (IN) exitosamente', async () => {
-      const dto: CreateMovementDto = {
+      const dto: CreateInventoryMovementDto = {
         type: InventoryMovementType.IN,
         reason: 'Compra inicial',
         items: [
@@ -126,7 +126,7 @@ describe('InventoryService', () => {
     });
 
     it('debe crear un movimiento de salida (OUT) y descontar stock', async () => {
-      const dto: CreateMovementDto = {
+      const dto: CreateInventoryMovementDto = {
         type: InventoryMovementType.OUT,
         reason: 'Ajuste de inventario',
         items: [
@@ -186,7 +186,7 @@ describe('InventoryService', () => {
     });
 
     it('debe crear un ajuste (ADJUST) correctamente', async () => {
-      const dto: CreateMovementDto = {
+      const dto: CreateInventoryMovementDto = {
         type: InventoryMovementType.ADJUST,
         reason: 'Corrección de inventario',
         items: [
@@ -236,7 +236,7 @@ describe('InventoryService', () => {
     });
 
     it('debe lanzar error si no hay items', async () => {
-      const dtoSinItems: CreateMovementDto = {
+      const dtoSinItems: CreateInventoryMovementDto = {
         type: InventoryMovementType.IN,
         reason: 'Test',
         items: [],
@@ -251,7 +251,7 @@ describe('InventoryService', () => {
     });
 
     it('debe lanzar error si uno o más productos no existen', async () => {
-      const dto: CreateMovementDto = {
+      const dto: CreateInventoryMovementDto = {
         type: InventoryMovementType.IN,
         reason: 'Compra',
         items: [
@@ -280,7 +280,7 @@ describe('InventoryService', () => {
     });
 
     it('debe lanzar error si stock es insuficiente para salida', async () => {
-      const dto: CreateMovementDto = {
+      const dto: CreateInventoryMovementDto = {
         type: InventoryMovementType.OUT,
         reason: 'Salida',
         items: [
@@ -326,7 +326,7 @@ describe('InventoryService', () => {
     });
 
     it('debe manejar múltiples items en un movimiento', async () => {
-      const dto: CreateMovementDto = {
+      const dto: CreateInventoryMovementDto = {
         type: InventoryMovementType.IN,
         reason: 'Compra múltiple',
         items: [
@@ -404,7 +404,7 @@ describe('InventoryService', () => {
     });
 
     it('debe crear balance si no existe', async () => {
-      const dto: CreateMovementDto = {
+      const dto: CreateInventoryMovementDto = {
         type: InventoryMovementType.IN,
         reason: 'Primera entrada',
         items: [

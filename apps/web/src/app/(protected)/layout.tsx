@@ -1,9 +1,11 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@shared/providers/AuthProvider';
 import { AppShell } from '@shared/ui/AppShell';
+import { SidebarProvider } from '@shared/ui/sidebar';
+import { canAccessPath } from '@shared/auth/roles';
 
 export default function ProtectedLayout({
   children,
@@ -11,16 +13,28 @@ export default function ProtectedLayout({
   children: React.ReactNode;
 }) {
   const router = useRouter();
-  const { isAuthenticated } = useAuth();
+  const pathname = usePathname();
+  const { isAuthenticated, user } = useAuth();
 
   useEffect(() => {
     if (!isAuthenticated) {
       router.replace('/login');
+      return;
     }
-  }, [isAuthenticated, router]);
+    if (user?.role && !canAccessPath(pathname ?? '', user.role)) {
+      router.replace('/app');
+    }
+  }, [isAuthenticated, user?.role, pathname, router]);
 
   if (!isAuthenticated) return null;
+  if (user?.role && pathname && !canAccessPath(pathname, user.role)) {
+    return null;
+  }
 
-  return <AppShell>{children}</AppShell>;
+  return (
+    <SidebarProvider>
+      <AppShell>{children}</AppShell>
+    </SidebarProvider>
+  );
 }
 

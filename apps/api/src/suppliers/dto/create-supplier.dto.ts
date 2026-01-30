@@ -22,6 +22,14 @@ export class CreateSupplierDto {
   name!: string;
 
   @ApiPropertyOptional({
+    example: 'Proveedor de materiales eléctricos y canaletas.',
+    description: 'Descripción del proveedor (opcional)',
+  })
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @ApiPropertyOptional({
     example: 'contacto@proveedor.com',
     description: 'Email (opcional)',
   })

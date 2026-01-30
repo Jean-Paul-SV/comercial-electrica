@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Patch,
   ParseUUIDPipe,
   Param,
   Post,
@@ -21,6 +22,7 @@ import { SupplierInvoicesService } from './supplier-invoices.service';
 import { PaginationDto } from '../common/dto/pagination.dto';
 import { CreateSupplierInvoiceDto } from './dto/create-supplier-invoice.dto';
 import { CreatePaymentDto } from './dto/create-payment.dto';
+import { UpdateStatusDto } from './dto/update-status.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { SupplierInvoiceStatus } from '@prisma/client';
@@ -110,6 +112,24 @@ export class SupplierInvoicesController {
     @Req() req: { user?: { sub?: string } },
   ) {
     return this.invoices.createSupplierInvoice(dto, req.user?.sub);
+  }
+
+  @Patch(':id/status')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Actualizar estado de la factura',
+    description: 'Cambia el estado de una factura de proveedor (ej. Pendiente, Pagada, Cancelada).',
+  })
+  @ApiParam({ name: 'id', description: 'ID de la factura de proveedor' })
+  @ApiResponse({ status: 200, description: 'Factura actualizada' })
+  @ApiResponse({ status: 404, description: 'Factura no encontrada' })
+  @ApiResponse({ status: 401, description: 'No autenticado' })
+  updateStatus(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @Body() dto: UpdateStatusDto,
+    @Req() req: { user?: { sub?: string } },
+  ) {
+    return this.invoices.updateStatus(id, dto, req.user?.sub);
   }
 
   @Post(':id/payments')

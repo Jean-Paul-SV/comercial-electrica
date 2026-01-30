@@ -1,0 +1,86 @@
+// =============================================================================
+// Fragmento para integrar en apps/api/prisma/schema.prisma
+// Sistema de roles y permisos desacoplados + multi-tenant.
+// Ver docs/ROLES_Y_PERMISOS_DISEÑO.md
+// =============================================================================
+
+// ---------- MULTI-TENANT (opcional) ----------
+model Tenant {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  slug      String   @unique
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users     User[]
+  roles     Role[]
+  userRoles UserRole[]
+}
+
+// ---------- PERMISOS (recurso:accion) ----------
+model Permission {
+  id          String   @id @default(uuid()) @db.Uuid
+  resource    String
+  action      String
+  description String?
+  createdAt   DateTime @default(now())
+
+  rolePermissions RolePermission[]
+
+  @@unique([resource, action])
+  @@index([resource])
+}
+
+// ---------- ROLES ----------
+model Role {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String
+  slug        String
+  description String?
+  tenantId    String?  @db.Uuid
+  isSystem    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant        Tenant?          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  permissions   RolePermission[]
+  userRoles     UserRole[]
+
+  @@unique([slug, tenantId])
+  @@index([tenantId])
+}
+
+model RolePermission {
+  roleId       String @db.Uuid
+  permissionId String @db.Uuid
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@index([permissionId])
+}
+
+// ---------- ASIGNACIÓN USUARIO-ROL ----------
+model UserRole {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  roleId    String   @db.Uuid
+  tenantId  String?  @db.Uuid
+  createdAt DateTime @default(now())
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role   Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roleId, tenantId])
+  @@index([userId])
+  @@index([roleId])
+  @@index([tenantId])
+}
+
+// ---------- En el modelo User existente añadir: ----------
+//   tenantId  String?  @db.Uuid
+//   tenant    Tenant?  @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+//   userRoles UserRole[]

@@ -134,13 +134,13 @@ export class PurchasesService {
           },
         );
 
-        // Invalidar caché
-        await this.cache.deletePattern('cache:purchaseOrders:*');
-
         return purchaseOrder;
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
-    );
+    ).then(async (purchaseOrder) => {
+      await this.cache.deletePattern('cache:purchaseOrders:*');
+      return purchaseOrder;
+    });
   }
 
   async listPurchaseOrders(pagination?: { page?: number; limit?: number }) {
@@ -350,14 +350,14 @@ export class PurchasesService {
           },
         );
 
-        // Invalidar caché
-        await this.cache.delete(this.cache.buildKey('purchaseOrder', id));
-        await this.cache.deletePattern('cache:purchaseOrders:*');
-
         return updatedOrder;
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
-    );
+    ).then(async (updatedOrder) => {
+      await this.cache.delete(this.cache.buildKey('purchaseOrder', id));
+      await this.cache.deletePattern('cache:purchaseOrders:*');
+      return updatedOrder;
+    });
   }
 
   private async generateOrderNumber(

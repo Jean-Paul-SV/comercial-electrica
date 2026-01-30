@@ -86,17 +86,15 @@ export class CatalogController {
     return this.catalog.getProduct(id);
   }
 
-  @Roles(RoleName.ADMIN)
   @Post('products')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Crear producto',
-    description: 'Crea un nuevo producto (requiere rol ADMIN)',
+    description: 'Crea un nuevo producto (requiere autenticación)',
   })
   @ApiResponse({ status: 201, description: 'Producto creado exitosamente' })
   @ApiResponse({ status: 400, description: 'Error de validación' })
   @ApiResponse({ status: 401, description: 'No autenticado' })
-  @ApiResponse({ status: 403, description: 'No autorizado (requiere ADMIN)' })
   createProduct(
     @Body() dto: CreateProductDto,
     @Req() req: { user?: { sub?: string } },
@@ -104,12 +102,11 @@ export class CatalogController {
     return this.catalog.createProduct(dto, req.user?.sub);
   }
 
-  @Roles(RoleName.ADMIN)
   @Patch('products/:id')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Actualizar producto',
-    description: 'Actualiza un producto existente (requiere rol ADMIN)',
+    description: 'Actualiza un producto existente (requiere autenticación)',
   })
   @ApiParam({ name: 'id', description: 'ID del producto' })
   @ApiResponse({
@@ -118,7 +115,6 @@ export class CatalogController {
   })
   @ApiResponse({ status: 404, description: 'Producto no encontrado' })
   @ApiResponse({ status: 401, description: 'No autenticado' })
-  @ApiResponse({ status: 403, description: 'No autorizado (requiere ADMIN)' })
   updateProduct(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Body() dto: UpdateProductDto,
@@ -142,8 +138,11 @@ export class CatalogController {
   @ApiResponse({ status: 404, description: 'Producto no encontrado' })
   @ApiResponse({ status: 401, description: 'No autenticado' })
   @ApiResponse({ status: 403, description: 'No autorizado (requiere ADMIN)' })
-  deactivate(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string) {
-    return this.catalog.deactivateProduct(id);
+  deactivate(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @Req() req: { user?: { sub?: string } },
+  ) {
+    return this.catalog.deactivateProduct(id, req.user?.sub);
   }
 
   @Get('categories')
@@ -158,17 +157,15 @@ export class CatalogController {
     return this.catalog.listCategories();
   }
 
-  @Roles(RoleName.ADMIN)
   @Post('categories')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Crear categoría',
-    description: 'Crea una nueva categoría (requiere rol ADMIN)',
+    description: 'Crea una nueva categoría (requiere autenticación)',
   })
   @ApiResponse({ status: 201, description: 'Categoría creada exitosamente' })
   @ApiResponse({ status: 400, description: 'Error de validación' })
   @ApiResponse({ status: 401, description: 'No autenticado' })
-  @ApiResponse({ status: 403, description: 'No autorizado (requiere ADMIN)' })
   createCategory(
     @Body() dto: CreateCategoryDto,
     @Req() req: { user?: { sub?: string } },

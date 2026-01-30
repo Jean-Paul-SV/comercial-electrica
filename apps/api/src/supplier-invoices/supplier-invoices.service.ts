@@ -8,6 +8,7 @@ import { Prisma, SupplierInvoiceStatus, PaymentMethod } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateSupplierInvoiceDto } from './dto/create-supplier-invoice.dto';
 import { CreatePaymentDto } from './dto/create-payment.dto';
+import { UpdateStatusDto } from './dto/update-status.dto';
 import { AuditService } from '../common/services/audit.service';
 import { CacheService } from '../common/services/cache.service';
 import { createPaginatedResponse } from '../common/interfaces/pagination.interface';
@@ -60,8 +61,24 @@ export class SupplierInvoicesService {
       );
     }
 
-    const grandTotal =
-      dto.subtotal + dto.taxTotal - (dto.discountTotal ?? 0);
+    // Calcular desde porcentajes: descuento sobre subtotal, impuesto sobre (subtotal - descuento)
+    const discountRate = dto.discountRate ?? 0;
+    const discountTotal = Math.round(dto.subtotal * (discountRate / 100) * 100) / 100;
+    const baseAfterDiscount = dto.subtotal - discountTotal;
+    const taxTotal = Math.round(baseAfterDiscount * (dto.taxRate / 100) * 100) / 100;
+    const grandTotal = Math.round((baseAfterDiscount + taxTotal) * 100) / 100;
+
+    const abono = dto.abono ?? 0;
+    if (abono > grandTotal) {
+      throw new BadRequestException(
+        `El abono no puede ser mayor al total de la factura (${grandTotal}).`,
+      );
+    }
+    if (abono > 0 && !dto.abonoPaymentMethod) {
+      throw new BadRequestException(
+        'Indica el método de pago del abono.',
+      );
+    }
 
     return this.prisma.$transaction(
       async (tx) => {
@@ -75,10 +92,16 @@ export class SupplierInvoicesService {
           );
         }
 
-        // Determinar estado inicial basado en fecha de vencimiento
-        let status = SupplierInvoiceStatus.PENDING;
+        // Determinar estado inicial basado en fecha de vencimiento y abono
+        let status: SupplierInvoiceStatus = SupplierInvoiceStatus.PENDING;
         if (dueDate < new Date()) {
           status = SupplierInvoiceStatus.OVERDUE;
+        }
+        const paidAmount = abono;
+        if (paidAmount >= grandTotal) {
+          status = SupplierInvoiceStatus.PAID;
+        } else if (paidAmount > 0) {
+          status = SupplierInvoiceStatus.PARTIALLY_PAID;
         }
 
         const invoice = await tx.supplierInvoice.create({
@@ -90,10 +113,10 @@ export class SupplierInvoicesService {
             dueDate: dueDate,
             status,
             subtotal: dto.subtotal,
-            taxTotal: dto.taxTotal,
-            discountTotal: dto.discountTotal ?? 0,
+            taxTotal,
+            discountTotal,
             grandTotal,
-            paidAmount: 0,
+            paidAmount,
             notes: dto.notes,
           },
           include: {
@@ -102,6 +125,44 @@ export class SupplierInvoicesService {
           },
         });
 
+        if (abono > 0 && dto.abonoPaymentMethod) {
+          const paymentDate = new Date();
+          await tx.supplierPayment.create({
+            data: {
+              supplierInvoiceId: invoice.id,
+              amount: abono,
+              paymentDate,
+              paymentMethod: dto.abonoPaymentMethod,
+              reference: 'Abono inicial',
+              notes: dto.notes,
+              createdBy: createdByUserId,
+            },
+          });
+          await this.audit.logCreate('supplierPayment', invoice.id, createdByUserId, {
+            invoiceId: invoice.id,
+            amount: abono,
+            paymentMethod: dto.abonoPaymentMethod,
+          });
+          // Registrar el abono como gasto
+          const supplierName = invoice.supplier?.name ?? 'Proveedor';
+          const expenseDescription = `Factura proveedor ${supplierName} - #${invoice.invoiceNumber} (abono)`.slice(0, 255);
+          const expenseDelegate = (tx as { expense?: { create: (args: unknown) => Promise<{ id: string }> } }).expense;
+          if (expenseDelegate) {
+            await expenseDelegate.create({
+              data: {
+                amount: abono,
+                description: expenseDescription,
+                category: 'Factura proveedor',
+                expenseDate: paymentDate,
+                paymentMethod: dto.abonoPaymentMethod,
+                cashSessionId: null,
+                reference: 'Abono inicial',
+                createdBy: createdByUserId ?? null,
+              },
+            });
+          }
+        }
+
         this.logger.log(
           `Factura de proveedor ${invoice.id} creada exitosamente`,
           {
@@ -109,6 +170,7 @@ export class SupplierInvoicesService {
             supplierId: dto.supplierId,
             dueDate: dueDate.toISOString(),
             grandTotal: Number(grandTotal),
+            paidAmount: abono,
             userId: createdByUserId,
           },
         );
@@ -122,16 +184,18 @@ export class SupplierInvoicesService {
             supplierId: dto.supplierId,
             dueDate: dueDate.toISOString(),
             grandTotal: Number(grandTotal),
+            taxRate: dto.taxRate,
+            discountRate: discountRate,
           },
         );
-
-        // Invalidar caché
-        await this.cache.deletePattern('cache:supplierInvoices:*');
 
         return invoice;
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
-    );
+    ).then(async (invoice) => {
+      await this.cache.deletePattern('cache:supplierInvoices:*');
+      return invoice;
+    });
   }
 
   async listSupplierInvoices(pagination?: {
@@ -140,22 +204,27 @@ export class SupplierInvoicesService {
     status?: SupplierInvoiceStatus;
     supplierId?: string;
   }) {
-    const page = pagination?.page ?? 1;
-    const limit = pagination?.limit ?? 20;
+    const page = Math.max(1, Number(pagination?.page) || 1);
+    const limit = Math.min(100, Math.max(1, Number(pagination?.limit) || 20));
     const skip = (page - 1) * limit;
 
     const where: Prisma.SupplierInvoiceWhereInput = {};
-    if (pagination?.status) {
-      where.status = pagination.status;
+    const validStatuses = Object.values(SupplierInvoiceStatus);
+    if (
+      pagination?.status &&
+      typeof pagination.status === 'string' &&
+      validStatuses.includes(pagination.status as SupplierInvoiceStatus)
+    ) {
+      where.status = pagination.status as SupplierInvoiceStatus;
     }
-    if (pagination?.supplierId) {
+    if (pagination?.supplierId && typeof pagination.supplierId === 'string') {
       where.supplierId = pagination.supplierId;
     }
 
     const [data, total] = await Promise.all([
       this.prisma.supplierInvoice.findMany({
         where,
-        orderBy: { dueDate: 'asc' },
+        orderBy: { invoiceDate: 'desc' },
         include: {
           supplier: true,
           purchaseOrder: true,
@@ -167,6 +236,45 @@ export class SupplierInvoicesService {
     ]);
 
     return createPaginatedResponse(data, total, page, limit);
+  }
+
+  async updateStatus(
+    id: string,
+    dto: UpdateStatusDto,
+    updatedByUserId?: string,
+  ) {
+    const invoice = await this.prisma.supplierInvoice.findUnique({
+      where: { id },
+      include: { supplier: true },
+    });
+    if (!invoice) {
+      throw new NotFoundException('Factura de proveedor no encontrada.');
+    }
+    const previousStatus = invoice.status;
+    const updated = await this.prisma.supplierInvoice.update({
+      where: { id },
+      data: { status: dto.status },
+      include: {
+        supplier: true,
+        purchaseOrder: true,
+      },
+    });
+    this.logger.log(`Estado de factura ${id} actualizado`, {
+      invoiceNumber: invoice.invoiceNumber,
+      previousStatus,
+      newStatus: dto.status,
+      userId: updatedByUserId,
+    });
+    await this.audit.logUpdate(
+      'supplierInvoice',
+      id,
+      updatedByUserId,
+      { status: previousStatus },
+      { status: dto.status },
+    );
+    await this.cache.delete(this.cache.buildKey('supplierInvoice', id));
+    await this.cache.deletePattern('cache:supplierInvoices:*');
+    return updated;
   }
 
   async getSupplierInvoice(id: string) {
@@ -203,7 +311,7 @@ export class SupplierInvoicesService {
   ) {
     const invoice = await this.prisma.supplierInvoice.findUnique({
       where: { id: invoiceId },
-      include: { payments: true },
+      include: { payments: true, supplier: true },
     });
 
     if (!invoice) {
@@ -304,14 +412,33 @@ export class SupplierInvoicesService {
           },
         );
 
-        // Invalidar caché
-        await this.cache.delete(this.cache.buildKey('supplierInvoice', invoiceId));
-        await this.cache.deletePattern('cache:supplierInvoices:*');
+        // Registrar el pago como gasto (factura de proveedor entra en módulo Gastos)
+        const supplierName = invoice.supplier?.name ?? 'Proveedor';
+        const expenseDescription = `Factura proveedor ${supplierName} - #${invoice.invoiceNumber}`.slice(0, 255);
+        const expenseDelegate = (tx as { expense?: { create: (args: unknown) => Promise<{ id: string }> } }).expense;
+        if (expenseDelegate) {
+          await expenseDelegate.create({
+            data: {
+              amount: dto.amount,
+              description: expenseDescription,
+              category: 'Factura proveedor',
+              expenseDate: paymentDate,
+              paymentMethod: dto.paymentMethod,
+              cashSessionId: null,
+              reference: dto.reference?.trim() ?? null,
+              createdBy: createdByUserId ?? null,
+            },
+          });
+        }
 
         return updatedInvoice;
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
-    );
+    ).then(async (updatedInvoice) => {
+      await this.cache.delete(this.cache.buildKey('supplierInvoice', invoiceId));
+      await this.cache.deletePattern('cache:supplierInvoices:*');
+      return updatedInvoice;
+    });
   }
 
   async getPendingPayments() {

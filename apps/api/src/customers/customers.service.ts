@@ -171,10 +171,12 @@ export class CustomersService {
       throw new NotFoundException('Cliente no encontrado.');
     }
 
-    // Validar que no tiene ventas asociadas
-    const salesCount = await this.prisma.sale.count({
-      where: { customerId: id },
-    });
+    // Validar que no tiene ventas, cotizaciones ni facturas asociadas
+    const [salesCount, quotesCount, invoicesCount] = await Promise.all([
+      this.prisma.sale.count({ where: { customerId: id } }),
+      this.prisma.quote.count({ where: { customerId: id } }),
+      this.prisma.invoice.count({ where: { customerId: id } }),
+    ]);
 
     if (salesCount > 0) {
       this.logger.warn(
@@ -182,6 +184,22 @@ export class CustomersService {
       );
       throw new BadRequestException(
         `No se puede eliminar el cliente. Tiene ${salesCount} venta(s) asociada(s).`,
+      );
+    }
+    if (quotesCount > 0) {
+      this.logger.warn(
+        `Intento de eliminar cliente ${id} con ${quotesCount} cotizaciones asociadas`,
+      );
+      throw new BadRequestException(
+        `No se puede eliminar el cliente. Tiene ${quotesCount} cotización(es) asociada(s).`,
+      );
+    }
+    if (invoicesCount > 0) {
+      this.logger.warn(
+        `Intento de eliminar cliente ${id} con ${invoicesCount} facturas asociadas`,
+      );
+      throw new BadRequestException(
+        `No se puede eliminar el cliente. Tiene ${invoicesCount} factura(s) asociada(s).`,
       );
     }
 

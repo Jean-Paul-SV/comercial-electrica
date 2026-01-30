@@ -79,6 +79,7 @@ export class SuppliersService {
         data: {
           nit: dto.nit.trim(),
           name: dto.name.trim(),
+          description: dto.description?.trim(),
           email: dto.email?.toLowerCase(),
           phone: dto.phone,
           address: dto.address,
@@ -134,6 +135,7 @@ export class SuppliersService {
         data: {
           nit: dto.nit?.trim(),
           name: dto.name?.trim(),
+          description: dto.description?.trim(),
           email: dto.email?.toLowerCase(),
           phone: dto.phone ?? undefined,
           address: dto.address ?? undefined,

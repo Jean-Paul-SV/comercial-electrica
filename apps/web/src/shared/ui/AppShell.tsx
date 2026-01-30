@@ -1,91 +1,151 @@
 'use client';
 
-import Link from 'next/link';
+import { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@shared/providers/AuthProvider';
 import { Button } from '@shared/components/ui/button';
 import { cn } from '@lib/utils';
-import {
-  LayoutDashboard,
-  ShoppingCart,
-  Package,
-  Users,
-  Wallet,
-  FileText,
-  LogOut,
-  Zap,
-} from 'lucide-react';
-
-const nav = [
-  { href: '/app', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/sales', label: 'Ventas', icon: ShoppingCart },
-  { href: '/products', label: 'Productos', icon: Package },
-  { href: '/customers', label: 'Clientes', icon: Users },
-  { href: '/cash', label: 'Caja', icon: Wallet },
-  { href: '/reports', label: 'Reportes', icon: FileText },
-];
+import { Menu, X, LogOut } from 'lucide-react';
+import { Sidebar, useSidebarOptional } from '@shared/ui/sidebar';
+import { navConfig } from '@shared/navigation/config';
+import { getNavForRole } from '@shared/navigation/filterByRole';
+import { getRouteLabel } from '@shared/navigation/routeLabel';
+import type { AppRole } from '@shared/navigation/types';
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { user, logout } = useAuth();
+  const sidebarContext = useSidebarOptional();
+
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const isMobileOpen = sidebarContext?.isMobileOpen ?? mobileOpen;
+  const setMobileOpenState = sidebarContext?.setMobileOpen ?? setMobileOpen;
+  const isCollapsed = sidebarContext?.isCollapsed ?? false;
+
+  const sections = getNavForRole(navConfig.sections, user?.role as AppRole | undefined);
+  const routeLabel = getRouteLabel(pathname ?? '');
+
+  useEffect(() => {
+    setMobileOpenState(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!isMobileOpen) return;
+    const onEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMobileOpenState(false);
+    };
+    document.addEventListener('keydown', onEscape);
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', onEscape);
+      document.body.style.overflow = '';
+    };
+  }, [isMobileOpen, setMobileOpenState]);
 
   return (
-    <div className="grid grid-cols-[260px_1fr] h-screen">
-      <aside className="flex flex-col border-r border-border bg-card p-4">
-        <div className="flex items-center gap-2 font-semibold text-lg mb-6">
-          <Zap className="h-6 w-6 text-primary" />
-          Comercial Eléctrica
-        </div>
-        <div className="text-sm text-muted-foreground mb-4 truncate">
-          {user ? `${user.email}` : '—'}
-        </div>
-        {user && (
-          <span className="text-xs font-medium text-primary bg-primary/10 px-2 py-1 rounded mb-4 w-fit">
-            {user.role}
-          </span>
-        )}
-        <nav className="flex flex-col gap-1 flex-1">
-          {nav.map((item) => {
-            const active = pathname === item.href;
-            const Icon = item.icon;
-            return (
-              <Link key={item.href} href={item.href}>
-                <span
-                  className={cn(
-                    'flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors',
-                    active
-                      ? 'bg-primary/15 text-primary border border-primary/20'
-                      : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-                  )}
-                >
-                  <Icon className="h-4 w-4 shrink-0" />
-                  {item.label}
-                </span>
-              </Link>
-            );
-          })}
-        </nav>
-        <Button
-          variant="outline"
-          size="sm"
-          className="w-full mt-4 justify-start gap-2"
-          onClick={logout}
-        >
-          <LogOut className="h-4 w-4" />
-          Cerrar sesión
-        </Button>
+    <div
+      className={cn(
+        'min-h-screen bg-background flex flex-col lg:grid',
+        isCollapsed ? 'lg:grid-cols-[72px_1fr]' : 'lg:grid-cols-[240px_1fr]'
+      )}
+    >
+      {/* Sidebar desktop: siempre visible en lg+ */}
+      <aside
+        className="hidden lg:flex lg:flex-col border-r border-border/80 bg-card/50 shrink-0"
+        style={{ width: isCollapsed ? 72 : 240 } as React.CSSProperties}
+      >
+        <Sidebar
+          sections={sections}
+          userEmail={user?.email}
+          userRole={user?.role}
+          onLogout={logout}
+          collapsed={isCollapsed}
+          showFooter={true}
+          showCollapseToggle={true}
+        />
       </aside>
 
-      <div className="flex flex-col min-h-0">
-        <header className="h-14 border-b border-border bg-background/95 px-6 flex items-center justify-between shrink-0">
-          <div className="text-sm text-muted-foreground capitalize">
-            {pathname === '/app' ? 'Dashboard' : pathname.replace('/', '')}
-          </div>
-          <div className="text-xs text-muted-foreground">
-            API: {process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3000'}
-          </div>
+      {/* Overlay móvil */}
+      {isMobileOpen && (
+        <button
+          type="button"
+          aria-label="Cerrar menú"
+          className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm lg:hidden animate-in fade-in duration-200"
+          onClick={() => setMobileOpenState(false)}
+        />
+      )}
+
+      {/* Drawer móvil */}
+      <aside
+        className={cn(
+          'fixed top-0 left-0 z-50 h-full w-[280px] max-w-[85vw] flex flex-col border-r border-border bg-card transition-transform duration-250 ease-out lg:hidden',
+          isMobileOpen ? 'translate-x-0' : '-translate-x-full'
+        )}
+        aria-hidden={!isMobileOpen}
+      >
+        <div className="flex items-center justify-between p-4 border-b border-border/80">
+          <span className="font-semibold text-foreground">Menú</span>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="shrink-0"
+            onClick={() => setMobileOpenState(false)}
+            aria-label="Cerrar menú"
+          >
+            <X className="h-5 w-5" />
+          </Button>
+        </div>
+        <div className="flex-1 overflow-y-auto min-h-0">
+          <Sidebar
+            sections={sections}
+            userEmail={null}
+            userRole={null}
+            onLogout={logout}
+            collapsed={false}
+            showFooter={false}
+            className="border-0 w-full"
+          />
+        </div>
+        <div className="p-4 border-t border-border/80">
+          {user && (
+            <div className="mb-3 space-y-0.5">
+              <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+              <span className="text-xs font-medium text-muted-foreground">{user.role}</span>
+            </div>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full justify-start gap-2 text-muted-foreground hover:text-foreground"
+            onClick={logout}
+          >
+            <LogOut className="h-4 w-4 shrink-0" />
+            Cerrar sesión
+          </Button>
+        </div>
+      </aside>
+
+      {/* Área principal */}
+      <div className="flex flex-col min-h-0 flex-1">
+        <header className="h-14 shrink-0 border-b border-border/80 bg-background/80 backdrop-blur-sm px-4 sm:px-6 flex items-center gap-3">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="lg:hidden shrink-0"
+            onClick={() => setMobileOpenState(true)}
+            aria-label="Abrir menú"
+          >
+            <Menu className="h-5 w-5" />
+          </Button>
+          <span className="text-sm font-medium text-foreground truncate">
+            {routeLabel}
+          </span>
         </header>
-        <main className="flex-1 p-6 overflow-auto">{children}</main>
+        <main className="flex-1 overflow-auto p-4 sm:p-6 md:p-8">
+          <div className="mx-auto max-w-6xl animate-in fade-in duration-200">
+            {children}
+          </div>
+        </main>
       </div>
     </div>
   );

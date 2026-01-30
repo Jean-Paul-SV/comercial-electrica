@@ -206,4 +206,49 @@ export class CashService {
       },
     };
   }
+
+  async createMovement(
+    sessionId: string,
+    dto: { type: 'IN' | 'OUT' | 'ADJUST'; method: string; amount: number; reference?: string },
+    createdBy?: string,
+  ) {
+    const session = await this.prisma.cashSession.findUnique({
+      where: { id: sessionId },
+    });
+    if (!session) throw new NotFoundException('Caja no encontrada.');
+    if (session.closedAt) {
+      throw new BadRequestException(
+        'No se pueden agregar movimientos a una sesión de caja cerrada.',
+      );
+    }
+
+    this.limits.validateCashAmount(dto.amount, 'movement');
+
+    const movement = await this.prisma.cashMovement.create({
+      data: {
+        sessionId,
+        // ADJUST en enum tras prisma generate; cast para compilar con cliente antiguo
+        type: dto.type as any,
+        method: dto.method as 'CASH' | 'CARD' | 'TRANSFER' | 'OTHER',
+        amount: dto.amount,
+        reference: dto.reference ?? null,
+      },
+    });
+
+    this.logger.log(`Movimiento de caja creado`, {
+      movementId: movement.id,
+      sessionId,
+      type: dto.type,
+      amount: dto.amount,
+      userId: createdBy,
+    });
+
+    await this.audit.logCreate('cashMovement', movement.id, createdBy, {
+      sessionId,
+      type: dto.type,
+      amount: dto.amount,
+    });
+
+    return movement;
+  }
 }

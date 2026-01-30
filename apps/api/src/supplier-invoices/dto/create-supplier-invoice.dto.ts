@@ -1,14 +1,16 @@
 import { Type } from 'class-transformer';
 import {
   IsDateString,
-  IsDecimal,
+  IsEnum,
   IsOptional,
   IsString,
   IsUUID,
+  Max,
   Min,
   MinLength,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { PaymentMethod } from '@prisma/client';
 
 export class CreateSupplierInvoiceDto {
   @ApiProperty({
@@ -50,7 +52,7 @@ export class CreateSupplierInvoiceDto {
 
   @ApiProperty({
     example: 200000,
-    description: 'Subtotal (sin impuestos)',
+    description: 'Subtotal (sin impuestos ni descuentos)',
     minimum: 0,
   })
   @Type(() => Number)
@@ -58,23 +60,46 @@ export class CreateSupplierInvoiceDto {
   subtotal!: number;
 
   @ApiProperty({
-    example: 38000,
-    description: 'Total de impuestos',
+    example: 19,
+    description: 'Porcentaje de impuesto (ej. 19 para IVA 19%)',
     minimum: 0,
+    maximum: 100,
   })
   @Type(() => Number)
   @Min(0)
-  taxTotal!: number;
+  @Max(100)
+  taxRate!: number;
 
   @ApiPropertyOptional({
     example: 0,
-    description: 'Total de descuentos',
+    description: 'Porcentaje de descuento sobre el subtotal (0-100)',
+    minimum: 0,
+    maximum: 100,
+    default: 0,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @Min(0)
+  @Max(100)
+  discountRate?: number;
+
+  @ApiPropertyOptional({
+    example: 0,
+    description: 'Abono inicial al registrar la factura (opcional)',
     minimum: 0,
   })
   @IsOptional()
   @Type(() => Number)
   @Min(0)
-  discountTotal?: number;
+  abono?: number;
+
+  @ApiPropertyOptional({
+    enum: PaymentMethod,
+    description: 'Método de pago del abono (requerido si abono > 0)',
+  })
+  @IsOptional()
+  @IsEnum(PaymentMethod)
+  abonoPaymentMethod?: PaymentMethod;
 
   @ApiPropertyOptional({
     example: 'Factura por pedido PO-202602-0001',

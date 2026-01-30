@@ -224,6 +224,8 @@ export class ReportsService {
       orderBy: { openedAt: 'desc' },
     });
 
+    const METHOD_KEYS = ['CASH', 'CARD', 'TRANSFER', 'OTHER'] as const;
+
     // Calcular estadísticas por sesión
     const sessionsWithStats = sessions.map((session) => {
       const movements = session.movements;
@@ -233,13 +235,25 @@ export class ReportsService {
       const totalOut = movements
         .filter((m) => m.type === 'OUT')
         .reduce((acc, m) => acc + Number(m.amount), 0);
-      const netAmount = totalIn - totalOut;
+      const totalAdjust = movements
+        .filter((m) => (m.type as string) === 'ADJUST')
+        .reduce((acc, m) => acc + Number(m.amount), 0);
+      const netAmount = totalIn - totalOut + totalAdjust;
       const expectedAmount = session.closedAt
         ? Number(session.closingAmount)
         : Number(session.openingAmount) + netAmount;
       const difference = session.closedAt
         ? Number(session.closingAmount) - expectedAmount
         : 0;
+
+      const totalsByMethod: Record<string, number> = {};
+      for (const key of METHOD_KEYS) totalsByMethod[key] = 0;
+      for (const m of movements) {
+        const method = String(m.method);
+        if (totalsByMethod[method] !== undefined) {
+          totalsByMethod[method] += Number(m.amount);
+        }
+      }
 
       return {
         id: session.id,
@@ -251,7 +265,9 @@ export class ReportsService {
           total: movements.length,
           totalIn,
           totalOut,
+          totalAdjust,
           netAmount,
+          totalsByMethod,
         },
         expectedAmount,
         difference,
@@ -266,6 +282,7 @@ export class ReportsService {
         openSessions: acc.openSessions + (s.isOpen ? 1 : 0),
         totalIn: acc.totalIn + s.movements.totalIn,
         totalOut: acc.totalOut + s.movements.totalOut,
+        totalAdjust: acc.totalAdjust + (s.movements.totalAdjust ?? 0),
         totalDifference: acc.totalDifference + s.difference,
       }),
       {
@@ -273,6 +290,7 @@ export class ReportsService {
         openSessions: 0,
         totalIn: 0,
         totalOut: 0,
+        totalAdjust: 0,
         totalDifference: 0,
       },
     );
@@ -285,7 +303,7 @@ export class ReportsService {
       },
       summary: {
         ...totals,
-        netAmount: totals.totalIn - totals.totalOut,
+        netAmount: totals.totalIn - totals.totalOut + totals.totalAdjust,
       },
       sessions: sessionsWithStats,
     };

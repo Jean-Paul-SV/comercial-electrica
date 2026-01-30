@@ -1,45 +1,56 @@
 # Guía paso a paso: Levantar el proyecto completo
 
 > **Objetivo:** Ejecutar API (NestJS), Frontend (Next.js), Postgres y Redis desde cero.  
-> **Requisitos:** Node.js 18+, npm, **Docker Desktop** (debe estar abierto y en ejecución antes del Paso 4).
+> **Requisitos:** Node.js 18+ y npm, **Docker Desktop** (con WSL actualizado: `wsl --update` si Docker pide actualizar WSL).
 
 ---
 
-## Resumen rápido
+## Resumen rápido (checklist)
 
-| Paso | Comando / Acción |
-|------|------------------|
-| 1 | Ir a la raíz del proyecto |
-| 2 | `npm install` |
-| 3 | Copiar `env.example` → `.env` |
-| 4 | `npm run db:up` (Docker: Postgres + Redis) |
-| 5 | `npm run prisma:generate` |
-| 6 | `npm run prisma:migrate` |
-| 7 | (Opcional) `npm run db:seed` |
-| 8 | `npm run dev` (API + Web a la vez) |
+**Opción automática (recomendada):** desde la raíz del proyecto ejecuta:
+```powershell
+.\scripts\instalar-todo.ps1
+```
+El script instala dependencias, crea `.env` si falta, levanta Docker, aplica migraciones y te pregunta si quieres ejecutar el seed.
+
+**Opción manual:**
+
+| # | Acción | Comando |
+|---|--------|---------|
+| 1 | Ir a la raíz del proyecto | `cd C:\Users\paulk\Desktop\Proyecto\Comercial-Electrica` |
+| 2 | Instalar dependencias | `npm install` |
+| 3 | Crear archivo de entorno | `copy env.example .env` |
+| 4 | Levantar Postgres y Redis | `npm run db:up` |
+| 5 | Generar cliente Prisma | `npm run prisma:generate` |
+| 6 | Aplicar migraciones a la BD | `npm run prisma:migrate` |
+| 7 | (Opcional) Crear usuario y datos de prueba | `npm run db:seed` |
+| 8 | Levantar API y Frontend | `npm run dev` |
 
 **URLs al terminar:**
-- **Frontend:** http://localhost:3001  
 - **API:** http://localhost:3000  
+- **Health:** http://localhost:3000/health  
 - **Swagger:** http://localhost:3000/api/docs  
+- **Frontend:** http://localhost:3001  
 
 ---
 
 ## Paso 1: Ubicarse en la raíz del proyecto
 
-Todos los comandos se ejecutan desde la **raíz** (donde están `package.json`, `env.example` y la carpeta `apps`).
+Todos los comandos siguientes se ejecutan desde la **raíz** (donde están `package.json`, `env.example` y la carpeta `apps`).
 
 ```powershell
-cd C:\Users\paulk\OneDrive\Escritorio\Proyecto\Comercial-Electrica
+cd C:\Users\paulk\Desktop\Proyecto\Comercial-Electrica
 ```
 
-Comprobar que existe:
+Comprobar que estás en el lugar correcto:
 
 ```powershell
 dir package.json
 dir env.example
 dir apps
 ```
+
+Si no ves esos archivos, vuelve a la carpeta correcta del proyecto.
 
 ---
 
@@ -114,19 +125,21 @@ Desde la raíz:
 npm run prisma:migrate
 ```
 
-Si es la primera vez y pide nombre de migración, puedes usar `init` o aceptar el que proponga. Esto crea/actualiza las tablas en Postgres.
+- Si es la **primera vez**, Prisma pedirá un nombre para la migración: escribe **`init`** y pulsa Enter.
+- Esto crea o actualiza todas las tablas en Postgres.
 
 ---
 
 ## Paso 7 (opcional): Datos iniciales y usuario admin
 
-Para tener un usuario con el que loguearte en el frontend:
+Para tener un usuario con el que loguearte en el frontend y datos de prueba:
 
 ```powershell
 npm run db:seed
 ```
 
-Esto crea el primer usuario administrador (por ejemplo `admin@example.com` / `Admin123!`). Si la base ya tiene usuarios, el seed puede indicar que el bootstrap ya se hizo; en ese caso usa ese usuario o crea uno por API/Swagger.
+- Crea el primer usuario administrador: **email** `admin@example.com`, **contraseña** `Admin123!`
+- Si la base ya tiene usuarios, el script puede indicar que el bootstrap ya se hizo; en ese caso usa ese usuario o crea uno desde Swagger (`POST /auth/users` con token de admin).
 
 ---
 
@@ -147,19 +160,19 @@ Cada uno se ejecuta en su propia ventana de terminal (si usas `concurrently`).
 
 ---
 
-## Verificación rápida
+## Verificación rápida (cuando todo esté levantado)
 
-1. **API:**  
-   - http://localhost:3000/health  
-   - Debe responder con estado de DB/Redis.
+1. **Health (API):**  
+   - Abre http://localhost:3000/health  
+   - Debe devolver JSON con `status`, `database`, `redis`, etc.
 
 2. **Swagger:**  
-   - http://localhost:3000/api/docs  
-   - Probar login y otros endpoints.
+   - Abre http://localhost:3000/api/docs  
+   - Authorize con el token que obtengas de `POST /auth/login` (email y contraseña del seed).
 
 3. **Frontend:**  
-   - http://localhost:3001  
-   - Te redirige a login; inicia sesión con el usuario del seed (o el que tengas).
+   - Abre http://localhost:3001  
+   - Te redirigirá a login; inicia sesión con `admin@example.com` / `Admin123!` (si hiciste el seed).
 
 ---
 
@@ -168,10 +181,19 @@ Cada uno se ejecuta en su propia ventana de terminal (si usas `concurrently`).
 | Problema | Qué hacer |
 |----------|-----------|
 | Puerto 3000 u otro ya en uso | Cierra la app que lo use o cambia `PORT` en `.env` (y en frontend `NEXT_PUBLIC_API_BASE_URL` si aplica). |
-| Docker no arranca | Abre Docker Desktop y vuelve a ejecutar `npm run db:up`. |
+| Docker no arranca | Abre Docker Desktop y vuelve a ejecutar `npm run db:up`. Si pide actualizar WSL, ejecuta `wsl --update` como administrador. |
 | Error de conexión a BD | Comprueba que `ce_postgres` esté en marcha (`docker ps`) y que `DATABASE_URL` en `.env` coincida con `infra/docker-compose.yml`. |
 | Prisma EPERM | Cerrar IDE, ejecutar PowerShell como administrador, `npm run prisma:generate` de nuevo. |
+| "npm no se reconoce" | Node.js no está en el PATH: reinstala Node.js (marca "Add to PATH") o abre una terminal nueva. |
 | “Bootstrap ya fue realizado” | Ya hay usuarios; usa ese usuario o crea uno por `POST /auth/users` (con token de admin). |
+
+---
+
+## Qué instalar si falta algo
+
+- **Node.js 18+** (incluye npm): https://nodejs.org — descarga LTS, instala y reinicia la terminal.
+- **Docker Desktop**: https://www.docker.com/products/docker-desktop — para Postgres y Redis.
+- **WSL**: Si Docker muestra "WSL needs updating", abre PowerShell como **Administrador** y ejecuta `wsl --update`. Luego reinicia Docker Desktop.
 
 ---
 

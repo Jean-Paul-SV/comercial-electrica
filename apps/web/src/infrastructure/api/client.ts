@@ -31,10 +31,14 @@ async function request<T>(
       : typeof rawMessage === 'string'
         ? rawMessage
         : 'Error en la solicitud';
-    throw {
+    const err: { status: number; message: string; [k: string]: unknown } = {
       status: res.status,
       message,
     };
+    if (isJson && body && typeof body === 'object' && body !== null) {
+      Object.assign(err, body);
+    }
+    throw err;
   }
 
   return body as T;
@@ -53,5 +57,17 @@ export const apiClient = {
       method: 'POST',
       body: body !== undefined ? JSON.stringify(body) : undefined,
     }),
+  patch: <T>(
+    path: string,
+    body?: unknown,
+    init?: RequestInit & { authToken?: string },
+  ) =>
+    request<T>(path, {
+      ...init,
+      method: 'PATCH',
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    }),
+  delete: <T>(path: string, init?: RequestInit & { authToken?: string }) =>
+    request<T>(path, { ...init, method: 'DELETE' }),
 };
 

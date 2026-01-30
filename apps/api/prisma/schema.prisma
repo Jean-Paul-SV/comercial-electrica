@@ -50,6 +50,7 @@ enum InvoiceStatus {
 enum CashMovementType {
   IN
   OUT
+  ADJUST
 }
 
 enum PaymentMethod {
@@ -132,6 +133,7 @@ model Product {
   stock    StockBalance?
 
   saleItems              SaleItem[]
+  saleReturnItems        SaleReturnItem[]
   quoteItems             QuoteItem[]
   inventoryMovementItems InventoryMovementItem[]
   purchaseOrderItems     PurchaseOrderItem[]
@@ -204,17 +206,18 @@ model Customer {
 }
 
 model Supplier {
-  id        String   @id @default(uuid()) @db.Uuid
-  nit       String   @unique
-  name      String
-  email     String?
-  phone     String?
-  address   String?
-  cityCode  String?
+  id          String   @id @default(uuid()) @db.Uuid
+  nit         String   @unique
+  name        String
+  description String?
+  email       String?
+  phone       String?
+  address     String?
+  cityCode    String?
   contactPerson String?
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   inventoryMovements InventoryMovement[]
   purchaseOrders     PurchaseOrder[]
@@ -328,6 +331,7 @@ model Sale {
 
   customer Customer? @relation(fields: [customerId], references: [id])
   items    SaleItem[]
+  returns  SaleReturn[]
 
   cashMovements CashMovement[]
   invoices      Invoice[]
@@ -335,6 +339,39 @@ model Sale {
   @@index([soldAt])
   @@index([customerId])
   @@index([status])
+}
+
+model SaleReturn {
+  id         String   @id @default(uuid()) @db.Uuid
+  saleId     String   @db.Uuid
+  returnedAt DateTime @default(now())
+  reason     String?
+  subtotal   Decimal  @db.Decimal(18, 2) @default(0)
+  taxTotal   Decimal  @db.Decimal(18, 2) @default(0)
+  grandTotal Decimal  @db.Decimal(18, 2) @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  sale  Sale            @relation(fields: [saleId], references: [id], onDelete: Restrict)
+  items SaleReturnItem[]
+
+  @@index([saleId])
+  @@index([returnedAt])
+}
+
+model SaleReturnItem {
+  id           String   @id @default(uuid()) @db.Uuid
+  saleReturnId String   @db.Uuid
+  productId    String   @db.Uuid
+  qty          Int
+  unitPrice    Decimal  @db.Decimal(18, 2)
+  lineTotal    Decimal  @db.Decimal(18, 2)
+
+  saleReturn SaleReturn @relation(fields: [saleReturnId], references: [id], onDelete: Cascade)
+  product    Product    @relation(fields: [productId], references: [id])
+
+  @@index([saleReturnId])
+  @@index([productId])
 }
 
 model SaleItem {
@@ -364,23 +401,47 @@ model CashSession {
   updatedAt     DateTime @updatedAt
 
   movements CashMovement[]
+  expenses  Expense[]
 
   @@index([openedAt])
   @@index([closedAt])
 }
 
-model CashMovement {
-  id          String           @id @default(uuid()) @db.Uuid
-  sessionId   String           @db.Uuid
-  type        CashMovementType
-  method      PaymentMethod
-  amount      Decimal          @db.Decimal(18, 2)
-  reference   String?
-  relatedSaleId String?        @db.Uuid
-  createdAt   DateTime         @default(now())
+model Expense {
+  id            String        @id @default(uuid()) @db.Uuid
+  amount        Decimal       @db.Decimal(18, 2)
+  description   String
+  category      String?
+  expenseDate   DateTime      @default(now())
+  paymentMethod PaymentMethod
+  cashSessionId String?       @db.Uuid
+  reference     String?
+  createdBy     String?       @db.Uuid
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
 
-  session CashSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  relatedSale Sale?   @relation(fields: [relatedSaleId], references: [id])
+  cashSession   CashSession?   @relation(fields: [cashSessionId], references: [id], onDelete: SetNull)
+  cashMovement CashMovement?
+
+  @@index([expenseDate])
+  @@index([cashSessionId])
+  @@index([category])
+}
+
+model CashMovement {
+  id               String           @id @default(uuid()) @db.Uuid
+  sessionId        String           @db.Uuid
+  type             CashMovementType
+  method           PaymentMethod
+  amount           Decimal          @db.Decimal(18, 2)
+  reference        String?
+  relatedSaleId    String?          @db.Uuid
+  relatedExpenseId String?          @unique @db.Uuid
+  createdAt        DateTime         @default(now())
+
+  session      CashSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  relatedSale  Sale?       @relation(fields: [relatedSaleId], references: [id])
+  relatedExpense Expense? @relation(fields: [relatedExpenseId], references: [id], onDelete: Cascade)
 
   @@index([sessionId])
   @@index([createdAt])

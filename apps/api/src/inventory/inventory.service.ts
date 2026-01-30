@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { Prisma, InventoryMovementType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreateMovementDto } from './dto/create-movement.dto';
+import { CreateInventoryMovementDto } from './dto/create-movement.dto';
 import { ValidationLimitsService } from '../common/services/validation-limits.service';
 import { AuditService } from '../common/services/audit.service';
 
@@ -15,7 +15,7 @@ export class InventoryService {
     private readonly audit: AuditService,
   ) {}
 
-  async createMovement(dto: CreateMovementDto, createdByUserId?: string) {
+  async createMovement(dto: CreateInventoryMovementDto, createdByUserId?: string) {
     const startTime = Date.now();
     this.logger.log(`Creando movimiento de inventario tipo ${dto.type}`, {
       type: dto.type,

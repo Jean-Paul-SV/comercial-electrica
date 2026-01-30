@@ -61,8 +61,8 @@ git status | grep .env
 ### Paso 3: Inicializar Git (si no está inicializado)
 
 ```bash
-# Desde la raíz del proyecto
-cd C:\Users\paulk\OneDrive\Escritorio\Proyecto\Comercial-Electrica
+# Desde la raíz del proyecto (ajusta la ruta si es necesario)
+cd C:\Users\paulk\Desktop\Proyecto\Comercial-Electrica
 
 # Inicializar git (si no está inicializado)
 git init
