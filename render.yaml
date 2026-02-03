@@ -1,0 +1,43 @@
+# Blueprint: Comercial Eléctrica – API (NestJS) + PostgreSQL
+# Despliegue gratuito en Render. Frontend se despliega en Vercel (ver docs/DEPLOY_VERCEL_RENDER.md).
+
+databases:
+  - name: comercial-electrica-db
+    plan: free
+    region: oregon
+
+services:
+  - type: web
+    name: comercial-electrica-api
+    runtime: node
+    plan: free
+    region: oregon
+    rootDir: apps/api
+    buildCommand: npm install && npx prisma generate && npm run build
+    preDeployCommand: npx prisma migrate deploy
+    startCommand: npm run start:prod
+    healthCheckPath: /
+    buildFilter:
+      paths:
+        - apps/api/**
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: comercial-electrica-db
+          property: connectionString
+      - key: JWT_ACCESS_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      # Añadir en el Dashboard de Render después del primer deploy:
+      # - ALLOWED_ORIGINS = https://tu-app.vercel.app (URL de Vercel)
+      # - REDIS_URL = redis://... (crear cuenta gratis en https://upstash.com)
+      # - FRONTEND_URL = https://tu-app.vercel.app
+      - key: ALLOWED_ORIGINS
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
