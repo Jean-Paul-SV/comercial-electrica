@@ -45,14 +45,20 @@ async function bootstrap() {
   const isProd = process.env.NODE_ENV === 'production';
   const allowedOrigins = (process.env.ALLOWED_ORIGINS ?? '')
     .split(',')
-    .map((s) => s.trim())
+    .map((s) => s.trim().replace(/\/$/, ''))
     .filter(Boolean);
-  // En prod sin ALLOWED_ORIGINS configurado, permitir cualquier origen (p. ej. Render sin variable). Configurar en Dashboard para restringir.
-  const corsOrigin = isProd
-    ? allowedOrigins.length > 0
-      ? allowedOrigins
-      : true
-    : true;
+  // En prod sin ALLOWED_ORIGINS configurado, permitir cualquier origen. Con valores, comparación normalizada (sin barra final).
+  const corsOrigin =
+    isProd && allowedOrigins.length > 0
+      ? (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+          if (!origin) {
+            return callback(null, false);
+          }
+          const normalized = origin.trim().replace(/\/$/, '');
+          const allowed = allowedOrigins.some((o) => o === normalized);
+          callback(null, allowed);
+        }
+      : true;
 
   // Correlation / Request ID (útil para debugging y trazabilidad)
   app.use((req: Request, res: Response, next: NextFunction) => {
@@ -72,6 +78,8 @@ async function bootstrap() {
   app.enableCors({
     origin: corsOrigin,
     credentials: true,
+    methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With', 'X-Request-Id'],
   });
   // Filtro global de excepciones para respuestas consistentes
   app.useGlobalFilters(new AllExceptionsFilter());
