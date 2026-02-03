@@ -2,13 +2,7 @@ import { Module } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { URL } from 'node:url';
-
-/** Extrae la URL de Redis si viene pegada como "redis-cli --tls -u redis://..." (Upstash). */
-function normalizeRedisUrl(urlStr: string): string {
-  const trimmed = urlStr.trim();
-  const match = trimmed.match(/\s-u\s+(rediss?:\/\/[^\s]+)/i) ?? trimmed.match(/(rediss?:\/\/[^\s]+)/);
-  return match ? (match[1] ?? trimmed).trim() : trimmed;
-}
+import { normalizeRedisUrl } from '../common/utils/redis-url';
 
 function parseRedis(urlStr: string) {
   const normalized = normalizeRedisUrl(urlStr);

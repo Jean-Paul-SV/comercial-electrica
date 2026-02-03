@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
+import { normalizeRedisUrl } from '../utils/redis-url';
 
 /**
  * Servicio de caché usando Redis
@@ -13,10 +14,11 @@ export class CacheService {
   private readonly defaultTtl: number;
 
   constructor(private readonly config: ConfigService) {
-    const redisUrl = this.config.get<string>(
+    const raw = this.config.get<string>(
       'REDIS_URL',
       'redis://localhost:6379',
     );
+    const redisUrl = normalizeRedisUrl(raw);
     this.defaultTtl = this.config.get<number>('CACHE_TTL_SECONDS', 300); // 5 minutos por defecto
 
     this.redis = new Redis(redisUrl, {
@@ -84,6 +86,8 @@ export class CacheService {
       const batch: string[] = [];
 
       await new Promise<void>((resolve, reject) => {
+        const rejectWithError = (e: unknown) =>
+          reject(e instanceof Error ? e : new Error(String(e)));
         stream.on('data', (keys: string[]) => {
           batch.push(...keys);
           if (batch.length >= 500) {
@@ -91,18 +95,18 @@ export class CacheService {
             void this.redis.del(...toDelete);
           }
         });
-        stream.on('end', async () => {
-          try {
-            if (batch.length > 0) {
-              const toDelete = batch.splice(0, batch.length);
-              await this.redis.del(...toDelete);
-            }
+        stream.on('end', () => {
+          if (batch.length === 0) {
             resolve();
-          } catch (e) {
-            reject(e);
+            return;
           }
+          const toDelete = batch.splice(0, batch.length);
+          this.redis.del(...toDelete).then(
+            () => resolve(),
+            (e: unknown) => rejectWithError(e),
+          );
         });
-        stream.on('error', (e: unknown) => reject(e));
+        stream.on('error', (e: unknown) => rejectWithError(e));
       });
     } catch (error) {
       this.logger.warn(`Error deleting cache pattern ${pattern}:`, error);
