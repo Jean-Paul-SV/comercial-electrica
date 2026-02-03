@@ -23,21 +23,22 @@ export type AuthState = {
 
 const AuthContext = createContext<AuthState | null>(null);
 
+function readStoredToken(): string | null {
+  if (typeof window === 'undefined') return null;
+  const stored = localStorage.getItem(TOKEN_KEY);
+  if (!stored || isJwtExpired(stored)) {
+    if (stored) localStorage.removeItem(TOKEN_KEY);
+    return null;
+  }
+  return stored;
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [token, setToken] = useState<string | null>(null);
+  const [token, setToken] = useState<string | null>(readStoredToken);
   const [user, setUser] = useState<{ id: string; email: string; role: 'ADMIN' | 'USER' } | null>(null);
   const [permissions, setPermissions] = useState<string[]>([]);
   const [enabledModules, setEnabledModules] = useState<string[]>([]);
   const [mustChangePassword, setMustChangePassword] = useState(false);
-
-  useEffect(() => {
-    const stored = localStorage.getItem(TOKEN_KEY);
-    if (stored && !isJwtExpired(stored)) {
-      setToken(stored);
-    } else if (stored) {
-      localStorage.removeItem(TOKEN_KEY);
-    }
-  }, []);
 
   const refreshMe = useCallback(async () => {
     if (!token) return;
@@ -78,6 +79,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setEnabledModules(res.tenant?.enabledModules ?? []);
       })
       .catch(() => {
+        localStorage.removeItem(TOKEN_KEY);
+        setToken(null);
         setUser(null);
         setPermissions([]);
         setEnabledModules([]);

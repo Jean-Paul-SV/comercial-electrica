@@ -23,7 +23,8 @@ import { PrismaModule } from '../prisma/prisma.module';
       useFactory: (config: ConfigService) => ({
         secret: config.get<string>('JWT_ACCESS_SECRET', 'CHANGE_ME_access'),
         signOptions: {
-          expiresIn: Number(config.get('JWT_ACCESS_TTL_SECONDS', 900)),
+          // 18 horas por defecto (64800 s); en Render definir JWT_ACCESS_TTL_SECONDS si quieres otro valor
+          expiresIn: Number(config.get('JWT_ACCESS_TTL_SECONDS', 64800)),
         },
       }),
     }),

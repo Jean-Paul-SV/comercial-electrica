@@ -23,10 +23,12 @@ export default function ProtectedLayout({
 }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { isAuthenticated, user, enabledModules } = useAuth();
+  const { isAuthenticated, user, enabledModules, token } = useAuth();
   const isOnline = useOnlineStatus();
+  const isLoadingSession = Boolean(token && !user);
 
   useEffect(() => {
+    if (isLoadingSession) return;
     if (!isAuthenticated) {
       router.replace('/login');
       return;
@@ -41,8 +43,15 @@ export default function ProtectedLayout({
         router.replace(`/plan-required?module=${encodeURIComponent(requiredModule)}`);
       }
     }
-  }, [isAuthenticated, user?.role, pathname, router, enabledModules]);
+  }, [isAuthenticated, user?.role, pathname, router, enabledModules, isLoadingSession]);
 
+  if (isLoadingSession) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <p className="text-muted-foreground text-sm">Cargando sesión…</p>
+      </div>
+    );
+  }
   if (!isAuthenticated) return null;
   if (user?.role && pathname && !canAccessPath(pathname, user.role)) {
     return null;
