@@ -60,7 +60,11 @@
     "swagger-ui-express": "^5.0.1",
     "xml-crypto": "^6.1.2",
     "@nestjs/cli": "^11.0.0",
-    "@types/express": "^5.0.0"
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.10.7",
+    "@types/nodemailer": "^7.0.9",
+    "@types/passport-jwt": "^4.0.1",
+    "@types/swagger-ui-express": "^4.1.6"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",
@@ -68,11 +72,7 @@
     "@nestjs/schematics": "^11.0.0",
     "@nestjs/testing": "^11.0.1",
     "@types/jest": "^30.0.0",
-    "@types/node": "^22.10.7",
-    "@types/nodemailer": "^7.0.9",
-    "@types/passport-jwt": "^4.0.1",
     "@types/supertest": "^6.0.2",
-    "@types/swagger-ui-express": "^4.1.6",
     "dotenv-cli": "^11.0.0",
     "eslint": "^9.18.0",
     "eslint-config-prettier": "^10.0.1",
