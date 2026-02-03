@@ -19,6 +19,10 @@ export class ThrottleAuthGuard extends ThrottlerGuard {
     if (req.method === 'GET' && (path === '' || path === '/')) {
       return true;
     }
+    // No limitar login para evitar 429 al iniciar sesión desde Vercel/frontend
+    if (req.method === 'POST' && (path === '/auth/login' || path === 'auth/login')) {
+      return true;
+    }
     return super.canActivate(context);
   }
 
