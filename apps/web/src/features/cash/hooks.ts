@@ -6,9 +6,11 @@ import {
   openCashSession,
   closeCashSession,
   listSessionMovements,
+  listAllCashMovements,
   createCashMovement,
   type CashSessionsListParams,
   type SessionMovementsParams,
+  type ListAllMovementsParams,
 } from './api';
 import type {
   OpenSessionPayload,
@@ -37,6 +39,16 @@ export function useSessionMovements(
     queryKey: ['cash', 'sessions', sessionId, 'movements', params],
     enabled: Boolean(token && sessionId),
     queryFn: () => listSessionMovements(sessionId!, params, token!),
+  });
+}
+
+export function useAllCashMovements(params: ListAllMovementsParams) {
+  const { token } = useAuth();
+
+  return useQuery({
+    queryKey: ['cash', 'movements', params],
+    enabled: Boolean(token),
+    queryFn: () => listAllCashMovements(params, token!),
   });
 }
 

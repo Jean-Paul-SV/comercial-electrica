@@ -7,12 +7,18 @@ import {
   getCashReport,
   getCustomersReport,
   getDashboard,
+  getActionableIndicators,
+  getDashboardSummary,
+  getOperationalState,
+  getCustomerClusters,
 } from './api';
 import type {
   SalesReportParams,
   InventoryReportParams,
   CashReportParams,
   CustomersReportParams,
+  ActionableIndicatorsParams,
+  CustomerClustersParams,
 } from './types';
 import { useAuth } from '@shared/providers/AuthProvider';
 
@@ -63,5 +69,50 @@ export function useDashboard() {
     queryKey: ['reports', 'dashboard'],
     enabled: Boolean(token),
     queryFn: () => getDashboard(token!),
+    staleTime: 90_000, // 1.5 min: dashboard no cambia tan seguido
+  });
+}
+
+export function useActionableIndicators(params: ActionableIndicatorsParams = {}) {
+  const { token } = useAuth();
+
+  return useQuery({
+    queryKey: ['reports', 'actionable-indicators', params],
+    enabled: Boolean(token),
+    queryFn: () => getActionableIndicators(token!, params),
+    staleTime: 0, // Siempre considerar datos obsoletos para refrescar
+    refetchInterval: 30_000, // Refrescar cada 30 s (tiempo casi real)
+    refetchOnWindowFocus: true, // Refrescar al volver a la pestaña
+  });
+}
+
+export function useDashboardSummary(params: ActionableIndicatorsParams = {}) {
+  const { token } = useAuth();
+
+  return useQuery({
+    queryKey: ['reports', 'dashboard-summary', params],
+    enabled: Boolean(token),
+    queryFn: () => getDashboardSummary(token!, params),
+    staleTime: 90_000,
+  });
+}
+
+export function useOperationalState() {
+  const { token } = useAuth();
+
+  return useQuery({
+    queryKey: ['reports', 'operational-state'],
+    enabled: Boolean(token),
+    queryFn: () => getOperationalState(token!),
+  });
+}
+
+export function useCustomerClusters(params: CustomerClustersParams = {}) {
+  const { token } = useAuth();
+
+  return useQuery({
+    queryKey: ['reports', 'customer-clusters', params],
+    enabled: Boolean(token),
+    queryFn: () => getCustomerClusters(token!, params),
   });
 }

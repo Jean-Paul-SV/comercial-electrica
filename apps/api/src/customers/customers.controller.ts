@@ -19,16 +19,15 @@ import {
   ApiParam,
 } from '@nestjs/swagger';
 import { CustomersService } from './customers.service';
-import { PaginationDto } from '../common/dto/pagination.dto';
+import { ListCustomersQueryDto } from './dto/list-customers-query.dto';
 import { CreateCustomerDto } from './dto/create-customer.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { RolesGuard } from '../auth/roles.guard';
-import { Roles } from '../auth/roles.decorator';
-import { RoleName } from '@prisma/client';
+import { PermissionsGuard } from '../auth/permissions.guard';
+import { RequirePermission } from '../auth/require-permission.decorator';
 
 @ApiTags('customers')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller('customers')
 export class CustomersController {
   constructor(private readonly customers: CustomersService) {}
@@ -64,11 +63,19 @@ export class CustomersController {
     },
   })
   @ApiResponse({ status: 401, description: 'No autenticado' })
-  list(@Query() pagination?: PaginationDto) {
-    return this.customers.list({
-      page: pagination?.page,
-      limit: pagination?.limit,
-    });
+  list(
+    @Query() query?: ListCustomersQueryDto,
+    @Req() req?: { user?: { tenantId?: string } },
+  ) {
+    return this.customers.list(
+      {
+        page: query?.page,
+        limit: query?.limit,
+        search: query?.search?.trim() || undefined,
+        sortOrder: query?.sortOrder,
+      },
+      req?.user?.tenantId,
+    );
   }
 
   @Get(':id')
@@ -81,8 +88,11 @@ export class CustomersController {
   @ApiResponse({ status: 200, description: 'Cliente encontrado' })
   @ApiResponse({ status: 404, description: 'Cliente no encontrado' })
   @ApiResponse({ status: 401, description: 'No autenticado' })
-  get(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string) {
-    return this.customers.get(id);
+  get(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @Req() req?: { user?: { tenantId?: string } },
+  ) {
+    return this.customers.get(id, req?.user?.tenantId);
   }
 
   @Post()
@@ -96,9 +106,9 @@ export class CustomersController {
   @ApiResponse({ status: 401, description: 'No autenticado' })
   create(
     @Body() dto: CreateCustomerDto,
-    @Req() req: { user?: { sub?: string } },
+    @Req() req: { user?: { sub?: string; tenantId?: string } },
   ) {
-    return this.customers.create(dto, req.user?.sub);
+    return this.customers.create(dto, req.user?.sub, req.user?.tenantId);
   }
 
   @Patch(':id')
@@ -114,28 +124,28 @@ export class CustomersController {
   update(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Body() dto: UpdateCustomerDto,
-    @Req() req: { user?: { sub?: string } },
+    @Req() req: { user?: { sub?: string; tenantId?: string } },
   ) {
-    return this.customers.update(id, dto, req.user?.sub);
+    return this.customers.update(id, dto, req.user?.sub, req.user?.tenantId);
   }
 
-  @Roles(RoleName.ADMIN)
+  @RequirePermission('customers:delete')
   @Delete(':id')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Eliminar cliente',
-    description: 'Elimina un cliente (requiere rol ADMIN). No se puede eliminar si tiene ventas asociadas.',
+    description: 'Elimina un cliente (requiere permiso customers:delete). No se puede eliminar si tiene ventas asociadas.',
   })
   @ApiParam({ name: 'id', description: 'ID del cliente' })
   @ApiResponse({ status: 200, description: 'Cliente eliminado exitosamente' })
   @ApiResponse({ status: 404, description: 'Cliente no encontrado' })
   @ApiResponse({ status: 400, description: 'Cliente tiene ventas asociadas' })
   @ApiResponse({ status: 401, description: 'No autenticado' })
-  @ApiResponse({ status: 403, description: 'No autorizado (requiere ADMIN)' })
+  @ApiResponse({ status: 403, description: 'No autorizado (requiere permiso customers:delete)' })
   delete(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
-    @Req() req: { user?: { sub?: string } },
+    @Req() req: { user?: { sub?: string; tenantId?: string } },
   ) {
-    return this.customers.delete(id, req.user?.sub);
+    return this.customers.delete(id, req.user?.sub, req.user?.tenantId ?? undefined);
   }
 }

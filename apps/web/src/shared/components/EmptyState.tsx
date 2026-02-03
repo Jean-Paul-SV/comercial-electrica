@@ -1,5 +1,6 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import { cn } from '@lib/utils';
 import type { LucideIcon } from 'lucide-react';
 import { Inbox } from 'lucide-react';
@@ -8,6 +9,8 @@ type EmptyStateProps = {
   message: string;
   description?: string;
   icon?: LucideIcon;
+  /** Acción opcional (ej. botón "Crear" o "Nueva devolución") */
+  action?: ReactNode;
   className?: string;
 };
 
@@ -15,6 +18,7 @@ export function EmptyState({
   message,
   description,
   icon: Icon = Inbox,
+  action,
   className,
 }: EmptyStateProps) {
   return (
@@ -31,6 +35,7 @@ export function EmptyState({
       {description && (
         <p className="text-xs text-muted-foreground/80 mt-1 max-w-sm">{description}</p>
       )}
+      {action && <div className="mt-4">{action}</div>}
     </div>
   );
 }

@@ -12,11 +12,14 @@ export type Paginated<T> = {
 
 export type PaymentMethod = 'CASH' | 'CARD' | 'TRANSFER' | 'OTHER';
 
+export type ExpenseKind = 'FIXED' | 'VARIABLE' | 'OTHER';
+
 export type Expense = {
   id: string;
   amount: string | number;
   description: string;
   category: string | null;
+  kind: ExpenseKind | null;
   expenseDate: string;
   paymentMethod: PaymentMethod;
   cashSessionId: string | null;
@@ -31,16 +34,23 @@ export type CreateExpensePayload = {
   amount: number;
   description: string;
   category?: string;
+  kind?: ExpenseKind;
   expenseDate?: string;
   paymentMethod: PaymentMethod;
   cashSessionId?: string;
   reference?: string;
 };
 
+export type ExpenseTypeFilter = 'all' | 'compras' | 'otros';
+
 export type ListExpensesParams = {
   startDate?: string;
   endDate?: string;
   category?: string;
+  search?: string;
+  expenseType?: ExpenseTypeFilter;
+  kind?: ExpenseKind;
+  cashSessionId?: string;
   page?: number;
   limit?: number;
 };

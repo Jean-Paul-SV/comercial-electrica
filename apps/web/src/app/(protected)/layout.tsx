@@ -3,9 +3,18 @@
 import { useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@shared/providers/AuthProvider';
+import { useOnlineStatus } from '@shared/hooks/useOnlineStatus';
 import { AppShell } from '@shared/ui/AppShell';
 import { SidebarProvider } from '@shared/ui/sidebar';
 import { canAccessPath } from '@shared/auth/roles';
+import { getModuleForPath } from '@shared/navigation/routeModuleMap';
+import { WifiOff } from 'lucide-react';
+
+const isOnboardingPath = (path: string | null) =>
+  path?.startsWith('/onboarding') ?? false;
+
+const isPlanRequiredPath = (path: string | null) =>
+  path === '/plan-required';
 
 export default function ProtectedLayout({
   children,
@@ -14,7 +23,8 @@ export default function ProtectedLayout({
 }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, user, enabledModules } = useAuth();
+  const isOnline = useOnlineStatus();
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -23,12 +33,49 @@ export default function ProtectedLayout({
     }
     if (user?.role && !canAccessPath(pathname ?? '', user.role)) {
       router.replace('/app');
+      return;
     }
-  }, [isAuthenticated, user?.role, pathname, router]);
+    if (!isPlanRequiredPath(pathname) && enabledModules.length > 0) {
+      const requiredModule = getModuleForPath(pathname);
+      if (requiredModule && !enabledModules.includes(requiredModule)) {
+        router.replace(`/plan-required?module=${encodeURIComponent(requiredModule)}`);
+      }
+    }
+  }, [isAuthenticated, user?.role, pathname, router, enabledModules]);
 
   if (!isAuthenticated) return null;
   if (user?.role && pathname && !canAccessPath(pathname, user.role)) {
     return null;
+  }
+  if (
+    !isPlanRequiredPath(pathname) &&
+    !isOnboardingPath(pathname) &&
+    enabledModules.length > 0
+  ) {
+    const requiredModule = getModuleForPath(pathname);
+    if (requiredModule && !enabledModules.includes(requiredModule)) {
+      return null;
+    }
+  }
+
+  if (isOnboardingPath(pathname)) {
+    return (
+      <div className="min-h-screen bg-background">
+        {!isOnline && (
+          <div
+            className="flex items-center justify-center gap-2 py-2 px-4 bg-warning/15 text-warning-foreground border-b border-warning/30 text-sm"
+            role="status"
+            aria-live="polite"
+          >
+            <WifiOff className="h-4 w-4 shrink-0" />
+            <span>
+              Sin conexión. Se reintentará al recuperar la conexión.
+            </span>
+          </div>
+        )}
+        {children}
+      </div>
+    );
   }
 
   return (

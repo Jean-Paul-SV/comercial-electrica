@@ -7,7 +7,11 @@ import { RoleName } from '@prisma/client';
 import { LoginDto } from './dto/login.dto';
 import { RegisterUserDto } from './dto/register-user.dto';
 import { BootstrapAdminDto } from './dto/bootstrap-admin.dto';
+import { ConfigService } from '@nestjs/config';
 import { AuditService } from '../common/services/audit.service';
+import { MailerService } from '../mailer/mailer.service';
+import { PermissionsService } from './permissions.service';
+import { TenantModulesService } from './tenant-modules.service';
 import * as argon2 from 'argon2';
 
 // Mock argon2
@@ -26,6 +30,8 @@ describe('AuthService', () => {
     email: 'admin@test.com',
     passwordHash: 'hashed-password',
     role: RoleName.ADMIN,
+    tenantId: null as string | null,
+    mustChangePassword: false,
     isActive: true,
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -58,8 +64,32 @@ describe('AuthService', () => {
         {
           provide: AuditService,
           useValue: {
+            log: jest.fn().mockResolvedValue(undefined),
             logAuth: jest.fn().mockResolvedValue(undefined),
             logCreate: jest.fn().mockResolvedValue(undefined),
+          },
+        },
+        {
+          provide: MailerService,
+          useValue: {
+            isConfigured: jest.fn().mockReturnValue(false),
+            sendMail: jest.fn().mockResolvedValue(true),
+          },
+        },
+        {
+          provide: ConfigService,
+          useValue: { get: jest.fn().mockReturnValue('') },
+        },
+        {
+          provide: PermissionsService,
+          useValue: { getPermissionsForRole: jest.fn().mockResolvedValue([]) },
+        },
+        {
+          provide: TenantModulesService,
+          useValue: {
+            getEnabledModulesForTenant: jest.fn().mockResolvedValue([]),
+            getDefaultTenantId: jest.fn().mockResolvedValue('tenant-default'),
+            getEffectiveTenantId: jest.fn().mockResolvedValue('tenant-default'),
           },
         },
       ],
@@ -237,6 +267,7 @@ describe('AuthService', () => {
         sub: 'user-1',
         email: 'admin@test.com',
         role: RoleName.ADMIN,
+        tenantId: 'tenant-default',
       };
 
       prisma.user.findUnique = jest.fn().mockResolvedValue(mockUser);
@@ -245,9 +276,17 @@ describe('AuthService', () => {
 
       const result = await service.login(dto);
 
-      expect(result).toEqual({ accessToken: 'jwt-token-123' });
+      expect(result).toEqual({ accessToken: 'jwt-token-123', mustChangePassword: false });
       expect(prisma.user.findUnique).toHaveBeenCalledWith({
         where: { email: 'admin@test.com' },
+        select: {
+          id: true,
+          email: true,
+          role: true,
+          tenantId: true,
+          passwordHash: true,
+          mustChangePassword: true,
+        },
       });
       expect(argon2.verify).toHaveBeenCalledWith(
         'hashed-password',
@@ -320,6 +359,14 @@ describe('AuthService', () => {
 
       expect(prisma.user.findUnique).toHaveBeenCalledWith({
         where: { email: 'admin@test.com' },
+        select: {
+          id: true,
+          email: true,
+          role: true,
+          tenantId: true,
+          passwordHash: true,
+          mustChangePassword: true,
+        },
       });
     });
   });

@@ -8,13 +8,15 @@ import {
 } from '@nestjs/swagger';
 import { DianService } from './dian.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { RolesGuard } from '../auth/roles.guard';
-import { Roles } from '../auth/roles.decorator';
-import { RoleName } from '@prisma/client';
+import { PermissionsGuard } from '../auth/permissions.guard';
+import { RequirePermission } from '../auth/require-permission.decorator';
+import { ModulesGuard } from '../auth/modules.guard';
+import { RequireModule } from '../auth/require-module.decorator';
 
 @ApiTags('dian')
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(RoleName.ADMIN)
+@UseGuards(JwtAuthGuard, PermissionsGuard, ModulesGuard)
+@RequirePermission('dian:manage')
+@RequireModule('electronic_invoicing')
 @Controller('dian')
 export class DianController {
   constructor(private readonly dianService: DianService) {}

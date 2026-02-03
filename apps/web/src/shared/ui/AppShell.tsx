@@ -3,31 +3,46 @@
 import { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@shared/providers/AuthProvider';
+import { useOnlineStatus } from '@shared/hooks/useOnlineStatus';
 import { Button } from '@shared/components/ui/button';
 import { cn } from '@lib/utils';
-import { Menu, X, LogOut } from 'lucide-react';
+import { Menu, X, LogOut, WifiOff, KeyRound } from 'lucide-react';
+import { AlertsBell } from '@shared/components/AlertsBell';
+import { OfflineQueueBell } from '@shared/components/OfflineQueueBell';
 import { Sidebar, useSidebarOptional } from '@shared/ui/sidebar';
 import { navConfig } from '@shared/navigation/config';
 import { getNavForRole } from '@shared/navigation/filterByRole';
 import { getRouteLabel } from '@shared/navigation/routeLabel';
+import { ChangePasswordDialog } from '@features/auth/ChangePasswordDialog';
 import type { AppRole } from '@shared/navigation/types';
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { user, logout } = useAuth();
+  const { user, permissions, enabledModules, logout, mustChangePassword, clearMustChangePassword } = useAuth();
+  const isOnline = useOnlineStatus();
   const sidebarContext = useSidebarOptional();
 
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
   const isMobileOpen = sidebarContext?.isMobileOpen ?? mobileOpen;
   const setMobileOpenState = sidebarContext?.setMobileOpen ?? setMobileOpen;
   const isCollapsed = sidebarContext?.isCollapsed ?? false;
 
-  const sections = getNavForRole(navConfig.sections, user?.role as AppRole | undefined);
+  const sections = getNavForRole(
+    navConfig.sections,
+    user?.role as AppRole | undefined,
+    permissions,
+    enabledModules?.length ? enabledModules : undefined
+  );
   const routeLabel = getRouteLabel(pathname ?? '');
 
   useEffect(() => {
     setMobileOpenState(false);
   }, [pathname]);
+
+  useEffect(() => {
+    if (mustChangePassword) setChangePasswordOpen(true);
+  }, [mustChangePassword]);
 
   useEffect(() => {
     if (!isMobileOpen) return;
@@ -49,9 +64,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         isCollapsed ? 'lg:grid-cols-[72px_1fr]' : 'lg:grid-cols-[240px_1fr]'
       )}
     >
+      {!isOnline && (
+        <div
+          className="col-span-full flex items-center justify-center gap-2 py-2 px-4 bg-warning/15 text-warning-foreground border-b border-warning/30 text-sm"
+          role="status"
+          aria-live="polite"
+        >
+          <WifiOff className="h-4 w-4 shrink-0" />
+          <span>
+            Sin conexión. Los datos pueden no estar actualizados. Se reintentará al recuperar la conexión.
+          </span>
+        </div>
+      )}
       {/* Sidebar desktop: siempre visible en lg+ */}
       <aside
-        className="hidden lg:flex lg:flex-col border-r border-border/80 bg-card/50 shrink-0"
+        className="hidden lg:flex lg:flex-col border-r border-border/60 bg-card shrink-0"
         style={{ width: isCollapsed ? 72 : 240 } as React.CSSProperties}
       >
         <Sidebar
@@ -59,6 +86,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           userEmail={user?.email}
           userRole={user?.role}
           onLogout={logout}
+          onOpenChangePassword={() => setChangePasswordOpen(true)}
           collapsed={isCollapsed}
           showFooter={true}
           showCollapseToggle={true}
@@ -117,6 +145,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             variant="ghost"
             size="sm"
             className="w-full justify-start gap-2 text-muted-foreground hover:text-foreground"
+            onClick={() => { setChangePasswordOpen(true); setMobileOpenState(false); }}
+          >
+            <KeyRound className="h-4 w-4 shrink-0" />
+            Cambiar contraseña
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full justify-start gap-2 text-muted-foreground hover:text-foreground"
             onClick={logout}
           >
             <LogOut className="h-4 w-4 shrink-0" />
@@ -127,19 +164,25 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       {/* Área principal */}
       <div className="flex flex-col min-h-0 flex-1">
-        <header className="h-14 shrink-0 border-b border-border/80 bg-background/80 backdrop-blur-sm px-4 sm:px-6 flex items-center gap-3">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="lg:hidden shrink-0"
-            onClick={() => setMobileOpenState(true)}
-            aria-label="Abrir menú"
-          >
-            <Menu className="h-5 w-5" />
-          </Button>
-          <span className="text-sm font-medium text-foreground truncate">
-            {routeLabel}
-          </span>
+        <header className="h-14 shrink-0 border-b border-border/80 bg-background/80 backdrop-blur-sm px-4 sm:px-6 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="lg:hidden shrink-0"
+              onClick={() => setMobileOpenState(true)}
+              aria-label="Abrir menú"
+            >
+              <Menu className="h-5 w-5" />
+            </Button>
+            <span className="text-sm font-medium text-foreground truncate">
+              {routeLabel}
+            </span>
+          </div>
+          <div className="flex items-center gap-1">
+            <OfflineQueueBell />
+            <AlertsBell />
+          </div>
         </header>
         <main className="flex-1 overflow-auto p-4 sm:p-6 md:p-8">
           <div className="mx-auto max-w-6xl animate-in fade-in duration-200">
@@ -147,6 +190,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </main>
       </div>
+      <ChangePasswordDialog
+        open={changePasswordOpen}
+        onOpenChange={(open) => {
+          if (!open && mustChangePassword) return;
+          setChangePasswordOpen(open);
+        }}
+        onSuccess={() => {
+          clearMustChangePassword();
+          setChangePasswordOpen(false);
+        }}
+        forceOpen={mustChangePassword}
+      />
     </div>
   );
 }

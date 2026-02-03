@@ -5,10 +5,11 @@ export type JwtClaims = {
   exp?: number;
 };
 
-function base64UrlDecode(input: string) {
+function base64UrlDecode(input: string): string {
   const padded = input.replace(/-/g, '+').replace(/_/g, '/');
   const padLength = (4 - (padded.length % 4)) % 4;
   const normalized = padded + '='.repeat(padLength);
+  if (typeof atob !== 'function') return ''; // SSR / entornos sin atob
   return atob(normalized);
 }
 

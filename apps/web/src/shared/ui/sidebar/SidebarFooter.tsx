@@ -1,8 +1,9 @@
 'use client';
 
 import { Button } from '@shared/components/ui/button';
-import { LogOut } from 'lucide-react';
+import { LogOut, KeyRound } from 'lucide-react';
 import { cn } from '@lib/utils';
+import { ThemeSelector } from '@shared/theme';
 
 type SidebarFooterProps = {
   /** Email del usuario (opcional). */
@@ -11,6 +12,8 @@ type SidebarFooterProps = {
   userRole?: string | null;
   /** Callback al cerrar sesión. */
   onLogout: () => void;
+  /** Callback para abrir diálogo de cambiar contraseña (opcional). */
+  onOpenChangePassword?: () => void;
   /** Modo colapsado: oculta texto secundario. */
   collapsed?: boolean;
   className?: string;
@@ -20,6 +23,7 @@ export function SidebarFooter({
   userEmail,
   userRole,
   onLogout,
+  onOpenChangePassword,
   collapsed = false,
   className,
 }: SidebarFooterProps) {
@@ -30,6 +34,7 @@ export function SidebarFooter({
         className
       )}
     >
+      <ThemeSelector collapsed={collapsed} className="w-full" />
       {!collapsed && (userEmail || userRole) && (
         <div className="space-y-0.5 px-1">
           {userEmail && (
@@ -43,6 +48,20 @@ export function SidebarFooter({
             </span>
           )}
         </div>
+      )}
+      {onOpenChangePassword && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className={cn(
+            'w-full justify-start gap-2 text-muted-foreground hover:text-foreground',
+            collapsed && 'justify-center px-2'
+          )}
+          onClick={onOpenChangePassword}
+        >
+          <KeyRound className="h-4 w-4 shrink-0" />
+          {!collapsed && <span>Cambiar contraseña</span>}
+        </Button>
       )}
       <Button
         variant="ghost"

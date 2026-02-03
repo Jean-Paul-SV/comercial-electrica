@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -32,7 +32,7 @@ import {
 } from '@shared/components/ui/dialog';
 import { Skeleton } from '@shared/components/ui/skeleton';
 import { Pagination } from '@shared/components/Pagination';
-import { Users, Plus } from 'lucide-react';
+import { Users, Plus, Search, ChevronUp, ChevronDown } from 'lucide-react';
 import { useCustomersList, useCreateCustomer } from '@features/customers/hooks';
 import type { CustomerDocType } from '@features/customers/types';
 
@@ -61,11 +61,30 @@ const customerSchema = z.object({
 });
 type CustomerFormValues = z.infer<typeof customerSchema>;
 
+const SEARCH_DEBOUNCE_MS = 300;
+
 export default function CustomersPage() {
   const [page, setPage] = useState(1);
   const [openNewCustomer, setOpenNewCustomer] = useState(false);
+  const [searchInput, setSearchInput] = useState('');
+  const [search, setSearch] = useState('');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc' | null>(null);
   const limit = 20;
-  const query = useCustomersList({ page, limit });
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setSearch(searchInput.trim());
+      setPage(1);
+    }, SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(t);
+  }, [searchInput]);
+
+  const query = useCustomersList({
+    page,
+    limit,
+    search: search || undefined,
+    sortOrder: sortOrder ?? undefined,
+  });
   const createCustomer = useCreateCustomer();
 
   const rows = useMemo(() => query.data?.data ?? [], [query.data]);
@@ -115,40 +134,124 @@ export default function CustomersPage() {
         </p>
       </div>
 
-      <Card className="border-0 shadow-sm">
-        <CardHeader className="pb-4">
+      <Card className="border-0 shadow-sm overflow-hidden">
+        <CardHeader className="pb-4 bg-muted/30 border-b border-border/50">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <CardTitle className="text-lg font-medium flex items-center gap-2">
-                <Users className="h-5 w-5 shrink-0" />
+                <Users className="h-5 w-5 shrink-0 text-primary" />
                 Listado
               </CardTitle>
               <CardDescription>
-                Clientes paginados
+                Clientes paginados. Busca por nombre, número o teléfono.
               </CardDescription>
             </div>
             <Button
               size="sm"
               onClick={() => setOpenNewCustomer(true)}
-              className="gap-2 w-full sm:w-auto"
+              className="gap-2 w-full sm:w-auto shadow-sm"
             >
               <Plus className="h-4 w-4 shrink-0" />
               Nuevo cliente
             </Button>
           </div>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <Pagination meta={meta} onPageChange={setPage} label="Página" />
+        <CardContent className="space-y-4 pt-4">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between rounded-lg bg-muted/20 border border-border/50 p-3">
+            <div className="flex flex-1 flex-wrap items-center gap-3 min-w-0">
+              <div className="flex items-center gap-2 flex-1 min-w-[200px] max-w-sm">
+                <Label htmlFor="search-customer" className="text-sm text-muted-foreground whitespace-nowrap">
+                  Buscar:
+                </Label>
+                <Input
+                  id="search-customer"
+                  type="search"
+                  placeholder="Nombre o número de identificación del cliente"
+                  value={searchInput}
+                  onChange={(e) => {
+                    setSearchInput(e.target.value);
+                    setPage(1);
+                  }}
+                  className="h-9 rounded-lg bg-background border-border/80 text-sm flex-1 min-w-0"
+                  autoComplete="off"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <Label className="text-sm text-muted-foreground whitespace-nowrap">
+                  Ordenar:
+                </Label>
+                <div className="flex items-center gap-1 border border-input rounded-lg p-0.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (sortOrder === 'asc') {
+                      setSortOrder(null);
+                    } else {
+                      setSortOrder('asc');
+                    }
+                    setPage(1);
+                  }}
+                  className={`h-7 px-2 flex items-center gap-1 rounded text-xs transition-colors ${
+                    sortOrder === 'asc'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'hover:bg-accent text-muted-foreground'
+                  }`}
+                  title="Nombre A-Z"
+                >
+                  <ChevronUp className="h-3 w-3" />
+                  Mayor
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (sortOrder === 'desc') {
+                      setSortOrder(null);
+                    } else {
+                      setSortOrder('desc');
+                    }
+                    setPage(1);
+                  }}
+                  className={`h-7 px-2 flex items-center gap-1 rounded text-xs transition-colors ${
+                    sortOrder === 'desc'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'hover:bg-accent text-muted-foreground'
+                  }`}
+                  title="Nombre Z-A"
+                >
+                  <ChevronDown className="h-3 w-3" />
+                  Menor
+                </button>
+                </div>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setSearchInput('');
+                  setSearch('');
+                  setSortOrder(null);
+                  setPage(1);
+                }}
+                disabled={!searchInput.trim() && !search && sortOrder === null}
+                className="h-9 shrink-0 border-border bg-background text-foreground hover:bg-muted/50 disabled:opacity-50"
+                aria-label="Limpiar filtros"
+              >
+                Limpiar filtros
+              </Button>
+            </div>
+            <Pagination meta={meta} onPageChange={setPage} label="Página" />
+          </div>
 
           {query.isLoading && (
             <div className="rounded-lg border border-border overflow-hidden">
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>Documento</TableHead>
-                    <TableHead>Nombre</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Teléfono</TableHead>
+                  <TableRow className="bg-muted/40">
+                    <TableHead className="font-medium">Documento</TableHead>
+                    <TableHead className="font-medium">Nombre</TableHead>
+                    <TableHead className="font-medium">Email</TableHead>
+                    <TableHead className="font-medium">Teléfono</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -176,16 +279,16 @@ export default function CustomersPage() {
             <div className="rounded-lg border border-border overflow-hidden">
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>Documento</TableHead>
-                    <TableHead>Nombre</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Teléfono</TableHead>
+                  <TableRow className="bg-muted/40 hover:bg-muted/40">
+                    <TableHead className="font-medium">Documento</TableHead>
+                    <TableHead className="font-medium">Nombre</TableHead>
+                    <TableHead className="font-medium">Email</TableHead>
+                    <TableHead className="font-medium">Teléfono</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {rows.map((c) => (
-                    <TableRow key={c.id}>
+                    <TableRow key={c.id} className="transition-colors hover:bg-muted/30">
                       <TableCell className="text-muted-foreground text-sm">
                         {DOC_LABELS[c.docType] ?? c.docType} {c.docNumber}
                       </TableCell>
@@ -204,7 +307,9 @@ export default function CustomersPage() {
                         colSpan={4}
                         className="h-24 text-center text-muted-foreground"
                       >
-                        No hay clientes. Crea uno para comenzar.
+                        {search
+                          ? 'Ningún cliente coincide con la búsqueda.'
+                          : 'No hay clientes. Crea uno para comenzar.'}
                       </TableCell>
                     </TableRow>
                   )}
@@ -229,8 +334,9 @@ export default function CustomersPage() {
           >
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label>Tipo documento</Label>
+                <Label htmlFor="docType">Tipo documento</Label>
                 <select
+                  id="docType"
                   {...form.register('docType')}
                   className="flex h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                 >
@@ -240,15 +346,21 @@ export default function CustomersPage() {
                     </option>
                   ))}
                 </select>
+                <p className="text-xs text-muted-foreground">
+                  Tipo de identificación: cédula, NIT, pasaporte, etc.
+                </p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="docNumber">Nº documento</Label>
                 <Input
                   id="docNumber"
                   {...form.register('docNumber')}
-                  placeholder="1234567890"
+                  placeholder="Ej: 1234567890"
                   className="rounded-lg"
                 />
+                <p className="text-xs text-muted-foreground">
+                  Número del documento, sin puntos ni espacios. Se usa en facturas.
+                </p>
                 {form.formState.errors.docNumber && (
                   <p className="text-sm text-destructive">
                     {form.formState.errors.docNumber.message}
@@ -260,9 +372,12 @@ export default function CustomersPage() {
                 <Input
                   id="name"
                   {...form.register('name')}
-                  placeholder="Juan Pérez"
+                  placeholder="Ej: Juan Pérez o Empresa S.A.S."
                   className="rounded-lg"
                 />
+                <p className="text-xs text-muted-foreground">
+                  Nombre completo de la persona o razón social de la empresa. Aparecerá en facturas y cotizaciones.
+                </p>
                 {form.formState.errors.name && (
                   <p className="text-sm text-destructive">
                     {form.formState.errors.name.message}
@@ -275,18 +390,24 @@ export default function CustomersPage() {
                   id="email"
                   type="email"
                   {...form.register('email')}
-                  placeholder="cliente@correo.com"
+                  placeholder="Ej: cliente@correo.com"
                   className="rounded-lg"
                 />
+                <p className="text-xs text-muted-foreground">
+                  Opcional. Para envío de facturas electrónicas o notificaciones.
+                </p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="phone">Teléfono</Label>
                 <Input
                   id="phone"
                   {...form.register('phone')}
-                  placeholder="3001234567"
+                  placeholder="Ej: 300 123 4567"
                   className="rounded-lg"
                 />
+                <p className="text-xs text-muted-foreground">
+                  Opcional. Número de contacto del cliente.
+                </p>
               </div>
             </div>
             <DialogFooter>

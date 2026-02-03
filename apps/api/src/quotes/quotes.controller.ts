@@ -22,13 +22,12 @@ import { QuotesService } from './quotes.service';
 import { CreateQuoteDto } from './dto/create-quote.dto';
 import { UpdateQuoteDto } from './dto/update-quote.dto';
 import { ConvertQuoteDto } from './dto/convert-quote.dto';
+import { ListQuotesQueryDto } from './dto/list-quotes-query.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { RolesGuard } from '../auth/roles.guard';
 import { QuoteStatus } from '@prisma/client';
-import { PaginationDto } from '../common/dto/pagination.dto';
 
 @ApiTags('quotes')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard)
 @Controller('quotes')
 export class QuotesController {
   constructor(private readonly quotesService: QuotesService) {}
@@ -50,8 +49,11 @@ export class QuotesController {
       'Error de validación (productos inexistentes, items vacíos, etc.)',
   })
   @ApiResponse({ status: 401, description: 'No autenticado' })
-  create(@Body() dto: CreateQuoteDto, @Req() req: { user?: { sub?: string } }) {
-    return this.quotesService.createQuote(dto, req.user?.sub);
+  create(
+    @Body() dto: CreateQuoteDto,
+    @Req() req: { user?: { sub?: string; tenantId?: string } },
+  ) {
+    return this.quotesService.createQuote(dto, req.user?.sub, req.user?.tenantId);
   }
 
   @Get()
@@ -98,13 +100,17 @@ export class QuotesController {
   })
   @ApiResponse({ status: 401, description: 'No autenticado' })
   list(
-    @Query('status') status?: QuoteStatus,
-    @Query('customerId') customerId?: string,
-    @Query() pagination?: PaginationDto,
+    @Query() query?: ListQuotesQueryDto,
+    @Req() req?: { user?: { tenantId?: string } },
   ) {
     return this.quotesService.listQuotes(
-      { status, customerId },
-      { page: pagination?.page, limit: pagination?.limit },
+      {
+        status: query?.status,
+        customerId: query?.customerId,
+        search: query?.search?.trim() || undefined,
+      },
+      { page: query?.page, limit: query?.limit },
+      req?.user?.tenantId,
     );
   }
 
@@ -143,9 +149,9 @@ export class QuotesController {
   update(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Body() dto: UpdateQuoteDto,
-    @Req() req: { user?: { sub?: string } },
+    @Req() req: { user?: { sub?: string; tenantId?: string } },
   ) {
-    return this.quotesService.updateQuote(id, dto, req.user?.sub);
+    return this.quotesService.updateQuote(id, dto, req.user?.sub, req.user?.tenantId);
   }
 
   @Post(':id/convert')
@@ -193,8 +199,8 @@ export class QuotesController {
   updateStatus(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Body('status') status: QuoteStatus,
-    @Req() req: { user?: { sub?: string } },
+    @Req() req: { user?: { sub?: string; tenantId?: string } },
   ) {
-    return this.quotesService.updateQuoteStatus(id, status, req.user?.sub);
+    return this.quotesService.updateQuoteStatus(id, status, req.user?.sub, req.user?.tenantId);
   }
 }

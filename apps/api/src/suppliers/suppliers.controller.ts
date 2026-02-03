@@ -19,16 +19,18 @@ import {
   ApiParam,
 } from '@nestjs/swagger';
 import { SuppliersService } from './suppliers.service';
-import { PaginationDto } from '../common/dto/pagination.dto';
+import { ListSuppliersQueryDto } from './dto/list-suppliers-query.dto';
 import { CreateSupplierDto } from './dto/create-supplier.dto';
 import { UpdateSupplierDto } from './dto/update-supplier.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { RolesGuard } from '../auth/roles.guard';
-import { Roles } from '../auth/roles.decorator';
-import { RoleName } from '@prisma/client';
+import { PermissionsGuard } from '../auth/permissions.guard';
+import { RequirePermission } from '../auth/require-permission.decorator';
+import { ModulesGuard } from '../auth/modules.guard';
+import { RequireModule } from '../auth/require-module.decorator';
 
 @ApiTags('suppliers')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard, ModulesGuard)
+@RequireModule('suppliers')
 @Controller('suppliers')
 export class SuppliersController {
   constructor(private readonly suppliers: SuppliersService) {}
@@ -37,7 +39,8 @@ export class SuppliersController {
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Listar proveedores',
-    description: 'Obtiene todos los proveedores activos. Respuesta paginada.',
+    description:
+      'Obtiene proveedores paginados. Query isActive=true devuelve solo activos (para selects); sin isActive devuelve todos (incl. deshabilitados).',
   })
   @ApiResponse({
     status: 200,
@@ -64,11 +67,21 @@ export class SuppliersController {
     },
   })
   @ApiResponse({ status: 401, description: 'No autenticado' })
-  list(@Query() pagination?: PaginationDto) {
-    return this.suppliers.list({
-      page: pagination?.page,
-      limit: pagination?.limit,
-    });
+  list(
+    @Query() query?: ListSuppliersQueryDto,
+    @Req() req?: { user?: { tenantId?: string } },
+  ) {
+    const isActive =
+      query?.isActive === 'true' ? true : query?.isActive === 'false' ? false : undefined;
+    return this.suppliers.list(
+      {
+        page: query?.page,
+        limit: query?.limit,
+        isActive,
+        search: query?.search?.trim() || undefined,
+      },
+      req?.user?.tenantId,
+    );
   }
 
   @Get(':id')
@@ -81,8 +94,11 @@ export class SuppliersController {
   @ApiResponse({ status: 200, description: 'Proveedor encontrado' })
   @ApiResponse({ status: 404, description: 'Proveedor no encontrado' })
   @ApiResponse({ status: 401, description: 'No autenticado' })
-  get(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string) {
-    return this.suppliers.get(id);
+  get(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @Req() req?: { user?: { tenantId?: string } },
+  ) {
+    return this.suppliers.get(id, req?.user?.tenantId);
   }
 
   @Post()
@@ -96,9 +112,9 @@ export class SuppliersController {
   @ApiResponse({ status: 401, description: 'No autenticado' })
   create(
     @Body() dto: CreateSupplierDto,
-    @Req() req: { user?: { sub?: string } },
+    @Req() req: { user?: { sub?: string; tenantId?: string } },
   ) {
-    return this.suppliers.create(dto, req.user?.sub);
+    return this.suppliers.create(dto, req.user?.sub, req.user?.tenantId);
   }
 
   @Patch(':id')
@@ -114,28 +130,28 @@ export class SuppliersController {
   update(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Body() dto: UpdateSupplierDto,
-    @Req() req: { user?: { sub?: string } },
+    @Req() req: { user?: { sub?: string; tenantId?: string } },
   ) {
-    return this.suppliers.update(id, dto, req.user?.sub);
+    return this.suppliers.update(id, dto, req.user?.sub, req.user?.tenantId);
   }
 
-  @Roles(RoleName.ADMIN)
+  @RequirePermission('suppliers:delete')
   @Delete(':id')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Eliminar proveedor',
-    description: 'Desactiva un proveedor (requiere rol ADMIN). No se puede eliminar si tiene movimientos de inventario asociados.',
+    description: 'Desactiva un proveedor (requiere permiso suppliers:delete). No se puede eliminar si tiene movimientos asociados.',
   })
   @ApiParam({ name: 'id', description: 'ID del proveedor' })
   @ApiResponse({ status: 200, description: 'Proveedor desactivado exitosamente' })
   @ApiResponse({ status: 404, description: 'Proveedor no encontrado' })
   @ApiResponse({ status: 400, description: 'Proveedor tiene movimientos asociados' })
   @ApiResponse({ status: 401, description: 'No autenticado' })
-  @ApiResponse({ status: 403, description: 'No autorizado (requiere ADMIN)' })
+  @ApiResponse({ status: 403, description: 'No autorizado (requiere permiso suppliers:delete)' })
   delete(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
-    @Req() req: { user?: { sub?: string } },
+    @Req() req: { user?: { sub?: string; tenantId?: string } },
   ) {
-    return this.suppliers.delete(id, req.user?.sub);
+    return this.suppliers.delete(id, req.user?.sub, req.user?.tenantId);
   }
 }

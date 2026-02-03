@@ -18,6 +18,8 @@ type SidebarProps = {
   userRole?: string | null;
   /** Callback al cerrar sesión. */
   onLogout: () => void;
+  /** Callback para abrir diálogo cambiar contraseña (opcional). */
+  onOpenChangePassword?: () => void;
   /** Modo colapsado (solo iconos). */
   collapsed?: boolean;
   /** Nombre del producto en la marca. */
@@ -35,6 +37,7 @@ export function Sidebar({
   userEmail,
   userRole,
   onLogout,
+  onOpenChangePassword,
   collapsed = false,
   productName = 'Comercial Eléctrica',
   className,
@@ -46,7 +49,7 @@ export function Sidebar({
   return (
     <aside
       className={cn(
-        'flex flex-col border-r border-border/80 bg-card/50 shrink-0',
+        'flex flex-col border-r border-border/60 bg-card shrink-0',
         collapsed ? 'w-[72px]' : 'w-[240px]',
         className
       )}
@@ -82,6 +85,7 @@ export function Sidebar({
             userEmail={userEmail}
             userRole={userRole}
             onLogout={onLogout}
+            onOpenChangePassword={onOpenChangePassword}
             collapsed={collapsed}
           />
         </div>

@@ -1,9 +1,14 @@
 import { apiClient } from '@infrastructure/api/client';
-import type { Paginated, SaleListItem, CreateSalePayload } from './types';
+import type { Paginated, SaleListItem, CreateSalePayload, CreateSaleResponse } from './types';
+
+export type CreateSaleOptions = {
+  idempotencyKey?: string;
+};
 
 export type SalesListParams = {
   page?: number;
   limit?: number;
+  search?: string;
 };
 
 export function listSales(
@@ -13,6 +18,7 @@ export function listSales(
   const qs = new URLSearchParams();
   if (params.page != null) qs.set('page', String(params.page));
   if (params.limit != null) qs.set('limit', String(params.limit));
+  if (params.search != null && params.search !== '') qs.set('search', params.search);
   const query = qs.toString() ? `?${qs.toString()}` : '';
   return apiClient.get(`/sales${query}`, { authToken });
 }
@@ -20,7 +26,11 @@ export function listSales(
 export function createSale(
   payload: CreateSalePayload,
   authToken: string,
-): Promise<SaleListItem> {
-  return apiClient.post('/sales', payload, { authToken });
+  options?: CreateSaleOptions,
+): Promise<CreateSaleResponse> {
+  return apiClient.post('/sales', payload, {
+    authToken,
+    idempotencyKey: options?.idempotencyKey,
+  });
 }
 

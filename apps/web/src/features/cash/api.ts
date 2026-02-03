@@ -4,6 +4,7 @@ import type {
   CashSessionListItem,
   CashSession,
   CashMovement,
+  CashMovementWithSession,
   OpenSessionPayload,
   CloseSessionPayload,
   CreateMovementPayload,
@@ -59,6 +60,30 @@ export function listSessionMovements(
   return apiClient.get(`/cash/sessions/${sessionId}/movements${query}`, {
     authToken,
   });
+}
+
+export type ListAllMovementsParams = {
+  page?: number;
+  limit?: number;
+  sessionId?: string;
+  type?: 'IN' | 'OUT' | 'ADJUST';
+  startDate?: string;
+  endDate?: string;
+};
+
+export function listAllCashMovements(
+  params: ListAllMovementsParams,
+  authToken: string,
+): Promise<Paginated<CashMovementWithSession>> {
+  const qs = new URLSearchParams();
+  if (params.page != null) qs.set('page', String(params.page));
+  if (params.limit != null) qs.set('limit', String(params.limit));
+  if (params.sessionId != null) qs.set('sessionId', params.sessionId);
+  if (params.type != null) qs.set('type', params.type);
+  if (params.startDate != null) qs.set('startDate', params.startDate);
+  if (params.endDate != null) qs.set('endDate', params.endDate);
+  const query = qs.toString() ? `?${qs.toString()}` : '';
+  return apiClient.get(`/cash/movements${query}`, { authToken });
 }
 
 export function createCashMovement(

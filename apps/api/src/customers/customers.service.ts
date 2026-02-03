@@ -3,12 +3,14 @@ import {
   NotFoundException,
   Logger,
   BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateCustomerDto } from './dto/create-customer.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
 import { AuditService } from '../common/services/audit.service';
 import { CacheService } from '../common/services/cache.service';
+import type { Prisma } from '@prisma/client';
 
 @Injectable()
 export class CustomersService {
@@ -20,18 +22,39 @@ export class CustomersService {
     private readonly cache: CacheService,
   ) {}
 
-  async list(pagination?: { page?: number; limit?: number }) {
+  async list(
+    pagination?: {
+      page?: number;
+      limit?: number;
+      search?: string;
+      sortOrder?: 'asc' | 'desc';
+    },
+    tenantId?: string | null,
+  ) {
+    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
     const page = pagination?.page ?? 1;
     const limit = pagination?.limit ?? 20;
     const skip = (page - 1) * limit;
+    const search = pagination?.search?.trim();
+    const order = pagination?.sortOrder ?? 'asc';
+
+    const where: Prisma.CustomerWhereInput = { tenantId };
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { docNumber: { contains: search, mode: 'insensitive' } },
+        { phone: { contains: search, mode: 'insensitive' } },
+      ];
+    }
 
     const [data, total] = await Promise.all([
       this.prisma.customer.findMany({
-        orderBy: { name: 'asc' },
+        where,
+        orderBy: { name: order },
         skip,
         take: limit,
       }),
-      this.prisma.customer.count(),
+      this.prisma.customer.count({ where }),
     ]);
 
     const totalPages = Math.ceil(total / limit);
@@ -49,15 +72,18 @@ export class CustomersService {
     };
   }
 
-  async get(id: string) {
-    const cacheKey = this.cache.buildKey('customer', id);
+  async get(id: string, tenantId?: string | null) {
+    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
+    const cacheKey = this.cache.buildKey('customer', id, tenantId);
     const cached = await this.cache.get(cacheKey);
     if (cached) {
       this.logger.debug(`Customer ${id} retrieved from cache`);
       return cached;
     }
 
-    const c = await this.prisma.customer.findUnique({ where: { id } });
+    const c = await this.prisma.customer.findFirst({
+      where: { id, tenantId },
+    });
     if (!c) throw new NotFoundException('Cliente no encontrado.');
 
     // Cachear por 5 minutos
@@ -65,7 +91,8 @@ export class CustomersService {
     return c;
   }
 
-  async create(dto: CreateCustomerDto, createdByUserId?: string) {
+  async create(dto: CreateCustomerDto, createdByUserId?: string, tenantId?: string | null) {
+    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
     const startTime = Date.now();
     this.logger.log(`Creando cliente ${dto.docNumber}`, {
       docType: dto.docType,
@@ -76,6 +103,7 @@ export class CustomersService {
 
     const created = await this.prisma.customer.create({
       data: {
+        tenantId,
         docType: dto.docType,
         docNumber: dto.docNumber.trim(),
         name: dto.name.trim(),
@@ -110,9 +138,10 @@ export class CustomersService {
     return created;
   }
 
-  async update(id: string, dto: UpdateCustomerDto, updatedByUserId?: string) {
-    const oldCustomerData = await this.prisma.customer.findUnique({
-      where: { id },
+  async update(id: string, dto: UpdateCustomerDto, updatedByUserId?: string, tenantId?: string | null) {
+    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
+    const oldCustomerData = await this.prisma.customer.findFirst({
+      where: { id, tenantId },
     });
     if (!oldCustomerData) throw new NotFoundException('Cliente no encontrado.');
 
@@ -162,7 +191,7 @@ export class CustomersService {
     return updated;
   }
 
-  async delete(id: string, deletedByUserId?: string) {
+  async delete(id: string, deletedByUserId?: string, tenantId?: string) {
     const customer = await this.prisma.customer.findUnique({
       where: { id },
     });
@@ -221,7 +250,7 @@ export class CustomersService {
     });
 
     // Invalidar caché del cliente y listados
-    await this.cache.delete(this.cache.buildKey('customer', id));
+    if (tenantId) await this.cache.delete(this.cache.buildKey('customer', id, tenantId));
     await this.cache.deletePattern('cache:customers:*');
   }
 }

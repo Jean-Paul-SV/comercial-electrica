@@ -18,6 +18,10 @@ export type NavItemConfig = {
   icon: string;
   /** Si se define, solo estos roles ven el ítem. ADMIN ve todo. */
   roles?: AppRole[];
+  /** Si se define, el usuario debe tener este permiso (resource:action) o * para ver el ítem. */
+  requiredPermission?: string;
+  /** Código de módulo SaaS (ej. inventory, suppliers). Si no se define o es "core", siempre visible cuando el plan lo incluye. */
+  moduleCode?: string;
   /** Orden dentro de la sección (menor = más arriba). */
   order?: number;
   /** Para deshabilitar temporalmente sin borrar (mantenibilidad). */
@@ -35,6 +39,10 @@ export type NavSectionConfig = {
   order?: number;
   /** Si se define, solo estos roles ven la sección entera. */
   roles?: AppRole[];
+  /** Si se define, el usuario debe tener este permiso para ver la sección. */
+  requiredPermission?: string;
+  /** Código de módulo SaaS para la sección (ej. inventory, suppliers). Si no se define o es "core", visible según plan. */
+  moduleCode?: string;
 };
 
 /** Árbol de navegación completo (configuración cruda). */

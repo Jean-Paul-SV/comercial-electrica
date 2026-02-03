@@ -10,6 +10,10 @@ import type {
 export type SuppliersListParams = {
   page?: number;
   limit?: number;
+  /** Si es true, solo devuelve proveedores activos (para selects). Si no se envía, devuelve todos. */
+  isActive?: boolean;
+  /** Buscar por NIT, nombre, contacto o email */
+  search?: string;
 };
 
 export function listSuppliers(
@@ -19,6 +23,8 @@ export function listSuppliers(
   const qs = new URLSearchParams();
   if (params.page != null) qs.set('page', String(params.page));
   if (params.limit != null) qs.set('limit', String(params.limit));
+  if (params.isActive === true) qs.set('isActive', 'true');
+  if (params.search != null && params.search.trim() !== '') qs.set('search', params.search.trim());
   const query = qs.toString() ? `?${qs.toString()}` : '';
   return apiClient.get(`/suppliers${query}`, { authToken });
 }

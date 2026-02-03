@@ -1,6 +1,7 @@
 import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
+import { AuditService } from '../common/services/audit.service';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -8,6 +9,7 @@ import { createHash } from 'crypto';
 import { readFile, unlink } from 'fs/promises';
 import { existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
+import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 
 const execAsync = promisify(exec);
 
@@ -19,6 +21,7 @@ export class BackupsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
+    private readonly audit: AuditService,
   ) {
     this.backupDir =
       this.config.get<string>('BACKUP_DIR') || join(process.cwd(), 'backups');
@@ -27,16 +30,18 @@ export class BackupsService {
   /**
    * Crea un backup de la base de datos
    */
-  async createBackup(): Promise<{
+  async createBackup(tenantId?: string): Promise<{
     id: string;
     storagePath: string;
     checksum: string;
     status: string;
   }> {
+    const tid =
+      tenantId ??
+      (await this.prisma.tenant.findFirst({ select: { id: true } }))?.id;
+    if (!tid) throw new BadRequestException('No hay tenant para el backup.');
     const backupRun = await this.prisma.backupRun.create({
-      data: {
-        status: 'IN_PROGRESS',
-      },
+      data: { tenantId: tid, status: 'IN_PROGRESS' },
     });
 
     try {
@@ -111,6 +116,14 @@ export class BackupsService {
       this.logger.log(
         `Backup completado: ${backupRun.id}, tamaño: ${fileContent.length} bytes`,
       );
+
+      // Copia off-site opcional a S3 (RESILIENCIA_Y_SINCRONIZACION)
+      await this.uploadToS3IfConfigured(filepath, updated.id).catch((err) => {
+        this.logger.warn(
+          `Copia off-site S3 fallida para backup ${updated.id}: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      });
+
       return {
         id: updated.id,
         storagePath: updated.storagePath!,
@@ -153,6 +166,29 @@ export class BackupsService {
   }
 
   /**
+   * Devuelve ruta y nombre de archivo para descargar un backup (solo si existe y está COMPLETED).
+   */
+  async getBackupDownload(
+    id: string,
+  ): Promise<{ filePath: string; fileName: string }> {
+    const backup = await this.getBackup(id);
+    if (backup.status !== 'COMPLETED' || !backup.storagePath) {
+      throw new NotFoundException(
+        `Backup ${id} no está disponible para descarga (estado: ${backup.status})`,
+      );
+    }
+    if (!existsSync(backup.storagePath)) {
+      throw new NotFoundException(
+        `Archivo del backup ${id} no encontrado en disco`,
+      );
+    }
+    const started = backup.startedAt;
+    const dateStr = started.toISOString().slice(0, 16).replace(/[:T]/g, '-');
+    const fileName = `backup-${dateStr}.dump`;
+    return { filePath: backup.storagePath, fileName };
+  }
+
+  /**
    * Verifica la integridad de un backup
    */
   async verifyBackup(id: string): Promise<boolean> {
@@ -176,12 +212,16 @@ export class BackupsService {
   /**
    * Elimina un backup
    */
-  async deleteBackup(id: string): Promise<void> {
+  async deleteBackup(id: string, deletedByUserId?: string | null): Promise<void> {
     const backup = await this.getBackup(id);
     if (backup.storagePath && existsSync(backup.storagePath)) {
       await unlink(backup.storagePath);
     }
     await this.prisma.backupRun.delete({ where: { id } });
+    await this.audit.logDelete('backupRun', id, deletedByUserId ?? null, {
+      storagePath: backup.storagePath ?? undefined,
+      status: backup.status,
+    });
     this.logger.log(`Backup eliminado: ${id}`);
   }
 
@@ -210,6 +250,57 @@ export class BackupsService {
     } catch (error) {
       this.logger.error('Error en backup automático:', error);
     }
+  }
+
+  /**
+   * Sube el archivo de backup a S3 si BACKUP_S3_BUCKET está configurado.
+   * No lanza error: si falla, solo se registra en log (el backup local ya está creado).
+   */
+  private async uploadToS3IfConfigured(
+    filePath: string,
+    backupId: string,
+  ): Promise<void> {
+    const bucket = this.config.get<string>('BACKUP_S3_BUCKET');
+    if (!bucket || !bucket.trim()) {
+      return;
+    }
+
+    const region =
+      this.config.get<string>('AWS_REGION') ||
+      this.config.get<string>('AWS_DEFAULT_REGION') ||
+      'us-east-1';
+    const accessKeyId = this.config.get<string>('AWS_ACCESS_KEY_ID');
+    const secretAccessKey = this.config.get<string>('AWS_SECRET_ACCESS_KEY');
+
+    const client = new S3Client({
+      region,
+      ...(accessKeyId && secretAccessKey
+        ? {
+            credentials: {
+              accessKeyId,
+              secretAccessKey,
+            },
+          }
+        : {}),
+    });
+
+    const body = await readFile(filePath);
+    const key = `backups/backup-${backupId}.dump`;
+
+    await client.send(
+      new PutObjectCommand({
+        Bucket: bucket,
+        Key: key,
+        Body: body,
+        ContentType: 'application/octet-stream',
+        Metadata: {
+          'backup-id': backupId,
+          'created-at': new Date().toISOString(),
+        },
+      }),
+    );
+
+    this.logger.log(`Copia off-site S3 completada: s3://${bucket}/${key}`);
   }
 
   /**

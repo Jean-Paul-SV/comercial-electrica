@@ -7,6 +7,30 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [Sin Versión] - 2026-02-03
+
+### ✅ Agregado
+- **Documentación**
+  - README principal: sección "Inicio rápido (uso diario)" con enlace a `docs/LEVANTAR_PROYECTO.md`
+  - `docs/LEVANTAR_PROYECTO.md`: sección sobre errores `ERR_CONNECTION_REFUSED` y 500 en consola
+  - `docs/README.md`: enlace destacado a LEVANTAR_PROYECTO y fecha Febrero 2026
+
+### 🔧 Corregido
+- **Gastos (expenses):** el frontend dejó de enviar la propiedad `kind` en `POST /expenses` (la API no la acepta), evitando 400 "property kind should not exist"
+- **Facturas proveedor:** al registrar un pago se crea el gasto asociado con `tenantId`; corregido "Argument `tenant` is missing" en `expenseDelegate.create()`
+
+### 🛡️ Mantenimiento y optimización
+- **Rate limiting (API):** en desarrollo (`NODE_ENV !== 'production'`) el throttle no aplica límites para evitar 429; límites aumentados (short/medium/long) para producción
+- **Login (frontend):** interfaz refinada (fondo con gradiente, tarjeta con acento, mejor jerarquía visual)
+- **Dashboard (frontend):** `useMemo` para datos del gráfico KPI; imports de lucide-react unificados
+- **React Query:** `staleTime` 60 s global, `gcTime` 5 min; reportes/dashboard con `staleTime` 90 s
+- **Next.js:** `optimizePackageImports: ['lucide-react']`; páginas `reset-password` y `accept-invite` envueltas en `Suspense` por `useSearchParams`
+- **Dialog (UI):** soporte de `onPointerDownOutside` y `onEscapeKeyDown` en `DialogContent` (ChangePasswordDialog con `forceOpen`)
+- **Recharts:** dimensiones mínimas en `KpiBarChart`, `CashInOutChart`, `SalesByDayChart`, `TopCustomersChart` para evitar warning width/height -1
+- **Layout (frontend):** `data-scroll-behavior="smooth"` en `<html>` para advertencia de Next.js
+
+---
+
 ## [Sin Versión] - 2026-01-28
 
 ### ✅ Agregado

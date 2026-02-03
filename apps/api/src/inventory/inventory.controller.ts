@@ -15,12 +15,14 @@ import {
 } from '@nestjs/swagger';
 import { InventoryService } from './inventory.service';
 import { CreateInventoryMovementDto } from './dto/create-movement.dto';
+import { ListMovementsQueryDto } from './dto/list-movements-query.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { RolesGuard } from '../auth/roles.guard';
-import { PaginationDto } from '../common/dto/pagination.dto';
+import { ModulesGuard } from '../auth/modules.guard';
+import { RequireModule } from '../auth/require-module.decorator';
 
 @ApiTags('inventory')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, ModulesGuard)
+@RequireModule('inventory')
 @Controller('inventory')
 export class InventoryController {
   constructor(private readonly inventory: InventoryService) {}
@@ -57,11 +59,19 @@ export class InventoryController {
     },
   })
   @ApiResponse({ status: 401, description: 'No autenticado' })
-  listMovements(@Query() pagination?: PaginationDto) {
-    return this.inventory.listMovements({
-      page: pagination?.page,
-      limit: pagination?.limit,
-    });
+  listMovements(
+    @Query() query?: ListMovementsQueryDto,
+    @Req() req?: { user?: { tenantId?: string } },
+  ) {
+    return this.inventory.listMovements(
+      {
+        page: query?.page,
+        limit: query?.limit,
+        search: query?.search,
+        sortOrder: query?.sortOrder,
+      },
+      req?.user?.tenantId,
+    );
   }
 
   @Post('movements')
@@ -79,8 +89,8 @@ export class InventoryController {
   @ApiResponse({ status: 401, description: 'No autenticado' })
   createMovement(
     @Body() dto: CreateInventoryMovementDto,
-    @Req() req: { user?: { sub?: string } },
+    @Req() req: { user?: { sub?: string; tenantId?: string } },
   ) {
-    return this.inventory.createMovement(dto, req.user?.sub);
+    return this.inventory.createMovement(dto, req.user?.sub, req.user?.tenantId);
   }
 }

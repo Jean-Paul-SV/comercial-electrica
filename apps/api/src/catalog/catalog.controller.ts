@@ -17,19 +17,20 @@ import {
   ApiResponse,
   ApiBearerAuth,
   ApiParam,
+  ApiQuery,
 } from '@nestjs/swagger';
 import { CatalogService } from './catalog.service';
 import { PaginationDto } from '../common/dto/pagination.dto';
+import { ListProductsQueryDto } from './dto/list-products-query.dto';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { RolesGuard } from '../auth/roles.guard';
-import { Roles } from '../auth/roles.decorator';
-import { RoleName } from '@prisma/client';
+import { PermissionsGuard } from '../auth/permissions.guard';
+import { RequirePermission } from '../auth/require-permission.decorator';
 
 @ApiTags('catalog')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller()
 export class CatalogController {
   constructor(private readonly catalog: CatalogService) {}
@@ -64,12 +65,34 @@ export class CatalogController {
       },
     },
   })
+  @ApiQuery({ name: 'zeroStock', required: false, type: Boolean, description: 'Solo productos con 0 unidades' })
+  @ApiQuery({ name: 'lowStock', required: false, type: Boolean, description: 'Solo productos con stock bajo' })
+  @ApiQuery({ name: 'lowStockThreshold', required: false, type: Number, description: 'Umbral de stock bajo (por defecto 10)' })
+  @ApiQuery({ name: 'minStock', required: false, type: Number, description: 'Stock mínimo' })
+  @ApiQuery({ name: 'maxStock', required: false, type: Number, description: 'Stock máximo' })
+  @ApiQuery({ name: 'search', required: false, type: String, description: 'Buscar por nombre o código' })
+  @ApiQuery({ name: 'sortByStock', required: false, enum: ['asc', 'desc'], description: 'Ordenar por stock: asc = menor a mayor, desc = mayor a menor' })
   @ApiResponse({ status: 401, description: 'No autenticado' })
-  listProducts(@Query() pagination?: PaginationDto) {
-    return this.catalog.listProducts({
-      page: pagination?.page,
-      limit: pagination?.limit,
-    });
+  listProducts(
+    @Query() query?: ListProductsQueryDto,
+    @Req() req?: { user?: { tenantId?: string } },
+  ) {
+    const zeroStock = query?.zeroStock === 'true' || query?.zeroStock === '1';
+    const lowStock = query?.lowStock === 'true' || query?.lowStock === '1';
+    return this.catalog.listProducts(
+      {
+        page: query?.page,
+        limit: query?.limit,
+        zeroStock: zeroStock || undefined,
+        lowStock: lowStock && !zeroStock ? true : undefined,
+        lowStockThreshold: query?.lowStockThreshold,
+        minStock: query?.minStock,
+        maxStock: query?.maxStock,
+        search: query?.search?.trim() || undefined,
+        sortByStock: query?.sortByStock,
+      },
+      req?.user?.tenantId,
+    );
   }
 
   @Get('products/:id')
@@ -82,8 +105,11 @@ export class CatalogController {
   @ApiResponse({ status: 200, description: 'Producto encontrado' })
   @ApiResponse({ status: 404, description: 'Producto no encontrado' })
   @ApiResponse({ status: 401, description: 'No autenticado' })
-  getProduct(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string) {
-    return this.catalog.getProduct(id);
+  getProduct(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @Req() req?: { user?: { tenantId?: string } },
+  ) {
+    return this.catalog.getProduct(id, req?.user?.tenantId);
   }
 
   @Post('products')
@@ -97,9 +123,9 @@ export class CatalogController {
   @ApiResponse({ status: 401, description: 'No autenticado' })
   createProduct(
     @Body() dto: CreateProductDto,
-    @Req() req: { user?: { sub?: string } },
+    @Req() req: { user?: { sub?: string; tenantId?: string } },
   ) {
-    return this.catalog.createProduct(dto, req.user?.sub);
+    return this.catalog.createProduct(dto, req.user?.sub, req.user?.tenantId);
   }
 
   @Patch('products/:id')
@@ -118,17 +144,17 @@ export class CatalogController {
   updateProduct(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Body() dto: UpdateProductDto,
-    @Req() req: { user?: { sub?: string } },
+    @Req() req: { user?: { sub?: string; tenantId?: string } },
   ) {
-    return this.catalog.updateProduct(id, dto, req.user?.sub);
+    return this.catalog.updateProduct(id, dto, req.user?.sub, req.user?.tenantId);
   }
 
-  @Roles(RoleName.ADMIN)
+  @RequirePermission('catalog:delete')
   @Delete('products/:id')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Desactivar producto',
-    description: 'Desactiva un producto (requiere rol ADMIN)',
+    description: 'Desactiva un producto (requiere permiso catalog:delete)',
   })
   @ApiParam({ name: 'id', description: 'ID del producto' })
   @ApiResponse({
@@ -137,12 +163,12 @@ export class CatalogController {
   })
   @ApiResponse({ status: 404, description: 'Producto no encontrado' })
   @ApiResponse({ status: 401, description: 'No autenticado' })
-  @ApiResponse({ status: 403, description: 'No autorizado (requiere ADMIN)' })
+  @ApiResponse({ status: 403, description: 'No autorizado (requiere permiso catalog:delete)' })
   deactivate(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
-    @Req() req: { user?: { sub?: string } },
+    @Req() req: { user?: { sub?: string; tenantId?: string } },
   ) {
-    return this.catalog.deactivateProduct(id, req.user?.sub);
+    return this.catalog.deactivateProduct(id, req.user?.sub, req.user?.tenantId);
   }
 
   @Get('categories')
@@ -153,8 +179,8 @@ export class CatalogController {
   })
   @ApiResponse({ status: 200, description: 'Lista de categorías' })
   @ApiResponse({ status: 401, description: 'No autenticado' })
-  listCategories() {
-    return this.catalog.listCategories();
+  listCategories(@Req() req?: { user?: { tenantId?: string } }) {
+    return this.catalog.listCategories(req?.user?.tenantId);
   }
 
   @Post('categories')
@@ -168,8 +194,8 @@ export class CatalogController {
   @ApiResponse({ status: 401, description: 'No autenticado' })
   createCategory(
     @Body() dto: CreateCategoryDto,
-    @Req() req: { user?: { sub?: string } },
+    @Req() req: { user?: { sub?: string; tenantId?: string } },
   ) {
-    return this.catalog.createCategory(dto, req.user?.sub);
+    return this.catalog.createCategory(dto, req.user?.sub, req.user?.tenantId);
   }
 }

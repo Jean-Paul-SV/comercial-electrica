@@ -82,5 +82,40 @@ export class MetricsService {
       },
     };
   }
+
+  /**
+   * Formato Prometheus (exposition text). Para scraping con Prometheus/Grafana.
+   * Ref: https://prometheus.io/docs/instrumenting/exposition_formats/
+   */
+  getPrometheusText(): string {
+    const uptimeSeconds = (Date.now() - this.startedAt) / 1000;
+    const avgDurationMs =
+      this.totalRequests > 0
+        ? this.totalDurationMs / this.totalRequests
+        : 0;
+
+    const lines: string[] = [
+      '# HELP api_http_requests_total Total HTTP requests.',
+      '# TYPE api_http_requests_total counter',
+      `api_http_requests_total ${this.totalRequests}`,
+      '# HELP api_http_request_duration_seconds_avg Average request duration in seconds.',
+      '# TYPE api_http_request_duration_seconds_avg gauge',
+      `api_http_request_duration_seconds_avg ${(avgDurationMs / 1000).toFixed(6)}`,
+      '# HELP api_http_request_duration_seconds_max Max request duration in seconds.',
+      '# TYPE api_http_request_duration_seconds_max gauge',
+      `api_http_request_duration_seconds_max ${(this.maxDurationMs / 1000).toFixed(6)}`,
+      '# HELP api_uptime_seconds Process uptime in seconds.',
+      '# TYPE api_uptime_seconds gauge',
+      `api_uptime_seconds ${uptimeSeconds.toFixed(2)}`,
+      '# HELP api_http_requests_by_status Total requests by status bucket (2xx, 3xx, 4xx, 5xx).',
+      '# TYPE api_http_requests_by_status counter',
+    ];
+
+    for (const [bucket, count] of Object.entries(this.statusBuckets)) {
+      lines.push(`api_http_requests_by_status{status="${bucket}"} ${count}`);
+    }
+
+    return lines.join('\n') + '\n';
+  }
 }
 

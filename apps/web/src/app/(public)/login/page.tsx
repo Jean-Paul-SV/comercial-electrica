@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -39,33 +40,50 @@ export default function LoginPage() {
   const onSubmit = (values: LoginFormValues) => {
     loginMutation.mutate(values, {
       onSuccess: (data) => {
-        auth.login(data.accessToken);
+        auth.login(data.accessToken, data.mustChangePassword);
         router.replace('/app');
       },
     });
   };
 
   return (
-    <main className="min-h-screen flex items-center justify-center p-6 bg-background">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-xl">
-            <Zap className="h-6 w-6 text-primary" />
-            Comercial Eléctrica
-          </CardTitle>
-          <CardDescription>
+    <main className="min-h-screen flex items-center justify-center p-6 bg-gradient-to-br from-slate-50 via-white to-blue-50/30">
+      {/* Detalle decorativo sutil */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden>
+        <div className="absolute -top-40 -right-40 h-80 w-80 rounded-full bg-primary/5 blur-3xl" />
+        <div className="absolute -bottom-40 -left-40 h-80 w-80 rounded-full bg-primary/[0.07] blur-3xl" />
+      </div>
+
+      <Card className="relative w-full max-w-md border-0 shadow-xl shadow-slate-200/50 rounded-2xl overflow-hidden">
+        {/* Línea de acento superior */}
+        <div className="h-1 bg-gradient-to-r from-primary to-primary/80" />
+
+        <CardHeader className="space-y-1 pb-6 pt-8 px-8">
+          <div className="flex items-center justify-center gap-3 mb-2">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <Zap className="h-7 w-7" strokeWidth={2.25} />
+            </div>
+            <CardTitle className="text-2xl font-semibold tracking-tight text-foreground">
+              Comercial Eléctrica
+            </CardTitle>
+          </div>
+          <CardDescription className="text-center text-muted-foreground">
             Acceso al sistema de gestión
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4">
+
+        <CardContent className="px-8 pb-10">
+          <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-5">
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email" className="text-foreground/90 font-medium">
+                Email
+              </Label>
               <Input
                 id="email"
                 type="email"
                 autoComplete="username"
-                placeholder="admin@example.com"
+                placeholder="tu@empresa.com"
+                className="h-11 rounded-lg border-input/80 bg-background focus-visible:ring-2"
                 {...register('email')}
               />
               {errors.email && (
@@ -74,12 +92,23 @@ export default function LoginPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password">Contraseña</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password" className="text-foreground/90 font-medium">
+                  Contraseña
+                </Label>
+                <Link
+                  href="/forgot-password"
+                  className="text-xs text-muted-foreground hover:text-primary transition-colors underline underline-offset-2"
+                >
+                  ¿Olvidaste tu contraseña?
+                </Link>
+              </div>
               <Input
                 id="password"
                 type="password"
                 autoComplete="current-password"
                 placeholder="••••••••"
+                className="h-11 rounded-lg border-input/80 bg-background focus-visible:ring-2"
                 {...register('password')}
               />
               {errors.password && (
@@ -88,14 +117,14 @@ export default function LoginPage() {
             </div>
 
             {loginMutation.isError && (
-              <p className="text-sm text-destructive">
+              <p className="text-sm text-destructive rounded-lg bg-destructive/10 px-3 py-2">
                 {(loginMutation.error as { message?: string })?.message ?? 'Error al iniciar sesión'}
               </p>
             )}
 
             <Button
               type="submit"
-              className="w-full"
+              className="w-full h-11 rounded-lg font-medium shadow-sm"
               disabled={loginMutation.isPending}
             >
               {loginMutation.isPending ? 'Accediendo…' : 'Iniciar sesión'}

@@ -1,0 +1,187 @@
+/**
+ * Seed: Tenant por defecto, Plan "Todo incluido", Permission, Role (admin, user), UserRole para usuarios existentes.
+ * Ejecutar tras migración: npx prisma db seed
+ * Ver docs/ROLES_Y_PERMISOS_DISEÑO.md y ARQUITECTURA_MODULAR_SAAS.md
+ */
+
+import { PrismaClient, RoleName } from '@prisma/client';
+
+const prisma = new PrismaClient();
+
+/** Módulos del producto (alineado con ARQUITECTURA_MODULAR_SAAS). Plan "Todo incluido" los tiene todos. */
+const MODULE_CODES = [
+  'core',
+  'inventory',
+  'suppliers',
+  'electronic_invoicing',
+  'advanced_reports',
+  'audit',
+  'backups',
+] as const;
+
+const RESOURCES = [
+  'sales', 'quotes', 'returns', 'cash', 'expenses', 'inventory', 'catalog',
+  'customers', 'suppliers', 'purchases', 'supplier-invoices',
+  'reports', 'audit', 'backups', 'dian', 'users', 'metrics',
+] as const;
+
+const ACTIONS = ['create', 'read', 'update', 'delete', 'manage'] as const;
+
+function buildPermissionSlugs(): { resource: string; action: string }[] {
+  const out: { resource: string; action: string }[] = [];
+  for (const resource of RESOURCES) {
+    for (const action of ACTIONS) {
+      out.push({ resource, action });
+    }
+  }
+  return out;
+}
+
+async function main() {
+  const slugList = buildPermissionSlugs();
+
+  // 1. Plan "Todo incluido" (todos los módulos)
+  let plan = await prisma.plan.findFirst({ where: { slug: 'all' } });
+  if (!plan) {
+    plan = await prisma.plan.create({
+      data: {
+        name: 'Todo incluido',
+        slug: 'all',
+        description: 'Todos los módulos activos (comportamiento por defecto)',
+        isActive: true,
+      },
+    });
+    for (const code of MODULE_CODES) {
+      await prisma.planFeature.create({
+        data: { planId: plan.id, moduleCode: code },
+      });
+    }
+    console.log('Plan "Todo incluido" creado con', MODULE_CODES.length, 'módulos');
+  }
+
+  // 2. Tenant por defecto (con plan "Todo incluido")
+  let tenant = await prisma.tenant.findFirst({ where: { slug: 'default' } });
+  if (!tenant) {
+    tenant = await prisma.tenant.create({
+      data: { name: 'Negocio principal', slug: 'default', planId: plan.id, isActive: true },
+    });
+    console.log('Tenant por defecto creado:', tenant.id);
+  } else if (!tenant.planId) {
+    tenant = await prisma.tenant.update({
+      where: { id: tenant.id },
+      data: { planId: plan.id },
+    });
+    console.log('Tenant por defecto actualizado con planId:', plan.id);
+  }
+
+  // 3. Permisos (upsert por resource+action)
+  for (const { resource, action } of slugList) {
+    await prisma.permission.upsert({
+      where: { resource_action: { resource, action } },
+      create: { resource, action, description: `${resource}:${action}` },
+      update: {},
+    });
+  }
+  console.log('Permisos creados/actualizados:', slugList.length);
+
+  // 4. Roles de sistema (globales, tenantId null para que apliquen en cualquier tenant)
+  const allPerms = await prisma.permission.findMany({ select: { id: true } });
+
+  let adminRole = await prisma.role.findFirst({
+    where: { slug: 'admin', tenantId: null },
+  });
+  if (!adminRole) {
+    adminRole = await prisma.role.create({
+      data: {
+        name: 'Administrador',
+        slug: 'admin',
+        description: 'Todos los permisos',
+        tenantId: null,
+        isSystem: true,
+      },
+    });
+    for (const p of allPerms) {
+      await prisma.rolePermission.upsert({
+        where: { roleId_permissionId: { roleId: adminRole.id, permissionId: p.id } },
+        create: { roleId: adminRole.id, permissionId: p.id },
+        update: {},
+      });
+    }
+    console.log('Rol admin creado con', allPerms.length, 'permisos');
+  }
+
+  const userPermSlugs = [
+    'sales:read', 'sales:create', 'quotes:read', 'quotes:create', 'quotes:update',
+    'returns:read', 'returns:create', 'cash:read', 'cash:create', 'cash:update',
+    'expenses:read', 'expenses:create', 'catalog:read', 'customers:read', 'customers:create',
+    'inventory:read', 'reports:read',
+  ];
+  const userPermIds = await prisma.permission.findMany({
+    where: {
+      OR: userPermSlugs.map((s) => {
+        const [resource, action] = s.split(':');
+        return { resource, action };
+      }),
+    },
+    select: { id: true },
+  });
+
+  let userRole = await prisma.role.findFirst({
+    where: { slug: 'user', tenantId: null },
+  });
+  if (!userRole) {
+    userRole = await prisma.role.create({
+      data: {
+        name: 'Usuario',
+        slug: 'user',
+        description: 'Permisos básicos de operación',
+        tenantId: null,
+        isSystem: true,
+      },
+    });
+    for (const p of userPermIds) {
+      await prisma.rolePermission.upsert({
+        where: { roleId_permissionId: { roleId: userRole!.id, permissionId: p.id } },
+        create: { roleId: userRole!.id, permissionId: p.id },
+        update: {},
+      });
+    }
+    console.log('Rol user creado con', userPermIds.length, 'permisos');
+  }
+
+  // 5. Asignar tenant a usuarios existentes y UserRole según role legacy
+  const users = await prisma.user.findMany({
+    select: { id: true, email: true, role: true },
+  });
+  for (const u of users) {
+    await prisma.user.update({
+      where: { id: u.id },
+      data: { tenantId: tenant.id },
+    });
+    const existingUserRole = await prisma.userRole.findFirst({
+      where: { userId: u.id },
+    });
+    if (!existingUserRole) {
+      const roleId = u.role === RoleName.ADMIN ? adminRole!.id : userRole!.id;
+      await prisma.userRole.create({
+        data: {
+          userId: u.id,
+          roleId,
+          tenantId: tenant.id,
+        },
+      });
+      console.log('UserRole asignado:', u.email, '->', u.role === RoleName.ADMIN ? 'admin' : 'user');
+    }
+  }
+}
+
+main()
+  .then(() => {
+    console.log('Seed completado.');
+    process.exit(0);
+  })
+  .catch((e) => {
+    console.error(e);
+    process.exit(1);
+  })
+  .finally(() => prisma.$disconnect());

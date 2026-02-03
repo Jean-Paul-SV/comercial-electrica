@@ -51,6 +51,8 @@ export type CreateQuotePayload = {
   customerId?: string;
   validUntil?: string;
   items: CreateQuoteItemPayload[];
+  /** Descuento en porcentaje (0-100) aplicado al total. */
+  discountPercent?: number;
 };
 
 export type UpdateQuotePayload = {

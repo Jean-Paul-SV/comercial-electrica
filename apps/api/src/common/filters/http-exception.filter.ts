@@ -127,7 +127,9 @@ export class AllExceptionsFilter implements ExceptionFilter {
       return {
         status: HttpStatus.BAD_REQUEST,
         error: 'Bad Request',
-        message: 'Datos inválidos para la operación.',
+        message: isProd
+          ? 'Datos inválidos para la operación.'
+          : exception.message || 'Datos inválidos para la operación.',
         details: isProd
           ? undefined
           : { prisma: 'PrismaClientValidationError', message: exception.message },

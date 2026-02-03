@@ -5,9 +5,11 @@ import {
   Delete,
   ParseUUIDPipe,
   Param,
+  Req,
   UseGuards,
   HttpCode,
   HttpStatus,
+  StreamableFile,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -16,15 +18,18 @@ import {
   ApiBearerAuth,
   ApiParam,
 } from '@nestjs/swagger';
+import { createReadStream } from 'fs';
 import { BackupsService } from './backups.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { RolesGuard } from '../auth/roles.guard';
-import { Roles } from '../auth/roles.decorator';
-import { RoleName } from '@prisma/client';
+import { PermissionsGuard } from '../auth/permissions.guard';
+import { RequirePermission } from '../auth/require-permission.decorator';
+import { ModulesGuard } from '../auth/modules.guard';
+import { RequireModule } from '../auth/require-module.decorator';
 
 @ApiTags('backups')
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(RoleName.ADMIN)
+@UseGuards(JwtAuthGuard, PermissionsGuard, ModulesGuard)
+@RequirePermission('backups:manage')
+@RequireModule('backups')
 @Controller('backups')
 export class BackupsController {
   constructor(private readonly backups: BackupsService) {}
@@ -33,7 +38,7 @@ export class BackupsController {
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Crear backup',
-    description: 'Crea un backup de la base de datos (requiere ADMIN)',
+    description: 'Crea un backup de la base de datos (requiere permiso backups:manage)',
   })
   @ApiResponse({ status: 201, description: 'Backup creado exitosamente' })
   @ApiResponse({ status: 401, description: 'No autenticado' })
@@ -53,6 +58,34 @@ export class BackupsController {
   @ApiResponse({ status: 403, description: 'No autorizado (requiere ADMIN)' })
   list() {
     return this.backups.listBackups();
+  }
+
+  @Get(':id/download')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Descargar archivo de backup',
+    description:
+      'Descarga el archivo del backup (requiere ADMIN). Nombre sugerido: backup-YYYY-MM-DD-HHmm.dump',
+  })
+  @ApiParam({ name: 'id', description: 'ID del backup' })
+  @ApiResponse({
+    status: 200,
+    description: 'Archivo del backup',
+    content: { 'application/octet-stream': {} },
+  })
+  @ApiResponse({ status: 404, description: 'Backup no encontrado o no disponible' })
+  @ApiResponse({ status: 401, description: 'No autenticado' })
+  @ApiResponse({ status: 403, description: 'No autorizado (requiere ADMIN)' })
+  async download(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+  ): Promise<StreamableFile> {
+    const { filePath, fileName } =
+      await this.backups.getBackupDownload(id);
+    const stream = createReadStream(filePath);
+    return new StreamableFile(stream, {
+      type: 'application/octet-stream',
+      disposition: `attachment; filename="${fileName}"`,
+    });
   }
 
   @Get(':id')
@@ -99,7 +132,10 @@ export class BackupsController {
   @ApiResponse({ status: 404, description: 'Backup no encontrado' })
   @ApiResponse({ status: 401, description: 'No autenticado' })
   @ApiResponse({ status: 403, description: 'No autorizado (requiere ADMIN)' })
-  delete(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string) {
-    return this.backups.deleteBackup(id);
+  delete(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @Req() req: { user?: { sub?: string } },
+  ) {
+    return this.backups.deleteBackup(id, req.user?.sub);
   }
 }

@@ -34,4 +34,17 @@ export type Paginated<T> = {
 export type ListAuditLogsParams = {
   page?: number;
   limit?: number;
+  entity?: string;
+  action?: string;
+  startDate?: string;
+  endDate?: string;
+  search?: string;
+};
+
+export type VerifyChainResponse = {
+  valid: boolean;
+  totalChecked: number;
+  totalWithHash: number;
+  brokenAt?: string;
+  errors: string[];
 };

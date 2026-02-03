@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
@@ -8,6 +9,7 @@ import {
   DianDocumentStatus,
   DianDocumentType,
   InvoiceStatus,
+  InventoryMovementType,
   PaymentMethod,
   Prisma,
   SaleStatus,
@@ -40,7 +42,8 @@ export class SalesService {
     private readonly cache: CacheService,
   ) {}
 
-  async createSale(dto: CreateSaleDto, createdByUserId?: string) {
+  async createSale(dto: CreateSaleDto, createdByUserId?: string, tenantId?: string | null) {
+    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
     this.logger.log(
       `Creando venta para usuario ${createdByUserId || 'anónimo'}`,
     );
@@ -53,15 +56,15 @@ export class SalesService {
       this.limits.validateItemQty(item.qty);
     }
 
-    // Validar que la sesión de caja existe y está abierta
+    // Validar que la sesión de caja existe y está abierta y pertenece al tenant
     if (!dto.cashSessionId) {
       throw new BadRequestException(
         'cashSessionId requerido para registrar caja.',
       );
     }
 
-    const cashSession = await this.prisma.cashSession.findUnique({
-      where: { id: dto.cashSessionId },
+    const cashSession = await this.prisma.cashSession.findFirst({
+      where: { id: dto.cashSessionId, tenantId },
     });
 
     if (!cashSession) {
@@ -76,10 +79,10 @@ export class SalesService {
       );
     }
 
-    // Validar que el cliente existe si se proporciona
+    // Validar que el cliente existe y pertenece al tenant si se proporciona
     if (dto.customerId) {
-      const customer = await this.prisma.customer.findUnique({
-        where: { id: dto.customerId },
+      const customer = await this.prisma.customer.findFirst({
+        where: { id: dto.customerId, tenantId },
       });
       if (!customer) {
         throw new NotFoundException(
@@ -92,7 +95,7 @@ export class SalesService {
       .$transaction(
         async (tx) => {
           const products = await tx.product.findMany({
-            where: { id: { in: dto.items.map((i) => i.productId) } },
+            where: { id: { in: dto.items.map((i) => i.productId) }, tenantId },
             include: { stock: true },
           });
           if (products.length !== dto.items.length) {
@@ -125,7 +128,11 @@ export class SalesService {
             };
           });
 
-          const grandTotal = subtotal + taxTotal;
+          const discountTotal = Math.min(
+            Number(dto.discountTotal ?? 0),
+            subtotal + taxTotal,
+          );
+          const grandTotal = Math.max(0, subtotal + taxTotal - discountTotal);
 
           // Stock check + update
           for (const it of dto.items) {
@@ -149,11 +156,13 @@ export class SalesService {
 
           const sale = await tx.sale.create({
             data: {
+              tenantId,
               customerId: dto.customerId ?? null,
+              createdByUserId: createdByUserId ?? null,
               status: SaleStatus.PAID,
               subtotal,
               taxTotal,
-              discountTotal: 0,
+              discountTotal,
               grandTotal,
               items: { create: saleItems },
             },
@@ -172,6 +181,7 @@ export class SalesService {
 
           const invoice = await tx.invoice.create({
             data: {
+              tenantId,
               saleId: sale.id,
               customerId: sale.customerId,
               number: makeInvoiceNumber(),
@@ -179,7 +189,7 @@ export class SalesService {
               status: InvoiceStatus.ISSUED,
               subtotal,
               taxTotal,
-              discountTotal: 0,
+              discountTotal,
               grandTotal,
             },
           });
@@ -192,19 +202,17 @@ export class SalesService {
             },
           });
 
-          // Audit logging mejorado
-          await tx.auditLog.create({
+          // Registrar salida en inventario (Movimientos) para trazabilidad
+          await tx.inventoryMovement.create({
             data: {
-              actorId: createdByUserId ?? null,
-              entity: 'sale',
-              entityId: sale.id,
-              action: 'create',
-              diff: {
-                invoiceId: invoice.id,
-                dianDocumentId: dianDoc.id,
-                customerId: sale.customerId,
-                grandTotal: Number(sale.grandTotal),
-                itemsCount: sale.items.length,
+              tenantId,
+              type: InventoryMovementType.OUT,
+              reason: 'Venta',
+              items: {
+                create: dto.items.map((it) => ({
+                  productId: it.productId,
+                  qty: it.qty,
+                })),
               },
             },
           });
@@ -217,7 +225,13 @@ export class SalesService {
         { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
       )
       .then(async (result) => {
-        // enqueue DIAN processing after commit
+        await this.audit.logCreate('sale', result.sale.id, createdByUserId, {
+          invoiceId: result.invoice.id,
+          dianDocumentId: result.dianDocument.id,
+          customerId: result.sale.customerId,
+          grandTotal: Number(result.sale.grandTotal),
+          itemsCount: result.sale.items.length,
+        });
         this.logger.log(
           `Encolando procesamiento DIAN para documento ${result.dianDocument.id}`,
         );
@@ -226,25 +240,55 @@ export class SalesService {
           { dianDocumentId: result.dianDocument.id },
           { attempts: 10, backoff: { type: 'exponential', delay: 5000 } },
         );
-        // Invalidar caché de listados
         await this.cache.deletePattern('cache:sales:*');
         return result;
       });
   }
 
-  async listSales(pagination?: { page?: number; limit?: number }) {
+  async listSales(
+    pagination?: { page?: number; limit?: number; search?: string },
+    tenantId?: string | null,
+  ) {
+    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
     const page = pagination?.page ?? 1;
     const limit = pagination?.limit ?? 20;
     const skip = (page - 1) * limit;
+    const search = pagination?.search?.trim();
+
+    const where: Prisma.SaleWhereInput = { tenantId };
+    if (search) {
+      where.OR = [
+        { customer: { name: { contains: search, mode: 'insensitive' } } },
+        { invoices: { some: { number: { contains: search, mode: 'insensitive' } } } },
+        { createdBy: { email: { contains: search, mode: 'insensitive' } } },
+      ];
+    }
 
     const [data, total] = await Promise.all([
       this.prisma.sale.findMany({
+        where,
         orderBy: { soldAt: 'desc' },
-        include: { items: { include: { product: true } }, customer: true, invoices: true },
+        select: {
+          id: true,
+          customerId: true,
+          createdByUserId: true,
+          status: true,
+          soldAt: true,
+          subtotal: true,
+          taxTotal: true,
+          discountTotal: true,
+          grandTotal: true,
+          createdAt: true,
+          updatedAt: true,
+          items: { include: { product: true } },
+          customer: true,
+          invoices: true,
+          createdBy: true,
+        },
         skip,
         take: limit,
       }),
-      this.prisma.sale.count(),
+      this.prisma.sale.count({ where }),
     ]);
 
     const totalPages = Math.ceil(total / limit);
@@ -261,9 +305,10 @@ export class SalesService {
       },
     };
 
-    // Cachear listados (sin filtros complejos por ahora)
-    const cacheKey = this.cache.buildKey('sales', 'list', page, limit);
-    await this.cache.set(cacheKey, result, 180); // 3 minutos
+    if (!search) {
+      const cacheKey = this.cache.buildKey('sales', 'list', page, limit);
+      await this.cache.set(cacheKey, result, 180); // 3 minutos
+    }
 
     return result;
   }

@@ -1,18 +1,32 @@
 # Sistema de Gestión Comercial Eléctrica
 
-Sistema integral para gestión de inventario, ventas, caja, clientes y facturación electrónica DIAN.
+Sistema integral para gestión de inventario, ventas, caja, clientes, gastos, facturas de proveedor y facturación electrónica DIAN.
 
 > **Estado del Proyecto:** 🟢 **8.5/10 - EXCELENTE**  
-> **Última actualización:** Enero 2026  
+> **Última actualización:** Febrero 2026  
 > **Calificación:** Base sólida y profesional, lista para continuar desarrollo hacia producción
 
-> **Fase actual:** ✅ **Core API lista (módulos comerciales) + hardening de producción en progreso**  
+> **Fase actual:** ✅ **API + Frontend (Next.js)** operativos; módulos: catálogo, ventas, caja, gastos, cotizaciones, inventario, proveedores, facturas proveedor, reportes, auditoría  
 > **Pendiente crítico:** 🔴 **DIAN real** (XML UBL + firma + envío + PDF/QR)  
-> **Pendiente importante:** 🟡 **Frontend**
+> **Pendiente:** 🟡 Ajustes y mejoras de UX en frontend
 
 > **Documento de estado (fuente de verdad):** `docs/ESTADO_ACTUAL_2026-01-28.md`
 
-## 🚀 Inicio Rápido - Guía Paso a Paso
+---
+
+## 🚀 Inicio rápido (uso diario)
+
+Si ya tienes el proyecto clonado, dependencias instaladas y `.env` configurado:
+
+1. **Docker** en marcha → `npm run db:up` (Postgres + Redis)
+2. **Levantar todo** → `npm run dev` (API en **http://localhost:3000** + Frontend en **http://localhost:3001**)
+3. Abre **http://localhost:3001** e inicia sesión con `admin@example.com` / `Admin123!`
+
+Guía detallada: **[docs/LEVANTAR_PROYECTO.md](./docs/LEVANTAR_PROYECTO.md)** (errores frecuentes, primera vez desde cero, puertos en uso).
+
+---
+
+## 📋 Instalación completa - Guía Paso a Paso
 
 ### 📋 Paso 1: Requisitos Previos
 
@@ -29,8 +43,8 @@ Asegúrate de tener instalado:
 **⚠️ IMPORTANTE:** Todos los comandos de configuración inicial se ejecutan desde la **raíz del proyecto**.
 
 ```powershell
-# Abrir PowerShell y navegar a la raíz del proyecto
-cd C:\Users\paulk\OneDrive\Escritorio\Proyecto\Comercial-Electrica
+# Abrir PowerShell y navegar a la raíz del proyecto (donde está package.json)
+cd C:\ruta\a\Comercial-Electrica
 
 # Verificar que estás en el lugar correcto (deberías ver estos archivos):
 dir env.example
@@ -201,28 +215,22 @@ Después de seguir todos los pasos, verifica que todo está funcionando:
 
 ---
 
-## 🎯 Próximos Pasos Después de la Instalación
+## 🎯 Próximos pasos después de la instalación
 
 Una vez que todo esté funcionando:
 
-1. **Crear usuario administrador:**
-   ```powershell
-   curl -X POST http://localhost:3000/auth/bootstrap-admin `
-     -H "Content-Type: application/json" `
-     -d '{\"email\": \"admin@example.com\", \"password\": \"Admin123!\"}'
-   ```
+1. **Abrir la aplicación web:**  
+   Ir a **http://localhost:3001**, iniciar sesión con `admin@example.com` / `Admin123!` (si ya ejecutaste `npm run db:seed` y `npm run prisma:seed`).
 
-2. **Iniciar sesión y obtener token:**
+2. **Si es la primera vez y no hay usuarios**, crear admin y datos iniciales:
    ```powershell
-   curl -X POST http://localhost:3000/auth/login `
-     -H "Content-Type: application/json" `
-     -d '{\"email\": \"admin@example.com\", \"password\": \"Admin123!\"}'
+   npm run db:seed
+   npm run prisma:seed
    ```
+   Luego `npm run dev` y abrir **http://localhost:3001**.
 
-3. **Probar endpoints desde Swagger:**
-   - Abrir `http://localhost:3000/api/docs`
-   - Hacer clic en "Authorize" y pegar el token
-   - Probar crear productos, clientes, etc.
+3. **Probar la API desde Swagger:**  
+   Abrir `http://localhost:3000/api/docs`, iniciar sesión en la app para obtener token y usarlo en "Authorize".
 
 4. **Ejecutar tests:**
    ```powershell
@@ -717,10 +725,13 @@ npm run prisma:generate -w api
 **Error: "Missing script: db:up"**
 ```bash
 # Este error ocurre si ejecutas el comando desde apps/api
-# Solución: Ejecuta desde la raíz del proyecto
-cd C:\Users\paulk\OneDrive\Escritorio\Proyecto\Comercial-Electrica
+# Solución: Ejecuta desde la raíz del proyecto (donde está package.json)
+cd C:\ruta\a\Comercial-Electrica
 npm run db:up
 ```
+
+**Errores `ERR_CONNECTION_REFUSED` o 500 en el navegador**  
+La API no está corriendo. Ver **[docs/LEVANTAR_PROYECTO.md](./docs/LEVANTAR_PROYECTO.md)** → sección "Errores net::ERR_CONNECTION_REFUSED".
 
 ## ✅ Funcionalidades Implementadas
 
@@ -780,9 +791,10 @@ El proyecto ha alcanzado un nivel de calidad **excepcional** después de las mej
 
 Para ver un análisis detallado del estado actual del proyecto, consulta la documentación completa en la carpeta [`docs/`](./docs/):
 
-### 📚 Documentación Principal
+### 📚 Documentación principal
 
-- [📚 Índice de Documentación](./docs/README.md) - Índice completo de toda la documentación
+- [📚 Índice de documentación](./docs/README.md) - Índice completo de toda la documentación
+- [🚀 Levantar el proyecto](./docs/LEVANTAR_PROYECTO.md) - Uso diario, primera vez, errores frecuentes (ERR_CONNECTION_REFUSED, puertos en uso)
 - [💼 Opinión Senior - Estado Actual](./docs/OPINION_SENIOR_ACTUAL.md) ⭐ **NUEVO** - Evaluación completa del estado actual (8.5/10)
 - [📊 Evaluación del Proyecto](./docs/EVALUACION_PROYECTO_SENIOR.md) - Evaluación completa desde perspectiva senior
 - [📋 Análisis del Estado Actual](./docs/ANALISIS_ESTADO_ACTUAL.md) - Análisis completo del estado

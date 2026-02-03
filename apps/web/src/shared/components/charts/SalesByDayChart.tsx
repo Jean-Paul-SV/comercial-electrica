@@ -28,8 +28,8 @@ export function SalesByDayChart({ data, className }: SalesByDayChartProps) {
   if (!data.length) return null;
 
   return (
-    <div className={className ?? 'h-72 w-full'}>
-      <ResponsiveContainer width="100%" height="100%">
+    <div className={className ?? 'h-72 w-full min-w-[280px] min-h-[200px]'} style={{ minHeight: 200, minWidth: 280 }}>
+      <ResponsiveContainer width="100%" height="100%" minWidth={280} minHeight={200}>
         <BarChart data={data} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
           <CartesianGrid strokeDasharray="3 3" stroke={CHART_STROKE} vertical={false} />
           <XAxis
@@ -46,7 +46,7 @@ export function SalesByDayChart({ data, className }: SalesByDayChartProps) {
             tickFormatter={(v) => (v >= 1e6 ? `${(v / 1e6).toFixed(1)}M` : v >= 1e3 ? `${(v / 1e3).toFixed(0)}k` : String(v))}
           />
           <Tooltip
-            cursor={() => null}
+            cursor={false}
             isAnimationActive={false}
             contentStyle={{
               borderRadius: '12px',
@@ -54,7 +54,7 @@ export function SalesByDayChart({ data, className }: SalesByDayChartProps) {
               backgroundColor: '#fff',
             }}
             labelFormatter={(label) => formatDate(label)}
-            formatter={(value: number) => [formatMoney(value), 'Total']}
+            formatter={(value: number | undefined) => [formatMoney(value ?? 0), 'Total']}
           />
           <Bar dataKey="total" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} name="Total" />
         </BarChart>

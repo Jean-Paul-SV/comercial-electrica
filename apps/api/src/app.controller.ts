@@ -7,9 +7,8 @@ import {
 } from '@nestjs/swagger';
 import { AppService } from './app.service';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
-import { RolesGuard } from './auth/roles.guard';
-import { Roles } from './auth/roles.decorator';
-import { RoleName } from '@prisma/client';
+import { PermissionsGuard } from './auth/permissions.guard';
+import { RequirePermission } from './auth/require-permission.decorator';
 
 @Controller()
 @ApiTags('health')
@@ -55,19 +54,19 @@ export class AppController {
   }
 
   @Get('stats')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(RoleName.ADMIN)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermission('reports:read')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Estadísticas generales del sistema',
-    description: 'Obtiene estadísticas generales del sistema (requiere ADMIN)',
+    description: 'Obtiene estadísticas generales del sistema (requiere permiso reports:read)',
   })
   @ApiResponse({
     status: 200,
     description: 'Estadísticas del sistema',
   })
   @ApiResponse({ status: 401, description: 'No autenticado' })
-  @ApiResponse({ status: 403, description: 'No autorizado (requiere ADMIN)' })
+  @ApiResponse({ status: 403, description: 'No autorizado (requiere permiso reports:read)' })
   getStats() {
     return this.appService.getStats();
   }

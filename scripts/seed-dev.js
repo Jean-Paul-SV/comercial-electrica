@@ -97,6 +97,8 @@ async function main() {
     await prisma.supplier.deleteMany();
     await prisma.quoteItem.deleteMany();
     await prisma.quote.deleteMany();
+    await prisma.saleReturnItem.deleteMany();
+    await prisma.saleReturn.deleteMany();
     await prisma.saleItem.deleteMany();
     await prisma.cashMovement.deleteMany();
     await prisma.dianEvent.deleteMany();

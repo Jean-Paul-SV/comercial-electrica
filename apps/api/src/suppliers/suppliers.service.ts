@@ -3,6 +3,7 @@ import {
   NotFoundException,
   Logger,
   BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateSupplierDto } from './dto/create-supplier.dto';
@@ -20,19 +21,42 @@ export class SuppliersService {
     private readonly cache: CacheService,
   ) {}
 
-  async list(pagination?: { page?: number; limit?: number }) {
+  async list(
+    pagination?: { page?: number; limit?: number; isActive?: boolean; search?: string },
+    tenantId?: string | null,
+  ) {
+    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
     const page = pagination?.page ?? 1;
     const limit = pagination?.limit ?? 20;
     const skip = (page - 1) * limit;
+    const where: {
+      tenantId: string;
+      isActive?: boolean;
+      OR?: Array<
+        | { nit: { contains: string; mode: 'insensitive' } }
+        | { name: { contains: string; mode: 'insensitive' } }
+        | { contactPerson: { contains: string; mode: 'insensitive' } }
+        | { email: { contains: string; mode: 'insensitive' } };
+    } = { tenantId };
+    if (pagination?.isActive === true) where.isActive = true;
+    const searchTerm = pagination?.search?.trim();
+    if (searchTerm) {
+      where.OR = [
+        { nit: { contains: searchTerm, mode: 'insensitive' } },
+        { name: { contains: searchTerm, mode: 'insensitive' } },
+        { contactPerson: { contains: searchTerm, mode: 'insensitive' } },
+        { email: { contains: searchTerm, mode: 'insensitive' } },
+      ];
+    }
 
     const [data, total] = await Promise.all([
       this.prisma.supplier.findMany({
-        where: { isActive: true },
+        where,
         orderBy: { name: 'asc' },
         skip,
         take: limit,
       }),
-      this.prisma.supplier.count({ where: { isActive: true } }),
+      this.prisma.supplier.count({ where }),
     ]);
 
     const totalPages = Math.ceil(total / limit);
@@ -50,15 +74,18 @@ export class SuppliersService {
     };
   }
 
-  async get(id: string) {
-    const cacheKey = this.cache.buildKey('supplier', id);
+  async get(id: string, tenantId?: string | null) {
+    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
+    const cacheKey = this.cache.buildKey('supplier', id, tenantId);
     const cached = await this.cache.get(cacheKey);
     if (cached) {
       this.logger.debug(`Supplier ${id} retrieved from cache`);
       return cached;
     }
 
-    const s = await this.prisma.supplier.findUnique({ where: { id } });
+    const s = await this.prisma.supplier.findFirst({
+      where: { id, tenantId },
+    });
     if (!s) throw new NotFoundException('Proveedor no encontrado.');
 
     // Cachear por 5 minutos
@@ -66,7 +93,8 @@ export class SuppliersService {
     return s;
   }
 
-  async create(dto: CreateSupplierDto, createdByUserId?: string) {
+  async create(dto: CreateSupplierDto, createdByUserId?: string, tenantId?: string | null) {
+    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
     const startTime = Date.now();
     this.logger.log(`Creando proveedor ${dto.nit}`, {
       nit: dto.nit,
@@ -77,6 +105,7 @@ export class SuppliersService {
     try {
       const created = await this.prisma.supplier.create({
         data: {
+          tenantId,
           nit: dto.nit.trim(),
           name: dto.name.trim(),
           description: dto.description?.trim(),
@@ -119,9 +148,10 @@ export class SuppliersService {
     }
   }
 
-  async update(id: string, dto: UpdateSupplierDto, updatedByUserId?: string) {
-    const oldSupplierData = await this.prisma.supplier.findUnique({
-      where: { id },
+  async update(id: string, dto: UpdateSupplierDto, updatedByUserId?: string, tenantId?: string | null) {
+    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
+    const oldSupplierData = await this.prisma.supplier.findFirst({
+      where: { id, tenantId },
     });
     if (!oldSupplierData)
       throw new NotFoundException('Proveedor no encontrado.');
@@ -130,18 +160,22 @@ export class SuppliersService {
     const startTime = Date.now();
 
     try {
+      const data: Record<string, unknown> = {
+        nit: dto.nit?.trim(),
+        name: dto.name?.trim(),
+        description: dto.description?.trim(),
+        email: dto.email?.toLowerCase(),
+        phone: dto.phone ?? undefined,
+        address: dto.address ?? undefined,
+        cityCode: dto.cityCode ?? undefined,
+        contactPerson: dto.contactPerson ?? undefined,
+      };
+      if (typeof dto.isActive === 'boolean') {
+        data.isActive = dto.isActive;
+      }
       const updated = await this.prisma.supplier.update({
         where: { id },
-        data: {
-          nit: dto.nit?.trim(),
-          name: dto.name?.trim(),
-          description: dto.description?.trim(),
-          email: dto.email?.toLowerCase(),
-          phone: dto.phone ?? undefined,
-          address: dto.address ?? undefined,
-          cityCode: dto.cityCode ?? undefined,
-          contactPerson: dto.contactPerson ?? undefined,
-        },
+        data,
       });
       const duration = Date.now() - startTime;
 
@@ -172,7 +206,7 @@ export class SuppliersService {
       );
 
       // Invalidar caché del proveedor y listados
-      await this.cache.delete(this.cache.buildKey('supplier', id));
+      await this.cache.delete(this.cache.buildKey('supplier', id, tenantId));
       await this.cache.deletePattern('cache:suppliers:*');
 
       return updated;
@@ -186,9 +220,10 @@ export class SuppliersService {
     }
   }
 
-  async delete(id: string, deletedByUserId?: string) {
-    const supplier = await this.prisma.supplier.findUnique({
-      where: { id },
+  async delete(id: string, deletedByUserId?: string, tenantId?: string | null) {
+    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
+    const supplier = await this.prisma.supplier.findFirst({
+      where: { id, tenantId },
     });
 
     if (!supplier) {

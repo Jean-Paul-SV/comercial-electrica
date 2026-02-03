@@ -7,6 +7,17 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { DianDocumentStatus, DianEnvironment, Prisma } from '@prisma/client';
 import { ConfigService } from '@nestjs/config';
+import { AuditService } from '../common/services/audit.service';
+import { readFile } from 'fs/promises';
+import { resolve } from 'path';
+import * as forge from 'node-forge';
+import { SignedXml } from 'xml-crypto';
+
+/** Algoritmos DIAN: RSA-SHA256, SHA256, C14N exclusivo. Ref: Anexo Técnico FE 1.9 */
+const DIAN_SIGNATURE_ALG = 'http://www.w3.org/2001/04/xmldsig-more#rsa-sha256';
+const DIAN_DIGEST_ALG = 'http://www.w3.org/2001/04/xmlenc#sha256';
+const DIAN_C14N_ALG = 'http://www.w3.org/2001/10/xml-exc-c14n#';
+const DIAN_TRANSFORM_ENVELOPED = 'http://www.w3.org/2000/09/xmldsig#enveloped-signature';
 
 /**
  * Servicio para procesamiento de documentos DIAN
@@ -24,12 +35,15 @@ export class DianService {
   private readonly dianEnv: DianEnvironment;
   private readonly softwareId: string;
   private readonly softwarePin: string;
+  private readonly certPath: string;
+  private readonly certPassword: string;
   private readonly isTestEnv =
     process.env.NODE_ENV === 'test' || !!process.env.JEST_WORKER_ID;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
+    private readonly audit: AuditService,
   ) {
     // Cargar configuración desde variables de entorno
     this.dianEnv =
@@ -39,10 +53,17 @@ export class DianService {
       ) as DianEnvironment) || DianEnvironment.HABILITACION;
     this.softwareId = this.config.get<string>('DIAN_SOFTWARE_ID', '') || '';
     this.softwarePin = this.config.get<string>('DIAN_SOFTWARE_PIN', '') || '';
+    this.certPath = this.config.get<string>('DIAN_CERT_PATH', '') || '';
+    this.certPassword = this.config.get<string>('DIAN_CERT_PASSWORD', '') || '';
 
     if (!this.softwareId || !this.softwarePin) {
       this.logger.warn(
         '⚠️ DIAN_SOFTWARE_ID o DIAN_SOFTWARE_PIN no configurados. El procesamiento DIAN no funcionará.',
+      );
+    }
+    if (!this.certPath || !this.certPassword) {
+      this.logger.warn(
+        '⚠️ DIAN_CERT_PATH o DIAN_CERT_PASSWORD no configurados. Los documentos se enviarán sin firma digital.',
       );
     }
   }
@@ -77,13 +98,6 @@ export class DianService {
     });
 
     if (!dianDoc) {
-      // En tests, es normal que el documento ya haya sido borrado por limpieza de BD
-      if (this.isTestEnv) {
-        this.logger.debug(
-          `Documento DIAN ${dianDocumentId} no encontrado (tests). Omitiendo.`,
-        );
-        return;
-      }
       throw new NotFoundException(`Documento DIAN ${dianDocumentId} no encontrado.`);
     }
 
@@ -194,8 +208,22 @@ export class DianService {
   }
 
   /**
-   * Genera el XML según el estándar DIAN (Resolución 00000010 de 2024)
-   * Por ahora retorna un XML básico - debe implementarse según especificación completa
+   * Escapa texto para uso seguro en XML (evita ruptura por <, >, &, ", ').
+   * Ref: DIAN Anexo Técnico FE 1.9 / Resolución 000165 de 2023 (mod. 000008, 000119, 000189 de 2024).
+   */
+  private escapeXml(text: string): string {
+    return String(text)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&apos;');
+  }
+
+  /**
+   * Genera el XML según estándar UBL 2.1 y normativa DIAN.
+   * Ref: Resolución 000165/2023, Anexo Técnico Factura Electrónica de Venta v1.9.
+   * Documentación: https://micrositios.dian.gov.co/sistema-de-facturacion-electronica/documentacion-tecnica/
    */
   async generateXML(dianDocumentId: string): Promise<string> {
     const dianDoc = await this.prisma.dianDocument.findUnique({
@@ -230,77 +258,65 @@ export class DianService {
     // Obtener configuración DIAN
     const config = this.getDianConfig();
 
-    // Generar XML básico según estándar DIAN
-    // NOTA: Este es un XML simplificado. En producción debe seguir la especificación completa
+    // UBL 2.1 Invoice: cada línea es un cac:InvoiceLine directo (sin wrapper). Ref: Anexo Técnico DIAN FE 1.9.
+    const invoiceLinesXml =
+      sale?.items
+        .map(
+          (item, index) => `
+  <cac:InvoiceLine>
+    <cbc:ID>${index + 1}</cbc:ID>
+    <cbc:InvoicedQuantity unitCode="C62">${item.qty}</cbc:InvoicedQuantity>
+    <cbc:LineExtensionAmount currencyID="COP">${Number(item.unitPrice) * item.qty}</cbc:LineExtensionAmount>
+    <cac:Item>
+      <cbc:Description>${this.escapeXml(item.product?.name || 'Producto')}</cbc:Description>
+      <cac:StandardItemIdentification>
+        <cbc:ID>${this.escapeXml(item.productId)}</cbc:ID>
+      </cac:StandardItemIdentification>
+    </cac:Item>
+    <cac:Price>
+      <cbc:PriceAmount currencyID="COP">${Number(item.unitPrice)}</cbc:PriceAmount>
+    </cac:Price>
+  </cac:InvoiceLine>`,
+        )
+        .join('') || '';
+
     const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"
          xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2"
          xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">
   <cbc:CustomizationID>10</cbc:CustomizationID>
   <cbc:ProfileID>DIAN 2.1: Factura Electrónica de Venta</cbc:ProfileID>
-  <cbc:ID>${invoice.number}</cbc:ID>
+  <cbc:ID>${this.escapeXml(invoice.number)}</cbc:ID>
   <cbc:IssueDate>${invoice.issuedAt.toISOString().split('T')[0]}</cbc:IssueDate>
   <cbc:IssueTime>${invoice.issuedAt.toISOString().split('T')[1].split('.')[0]}</cbc:IssueTime>
   <cbc:InvoiceTypeCode listID="01" listAgencyName="PE" listName="Tipo de Operación">01</cbc:InvoiceTypeCode>
   <cbc:DocumentCurrencyCode listID="ISO 4217 Alpha" listName="Currency" listAgencyName="United Nations Economic Commission for Europe">COP</cbc:DocumentCurrencyCode>
-  
-  <!-- Emisor -->
   <cac:AccountingSupplierParty>
     <cac:Party>
       <cac:PartyIdentification>
-        <cbc:ID schemeID="4" schemeName="NIT">${config.softwareId}</cbc:ID>
+        <cbc:ID schemeID="4" schemeName="NIT">${this.escapeXml(config.softwareId)}</cbc:ID>
       </cac:PartyIdentification>
       <cac:PartyName>
-        <cbc:Name>EMPRESA COMERCIAL ELECTRICA</cbc:Name>
+        <cbc:Name>${this.escapeXml(config.softwareId ? 'EMPRESA COMERCIAL ELECTRICA' : 'Emisor')}</cbc:Name>
       </cac:PartyName>
     </cac:Party>
   </cac:AccountingSupplierParty>
-  
-  <!-- Cliente -->
   ${
     customer
       ? `
   <cac:AccountingCustomerParty>
     <cac:Party>
       <cac:PartyIdentification>
-        <cbc:ID schemeID="${customer.docType === 'NIT' ? '4' : '1'}" schemeName="${customer.docType}">${customer.docNumber}</cbc:ID>
+        <cbc:ID schemeID="${customer.docType === 'NIT' ? '4' : '1'}" schemeName="${customer.docType || 'CC'}">${this.escapeXml(customer.docNumber || '')}</cbc:ID>
       </cac:PartyIdentification>
       <cac:PartyName>
-        <cbc:Name>${customer.name}</cbc:Name>
+        <cbc:Name>${this.escapeXml(customer.name || '')}</cbc:Name>
       </cac:PartyName>
     </cac:Party>
-  </cac:AccountingCustomerParty>
-  `
+  </cac:AccountingCustomerParty>`
       : ''
   }
-  
-  <!-- Items -->
-  <cac:InvoiceLine>
-    ${
-      sale?.items
-        .map(
-          (item, index) => `
-    <cac:InvoiceLine>
-      <cbc:ID>${index + 1}</cbc:ID>
-      <cbc:InvoicedQuantity unitCode="C62">${item.qty}</cbc:InvoicedQuantity>
-      <cbc:LineExtensionAmount currencyID="COP">${Number(item.unitPrice) * item.qty}</cbc:LineExtensionAmount>
-      <cac:Item>
-        <cbc:Description>${item.product?.name || 'Producto'}</cbc:Description>
-        <cac:StandardItemIdentification>
-          <cbc:ID>${item.productId}</cbc:ID>
-        </cac:StandardItemIdentification>
-      </cac:Item>
-      <cac:Price>
-        <cbc:PriceAmount currencyID="COP">${Number(item.unitPrice)}</cbc:PriceAmount>
-      </cac:Price>
-    </cac:InvoiceLine>
-    `,
-        )
-        .join('') || ''
-    }
-  </cac:InvoiceLine>
-  
-  <!-- Totales -->
+  ${invoiceLinesXml}
   <cac:LegalMonetaryTotal>
     <cbc:LineExtensionAmount currencyID="COP">${Number(invoice.subtotal)}</cbc:LineExtensionAmount>
     <cbc:TaxExclusiveAmount currencyID="COP">${Number(invoice.subtotal)}</cbc:TaxExclusiveAmount>
@@ -337,26 +353,111 @@ export class DianService {
   }
 
   /**
-   * Firma digitalmente el XML usando certificado digital
-   * Por ahora retorna el XML sin firmar - debe implementarse con librería de firma digital
+   * Carga clave privada y certificado desde archivo .p12/.pfx (PKCS#12).
+   * Requiere DIAN_CERT_PATH y DIAN_CERT_PASSWORD configurados.
+   */
+  private async loadCertFromP12(): Promise<{
+    privateKeyPem: string;
+    certPem: string;
+  }> {
+    const pathToUse = resolve(this.certPath);
+    const raw = await readFile(pathToUse);
+    const binary = typeof raw === 'string' ? raw : raw.toString('binary');
+    const p12Asn1 = forge.asn1.fromDer(binary);
+    const p12 = forge.pkcs12.pkcs12FromAsn1(p12Asn1, this.certPassword);
+
+    let keyBag = p12.getBags({
+      bagType: forge.pki.oids.pkcs8ShroudedKeyBag,
+    })[forge.pki.oids.pkcs8ShroudedKeyBag];
+    if (!keyBag || keyBag.length === 0) {
+      keyBag = p12.getBags({ bagType: forge.pki.oids.keyBag })[
+        forge.pki.oids.keyBag
+      ];
+    }
+    if (!keyBag || keyBag.length === 0) {
+      throw new BadRequestException(
+        'No se encontró clave privada en el certificado .p12.',
+      );
+    }
+    const privateKey = keyBag[0].key;
+    if (!privateKey) {
+      throw new BadRequestException(
+        'Clave privada no encontrada en el certificado .p12.',
+      );
+    }
+    const privateKeyPem = forge.pki.privateKeyToPem(privateKey);
+
+    const certBags = p12.getBags({ bagType: forge.pki.oids.certBag });
+    const certBag = certBags[forge.pki.oids.certBag];
+    if (!certBag || certBag.length === 0) {
+      throw new BadRequestException(
+        'No se encontró certificado en el archivo .p12.',
+      );
+    }
+    const cert = certBag[0].cert;
+    if (!cert) {
+      throw new BadRequestException(
+        'Certificado no encontrado en el archivo .p12.',
+      );
+    }
+    const certPem = forge.pki.certificateToPem(cert);
+
+    return { privateKeyPem, certPem };
+  }
+
+  /**
+   * Firma digitalmente el XML con certificado .p12 (XMLDSig, RSA-SHA256).
+   * Si DIAN_CERT_PATH/DIAN_CERT_PASSWORD no están configurados, retorna el XML sin firmar.
+   * Ref: DIAN Anexo Técnico FE 1.9, XML Signature.
    */
   async signDocument(xml: string, dianDocumentId: string): Promise<string> {
     this.logger.log(`Firmando documento ${dianDocumentId}`);
 
-    // TODO: Implementar firma digital real
-    await Promise.resolve(); // Placeholder para mantener async
-    // Requiere:
-    // - Certificado digital (.p12 o .pfx)
-    // - Librería de firma XML (xml-crypto, xmldsigjs, etc.)
-    // - Validación de certificado
+    if (!this.certPath || !this.certPassword) {
+      this.logger.warn(
+        `⚠️ Firma digital omitida (certificado no configurado). Retornando XML sin firmar.`,
+      );
+      return xml;
+    }
 
-    // Por ahora retornamos el XML sin firmar
-    // En producción esto debe firmarse correctamente
-    this.logger.warn(
-      `⚠️ Firma digital no implementada. Retornando XML sin firmar.`,
-    );
+    const { privateKeyPem, certPem } = await this.loadCertFromP12();
 
-    return xml;
+    const sig = new SignedXml({
+      privateKey: privateKeyPem,
+      publicCert: certPem,
+      signatureAlgorithm: DIAN_SIGNATURE_ALG,
+      canonicalizationAlgorithm: DIAN_C14N_ALG,
+      implicitTransforms: [
+        DIAN_TRANSFORM_ENVELOPED,
+        DIAN_C14N_ALG,
+      ],
+    });
+
+    // Referencia al documento completo (firma enveloped): se firma el elemento raíz Invoice
+    sig.addReference({
+      xpath: "//*[local-name(.)='Invoice']",
+      transforms: [DIAN_TRANSFORM_ENVELOPED, DIAN_C14N_ALG],
+      digestAlgorithm: DIAN_DIGEST_ALG,
+      uri: '',
+      inclusiveNamespacesPrefixList: [],
+      isEmptyUri: true,
+    });
+
+    sig.computeSignature(xml, {
+      location: {
+        reference: "//*[local-name(.)='Invoice']",
+        action: 'append',
+      },
+      existingPrefixes: {
+        '': 'urn:oasis:names:specification:ubl:schema:xsd:Invoice-2',
+        cac: 'urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2',
+        cbc: 'urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2',
+      },
+    });
+
+    const signedXml = sig.getSignedXml();
+    this.logger.log(`Documento ${dianDocumentId} firmado correctamente.`);
+    return signedXml;
   }
 
   /**
@@ -460,6 +561,10 @@ export class DianService {
       );
     } else {
       // Documento rechazado
+      const docBefore = await this.prisma.dianDocument.findUnique({
+        where: { id: dianDocumentId },
+        select: { status: true },
+      });
       await this.prisma.dianDocument.update({
         where: { id: dianDocumentId },
         data: {
@@ -467,6 +572,11 @@ export class DianService {
           lastError: response.message || 'Documento rechazado por DIAN',
           sentAt: new Date(),
         },
+      });
+      await this.audit.log('dianDocument', dianDocumentId, 'status_update', null, {
+        oldStatus: docBefore?.status ?? 'DRAFT',
+        newStatus: DianDocumentStatus.REJECTED,
+        error: response.message,
       });
 
       // Registrar evento de rechazo

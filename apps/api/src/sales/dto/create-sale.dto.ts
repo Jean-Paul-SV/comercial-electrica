@@ -67,4 +67,14 @@ export class CreateSaleDto {
   @ValidateNested({ each: true })
   @Type(() => SaleItemInputDto)
   items!: SaleItemInputDto[];
+
+  @ApiPropertyOptional({
+    example: 0,
+    description: 'Descuento total en COP (se resta del total). No puede superar subtotal + IVA.',
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  discountTotal?: number;
 }

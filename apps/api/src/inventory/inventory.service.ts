@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, Logger } from '@nestjs/common';
 import { Prisma, InventoryMovementType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateInventoryMovementDto } from './dto/create-movement.dto';
@@ -15,7 +15,8 @@ export class InventoryService {
     private readonly audit: AuditService,
   ) {}
 
-  async createMovement(dto: CreateInventoryMovementDto, createdByUserId?: string) {
+  async createMovement(dto: CreateInventoryMovementDto, createdByUserId?: string, tenantId?: string | null) {
+    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
     const startTime = Date.now();
     this.logger.log(`Creando movimiento de inventario tipo ${dto.type}`, {
       type: dto.type,
@@ -34,10 +35,10 @@ export class InventoryService {
       );
     }
 
-    // Validar que el proveedor existe si se proporciona
+    // Validar que el proveedor existe y pertenece al tenant si se proporciona
     if (dto.supplierId) {
-      const supplier = await this.prisma.supplier.findUnique({
-        where: { id: dto.supplierId },
+      const supplier = await this.prisma.supplier.findFirst({
+        where: { id: dto.supplierId, tenantId },
       });
       if (!supplier) {
         throw new BadRequestException(
@@ -87,6 +88,7 @@ export class InventoryService {
         async (tx) => {
           const movement = await tx.inventoryMovement.create({
             data: {
+              tenantId,
               type,
               reason: dto.reason,
               supplierId: dto.supplierId,
@@ -146,19 +148,48 @@ export class InventoryService {
       });
   }
 
-  async listMovements(pagination?: { page?: number; limit?: number }) {
+  async listMovements(
+    pagination?: {
+      page?: number;
+      limit?: number;
+      search?: string;
+      sortOrder?: 'asc' | 'desc';
+    },
+    tenantId?: string | null,
+  ) {
+    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
     const page = pagination?.page ?? 1;
     const limit = pagination?.limit ?? 20;
     const skip = (page - 1) * limit;
+    const search = pagination?.search?.trim();
+    const order = pagination?.sortOrder === 'asc' ? 'asc' : 'desc';
+
+    const where: Prisma.InventoryMovementWhereInput = { tenantId };
+    if (search) {
+      where.items = {
+        some: {
+          product: {
+            OR: [
+              { name: { contains: search, mode: 'insensitive' } },
+              { internalCode: { contains: search, mode: 'insensitive' } },
+            ],
+          },
+        },
+      };
+    }
 
     const [data, total] = await Promise.all([
       this.prisma.inventoryMovement.findMany({
-        orderBy: { createdAt: 'desc' },
-        include: { items: true, supplier: true },
+        where,
+        orderBy: { createdAt: order },
+        include: {
+          items: { include: { product: { select: { name: true, internalCode: true } } } },
+          supplier: true,
+        },
         skip,
         take: limit,
       }),
-      this.prisma.inventoryMovement.count(),
+      this.prisma.inventoryMovement.count({ where }),
     ]);
 
     const totalPages = Math.ceil(total / limit);

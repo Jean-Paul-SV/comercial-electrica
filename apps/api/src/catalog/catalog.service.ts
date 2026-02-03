@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
   Logger,
@@ -21,19 +22,75 @@ export class CatalogService {
     private readonly cache: CacheService,
   ) {}
 
-  async listProducts(pagination?: { page?: number; limit?: number }) {
+  async listProducts(
+    pagination?: {
+      page?: number;
+      limit?: number;
+      zeroStock?: boolean;
+      lowStock?: boolean;
+      lowStockThreshold?: number;
+      minStock?: number;
+      maxStock?: number;
+      search?: string;
+      sortByStock?: 'asc' | 'desc';
+    },
+    tenantId?: string | null,
+  ) {
+    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
     const page = pagination?.page ?? 1;
     const limit = pagination?.limit ?? 20;
     const skip = (page - 1) * limit;
 
+    const where: {
+      tenantId: string;
+      isActive?: boolean;
+      stock?: { qtyOnHand: number | { lte?: number; gte?: number } };
+      OR?: Array<{ name?: { contains: string; mode: 'insensitive' }; internalCode?: { contains: string; mode: 'insensitive' } }>;
+    } = { tenantId };
+
+    // Filtro por stock
+    if (pagination?.zeroStock === true) {
+      where.stock = { qtyOnHand: 0 };
+    } else if (pagination?.lowStock === true) {
+      const threshold = pagination?.lowStockThreshold ?? 10;
+      where.stock = { qtyOnHand: { lte: threshold } };
+    } else if (pagination?.minStock != null || pagination?.maxStock != null) {
+      const stockConditions: { gte?: number; lte?: number } = {};
+      if (pagination?.minStock != null) {
+        stockConditions.gte = pagination.minStock;
+      }
+      if (pagination?.maxStock != null) {
+        stockConditions.lte = pagination.maxStock;
+      }
+      if (Object.keys(stockConditions).length > 0) {
+        where.stock = { qtyOnHand: stockConditions };
+      }
+    }
+
+    // Búsqueda por nombre o código
+    if (pagination?.search?.trim()) {
+      const searchTerm = pagination.search.trim();
+      where.OR = [
+        { name: { contains: searchTerm, mode: 'insensitive' } },
+        { internalCode: { contains: searchTerm, mode: 'insensitive' } },
+      ];
+    }
+
+    // Determinar el ordenamiento
+    let orderBy: Array<{ name?: 'asc' | 'desc' } | { stock?: { qtyOnHand: 'asc' | 'desc' } }> = [{ name: 'asc' }];
+    if (pagination?.sortByStock) {
+      orderBy = [{ stock: { qtyOnHand: pagination.sortByStock } }, { name: 'asc' }];
+    }
+
     const [data, total] = await Promise.all([
       this.prisma.product.findMany({
-        orderBy: { name: 'asc' },
+        where,
+        orderBy: orderBy.length === 1 ? orderBy[0] : orderBy,
         include: { category: true, stock: true },
         skip,
         take: limit,
       }),
-      this.prisma.product.count(),
+      this.prisma.product.count({ where }),
     ]);
 
     const totalPages = Math.ceil(total / limit);
@@ -51,16 +108,17 @@ export class CatalogService {
     };
   }
 
-  async getProduct(id: string) {
-    const cacheKey = this.cache.buildKey('product', id);
+  async getProduct(id: string, tenantId?: string | null) {
+    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
+    const cacheKey = this.cache.buildKey('product', id, tenantId);
     const cached = await this.cache.get(cacheKey);
     if (cached) {
       this.logger.debug(`Product ${id} retrieved from cache`);
       return cached;
     }
 
-    const p = await this.prisma.product.findUnique({
-      where: { id },
+    const p = await this.prisma.product.findFirst({
+      where: { id, tenantId },
       include: { category: true, stock: true },
     });
     if (!p) throw new NotFoundException('Producto no encontrado.');
@@ -70,12 +128,14 @@ export class CatalogService {
     return p;
   }
 
-  async createProduct(dto: CreateProductDto, createdByUserId?: string) {
+  async createProduct(dto: CreateProductDto, createdByUserId?: string, tenantId?: string | null) {
+    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
     const internalCode = dto.internalCode.trim();
     if (!internalCode) throw new BadRequestException('internalCode requerido.');
 
     const created = await this.prisma.product.create({
       data: {
+        tenantId,
         internalCode,
         name: dto.name.trim(),
         categoryId: dto.categoryId ?? null,
@@ -104,9 +164,11 @@ export class CatalogService {
     id: string,
     dto: UpdateProductDto,
     updatedByUserId?: string,
+    tenantId?: string | null,
   ) {
-    const oldProductData = await this.prisma.product.findUnique({
-      where: { id },
+    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
+    const oldProductData = await this.prisma.product.findFirst({
+      where: { id, tenantId },
       include: { category: true, stock: true },
     });
     if (!oldProductData) throw new NotFoundException('Producto no encontrado.');
@@ -145,14 +207,15 @@ export class CatalogService {
     );
 
     // Invalidar caché del producto y listados
-    await this.cache.delete(this.cache.buildKey('product', id));
+    await this.cache.delete(this.cache.buildKey('product', id, tenantId));
     await this.cache.deletePattern('cache:products:*');
 
     return updated;
   }
 
-  async deactivateProduct(id: string, deactivatedByUserId?: string) {
-    const product = await this.getProduct(id);
+  async deactivateProduct(id: string, deactivatedByUserId?: string, tenantId?: string | null) {
+    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
+    const product = await this.getProduct(id, tenantId);
 
     // Validar que no tiene ventas asociadas
     const salesCount = await this.prisma.saleItem.count({
@@ -194,14 +257,15 @@ export class CatalogService {
     );
 
     // Invalidar caché del producto y listados
-    await this.cache.delete(this.cache.buildKey('product', id));
+    await this.cache.delete(this.cache.buildKey('product', id, tenantId));
     await this.cache.deletePattern('cache:products:*');
 
     return updated;
   }
 
-  async listCategories() {
-    const cacheKey = this.cache.buildKey('categories', 'list');
+  async listCategories(tenantId?: string | null) {
+    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
+    const cacheKey = this.cache.buildKey('categories', 'list', tenantId);
     const cached = await this.cache.get(cacheKey);
     if (cached) {
       this.logger.debug('Categories list retrieved from cache');
@@ -209,6 +273,7 @@ export class CatalogService {
     }
 
     const categories = await this.prisma.category.findMany({
+      where: { tenantId },
       orderBy: { name: 'asc' },
     });
 
@@ -217,12 +282,13 @@ export class CatalogService {
     return categories;
   }
 
-  async createCategory(dto: CreateCategoryDto, createdByUserId?: string) {
+  async createCategory(dto: CreateCategoryDto, createdByUserId?: string, tenantId?: string | null) {
+    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
     const name = dto.name.trim();
     if (!name) throw new BadRequestException('name requerido.');
 
     const created = await this.prisma.category.create({
-      data: { name },
+      data: { tenantId, name },
     });
 
     await this.audit.logCreate('category', created.id, createdByUserId, {

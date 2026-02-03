@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import {
   Card,
@@ -30,13 +31,12 @@ import {
 import { Skeleton } from '@shared/components/ui/skeleton';
 import { Pagination } from '@shared/components/Pagination';
 import { formatMoney, formatDate } from '@shared/utils/format';
-import { FileSignature, Plus, Trash2, ShoppingCart, FileDown } from 'lucide-react';
 import { downloadQuotePdf } from '@shared/utils/quotePdf';
-import { useQuotesList, useCreateQuote, useConvertQuote } from '@features/quotes/hooks';
+import { FileSignature, Plus, Trash2, ShoppingCart, FileDown, Search, Layers } from 'lucide-react';
+import { useQuotesList, useCreateQuote, useConvertQuote, useUpdateQuoteStatus } from '@features/quotes/hooks';
 import { useProductsList } from '@features/products/hooks';
 import { useCustomersList } from '@features/customers/hooks';
 import { useCashSessionsList } from '@features/cash/hooks';
-import type { QuoteStatus } from '@features/quotes/types';
 
 const selectClassName =
   'flex h-10 w-full items-center rounded-lg border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:opacity-50';
@@ -59,19 +59,35 @@ const PAYMENT_METHODS = [
 type QuoteLine = { productId: string; qty: number; unitPrice?: number };
 
 export default function QuotesPage() {
+  const searchParams = useSearchParams();
+  const statusFilter = searchParams.get('status') ?? '';
+
   const [page, setPage] = useState(1);
   const [openNew, setOpenNew] = useState(false);
   const [openConvert, setOpenConvert] = useState<string | null>(null);
+  const [quoteToCancel, setQuoteToCancel] = useState<string | null>(null);
   const [customerId, setCustomerId] = useState('');
   const [validUntil, setValidUntil] = useState('');
   const [lines, setLines] = useState<QuoteLine[]>([]);
+  const [openAddMultiple, setOpenAddMultiple] = useState(false);
+  const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(new Set());
+  const [addMultipleSearch, setAddMultipleSearch] = useState('');
   const [convertCashSessionId, setConvertCashSessionId] = useState('');
   const [convertPaymentMethod, setConvertPaymentMethod] = useState<'CASH' | 'CARD' | 'TRANSFER' | 'OTHER'>('CASH');
+  const [searchInput, setSearchInput] = useState('');
+  const [search, setSearch] = useState('');
+  const [discountPercent, setDiscountPercent] = useState<number>(0);
 
   const limit = 20;
-  const query = useQuotesList({ page, limit });
+  const query = useQuotesList({
+    page,
+    limit,
+    status: statusFilter || undefined,
+    search: search || undefined,
+  });
   const createMutation = useCreateQuote();
   const convertMutation = useConvertQuote();
+  const updateStatusMutation = useUpdateQuoteStatus();
   const productsQuery = useProductsList({ page: 1, limit: 100 });
   const customersQuery = useCustomersList({ page: 1, limit: 100 });
   const cashSessionsQuery = useCashSessionsList({});
@@ -85,11 +101,70 @@ export default function QuotesPage() {
     [cashSessionsQuery.data]
   );
 
+  const SEARCH_DEBOUNCE_MS = 300;
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setSearch(searchInput.trim());
+      setPage(1);
+    }, SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(t);
+  }, [searchInput]);
+
   useEffect(() => {
     if (openNew) productsQuery.refetch();
   }, [openNew]);
 
+  useEffect(() => {
+    setPage(1);
+  }, [statusFilter]);
+
+  // Predeterminar la sesión de caja abierta al abrir el modal "Convertir a factura"
+  useEffect(() => {
+    if (!openConvert) return;
+    if (openSessions.length > 0) {
+      setConvertCashSessionId(openSessions[0].id);
+    } else {
+      setConvertCashSessionId('');
+    }
+  }, [openConvert, openSessions]);
+
   const addLine = () => setLines((prev) => [...prev, { productId: '', qty: 1 }]);
+
+  const toggleProductSelection = (id: string) => {
+    setSelectedProductIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const confirmAddMultiple = () => {
+    if (selectedProductIds.size === 0) {
+      toast.error('Selecciona al menos un producto');
+      return;
+    }
+    const existingIds = new Set(lines.map((l) => l.productId));
+    const toAdd = [...selectedProductIds].filter((id) => !existingIds.has(id));
+    if (toAdd.length === 0) {
+      toast.info('Esos productos ya están en las líneas');
+      setOpenAddMultiple(false);
+      setSelectedProductIds(new Set());
+      setAddMultipleSearch('');
+      return;
+    }
+    const priceByProduct = Object.fromEntries(products.map((p) => [p.id, Number(p.price)]));
+    const newLines: QuoteLine[] = toAdd.map((productId) => ({
+      productId,
+      qty: 1,
+      unitPrice: priceByProduct[productId],
+    }));
+    setLines((prev) => [...prev, ...newLines]);
+    setOpenAddMultiple(false);
+    setSelectedProductIds(new Set());
+    setAddMultipleSearch('');
+  };
+
   const updateLine = (index: number, field: keyof QuoteLine, value: string | number | undefined) => {
     setLines((prev) => {
       const next = [...prev];
@@ -99,7 +174,6 @@ export default function QuotesPage() {
   };
   const removeLine = (index: number) => setLines((prev) => prev.filter((_, i) => i !== index));
 
-  /** Total por línea: cantidad × (precio unitario o precio del producto) */
   const lineTotal = (line: QuoteLine) => {
     if (!line.productId || line.qty < 1) return 0;
     const product = products.find((p) => p.id === line.productId);
@@ -107,16 +181,35 @@ export default function QuotesPage() {
     return line.qty * unitPrice;
   };
 
-  /** Suma total de todas las líneas */
-  const totalCotizacion = useMemo(
+  const subtotalCotizacion = useMemo(
     () => lines.reduce((sum, line) => sum + lineTotal(line), 0),
     [lines, products]
   );
+
+  const taxEstimateQuote = useMemo(() => {
+    return lines.reduce((sum, line) => {
+      if (!line.productId || line.qty < 1) return sum;
+      const product = products.find((p) => p.id === line.productId);
+      const unitPrice = line.unitPrice ?? (product ? Number(product.price) : 0);
+      const lineSubtotal = unitPrice * line.qty;
+      const taxRate = product ? Number(product.taxRate ?? 0) : 0;
+      return sum + (lineSubtotal * taxRate) / 100;
+    }, 0);
+  }, [lines, products]);
+
+  const discountPercentCapped = Math.min(100, Math.max(0, Number(discountPercent) || 0));
+  const totalAntesDescuento = subtotalCotizacion + taxEstimateQuote;
+  const discountAmountQuote = Math.round((totalAntesDescuento * discountPercentCapped) / 100);
+  const totalCotizacion = Math.max(0, totalAntesDescuento - discountAmountQuote);
 
   const resetForm = () => {
     setCustomerId('');
     setValidUntil('');
     setLines([]);
+    setOpenAddMultiple(false);
+    setSelectedProductIds(new Set());
+    setAddMultipleSearch('');
+    setDiscountPercent(0);
   };
 
   const submitNew = () => {
@@ -136,6 +229,7 @@ export default function QuotesPage() {
         customerId: customerId || undefined,
         validUntil: validUntil || undefined,
         items,
+        discountPercent: discountPercentCapped > 0 ? discountPercentCapped : undefined,
       },
       {
         onSuccess: () => {
@@ -150,94 +244,132 @@ export default function QuotesPage() {
     );
   };
 
+  const canConvert = (q: { status: string }) => q.status === 'DRAFT' || q.status === 'SENT';
+  const canCancel = (q: { status: string }) => q.status === 'DRAFT' || q.status === 'SENT';
+
   const submitConvert = () => {
-    const quoteId = openConvert;
-    if (!quoteId || !convertCashSessionId) {
-      toast.error('Selecciona una sesión de caja abierta');
-      return;
-    }
+    if (!openConvert || !convertCashSessionId) return;
     convertMutation.mutate(
       {
-        id: quoteId,
-        payload: {
-          cashSessionId: convertCashSessionId,
-          paymentMethod: convertPaymentMethod,
-        },
+        id: openConvert,
+        payload: { cashSessionId: convertCashSessionId, paymentMethod: convertPaymentMethod },
       },
       {
-        onSuccess: (data) => {
-          const invoiceNumber = data?.invoice?.number;
-          toast.success(
-            invoiceNumber
-              ? `Factura generada: ${invoiceNumber}`
-              : 'Cotización convertida a venta y factura'
-          );
+        onSuccess: () => {
+          toast.success('Cotización convertida a factura');
           setOpenConvert(null);
           setConvertCashSessionId('');
           setConvertPaymentMethod('CASH');
         },
         onError: (e: { message?: string }) => {
-          toast.error(e?.message ?? 'No se pudo convertir la cotización');
+          toast.error(e?.message ?? 'No se pudo convertir');
         },
       }
     );
   };
 
-  const canSubmitNew =
-    lines.length > 0 && !lines.some((l) => !l.productId || l.qty < 1);
-
-  const canConvert = (q: { status: QuoteStatus; validUntil: string | null }) => {
-    if (q.status === 'CONVERTED' || q.status === 'CANCELLED') return false;
-    if (q.status === 'EXPIRED') return false;
-    if (q.validUntil && new Date(q.validUntil) < new Date()) return false;
-    return true;
+  const handleCancelQuote = () => {
+    if (!quoteToCancel) return;
+    updateStatusMutation.mutate(
+      { id: quoteToCancel, status: 'CANCELLED' },
+      {
+        onSuccess: () => {
+          toast.success('Cotización cancelada');
+          setQuoteToCancel(null);
+        },
+        onError: (e: { message?: string }) => {
+          toast.error(e?.message ?? 'No se pudo cancelar la cotización');
+        },
+      }
+    );
   };
+
+  const canSubmitNew = lines.some((l) => l.productId && l.qty >= 1);
 
   return (
     <div className="space-y-6 sm:space-y-8">
       <div className="flex flex-col gap-1">
-        <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">
-          Cotizaciones
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Listado de cotizaciones
-        </p>
+        <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">Cotizaciones</h1>
+        <p className="text-sm text-muted-foreground">Listado de cotizaciones</p>
       </div>
 
-      <Card className="border-0 shadow-sm">
-        <CardHeader className="pb-4">
+      {statusFilter === 'EXPIRED' && (
+        <p className="text-sm text-muted-foreground rounded-lg border border-border/60 bg-muted/30 px-3 py-2">
+          Filtro desde alerta: cotizaciones vencidas.
+          <a href="/quotes" className="ml-2 text-primary font-medium hover:underline">Ver todas</a>
+        </p>
+      )}
+
+      <Card className="border-0 shadow-sm overflow-hidden">
+        <CardHeader className="pb-4 bg-muted/30 border-b border-border/50">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <CardTitle className="text-lg font-medium flex items-center gap-2">
-                <FileSignature className="h-5 w-5 shrink-0" />
+                <FileSignature className="h-5 w-5 shrink-0 text-primary" />
                 Listado
               </CardTitle>
               <CardDescription>
-                Cotizaciones paginadas
+                Cotizaciones paginadas. Busca por cliente (nombre o número).
               </CardDescription>
             </div>
             <Button
               size="sm"
               onClick={() => setOpenNew(true)}
-              className="gap-2 w-full sm:w-fit"
+              className="gap-2 w-full sm:w-fit shadow-sm"
             >
               <Plus className="h-4 w-4" />
               Nueva cotización
             </Button>
           </div>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <Pagination meta={meta} onPageChange={setPage} label="Página" />
+        <CardContent className="space-y-4 pt-4">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between rounded-lg bg-muted/20 border border-border/50 p-3">
+            <div className="flex flex-1 flex-wrap items-center gap-3 min-w-0">
+              <div className="flex items-center gap-2 flex-1 min-w-[200px] max-w-sm">
+                <Label htmlFor="search-quote" className="text-sm text-muted-foreground whitespace-nowrap">
+                  Buscar:
+                </Label>
+                <Input
+                  id="search-quote"
+                  type="search"
+                  placeholder="Buscar por cliente (nombre o número)"
+                  value={searchInput}
+                  onChange={(e) => {
+                    setSearchInput(e.target.value);
+                    setPage(1);
+                  }}
+                  className="h-9 rounded-lg bg-background border-border/80 text-sm flex-1 min-w-0"
+                  autoComplete="off"
+                />
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setSearchInput('');
+                  setSearch('');
+                  setPage(1);
+                }}
+                disabled={!searchInput && !search}
+                className="h-9 shrink-0 border-border bg-background text-foreground hover:bg-muted/50 disabled:opacity-50"
+                aria-label="Limpiar filtros"
+              >
+                Limpiar filtros
+              </Button>
+            </div>
+            <Pagination meta={meta} onPageChange={setPage} label="Página" />
+          </div>
 
           {query.isLoading && (
             <div className="rounded-lg border border-border overflow-hidden">
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>Cliente</TableHead>
-                    <TableHead>Validez</TableHead>
-                    <TableHead className="text-right">Total</TableHead>
-                    <TableHead>Estado</TableHead>
+                  <TableRow className="bg-muted/40">
+                    <TableHead className="font-medium">Cliente</TableHead>
+                    <TableHead className="font-medium">Validez</TableHead>
+                    <TableHead className="text-right font-medium">Total</TableHead>
+                    <TableHead className="font-medium">Estado</TableHead>
                     <TableHead className="w-24" />
                   </TableRow>
                 </TableHeader>
@@ -267,17 +399,17 @@ export default function QuotesPage() {
             <div className="rounded-lg border border-border overflow-hidden">
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>Cliente</TableHead>
-                    <TableHead>Validez</TableHead>
-                    <TableHead className="text-right">Total</TableHead>
-                    <TableHead>Estado</TableHead>
-                    <TableHead className="w-40 text-right">Acciones</TableHead>
+                  <TableRow className="bg-muted/40 hover:bg-muted/40">
+                    <TableHead className="font-medium">Cliente</TableHead>
+                    <TableHead className="font-medium">Validez</TableHead>
+                    <TableHead className="text-right font-medium">Total</TableHead>
+                    <TableHead className="font-medium">Estado</TableHead>
+                    <TableHead className="w-40 text-right font-medium">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {rows.map((q) => (
-                    <TableRow key={q.id}>
+                    <TableRow key={q.id} className="transition-colors hover:bg-muted/30">
                       <TableCell className="font-medium">
                         {q.customer?.name ?? '—'}
                       </TableCell>
@@ -316,6 +448,17 @@ export default function QuotesPage() {
                               Convertir a factura
                             </Button>
                           )}
+                          {canCancel(q) && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="gap-1 text-destructive hover:text-destructive"
+                              onClick={() => setQuoteToCancel(q.id)}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                              Cancelar
+                            </Button>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -326,7 +469,9 @@ export default function QuotesPage() {
                         colSpan={5}
                         className="h-24 text-center text-muted-foreground"
                       >
-                        No hay cotizaciones.
+                        {search
+                          ? 'Ninguna cotización coincide con la búsqueda.'
+                          : 'No hay cotizaciones. Crea una para comenzar.'}
                       </TableCell>
                     </TableRow>
                   )}
@@ -345,8 +490,14 @@ export default function QuotesPage() {
               <FileSignature className="h-4 w-4" />
               Nueva cotización
             </DialogTitle>
+            <p className="text-sm text-muted-foreground pt-1">
+              Elige el cliente (opcional), fecha de validez y agrega los productos con cantidad y precio. El total se calcula automáticamente.
+            </p>
           </DialogHeader>
           <div className="space-y-4">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide border-b border-border pb-1.5">
+              Datos generales
+            </p>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label>Cliente (opcional)</Label>
@@ -360,6 +511,9 @@ export default function QuotesPage() {
                     <option key={c.id} value={c.id}>{c.name}</option>
                   ))}
                 </select>
+                <p className="text-xs text-muted-foreground">
+                  Asocia la cotización a un cliente para facturación.
+                </p>
               </div>
               <div className="space-y-2">
                 <Label>Validez hasta (opcional)</Label>
@@ -369,19 +523,42 @@ export default function QuotesPage() {
                   onChange={(e) => setValidUntil(e.target.value)}
                   className="rounded-lg"
                 />
+                <p className="text-xs text-muted-foreground">
+                  Fecha límite para aceptar la cotización. Por defecto 30 días.
+                </p>
               </div>
             </div>
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide border-b border-border pb-1.5">
+              Productos (requerido)
+            </p>
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
                 <Label>Líneas</Label>
-                <Button type="button" variant="outline" size="sm" onClick={addLine} className="gap-1">
-                  <Plus className="h-3 w-3" />
-                  Agregar línea
-                </Button>
+                {lines.length > 0 && (
+                  <Button type="button" variant="outline" size="sm" onClick={addLine} className="gap-1">
+                    <Plus className="h-3 w-3" />
+                    Agregar línea
+                  </Button>
+                )}
               </div>
+              <p className="text-xs text-muted-foreground">
+                Agrega productos, cantidad y precio unitario. Puedes dejar el precio en blanco para usar el del catálogo.
+              </p>
               <div className="rounded-lg border border-border divide-y divide-border max-h-48 overflow-auto">
                 {lines.length === 0 && (
-                  <p className="p-3 text-sm text-muted-foreground">Agrega al menos un producto.</p>
+                  <div className="flex flex-col items-center justify-center gap-3 p-6 text-center">
+                    <p className="text-sm text-muted-foreground">Sin productos. Agrega al menos una línea para continuar.</p>
+                    <div className="flex flex-wrap items-center justify-center gap-2">
+                      <Button type="button" variant="outline" size="sm" onClick={addLine} className="gap-1.5">
+                        <Plus className="h-4 w-4" />
+                        Agregar primera línea
+                      </Button>
+                      <Button type="button" variant="outline" size="sm" onClick={() => setOpenAddMultiple(true)} className="gap-1.5">
+                        <Layers className="h-4 w-4" />
+                        Agregar varias líneas
+                      </Button>
+                    </div>
+                  </div>
                 )}
                 {lines.length > 0 && (
                   <div className="grid grid-cols-[1fr_80px_90px_80px_auto] gap-2 px-2 py-1.5 text-xs font-medium text-muted-foreground border-b border-border">
@@ -439,9 +616,44 @@ export default function QuotesPage() {
                 ))}
               </div>
               {lines.length > 0 && (
-                <div className="rounded-lg bg-muted/50 px-3 py-2 flex justify-between items-center text-sm">
-                  <span className="font-medium">Total cotización</span>
-                  <span className="tabular-nums font-semibold text-base">{formatMoney(totalCotizacion)}</span>
+                <div className="rounded-lg border border-border/80 bg-muted/30 p-4 space-y-2 text-sm">
+                  <div className="flex justify-between text-muted-foreground">
+                    <span>Subtotal</span>
+                    <span className="tabular-nums">{formatMoney(subtotalCotizacion)}</span>
+                  </div>
+                  <div className="flex justify-between text-muted-foreground">
+                    <span>IVA (aprox.)</span>
+                    <span className="tabular-nums">{formatMoney(Math.round(taxEstimateQuote))}</span>
+                  </div>
+                  <div className="flex justify-between items-center gap-2">
+                    <Label htmlFor="quote-discount-pct" className="text-muted-foreground font-normal text-sm">
+                      Descuento %
+                    </Label>
+                    <Input
+                      id="quote-discount-pct"
+                      type="number"
+                      min={0}
+                      max={100}
+                      step={0.5}
+                      value={discountPercent > 0 ? discountPercent : ''}
+                      onChange={(e) => setDiscountPercent(Math.min(100, Math.max(0, Number(e.target.value) || 0)))}
+                      placeholder="0"
+                      className="h-9 w-24 rounded-lg text-right tabular-nums"
+                    />
+                  </div>
+                  {discountPercentCapped > 0 && (
+                    <div className="flex justify-between text-emerald-600 dark:text-emerald-400 text-sm">
+                      <span>Descuento aplicado</span>
+                      <span className="tabular-nums">−{formatMoney(discountAmountQuote)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between font-medium pt-1 border-t border-border">
+                    <span>Total cotización</span>
+                    <span className="tabular-nums font-semibold text-base">{formatMoney(totalCotizacion)}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Opcional: ingresa un porcentaje (0-100) para descontar del total.
+                  </p>
                 </div>
               )}
             </div>
@@ -457,7 +669,93 @@ export default function QuotesPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Modal Convertir a factura (venta + factura) */}
+      {/* Modal Agregar varios productos */}
+      <Dialog open={openAddMultiple} onOpenChange={setOpenAddMultiple}>
+        <DialogContent showClose className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Layers className="h-4 w-4" />
+              Agregar varias líneas
+            </DialogTitle>
+            <p className="text-sm text-muted-foreground pt-1">
+              Marca los productos que quieras agregar a la cotización. Se añadirán con cantidad 1 y precio del catálogo.
+            </p>
+          </DialogHeader>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+            <Input
+              type="text"
+              placeholder="Buscar por nombre o código..."
+              value={addMultipleSearch}
+              onChange={(e) => setAddMultipleSearch(e.target.value)}
+              className="pl-9 rounded-lg mb-2"
+              autoComplete="off"
+            />
+          </div>
+          <div className="max-h-64 overflow-auto rounded-lg border border-border divide-y divide-border">
+            {(() => {
+              const term = addMultipleSearch.trim().toLowerCase();
+              const filtered = term
+                ? products.filter(
+                    (p) =>
+                      (p.name ?? '').toLowerCase().includes(term) ||
+                      (p.internalCode ?? '').toLowerCase().includes(term),
+                  )
+                : products;
+              if (filtered.length === 0) {
+                return (
+                  <p className="p-4 text-sm text-muted-foreground text-center">
+                    {products.length === 0 ? 'No hay productos disponibles.' : 'Ningún producto coincide con la búsqueda.'}
+                  </p>
+                );
+              }
+              return (
+                <>
+                  <div className="grid grid-cols-[auto_1fr_auto_auto] gap-2 px-2 py-1.5 text-xs font-medium text-muted-foreground border-b border-border sticky top-0 bg-background">
+                    <span className="w-4" />
+                    <span>Producto</span>
+                    <span className="tabular-nums text-right w-14">Stock</span>
+                    <span className="tabular-nums text-right w-16">Precio</span>
+                  </div>
+                  {filtered.map((p) => {
+                    const stockQty = p.stock?.qtyOnHand ?? 0;
+                    return (
+                      <label
+                        key={p.id}
+                        className="grid grid-cols-[auto_1fr_auto_auto] gap-2 items-center p-2 hover:bg-muted/30 cursor-pointer"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedProductIds.has(p.id)}
+                          onChange={() => toggleProductSelection(p.id)}
+                          className="h-4 w-4 rounded border-input"
+                        />
+                        <span className="text-sm truncate min-w-0">{p.name}</span>
+                        <span className="text-xs text-muted-foreground tabular-nums text-right w-14">
+                          {stockQty}
+                        </span>
+                        <span className="text-xs text-muted-foreground tabular-nums shrink-0 w-16 text-right">
+                          {formatMoney(p.price)}
+                        </span>
+                      </label>
+                    );
+                  })}
+                </>
+              );
+            })()}
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => { setOpenAddMultiple(false); setSelectedProductIds(new Set()); setAddMultipleSearch(''); }}>
+              Cancelar
+            </Button>
+            <Button onClick={confirmAddMultiple} disabled={selectedProductIds.size === 0}>
+              Agregar {selectedProductIds.size > 0 ? selectedProductIds.size : ''} producto(s)
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal Convertir a factura */}
       <Dialog open={!!openConvert} onOpenChange={(open) => { if (!open) setOpenConvert(null); }}>
         <DialogContent showClose className="sm:max-w-md">
           <DialogHeader>
@@ -468,24 +766,24 @@ export default function QuotesPage() {
           </DialogHeader>
           <div className="space-y-4">
             {openSessions.length === 0 && (
-              <p className="text-sm text-amber-600 dark:text-amber-400">
-                No hay sesión de caja abierta. Ve a Caja y abre una sesión.
+              <p className="rounded-lg border border-warning/30 bg-warning/10 p-3 text-sm text-warning-foreground dark:text-warning">
+                No hay sesión de caja abierta. Ve a Caja y abre una sesión para poder convertir.
               </p>
             )}
             <div className="space-y-2">
               <Label>Sesión de caja</Label>
-              <select
-                value={convertCashSessionId}
-                onChange={(e) => setConvertCashSessionId(e.target.value)}
-                className={selectClassName}
-              >
-                <option value="">Selecciona sesión abierta</option>
-                {openSessions.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    Sesión {new Date(s.openedAt).toLocaleDateString('es-CO')} — {formatMoney(Number(s.openingAmount))}
-                  </option>
-                ))}
-              </select>
+              {openSessions.length > 0 ? (
+                <p className="flex h-10 items-center rounded-lg border border-border bg-muted/30 px-3 py-2 text-sm text-foreground">
+                  Sesión {new Date(openSessions[0].openedAt).toLocaleDateString('es-CO')} — {formatMoney(Number(openSessions[0].openingAmount))}
+                </p>
+              ) : (
+                <p className="flex h-10 items-center rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                  No hay sesión abierta
+                </p>
+              )}
+              <p className="text-xs text-muted-foreground">
+                La venta se registrará en la sesión de caja abierta.
+              </p>
             </div>
             <div className="space-y-2">
               <Label>Método de pago</Label>
@@ -506,9 +804,43 @@ export default function QuotesPage() {
             </Button>
             <Button
               onClick={submitConvert}
-              disabled={convertMutation.isPending || !convertCashSessionId}
+              disabled={convertMutation.isPending || openSessions.length === 0}
             >
               {convertMutation.isPending ? 'Convirtiendo…' : 'Convertir a factura'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal Confirmar cancelación */}
+      <Dialog open={quoteToCancel !== null} onOpenChange={(open) => !open && setQuoteToCancel(null)}>
+        <DialogContent showClose className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Trash2 className="h-4 w-4 text-destructive" />
+              Cancelar cotización
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              ¿Estás seguro de que deseas cancelar esta cotización? Esta acción no se puede deshacer.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setQuoteToCancel(null)}
+            >
+              No cancelar
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={handleCancelQuote}
+              disabled={updateStatusMutation.isPending}
+            >
+              {updateStatusMutation.isPending ? 'Cancelando…' : 'Sí, cancelar'}
             </Button>
           </DialogFooter>
         </DialogContent>

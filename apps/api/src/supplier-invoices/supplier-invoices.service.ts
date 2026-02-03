@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
   Logger,
@@ -26,10 +27,12 @@ export class SupplierInvoicesService {
   async createSupplierInvoice(
     dto: CreateSupplierInvoiceDto,
     createdByUserId?: string,
+    tenantId?: string | null,
   ) {
-    // Validar que el proveedor existe y está activo
-    const supplier = await this.prisma.supplier.findUnique({
-      where: { id: dto.supplierId },
+    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
+    // Validar que el proveedor existe, está activo y pertenece al tenant
+    const supplier = await this.prisma.supplier.findFirst({
+      where: { id: dto.supplierId, tenantId },
     });
     if (!supplier) {
       throw new NotFoundException(
@@ -82,9 +85,9 @@ export class SupplierInvoicesService {
 
     return this.prisma.$transaction(
       async (tx) => {
-        // Verificar que el número de factura no existe
-        const existing = await tx.supplierInvoice.findUnique({
-          where: { invoiceNumber: dto.invoiceNumber },
+        // Verificar que el número de factura no existe en este tenant
+        const existing = await tx.supplierInvoice.findFirst({
+          where: { tenantId, invoiceNumber: dto.invoiceNumber },
         });
         if (existing) {
           throw new BadRequestException(
@@ -106,6 +109,7 @@ export class SupplierInvoicesService {
 
         const invoice = await tx.supplierInvoice.create({
           data: {
+            tenantId,
             supplierId: dto.supplierId,
             purchaseOrderId: dto.purchaseOrderId,
             invoiceNumber: dto.invoiceNumber,
@@ -150,6 +154,7 @@ export class SupplierInvoicesService {
           if (expenseDelegate) {
             await expenseDelegate.create({
               data: {
+                tenantId,
                 amount: abono,
                 description: expenseDescription,
                 category: 'Factura proveedor',
@@ -198,17 +203,24 @@ export class SupplierInvoicesService {
     });
   }
 
-  async listSupplierInvoices(pagination?: {
-    page?: number;
-    limit?: number;
-    status?: SupplierInvoiceStatus;
-    supplierId?: string;
-  }) {
+  async listSupplierInvoices(
+    pagination?: {
+      page?: number;
+      limit?: number;
+      status?: SupplierInvoiceStatus;
+      supplierId?: string;
+      search?: string;
+    },
+    tenantId?: string | null,
+  ) {
+    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
     const page = Math.max(1, Number(pagination?.page) || 1);
     const limit = Math.min(100, Math.max(1, Number(pagination?.limit) || 20));
     const skip = (page - 1) * limit;
+    const searchTrim =
+      typeof pagination?.search === 'string' ? pagination.search.trim() : '';
 
-    const where: Prisma.SupplierInvoiceWhereInput = {};
+    const where: Prisma.SupplierInvoiceWhereInput = { tenantId };
     const validStatuses = Object.values(SupplierInvoiceStatus);
     if (
       pagination?.status &&
@@ -219,6 +231,16 @@ export class SupplierInvoicesService {
     }
     if (pagination?.supplierId && typeof pagination.supplierId === 'string') {
       where.supplierId = pagination.supplierId;
+    }
+    if (searchTrim.length > 0) {
+      where.AND = [
+        {
+          OR: [
+            { invoiceNumber: { contains: searchTrim, mode: 'insensitive' } },
+            { supplier: { name: { contains: searchTrim, mode: 'insensitive' } } },
+          ],
+        },
+      ];
     }
 
     const [data, total] = await Promise.all([
@@ -242,9 +264,11 @@ export class SupplierInvoicesService {
     id: string,
     dto: UpdateStatusDto,
     updatedByUserId?: string,
+    tenantId?: string | null,
   ) {
-    const invoice = await this.prisma.supplierInvoice.findUnique({
-      where: { id },
+    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
+    const invoice = await this.prisma.supplierInvoice.findFirst({
+      where: { id, tenantId },
       include: { supplier: true },
     });
     if (!invoice) {
@@ -272,21 +296,22 @@ export class SupplierInvoicesService {
       { status: previousStatus },
       { status: dto.status },
     );
-    await this.cache.delete(this.cache.buildKey('supplierInvoice', id));
+    await this.cache.delete(this.cache.buildKey('supplierInvoice', id, tenantId));
     await this.cache.deletePattern('cache:supplierInvoices:*');
     return updated;
   }
 
-  async getSupplierInvoice(id: string) {
-    const cacheKey = this.cache.buildKey('supplierInvoice', id);
+  async getSupplierInvoice(id: string, tenantId?: string | null) {
+    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
+    const cacheKey = this.cache.buildKey('supplierInvoice', id, tenantId);
     const cached = await this.cache.get(cacheKey);
     if (cached) {
       this.logger.debug(`SupplierInvoice ${id} retrieved from cache`);
       return cached;
     }
 
-    const invoice = await this.prisma.supplierInvoice.findUnique({
-      where: { id },
+    const invoice = await this.prisma.supplierInvoice.findFirst({
+      where: { id, tenantId },
       include: {
         supplier: true,
         purchaseOrder: true,
@@ -308,9 +333,11 @@ export class SupplierInvoicesService {
     invoiceId: string,
     dto: CreatePaymentDto,
     createdByUserId?: string,
+    tenantId?: string | null,
   ) {
-    const invoice = await this.prisma.supplierInvoice.findUnique({
-      where: { id: invoiceId },
+    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
+    const invoice = await this.prisma.supplierInvoice.findFirst({
+      where: { id: invoiceId, tenantId },
       include: { payments: true, supplier: true },
     });
 
@@ -351,9 +378,11 @@ export class SupplierInvoicesService {
           },
         });
 
-        // Actualizar monto pagado y estado de la factura
+        // Actualizar monto pagado y estado de la factura (redondeo a 2 decimales para evitar errores de punto flotante)
         let newStatus = invoice.status;
-        if (newPaidAmount >= grandTotal) {
+        const paidCents = Math.round(newPaidAmount * 100);
+        const totalCents = Math.round(grandTotal * 100);
+        if (paidCents >= totalCents) {
           newStatus = SupplierInvoiceStatus.PAID;
         } else if (newPaidAmount > 0) {
           newStatus = SupplierInvoiceStatus.PARTIALLY_PAID;
@@ -370,7 +399,7 @@ export class SupplierInvoicesService {
         const updatedInvoice = await tx.supplierInvoice.update({
           where: { id: invoiceId },
           data: {
-            paidAmount: newPaidAmount,
+            paidAmount: Math.round(newPaidAmount * 100) / 100,
             status: newStatus,
           },
           include: {
@@ -412,21 +441,35 @@ export class SupplierInvoicesService {
           },
         );
 
-        // Registrar el pago como gasto (factura de proveedor entra en módulo Gastos)
+        // Registrar el pago como gasto y, si hay sesión de caja abierta, crear movimiento de caja (salida)
         const supplierName = invoice.supplier?.name ?? 'Proveedor';
         const expenseDescription = `Factura proveedor ${supplierName} - #${invoice.invoiceNumber}`.slice(0, 255);
-        const expenseDelegate = (tx as { expense?: { create: (args: unknown) => Promise<{ id: string }> } }).expense;
-        if (expenseDelegate) {
-          await expenseDelegate.create({
+        const openSession = await tx.cashSession.findFirst({
+          where: { tenantId, closedAt: null },
+        });
+        const expense = await tx.expense.create({
+          data: {
+            tenantId: tenantId!,
+            amount: dto.amount,
+            description: expenseDescription,
+            category: 'Factura proveedor',
+            expenseDate: paymentDate,
+            paymentMethod: dto.paymentMethod,
+            cashSessionId: openSession?.id ?? null,
+            reference: dto.reference?.trim() ?? null,
+            createdBy: createdByUserId ?? null,
+          },
+        });
+        if (openSession) {
+          const movementReference = `Pago factura #${invoice.invoiceNumber} - ${supplierName}`.slice(0, 255);
+          await tx.cashMovement.create({
             data: {
+              sessionId: openSession.id,
+              type: 'OUT',
+              method: dto.paymentMethod,
               amount: dto.amount,
-              description: expenseDescription,
-              category: 'Factura proveedor',
-              expenseDate: paymentDate,
-              paymentMethod: dto.paymentMethod,
-              cashSessionId: null,
-              reference: dto.reference?.trim() ?? null,
-              createdBy: createdByUserId ?? null,
+              reference: movementReference,
+              relatedExpenseId: expense.id,
             },
           });
         }
@@ -441,9 +484,11 @@ export class SupplierInvoicesService {
     });
   }
 
-  async getPendingPayments() {
+  async getPendingPayments(tenantId?: string | null) {
+    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
     const invoices = await this.prisma.supplierInvoice.findMany({
       where: {
+        tenantId,
         status: {
           in: [
             SupplierInvoiceStatus.PENDING,

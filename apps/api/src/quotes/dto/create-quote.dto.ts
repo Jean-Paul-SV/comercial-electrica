@@ -4,10 +4,12 @@ import {
   IsArray,
   IsDateString,
   IsInt,
+  IsNumber,
   IsOptional,
   IsString,
   IsUUID,
   Min,
+  Max,
   MinLength,
   ValidateNested,
 } from 'class-validator';
@@ -61,4 +63,15 @@ export class CreateQuoteDto {
   @ValidateNested({ each: true })
   @Type(() => QuoteItemInputDto)
   items!: QuoteItemInputDto[];
+
+  @ApiPropertyOptional({
+    example: 10,
+    description: 'Descuento en porcentaje (0-100) aplicado al total (subtotal + IVA).',
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  discountPercent?: number;
 }

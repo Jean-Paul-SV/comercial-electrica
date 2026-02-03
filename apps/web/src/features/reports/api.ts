@@ -5,6 +5,12 @@ import type {
   CashReportResponse,
   CustomersReportResponse,
   DashboardResponse,
+  ActionableIndicatorsResponse,
+  ActionableIndicatorsParams,
+  DashboardSummaryResponse,
+  OperationalStateResponse,
+  CustomerClustersResponse,
+  CustomerClustersParams,
   SalesReportParams,
   InventoryReportParams,
   CashReportParams,
@@ -50,4 +56,37 @@ export function getCustomersReport(
 
 export function getDashboard(authToken: string): Promise<DashboardResponse> {
   return apiClient.get('/reports/dashboard', { authToken });
+}
+
+export function getActionableIndicators(
+  authToken: string,
+  params?: ActionableIndicatorsParams,
+): Promise<ActionableIndicatorsResponse> {
+  return apiClient.get(`/reports/actionable-indicators${buildQuery(params ?? {})}`, {
+    authToken,
+  });
+}
+
+export function getDashboardSummary(
+  authToken: string,
+  params?: ActionableIndicatorsParams,
+): Promise<DashboardSummaryResponse> {
+  return apiClient.get(`/reports/dashboard-summary${buildQuery(params ?? {})}`, {
+    authToken,
+  });
+}
+
+export function getOperationalState(
+  authToken: string,
+): Promise<OperationalStateResponse> {
+  return apiClient.get('/reports/operational-state', { authToken });
+}
+
+export function getCustomerClusters(
+  authToken: string,
+  params?: CustomerClustersParams,
+): Promise<CustomerClustersResponse> {
+  return apiClient.get(`/reports/customer-clusters${buildQuery(params ?? {})}`, {
+    authToken,
+  });
 }

@@ -1,39 +1,35 @@
 /* eslint-disable no-console */
 /**
- * Seed de prueba con 10.000 registros de cada entidad.
+ * Seed de prueba con N registros de cada entidad (por defecto 10.000).
  *
  * Genera (con --clean):
  * - Usuarios: admin + vendedor
- * - 10.000 categorías
- * - 10.000 productos + StockBalance
- * - 10.000 clientes
- * - 10.000 proveedores
- * - 10.000 sesiones de caja (última abierta)
- * - 10.000 pedidos de compra (con 1-3 ítems cada uno)
- * - 10.000 facturas de proveedor
- * - 10.000 movimientos de inventario (con 1-2 ítems)
- * - 10.000 ventas (con 1-4 ítems, factura, movimiento de caja)
- * - 10.000 cotizaciones (con 1-4 ítems)
+ * - N categorías, productos, clientes, proveedores, sesiones de caja,
+ *   pedidos de compra, facturas de proveedor, movimientos de inventario,
+ *   ventas, cotizaciones
  *
  * Uso:
- *   node scripts/seed-10k.js --clean   (limpia y crea todo)
- *   node scripts/seed-10k.js --force   (permite DB no local)
- *
- * Tiempo estimado: varios minutos según máquina.
+ *   node scripts/seed-10k.js --clean             (10.000 de cada uno)
+ *   node scripts/seed-10k.js --clean --count 100 (100 de cada uno)
+ *   node scripts/seed-10k.js --force            (permite DB no local)
  */
 
 const path = require('path');
 const fs = require('fs');
 
-const N = 10000;
-const BATCH = 500;
+const DEFAULT_N = 10000;
 
 function parseArgs(argv) {
-  const out = { clean: false, force: false };
+  const out = { clean: false, force: false, count: DEFAULT_N };
   for (let i = 2; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--clean') out.clean = true;
     else if (a === '--force') out.force = true;
+    else if ((a === '--count' || a === '-n') && argv[i + 1] != null) {
+      const n = parseInt(argv[i + 1], 10);
+      if (Number.isFinite(n) && n > 0) out.count = Math.min(n, 50000);
+      i += 1;
+    }
   }
   return out;
 }
@@ -83,6 +79,8 @@ function money(n) {
 async function main() {
   loadEnv();
   const opts = parseArgs(process.argv);
+  const N = opts.count;
+  const BATCH = Math.min(500, Math.max(50, N));
 
   const databaseUrl =
     process.env.DATABASE_URL ||
@@ -101,7 +99,7 @@ async function main() {
   const PrismaClient = prismaPkg.PrismaClient;
   const prisma = new PrismaClient({ datasources: { db: { url: databaseUrl } } });
 
-  console.log(`=== Seed 10k (${N} de cada entidad) ===`);
+  console.log(`=== Seed (${N} de cada entidad) ===`);
   console.log(`DATABASE_URL=${databaseUrl}`);
 
   const start = Date.now();
@@ -116,6 +114,8 @@ async function main() {
     await prisma.supplier.deleteMany();
     await prisma.quoteItem.deleteMany();
     await prisma.quote.deleteMany();
+    await prisma.saleReturnItem.deleteMany();
+    await prisma.saleReturn.deleteMany();
     await prisma.saleItem.deleteMany();
     await prisma.cashMovement.deleteMany();
     await prisma.dianEvent.deleteMany();

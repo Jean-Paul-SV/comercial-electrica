@@ -16,7 +16,7 @@ export function SidebarNavSection({ section, collapsed = false }: SidebarNavSect
     <div className="space-y-0.5">
       {section.label && !collapsed && (
         <p
-          className="px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+          className="px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-foreground"
           id={`nav-section-${section.id}`}
         >
           {section.label}

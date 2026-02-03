@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -34,10 +34,12 @@ import { Skeleton } from '@shared/components/ui/skeleton';
 import { Pagination } from '@shared/components/Pagination';
 import { EmptyState } from '@shared/components/EmptyState';
 import { formatMoney } from '@shared/utils/format';
-import { Package, Plus, Tag } from 'lucide-react';
+import { Package, Plus, Tag, Pencil } from 'lucide-react';
 import {
   useProductsList,
   useCreateProduct,
+  useUpdateProduct,
+  useProduct,
   useCategories,
   useCreateCategory,
 } from '@features/products/hooks';
@@ -47,7 +49,7 @@ const productSchema = z.object({
   name: z.string().min(2, 'Nombre requerido'),
   categoryId: z.string().optional(),
   cost: z.coerce.number().min(0, 'Costo >= 0'),
-  price: z.coerce.number().min(0, 'Precio >= 0'),
+  marginPercent: z.coerce.number().min(0, 'Margen >= 0'),
   taxRate: z.coerce.number().min(0).max(100).optional(),
 });
 type ProductFormValues = z.infer<typeof productSchema>;
@@ -61,11 +63,27 @@ export default function ProductsPage() {
   const [page, setPage] = useState(1);
   const [openNewProduct, setOpenNewProduct] = useState(false);
   const [openNewCategory, setOpenNewCategory] = useState(false);
+  const [editingProductId, setEditingProductId] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState<string>('');
   const limit = 20;
-  const query = useProductsList({ page, limit });
+  const listParams = useMemo(
+    () => ({
+      page,
+      limit,
+      search: searchTerm.trim() || undefined,
+    }),
+    [page, limit, searchTerm]
+  );
+  const query = useProductsList(listParams);
+
+  useEffect(() => {
+    setPage(1);
+  }, [searchTerm]);
   const categories = useCategories();
   const createProduct = useCreateProduct();
+  const updateProduct = useUpdateProduct();
   const createCategory = useCreateCategory();
+  const productToEdit = useProduct(editingProductId);
 
   const rows = useMemo(() => query.data?.data ?? [], [query.data]);
   const meta = query.data?.meta;
@@ -76,23 +94,49 @@ export default function ProductsPage() {
       internalCode: '',
       name: '',
       cost: 0,
-      price: 0,
+      marginPercent: 0,
       taxRate: 0,
     },
   });
+
+  // Cargar datos del producto cuando se abre el modal de edición
+  useEffect(() => {
+    if (productToEdit.data && editingProductId) {
+      const cost = productToEdit.data.cost ? Number(productToEdit.data.cost) : 0;
+      const price = productToEdit.data.price ? Number(productToEdit.data.price) : 0;
+      const marginPercent = cost > 0 ? ((price / cost) - 1) * 100 : 0;
+      productForm.reset({
+        internalCode: productToEdit.data.internalCode ?? '',
+        name: productToEdit.data.name ?? '',
+        categoryId: productToEdit.data.categoryId ?? '',
+        cost,
+        marginPercent: Math.max(0, Math.round(marginPercent * 100) / 100),
+        taxRate: productToEdit.data.taxRate ? Number(productToEdit.data.taxRate) : 0,
+      });
+    } else if (!editingProductId) {
+      productForm.reset({
+        internalCode: '',
+        name: '',
+        cost: 0,
+        marginPercent: 0,
+        taxRate: 0,
+      });
+    }
+  }, [productToEdit.data, editingProductId, productForm]);
   const categoryForm = useForm<CategoryFormValues>({
     resolver: zodResolver(categorySchema),
     defaultValues: { name: '' },
   });
 
   const onNewProduct = (values: ProductFormValues) => {
+    const price = values.cost * (1 + values.marginPercent / 100);
     createProduct.mutate(
       {
         internalCode: values.internalCode.trim(),
         name: values.name.trim(),
         categoryId: values.categoryId || undefined,
         cost: values.cost,
-        price: values.price,
+        price,
         taxRate: values.taxRate ?? 0,
       },
       {
@@ -103,6 +147,34 @@ export default function ProductsPage() {
         },
         onError: (e: { message?: string }) => {
           toast.error(e?.message ?? 'No se pudo crear el producto');
+        },
+      }
+    );
+  };
+
+  const onUpdateProduct = (values: ProductFormValues) => {
+    if (!editingProductId) return;
+    const price = values.cost * (1 + values.marginPercent / 100);
+    updateProduct.mutate(
+      {
+        id: editingProductId,
+        payload: {
+          internalCode: values.internalCode.trim(),
+          name: values.name.trim(),
+          categoryId: values.categoryId || undefined,
+          cost: values.cost,
+          price,
+          taxRate: values.taxRate ?? 0,
+        },
+      },
+      {
+        onSuccess: () => {
+          toast.success('Producto actualizado');
+          setEditingProductId(null);
+          productForm.reset();
+        },
+        onError: (e: { message?: string }) => {
+          toast.error(e?.message ?? 'No se pudo actualizar el producto');
         },
       }
     );
@@ -124,27 +196,35 @@ export default function ProductsPage() {
     );
   };
 
+  const totalProducts = meta?.total ?? 0;
+  const hasData = rows.length > 0;
+
   return (
     <div className="space-y-6 sm:space-y-8">
       <div className="flex flex-col gap-1">
-        <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">Productos</h1>
+        <h1 className="text-xl font-semibold tracking-tight sm:text-2xl text-foreground">
+          Productos
+        </h1>
         <p className="text-sm text-muted-foreground">
-          Catálogo y stock de productos
+          Catálogo de productos (código, nombre, categoría, precios). El stock se gestiona en Inventario.
         </p>
       </div>
 
-      <Card className="border-0 shadow-sm">
-        <CardHeader className="pb-4">
+      <Card className="border border-border/80 shadow-sm rounded-xl overflow-hidden">
+        <CardHeader className="pb-4 border-b border-border/60">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <CardTitle className="text-lg font-medium">
+              <CardTitle className="text-lg font-medium flex items-center gap-2 text-foreground">
+                <Package className="h-5 w-5 shrink-0 text-primary" aria-hidden />
                 Catálogo
               </CardTitle>
               <CardDescription>
-                Listado paginado de productos
+                {hasData
+                  ? `${totalProducts} producto${totalProducts !== 1 ? 's' : ''}`
+                  : 'Listado paginado de productos'}
               </CardDescription>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2 shrink-0">
               <Button
                 variant="outline"
                 size="sm"
@@ -161,33 +241,59 @@ export default function ProductsPage() {
             </div>
           </div>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <Pagination
-            meta={meta}
-            onPageChange={setPage}
-            label="Página"
-          />
+        <CardContent className="pt-4 space-y-4">
+          <div className="flex flex-wrap gap-3 pb-3 border-b border-border/60">
+            <div className="flex items-center gap-2 flex-1 min-w-[200px]">
+              <Label htmlFor="search-product" className="text-xs text-muted-foreground whitespace-nowrap">
+                Buscar:
+              </Label>
+              <Input
+                id="search-product"
+                type="text"
+                placeholder="Nombre o código del producto"
+                value={searchTerm}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  setPage(1);
+                }}
+                className="h-9 rounded-lg text-sm"
+              />
+            </div>
+            {searchTerm.trim() && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setSearchTerm('');
+                  setPage(1);
+                }}
+                className="h-9 text-xs text-muted-foreground hover:text-foreground"
+              >
+                Limpiar búsqueda
+              </Button>
+            )}
+          </div>
 
           {query.isLoading && (
-            <div className="rounded-lg border border-border overflow-hidden">
+            <div className="rounded-lg border border-border/80 overflow-hidden">
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>Código</TableHead>
-                    <TableHead>Nombre</TableHead>
-                    <TableHead>Categoría</TableHead>
-                    <TableHead className="text-right">Precio</TableHead>
-                    <TableHead className="text-right">Stock</TableHead>
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="font-medium text-muted-foreground">Código</TableHead>
+                    <TableHead className="font-medium text-muted-foreground">Nombre</TableHead>
+                    <TableHead className="font-medium text-muted-foreground">Categoría</TableHead>
+                    <TableHead className="text-right font-medium text-muted-foreground">Precio</TableHead>
+                    <TableHead className="w-20 text-center font-medium text-muted-foreground">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {Array.from({ length: 5 }).map((_, i) => (
                     <TableRow key={i}>
-                      <TableCell><Skeleton className="h-5 w-20" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-32" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-24" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-16 ml-auto" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-10 ml-auto" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-20 rounded" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-32 rounded" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-24 rounded" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-16 ml-auto rounded" /></TableCell>
+                      <TableCell><Skeleton className="h-8 w-8 mx-auto rounded" /></TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -196,56 +302,95 @@ export default function ProductsPage() {
           )}
 
           {query.isError && (
-            <p className="text-sm text-destructive py-4">
-              {(query.error as { message?: string })?.message ??
-                'Error al cargar productos'}
-            </p>
+            <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3">
+              <p className="text-sm text-destructive">
+                {(query.error as { message?: string })?.message ??
+                  'Error al cargar productos'}
+              </p>
+            </div>
           )}
 
-          {!query.isLoading && (
-            <div className="rounded-lg border border-border overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Código</TableHead>
-                    <TableHead>Nombre</TableHead>
-                    <TableHead>Categoría</TableHead>
-                    <TableHead className="text-right">Precio</TableHead>
-                    <TableHead className="text-right">Stock</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {rows.map((p) => (
-                    <TableRow key={p.id}>
-                      <TableCell className="font-mono text-muted-foreground text-sm">
-                        {p.internalCode}
-                      </TableCell>
-                      <TableCell className="font-medium">{p.name}</TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {p.category?.name ?? '—'}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {formatMoney(p.price)}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums text-muted-foreground">
-                        {p.stock?.qtyOnHand ?? 0}
-                      </TableCell>
+          {!query.isLoading && !query.isError && (
+            <>
+              <div className="rounded-lg border border-border/80 overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="hover:bg-transparent border-b border-border/80">
+                      <TableHead className="font-medium text-muted-foreground">Código</TableHead>
+                      <TableHead className="font-medium text-muted-foreground">Nombre</TableHead>
+                      <TableHead className="font-medium text-muted-foreground">Categoría</TableHead>
+                      <TableHead className="text-right font-medium text-muted-foreground">Precio</TableHead>
+                      <TableHead className="w-20 text-center font-medium text-muted-foreground">Acciones</TableHead>
                     </TableRow>
-                  ))}
-                  {rows.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={5} className="p-0">
-                        <EmptyState
-                          message="No hay productos"
-                          description="Crea uno para comenzar"
-                          icon={Package}
-                        />
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </div>
+                  </TableHeader>
+                  <TableBody>
+                    {rows.map((p) => (
+                      <TableRow
+                        key={p.id}
+                        className="transition-colors hover:bg-muted/40"
+                      >
+                        <TableCell className="font-mono text-sm text-muted-foreground">
+                          {p.internalCode}
+                        </TableCell>
+                        <TableCell className="font-medium text-foreground">
+                          {p.name}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {p.category?.name ?? '—'}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums font-medium text-foreground">
+                          {formatMoney(p.price)}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+                            onClick={() => setEditingProductId(p.id)}
+                            title="Editar producto"
+                            aria-label="Editar producto"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {rows.length === 0 && (
+                      <TableRow className="hover:bg-transparent">
+                        <TableCell colSpan={5} className="p-0 align-top">
+                          <EmptyState
+                            message="No hay productos"
+                            description="Crea un producto o una categoría para organizar tu catálogo."
+                            icon={Package}
+                            action={
+                              <Button
+                                size="sm"
+                                onClick={() => setOpenNewProduct(true)}
+                                className="gap-2"
+                              >
+                                <Plus className="h-4 w-4" />
+                                Nuevo producto
+                              </Button>
+                            }
+                            className="py-16"
+                          />
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+              {meta && (meta.total > 0 || meta.totalPages > 1) && (
+                <div className="flex items-center justify-between gap-4 flex-wrap">
+                  <p className="text-xs text-muted-foreground">
+                    {meta.total > 0
+                      ? `Mostrando ${(meta.page - 1) * meta.limit + 1}–${Math.min(meta.page * meta.limit, meta.total)} de ${meta.total}`
+                      : '0 resultados'}
+                  </p>
+                  <Pagination meta={meta} onPageChange={setPage} label="Página" />
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>
@@ -257,11 +402,17 @@ export default function ProductsPage() {
               <Tag className="h-4 w-4" />
               Nueva categoría
             </DialogTitle>
+            <p className="text-sm text-muted-foreground pt-1">
+              Las categorías sirven para organizar productos (ej. Cables, Iluminación, Herrajes).
+            </p>
           </DialogHeader>
           <form
             onSubmit={categoryForm.handleSubmit(onNewCategory)}
             className="space-y-4"
           >
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide border-b border-border pb-1.5">
+              Nombre de la categoría
+            </p>
             <div className="space-y-2">
               <Label htmlFor="cat-name">Nombre</Label>
               <Input
@@ -270,6 +421,9 @@ export default function ProductsPage() {
                 placeholder="Ej: Cables"
                 className="rounded-lg"
               />
+              <p className="text-xs text-muted-foreground">
+                Nombre corto y claro para filtrar y agrupar productos.
+              </p>
               {categoryForm.formState.errors.name && (
                 <p className="text-sm text-destructive">
                   {categoryForm.formState.errors.name.message}
@@ -292,16 +446,35 @@ export default function ProductsPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={openNewProduct} onOpenChange={setOpenNewProduct}>
+      <Dialog
+        open={openNewProduct || editingProductId !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setOpenNewProduct(false);
+            setEditingProductId(null);
+          }
+        }}
+      >
         <DialogContent showClose className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Plus className="h-4 w-4" />
-              Nuevo producto
+              {editingProductId ? (
+                <>
+                  <Pencil className="h-4 w-4" />
+                  Editar producto
+                </>
+              ) : (
+                <>
+                  <Plus className="h-4 w-4" />
+                  Nuevo producto
+                </>
+              )}
             </DialogTitle>
           </DialogHeader>
           <form
-            onSubmit={productForm.handleSubmit(onNewProduct)}
+            onSubmit={productForm.handleSubmit(
+              editingProductId ? onUpdateProduct : onNewProduct
+            )}
             className="space-y-4"
           >
             <div className="grid gap-4 sm:grid-cols-2">
@@ -310,9 +483,12 @@ export default function ProductsPage() {
                 <Input
                   id="internalCode"
                   {...productForm.register('internalCode')}
-                  placeholder="PROD-001"
+                  placeholder="Ej: PROD-001, CBL-2024"
                   className="rounded-lg"
                 />
+                <p className="text-xs text-muted-foreground">
+                  Identificador único del producto. Úsalo para referencia interna o códigos de barras.
+                </p>
                 {productForm.formState.errors.internalCode && (
                   <p className="text-sm text-destructive">
                     {productForm.formState.errors.internalCode.message}
@@ -324,9 +500,12 @@ export default function ProductsPage() {
                 <Input
                   id="name"
                   {...productForm.register('name')}
-                  placeholder="Nombre del producto"
+                  placeholder="Ej: Cable THHN 12 AWG"
                   className="rounded-lg"
                 />
+                <p className="text-xs text-muted-foreground">
+                  Nombre descriptivo del producto que aparecerá en facturas y cotizaciones.
+                </p>
                 {productForm.formState.errors.name && (
                   <p className="text-sm text-destructive">
                     {productForm.formState.errors.name.message}
@@ -347,6 +526,9 @@ export default function ProductsPage() {
                     </option>
                   ))}
                 </select>
+                <p className="text-xs text-muted-foreground">
+                  Opcional. Organiza tus productos por categorías para facilitar la búsqueda y el filtrado.
+                </p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="cost">Costo (COP)</Label>
@@ -354,9 +536,14 @@ export default function ProductsPage() {
                   id="cost"
                   type="number"
                   step="0.01"
+                  min={0.01}
                   {...productForm.register('cost')}
+                  placeholder="15000"
                   className="rounded-lg"
                 />
+                <p className="text-xs text-muted-foreground">
+                  Costo de compra o producción del producto. Se usa para calcular márgenes de ganancia.
+                </p>
                 {productForm.formState.errors.cost && (
                   <p className="text-sm text-destructive">
                     {productForm.formState.errors.cost.message}
@@ -364,17 +551,22 @@ export default function ProductsPage() {
                 )}
               </div>
               <div className="space-y-2">
-                <Label htmlFor="price">Precio (COP)</Label>
+                <Label htmlFor="marginPercent">Margen (%)</Label>
                 <Input
-                  id="price"
+                  id="marginPercent"
                   type="number"
                   step="0.01"
-                  {...productForm.register('price')}
+                  min={0}
+                  {...productForm.register('marginPercent')}
+                  placeholder="30"
                   className="rounded-lg"
                 />
-                {productForm.formState.errors.price && (
+                <p className="text-xs text-muted-foreground">
+                  Porcentaje de ganancia sobre el costo. El precio de venta se calcula: costo × (1 + margen %).
+                </p>
+                {productForm.formState.errors.marginPercent && (
                   <p className="text-sm text-destructive">
-                    {productForm.formState.errors.price.message}
+                    {productForm.formState.errors.marginPercent.message}
                   </p>
                 )}
               </div>
@@ -384,21 +576,56 @@ export default function ProductsPage() {
                   id="taxRate"
                   type="number"
                   step="0.01"
+                  min={0}
+                  max={100}
                   {...productForm.register('taxRate')}
+                  placeholder="19"
                   className="rounded-lg"
                 />
+                <p className="text-xs text-muted-foreground">
+                  Porcentaje de impuesto sobre el valor añadido. Opcional. Por defecto es 0% si no se especifica.
+                </p>
               </div>
+              {(() => {
+                const cost = Number(productForm.watch('cost')) || 0;
+                const marginPercent = Number(productForm.watch('marginPercent')) || 0;
+                const taxRate = Number(productForm.watch('taxRate')) || 0;
+                const price = cost * (1 + marginPercent / 100);
+                const totalWithTax = price * (1 + taxRate / 100);
+                return (
+                  <div className="rounded-lg border border-border bg-muted/30 px-3 py-2.5 flex justify-between items-center text-sm sm:col-span-2">
+                    <span className="font-medium text-muted-foreground">Valor total (precio + IVA)</span>
+                    <span className="tabular-nums font-semibold text-base">{formatMoney(totalWithTax)}</span>
+                  </div>
+                );
+              })()}
             </div>
             <DialogFooter>
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setOpenNewProduct(false)}
+                onClick={() => {
+                  setOpenNewProduct(false);
+                  setEditingProductId(null);
+                }}
               >
                 Cancelar
               </Button>
-              <Button type="submit" disabled={createProduct.isPending}>
-                {createProduct.isPending ? 'Guardando…' : 'Crear producto'}
+              <Button
+                type="submit"
+                disabled={
+                  editingProductId
+                    ? updateProduct.isPending || productToEdit.isLoading
+                    : createProduct.isPending
+                }
+              >
+                {editingProductId
+                  ? updateProduct.isPending
+                    ? 'Guardando…'
+                    : 'Guardar cambios'
+                  : createProduct.isPending
+                    ? 'Guardando…'
+                    : 'Crear producto'}
               </Button>
             </DialogFooter>
           </form>

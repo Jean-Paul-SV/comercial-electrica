@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
   Logger,
@@ -26,7 +27,8 @@ export class ExpensesService {
     return (this.prisma as any).expense;
   }
 
-  async create(dto: CreateExpenseDto, createdBy?: string) {
+  async create(dto: CreateExpenseDto, createdBy?: string, tenantId?: string | null) {
+    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
     this.limits.validateCashAmount(Number(dto.amount), 'movement');
 
     const expenseDate = dto.expenseDate
@@ -34,8 +36,8 @@ export class ExpensesService {
       : new Date();
 
     if (dto.cashSessionId) {
-      const session = await this.prisma.cashSession.findUnique({
-        where: { id: dto.cashSessionId },
+      const session = await this.prisma.cashSession.findFirst({
+        where: { id: dto.cashSessionId, tenantId },
       });
       if (!session) throw new NotFoundException('Sesión de caja no encontrada.');
       if (session.closedAt) {
@@ -47,6 +49,7 @@ export class ExpensesService {
 
     const expense = await this.expenseDelegate.create({
       data: {
+        tenantId,
         amount: dto.amount,
         description: dto.description.trim(),
         category: dto.category?.trim() ?? null,
@@ -89,13 +92,35 @@ export class ExpensesService {
   async list(
     dto: ListExpensesDto,
     pagination?: { page?: number; limit?: number },
+    tenantId?: string | null,
   ) {
+    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
     const page = pagination?.page ?? 1;
     const limit = pagination?.limit ?? 20;
     const skip = (page - 1) * limit;
 
-    const where: { expenseDate?: { gte?: Date; lte?: Date }; category?: string } = {};
+    const CATEGORY_FACTURA_PROVEEDOR = 'Factura proveedor';
+    const CATEGORY_PEDIDO_DE_COMPRA = 'Pedido de compra';
+    const search = dto.search?.trim();
+    type Where = {
+      tenantId: string;
+      cashSessionId?: string;
+      expenseDate?: { gte?: Date; lte?: Date };
+      category?: string;
+      kind?: 'FIXED' | 'VARIABLE' | 'OTHER';
+      OR?: Array<
+        | { category: string | null }
+        | { category: { not: string } }
+        | { category: { in: string[] } }
+        | { category: { notIn: string[] } }
+      >;
+      AND?: unknown[];
+    };
+    const where: Where = { tenantId };
 
+    if (dto.cashSessionId?.trim()) {
+      where.cashSessionId = dto.cashSessionId.trim();
+    }
     if (dto.startDate || dto.endDate) {
       where.expenseDate = {};
       if (dto.startDate) {
@@ -107,8 +132,28 @@ export class ExpensesService {
         where.expenseDate.lte = end;
       }
     }
-    if (dto.category?.trim()) {
+    if (dto.expenseType === 'compras') {
+      where.OR = [
+        { category: CATEGORY_FACTURA_PROVEEDOR },
+        { category: CATEGORY_PEDIDO_DE_COMPRA },
+      ];
+    } else if (dto.expenseType === 'otros') {
+      where.OR = [
+        { category: null },
+        { category: { notIn: [CATEGORY_FACTURA_PROVEEDOR, CATEGORY_PEDIDO_DE_COMPRA] } },
+      ];
+    } else if (dto.category?.trim() && !search) {
       where.category = dto.category.trim();
+    }
+    if (search) {
+      where.AND = [
+        {
+          OR: [
+            { description: { contains: search, mode: 'insensitive' } },
+            { category: { contains: search, mode: 'insensitive' } },
+          ],
+        },
+      ];
     }
 
     const [data, total] = await Promise.all([
@@ -137,18 +182,20 @@ export class ExpensesService {
     };
   }
 
-  async getById(id: string) {
-    const expense = await this.expenseDelegate.findUnique({
-      where: { id },
+  async getById(id: string, tenantId?: string | null) {
+    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
+    const expense = await this.expenseDelegate.findFirst({
+      where: { id, tenantId },
       include: { cashSession: true },
     });
     if (!expense) throw new NotFoundException('Gasto no encontrado.');
     return expense;
   }
 
-  async remove(id: string, deletedByUserId?: string, deletionReason?: string) {
-    const expense = await this.expenseDelegate.findUnique({
-      where: { id },
+  async remove(id: string, deletedByUserId?: string, deletionReason?: string, tenantId?: string | null) {
+    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
+    const expense = await this.expenseDelegate.findFirst({
+      where: { id, tenantId },
       include: { cashSession: true },
     });
     if (!expense) throw new NotFoundException('Gasto no encontrado.');

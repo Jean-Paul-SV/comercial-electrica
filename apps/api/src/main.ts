@@ -5,6 +5,7 @@ import { config } from 'dotenv';
 import { resolve } from 'path';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AllExceptionsFilter } from './common/filters/http-exception.filter';
+import { JsonLogger } from './common/logger/json-logger';
 import { randomUUID } from 'crypto';
 import type { Request, Response, NextFunction } from 'express';
 
@@ -37,7 +38,10 @@ if (!envLoaded) {
 }
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const useJsonLog = process.env.LOG_FORMAT === 'json';
+  const app = await NestFactory.create(AppModule, {
+    logger: useJsonLog ? new JsonLogger() : undefined,
+  });
   const isProd = process.env.NODE_ENV === 'production';
   const allowedOrigins = (process.env.ALLOWED_ORIGINS ?? '')
     .split(',')

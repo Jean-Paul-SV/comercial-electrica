@@ -26,9 +26,14 @@ import { DianModule } from './dian/dian.module';
 import { CommonModule } from './common/common.module';
 import { BackupsModule } from './backups/backups.module';
 import { AuditModule } from './audit/audit.module';
+import { OnboardingModule } from './onboarding/onboarding.module';
 import { validateEnv } from './config/env.validation';
 import { MetricsModule } from './metrics/metrics.module';
 import { RequestMetricsInterceptor } from './metrics/request-metrics.interceptor';
+import { AuditContextInterceptor } from './common/interceptors/audit-context.interceptor';
+import { IdempotencyInterceptor } from './common/interceptors/idempotency.interceptor';
+import { TenantContextInterceptor } from './auth/tenant-context.interceptor';
+import { MailerModule } from './mailer/mailer.module';
 
 @Module({
   imports: [
@@ -47,20 +52,26 @@ import { RequestMetricsInterceptor } from './metrics/request-metrics.interceptor
       {
         name: 'short',
         ttl: 60000, // 1 minuto
-        limit: 100, // 100 requests por minuto
+        limit: 1000, // 1000 requests por minuto (evita 429 con múltiples pestañas y listas)
       },
       {
         name: 'medium',
         ttl: 600000, // 10 minutos
-        limit: 500, // 500 requests por 10 minutos
+        limit: 5000, // 5000 requests por 10 minutos (uso normal con listas y reportes)
       },
       {
         name: 'long',
         ttl: 3600000, // 1 hora
-        limit: 1000, // 1000 requests por hora
+        limit: 20000, // 20000 requests por hora
+      },
+      {
+        name: 'forgot',
+        ttl: 900000, // 15 minutos
+        limit: 3, // 3 solicitudes de olvidé contraseña por 15 min por IP
       },
     ]),
     ScheduleModule.forRoot(),
+    MailerModule,
     CommonModule,
     MetricsModule,
     PrismaModule,
@@ -81,14 +92,28 @@ import { RequestMetricsInterceptor } from './metrics/request-metrics.interceptor
     DianModule,
     BackupsModule,
     AuditModule,
+    OnboardingModule,
   ],
   controllers: [AppController],
   providers: [
     AppService,
+    AuditContextInterceptor,
     RequestMetricsInterceptor,
     {
       provide: APP_GUARD,
       useClass: ThrottleAuthGuard,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: AuditContextInterceptor,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: TenantContextInterceptor,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: IdempotencyInterceptor,
     },
     {
       provide: APP_INTERCEPTOR,

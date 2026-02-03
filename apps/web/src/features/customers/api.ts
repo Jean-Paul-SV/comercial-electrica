@@ -10,6 +10,8 @@ import type {
 export type CustomersListParams = {
   page?: number;
   limit?: number;
+  search?: string;
+  sortOrder?: 'asc' | 'desc';
 };
 
 export function listCustomers(
@@ -19,6 +21,8 @@ export function listCustomers(
   const qs = new URLSearchParams();
   if (params.page != null) qs.set('page', String(params.page));
   if (params.limit != null) qs.set('limit', String(params.limit));
+  if (params.search != null && params.search !== '') qs.set('search', params.search);
+  if (params.sortOrder != null) qs.set('sortOrder', params.sortOrder);
   const query = qs.toString() ? `?${qs.toString()}` : '';
   return apiClient.get(`/customers${query}`, { authToken });
 }

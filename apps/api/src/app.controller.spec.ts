@@ -3,6 +3,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PrismaService } from './prisma/prisma.service';
 import { CacheService } from './common/services/cache.service';
+import { PermissionsService } from './auth/permissions.service';
 import { getQueueToken } from '@nestjs/bullmq';
 
 describe('AppController', () => {
@@ -36,6 +37,10 @@ describe('AppController', () => {
             invalidateEntity: jest.fn(),
             buildKey: jest.fn(),
           },
+        },
+        {
+          provide: PermissionsService,
+          useValue: { getPermissionsForRole: jest.fn().mockResolvedValue([]) },
         },
         {
           provide: PrismaService,

@@ -6,9 +6,8 @@ import {
   getExpenseById,
   createExpense,
   deleteExpense,
-  type ListExpensesParams,
 } from './api';
-import type { CreateExpensePayload } from './types';
+import type { CreateExpensePayload, ListExpensesParams } from './types';
 import { useAuth } from '@shared/providers/AuthProvider';
 
 export function useExpensesList(params: ListExpensesParams = {}) {

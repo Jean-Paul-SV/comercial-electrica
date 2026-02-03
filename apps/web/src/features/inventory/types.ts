@@ -26,6 +26,7 @@ export type InventoryMovementListItem = {
   type: MovementType;
   reason: string | null;
   supplierId: string | null;
+  supplier?: { id: string; name: string } | null;
   createdBy: string | null;
   createdAt: string;
   items?: InventoryMovementItem[];

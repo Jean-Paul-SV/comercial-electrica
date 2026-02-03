@@ -30,8 +30,8 @@ export function TopCustomersChart({ data, className, maxBars = 10 }: TopCustomer
   if (!slice.length) return null;
 
   return (
-    <div className={className ?? 'h-72 w-full'}>
-      <ResponsiveContainer width="100%" height="100%">
+    <div className={className ?? 'h-72 w-full min-w-[280px] min-h-[200px]'} style={{ minHeight: 200, minWidth: 280 }}>
+      <ResponsiveContainer width="100%" height="100%" minWidth={280} minHeight={200}>
         <BarChart
           data={slice}
           layout="vertical"
@@ -55,14 +55,14 @@ export function TopCustomersChart({ data, className, maxBars = 10 }: TopCustomer
             tickFormatter={(v) => (v.length > 14 ? v.slice(0, 12) + '…' : v)}
           />
           <Tooltip
-            cursor={() => null}
+            cursor={false}
             isAnimationActive={false}
             contentStyle={{
               borderRadius: '12px',
               border: '1px solid #e5e7eb',
               backgroundColor: '#fff',
             }}
-            formatter={(value: number) => [formatMoney(value), 'Monto']}
+            formatter={(value: number | undefined) => [formatMoney(value ?? 0), 'Monto']}
           />
           <Bar dataKey="amount" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} name="Monto" />
         </BarChart>

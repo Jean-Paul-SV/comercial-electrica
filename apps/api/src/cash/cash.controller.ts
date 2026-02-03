@@ -19,13 +19,13 @@ import {
 } from '@nestjs/swagger';
 import { CashService } from './cash.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { RolesGuard } from '../auth/roles.guard';
 import { OpenSessionDto } from './dto/open-session.dto';
 import { CloseSessionDto } from './dto/close-session.dto';
 import { PaginationDto } from '../common/dto/pagination.dto';
+import { ListMovementsQueryDto } from './dto/list-movements-query.dto';
 
 @ApiTags('cash')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard)
 @Controller('cash')
 export class CashController {
   constructor(private readonly cash: CashService) {}
@@ -62,11 +62,14 @@ export class CashController {
     },
   })
   @ApiResponse({ status: 401, description: 'No autenticado' })
-  listSessions(@Query() pagination?: PaginationDto) {
-    return this.cash.listSessions({
-      page: pagination?.page,
-      limit: pagination?.limit,
-    });
+  listSessions(
+    @Query() pagination?: PaginationDto,
+    @Req() req?: { user?: { tenantId?: string } },
+  ) {
+    return this.cash.listSessions(
+      { page: pagination?.page, limit: pagination?.limit },
+      req?.user?.tenantId,
+    );
   }
 
   @Post('sessions')
@@ -79,9 +82,9 @@ export class CashController {
   @ApiResponse({ status: 401, description: 'No autenticado' })
   async open(
     @Body() dto: OpenSessionDto,
-    @Req() req: { user?: { sub?: string } },
+    @Req() req: { user?: { sub?: string; tenantId?: string } },
   ) {
-    return this.cash.openSession(dto.openingAmount, req.user?.sub);
+    return this.cash.openSession(dto.openingAmount, req.user?.sub, req.user?.tenantId);
   }
 
   @Post('sessions/:id/close')
@@ -98,9 +101,9 @@ export class CashController {
   close(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Body() dto: CloseSessionDto,
-    @Req() req: { user?: { sub?: string } },
+    @Req() req: { user?: { sub?: string; tenantId?: string } },
   ) {
-    return this.cash.closeSession(id, dto.closingAmount, req.user?.sub);
+    return this.cash.closeSession(id, dto.closingAmount, req.user?.sub, req.user?.tenantId);
   }
 
   @Get('sessions/:id/movements')
@@ -146,4 +149,52 @@ export class CashController {
     });
   }
 
+  @Get('movements')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Listar todos los movimientos de caja',
+    description:
+      'Obtiene todos los movimientos de caja con filtros opcionales (sesión, tipo, rango de fechas). Respuesta paginada.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Lista paginada de movimientos',
+    schema: {
+      type: 'object',
+      properties: {
+        data: {
+          type: 'array',
+          items: { type: 'object' },
+        },
+        meta: {
+          type: 'object',
+          properties: {
+            total: { type: 'number' },
+            page: { type: 'number' },
+            limit: { type: 'number' },
+            totalPages: { type: 'number' },
+            hasNextPage: { type: 'boolean' },
+            hasPreviousPage: { type: 'boolean' },
+          },
+        },
+      },
+    },
+  })
+  @ApiResponse({ status: 401, description: 'No autenticado' })
+  listAllMovements(
+    @Query() query: ListMovementsQueryDto,
+    @Req() req?: { user?: { tenantId?: string } },
+  ) {
+    return this.cash.listAllMovements(
+      {
+        page: query.page,
+        limit: query.limit,
+        sessionId: query.sessionId,
+        type: query.type,
+        startDate: query.startDate,
+        endDate: query.endDate,
+      },
+      req?.user?.tenantId,
+    );
+  }
 }

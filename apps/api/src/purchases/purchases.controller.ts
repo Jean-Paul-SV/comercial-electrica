@@ -22,10 +22,12 @@ import { PaginationDto } from '../common/dto/pagination.dto';
 import { CreatePurchaseOrderDto } from './dto/create-purchase-order.dto';
 import { ReceivePurchaseOrderDto } from './dto/receive-purchase-order.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { RolesGuard } from '../auth/roles.guard';
+import { ModulesGuard } from '../auth/modules.guard';
+import { RequireModule } from '../auth/require-module.decorator';
 
 @ApiTags('purchases')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, ModulesGuard)
+@RequireModule('suppliers')
 @Controller('purchases')
 export class PurchasesController {
   constructor(private readonly purchases: PurchasesService) {}
@@ -41,11 +43,14 @@ export class PurchasesController {
     description: 'Lista paginada de pedidos de compra',
   })
   @ApiResponse({ status: 401, description: 'No autenticado' })
-  list(@Query() pagination?: PaginationDto) {
-    return this.purchases.listPurchaseOrders({
-      page: pagination?.page,
-      limit: pagination?.limit,
-    });
+  list(
+    @Query() pagination?: PaginationDto,
+    @Req() req?: { user?: { tenantId?: string } },
+  ) {
+    return this.purchases.listPurchaseOrders(
+      { page: pagination?.page, limit: pagination?.limit },
+      req?.user?.tenantId,
+    );
   }
 
   @Get(':id')
@@ -58,8 +63,11 @@ export class PurchasesController {
   @ApiResponse({ status: 200, description: 'Pedido encontrado' })
   @ApiResponse({ status: 404, description: 'Pedido no encontrado' })
   @ApiResponse({ status: 401, description: 'No autenticado' })
-  get(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string) {
-    return this.purchases.getPurchaseOrder(id);
+  get(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @Req() req?: { user?: { tenantId?: string } },
+  ) {
+    return this.purchases.getPurchaseOrder(id, req?.user?.tenantId);
   }
 
   @Post()
@@ -73,9 +81,9 @@ export class PurchasesController {
   @ApiResponse({ status: 401, description: 'No autenticado' })
   create(
     @Body() dto: CreatePurchaseOrderDto,
-    @Req() req: { user?: { sub?: string } },
+    @Req() req: { user?: { sub?: string; tenantId?: string } },
   ) {
-    return this.purchases.createPurchaseOrder(dto, req.user?.sub);
+    return this.purchases.createPurchaseOrder(dto, req.user?.sub, req.user?.tenantId);
   }
 
   @Post(':id/receive')
@@ -94,8 +102,8 @@ export class PurchasesController {
   receive(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Body() dto: ReceivePurchaseOrderDto,
-    @Req() req: { user?: { sub?: string } },
+    @Req() req: { user?: { sub?: string; tenantId?: string } },
   ) {
-    return this.purchases.receivePurchaseOrder(id, dto, req.user?.sub);
+    return this.purchases.receivePurchaseOrder(id, dto, req.user?.sub, req.user?.tenantId);
   }
 }

@@ -15,12 +15,11 @@ import {
 } from '@nestjs/swagger';
 import { SalesService } from './sales.service';
 import { CreateSaleDto } from './dto/create-sale.dto';
-import { PaginationDto } from '../common/dto/pagination.dto';
+import { ListSalesQueryDto } from './dto/list-sales-query.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { RolesGuard } from '../auth/roles.guard';
 
 @ApiTags('sales')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard)
 @Controller('sales')
 export class SalesController {
   constructor(private readonly sales: SalesService) {}
@@ -57,11 +56,18 @@ export class SalesController {
     },
   })
   @ApiResponse({ status: 401, description: 'No autenticado' })
-  list(@Query() pagination?: PaginationDto) {
-    return this.sales.listSales({
-      page: pagination?.page,
-      limit: pagination?.limit,
-    });
+  list(
+    @Query() query?: ListSalesQueryDto,
+    @Req() req?: { user?: { tenantId?: string } },
+  ) {
+    return this.sales.listSales(
+      {
+        page: query?.page,
+        limit: query?.limit,
+        search: query?.search?.trim() || undefined,
+      },
+      req?.user?.tenantId,
+    );
   }
 
   @Post()
@@ -78,7 +84,7 @@ export class SalesController {
       'Error de validación (stock insuficiente, productos inexistentes, etc.)',
   })
   @ApiResponse({ status: 401, description: 'No autenticado' })
-  create(@Body() dto: CreateSaleDto, @Req() req: { user?: { sub?: string } }) {
-    return this.sales.createSale(dto, req.user?.sub);
+  create(@Body() dto: CreateSaleDto, @Req() req: { user?: { sub?: string; tenantId?: string } }) {
+    return this.sales.createSale(dto, req.user?.sub, req.user?.tenantId);
   }
 }

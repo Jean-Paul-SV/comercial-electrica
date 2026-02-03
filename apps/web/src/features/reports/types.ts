@@ -131,3 +131,110 @@ export type CustomersReportParams = {
   endDate?: string;
   top?: number;
 };
+
+// Indicadores accionables (GET /reports/actionable-indicators)
+export type ActionableIndicatorItem = {
+  id: string;
+  name: string;
+  value?: number | string;
+  /** Precio mínimo sugerido para margen objetivo (ej. 15 %). Solo en productos con pérdida o margen bajo. */
+  suggestedPrice?: number;
+  /** Total en ventas (numérico). Solo en indicador SALES_BY_EMPLOYEE para gráficos. */
+  totalSales?: number;
+};
+
+export type ActionableIndicator = {
+  code: string;
+  title: string;
+  insight: string;
+  metric: string | number;
+  severity: 'critical' | 'high' | 'medium' | 'low' | 'info';
+  suggestedAction: string;
+  actionLabel: string;
+  actionHref: string;
+  items: ActionableIndicatorItem[];
+  detectedAt: string;
+};
+
+export type ActionableIndicatorsResponse = {
+  periodDays: number;
+  indicators: ActionableIndicator[];
+};
+
+export type ActionableIndicatorsParams = {
+  days?: number;
+  top?: number;
+};
+
+// Resumen del dashboard en lenguaje natural (GET /reports/dashboard-summary)
+export type DashboardSummaryResponse = {
+  summary: string;
+  source: 'llm' | 'fallback';
+};
+
+// Estado operativo (GET /reports/operational-state)
+export type OperationalIndicators = {
+  cash: {
+    openSessionsCount: number;
+    hasOpenSession: boolean;
+    oldestOpenAt: string | null;
+  };
+  inventory: {
+    lowStockCount: number;
+    zeroStockCount: number;
+  };
+  quotes: {
+    pendingCount: number;
+    expiringSoonCount: number;
+    expiredCount: number;
+  };
+  sales: {
+    todayCount: number;
+    todayTotal: number;
+    avgDailyTotalLast7: number;
+  };
+  supplierInvoices: {
+    overdueCount: number;
+    dueSoonCount: number;
+  };
+};
+
+export type OperationalAlert = {
+  code: string;
+  severity: 'critical' | 'high' | 'medium' | 'low' | 'info';
+  priority: number;
+  title: string;
+  message: string;
+  area: string;
+  count: number;
+  actionLabel: string;
+  actionHref: string;
+  entityIds: string[];
+  detectedAt: string;
+};
+
+export type OperationalStateResponse = {
+  indicators: OperationalIndicators;
+  alerts: OperationalAlert[];
+};
+
+// Clustering de clientes K-means (GET /reports/customer-clusters)
+export type CustomerClustersParams = {
+  days?: number;
+  k?: number;
+};
+
+export type CustomerClustersResponse = {
+  periodDays: number;
+  k: number;
+  clusters: Array<{
+    clusterIndex: number;
+    label: string;
+    suggestedLabel: string;
+    description: string;
+    customers: Array<{ id: string; name: string }>;
+    avgAmount: number;
+    avgDaysAgo: number;
+    avgCount: number;
+  }>;
+};

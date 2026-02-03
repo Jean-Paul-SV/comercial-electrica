@@ -14,6 +14,7 @@ export type QuotesListParams = {
   limit?: number;
   status?: string;
   customerId?: string;
+  search?: string;
 };
 
 export function listQuotes(
@@ -25,6 +26,7 @@ export function listQuotes(
   if (params.limit != null) qs.set('limit', String(params.limit));
   if (params.status) qs.set('status', params.status);
   if (params.customerId) qs.set('customerId', params.customerId);
+  if (params.search != null && params.search !== '') qs.set('search', params.search);
   const query = qs.toString() ? `?${qs.toString()}` : '';
   return apiClient.get(`/quotes${query}`, { authToken });
 }

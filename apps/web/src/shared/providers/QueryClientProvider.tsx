@@ -12,7 +12,8 @@ export function QueryClientProvider({ children }: { children: ReactNode }) {
       new QueryClient({
         defaultOptions: {
           queries: {
-            staleTime: 30_000,
+            staleTime: 60_000, // 1 min: menos refetches al cambiar de pestaña
+            gcTime: 5 * 60 * 1000, // 5 min en caché
             retry: 1,
             refetchOnWindowFocus: false,
           },

@@ -8,13 +8,13 @@
 
 | Área | Objetivo de negocio | Documento(s) de diseño | Estado actual |
 |------|---------------------|-------------------------|---------------|
-| **Seguridad y acceso** | Roles y permisos por cliente; validación backend + frontend | ROLES_Y_PERMISOS_DISEÑO, schema-roles-permisos.prisma | Diseñado; implementado parcial (RoleName ADMIN/USER) |
-| **Estado operativo** | Interpretar estado del negocio; alertas y acciones | ESTADOS_OPERATIVOS_Y_ALERTAS | Diseñado; dashboard con KPIs básicos |
-| **Onboarding** | Guiar usuarios no técnicos; reducir estrés | ONBOARDING_UX_DISEÑO | Diseñado; no implementado |
-| **Auditoría** | Trazabilidad completa; defendible ante DIAN | AUDITORIA_Y_TRAZABILIDAD | Diseñado; AuditLog + AuditService existentes, sin IP/hash/severidad |
-| **Resiliencia** | Negocio no se detenga; backups y offline | RESILIENCIA_Y_SINCRONIZACION | Parcial: backups automáticos; sin descarga ni cola offline |
-| **Modularidad SaaS** | Módulos por cliente; planes y franquicias | ARQUITECTURA_MODULAR_SAAS | Diseñado; no implementado (sin Tenant/Plan) |
-| **Indicadores** | Datos que digan “qué hacer”; no solo gráficas | INDICADORES_Y_ACCIONES | Diseñado; reportes descriptivos, sin indicadores accionables |
+| **Seguridad y acceso** | Roles y permisos por cliente; validación backend + frontend | ROLES_Y_PERMISOS_DISEÑO, schema-roles-permisos.prisma | Parcial: Tenant, Permission, Role, UserRole, PermissionsService, PermissionsGuard, GET /auth/me; nav por permisos; RoleName se mantiene por compatibilidad |
+| **Estado operativo** | Interpretar estado del negocio; alertas y acciones | ESTADOS_OPERATIVOS_Y_ALERTAS | Implementado: GET /reports/operational-state; dashboard con bloque "Alertas operativas" |
+| **Onboarding** | Guiar usuarios no técnicos; reducir estrés | ONBOARDING_UX_DISEÑO | Implementado: flujo 3 pasos, GET/PATCH /onboarding/status, panel Tu progreso |
+| **Auditoría** | Trazabilidad completa; defendible ante DIAN | AUDITORIA_Y_TRAZABILIDAD | Parcial: AuditLog + requestId, ip, userAgent, severity, category; AuditContextInterceptor; hash chain pendiente |
+| **Resiliencia** | Negocio no se detenga; backups y offline | RESILIENCIA_Y_SINCRONIZACION | Implementado: backups + download + export CSV + copia S3; cliente: reintentos/backoff, timeout, detección offline, banner; cola offline + Idempotency-Key (nivel B) |
+| **Modularidad SaaS** | Módulos por cliente; planes y franquicias | ARQUITECTURA_MODULAR_SAAS | Implementado: Plan, PlanFeature, TenantModule, AddOn, TenantAddOn; TenantModulesService; ModulesGuard + @RequireModule; GET /auth/me con tenant + enabledModules; nav por moduleCode; página "Módulo no disponible" |
+| **Indicadores** | Datos que digan “qué hacer”; no solo gráficas | INDICADORES_Y_ACCIONES | Implementado: productos pérdida/margen bajo, sin rotación, facturas vencidas, proveedores menos competitivos, ventas por empleado; dashboard "Acciones recomendadas" |
 
 ---
 
@@ -49,42 +49,43 @@ Qué parte del código o del esquema materializa cada diseño.
 
 | Entregable del diseño | Componente actual | Estado |
 |------------------------|-------------------|--------|
-| Tenant, Permission, Role, RolePermission, UserRole | Prisma: no existen; User tiene solo RoleName (ADMIN/USER) | Por implementar |
-| PermissionsService, getEnabledPermissions(tenantId/userId) | No existe | Por implementar |
-| PermissionsGuard, @RequirePermission('recurso:accion') | RolesGuard + @Roles(RoleName) en controllers | Parcial; migrar a permisos |
-| JWT con permisos o tenantId | JWT con sub, email, role | Parcial; añadir permissions o tenantId |
-| Frontend: nav y rutas por permisos | filterByRole.ts, nav por roles ADMIN/USER | Parcial; extender a permisos |
+| Tenant, Permission, Role, RolePermission, UserRole | Prisma: Tenant, Permission, Role, RolePermission, UserRole; User.tenantId, User.userRoles | Implementado |
+| PermissionsService, getEnabledPermissionsForUser(userId) | PermissionsService.getEnabledPermissionsForUser, userHasAnyPermission | Implementado |
+| PermissionsGuard, @RequirePermission('recurso:accion') | PermissionsGuard + @RequirePermission; AuditController usa audit:read | Implementado |
+| GET /auth/me con permissions | GET /auth/me devuelve user + permissions | Implementado |
+| Frontend: nav por permisos | filterByRole: getNavForRole(..., permissions); config con requiredPermission; AuthProvider permissions | Implementado |
 
-**Archivos relacionados:** `apps/api/src/auth/roles.guard.ts`, `roles.decorator.ts`, `auth.service.ts`; `apps/web/src/shared/navigation/config.ts`, `filterByRole.ts`, `shared/auth/roles.ts`.
+**Archivos relacionados:** `apps/api/prisma/schema.prisma`, `apps/api/src/auth/permissions.service.ts`, `permissions.guard.ts`, `require-permission.decorator.ts`, `auth.service.ts`, `auth.controller.ts`; `apps/api/prisma/seed.ts`; `apps/web/src/features/auth/api.ts`, `types.ts`; `apps/web/src/shared/providers/AuthProvider.tsx`, `shared/navigation/config.ts`, `filterByRole.ts`, `types.ts`, `shared/ui/AppShell.tsx`.
 
 ### 3.2 Estados operativos y alertas (ESTADOS_OPERATIVOS_Y_ALERTAS)
 
 | Entregable del diseño | Componente actual | Estado |
 |------------------------|-------------------|--------|
-| GET /reports/operational-state (indicators + alerts) | GET /reports/dashboard con sales, inventory, cash, quotes | Parcial; sin estructura alerts[] ni acción por estado |
-| Reglas de detección (caja, stock, cotizaciones, ventas anómalas, etc.) | app.service.getStats, reports.getDashboard (lowStock, openSessions, pendingQuotes) | Parcial; faltan CASH_NO_SESSION, QUOTES_EXPIRED, SALES_ANOMALY_*, etc. |
-| Severidad y prioridad por estado | No | Por implementar |
-| actionLabel, actionHref por alerta | No | Por implementar |
+| GET /reports/operational-state (indicators + alerts) | ReportsService.getOperationalState(), GET /reports/operational-state | Implementado |
+| Reglas de detección (caja, stock, cotizaciones, ventas, facturas proveedor) | getOperationalState: CASH_NO_SESSION, CASH_MULTIPLE_OPEN, STOCK_ZERO, STOCK_LOW, QUOTES_EXPIRED, QUOTES_EXPIRING_SOON, SALES_ANOMALY_ZERO, INVOICES_OVERDUE, INVOICES_DUE_SOON | Implementado |
+| Severidad y prioridad por estado | Cada alerta tiene severity y priority; orden por priority | Implementado |
+| actionLabel, actionHref por alerta | Cada alerta tiene actionLabel, actionHref, entityIds | Implementado |
 
-**Archivos relacionados:** `apps/api/src/reports/reports.service.ts`, `app.service.ts`; `apps/web/src/app/(protected)/app/page.tsx`.
+**Archivos relacionados:** `apps/api/src/reports/reports.service.ts`; `apps/web/src/features/reports/api.ts`, `hooks.ts`, `types.ts`; `apps/web/src/app/(protected)/app/page.tsx` (bloque "Alertas operativas").
 
 ### 3.3 Onboarding (ONBOARDING_UX_DISEÑO)
 
 | Entregable del diseño | Componente actual | Estado |
 |------------------------|-------------------|--------|
-| Flujo bienvenida → Paso 1 (caja) → Paso 2 (producto) → Paso 3 (listo) | No existe | Por implementar |
-| Condición “primera vez” (sin caja/productos o flag onboarding) | No | Por implementar |
-| Panel “Tu progreso” / checklist Recomendado en dashboard | No | Por implementar |
-| Mensajes y glosario no técnicos | No centralizado | Por implementar donde aplique |
+| Flujo bienvenida → Paso 1 (caja) → Paso 2 (producto) → Paso 3 (listo) | /onboarding: bienvenida, paso 1 (abrir caja), paso 2 (primer producto), paso 3 (listo) | Implementado |
+| Condición “primera vez” (User.onboardingStatus, sin caja/productos) | GET /onboarding/status; redirección desde dashboard si not_started/in_progress | Implementado |
+| Panel “Tu progreso” / checklist Recomendado en dashboard | Dashboard: panel “Tu progreso” colapsable con checklist, “Ya no mostrar”, enlace a /onboarding | Implementado |
+| Mensajes claros y no técnicos | Textos en onboarding y panel según glosario del diseño | Implementado |
 
-**Archivos relacionados:** Nuevas rutas/páginas en `apps/web`; posible endpoint GET /onboarding/status o flag en GET /auth/me.
+**Archivos relacionados:** `apps/api/src/onboarding/`, `apps/api/prisma/schema.prisma` (User.onboardingStatus, onboardingCompletedAt); `apps/web/src/features/onboarding/`, `apps/web/src/app/(protected)/onboarding/page.tsx`, `app/page.tsx`, `layout.tsx`.
 
 ### 3.4 Auditoría (AUDITORIA_Y_TRAZABILIDAD)
 
 | Entregable del diseño | Componente actual | Estado |
 |------------------------|-------------------|--------|
 | AuditLog con actorId, entity, entityId, action, diff, createdAt | AuditLog en Prisma; AuditService.log, logCreate, logUpdate, logDelete, logAuth | Implementado |
-| Campos ip, userAgent, requestId, severity, category, hash | No en schema ni en servicio | Por implementar |
+| Campos ip, userAgent, requestId, severity, category | Schema + migración 20260131000000; AuditService acepta contexto; AuditContextInterceptor inyecta por request | Implementado |
+| Cadena de integridad (hash) | No | Opcional |
 | Guard de permisos para consulta (solo ADMIN) | AuditController @Roles(ADMIN) | Implementado |
 | Cadena de integridad (hash chain) | No | Opcional |
 | Retención y archivado | No documentado en código | Por definir en operación |
@@ -97,38 +98,40 @@ Qué parte del código o del esquema materializa cada diseño.
 |------------------------|-------------------|--------|
 | Backups automáticos periódicos | BackupsService.scheduledBackup (cron 2 AM), createBackup, cleanupOldBackups | Implementado |
 | Verificación por checksum | verifyBackup(id) | Implementado |
-| Descarga de backup (GET /backups/:id/download) | No | Por implementar |
-| Copia off-site (S3/Blob) | No | Por implementar |
-| Exportación por entidad (CSV/Excel) | No | Por implementar |
-| Reintentos y detección offline en cliente | apiClient sin reintentos; sin navigator.onLine | Por implementar |
-| Cola de escrituras + Idempotency-Key | No | Por implementar |
+| Descarga de backup (GET /backups/:id/download) | BackupsController GET :id/download, BackupsService.getBackupDownload | Implementado |
+| Copia off-site (S3/Blob) | BackupsService.uploadToS3IfConfigured: tras backup exitoso, si BACKUP_S3_BUCKET está definido, sube a S3 (key backups/backup-{id}.dump) | Implementado |
+| Exportación por entidad (CSV) | GET /reports/export?entity=sales|customers, ReportsService.exportAsCsv | Implementado (ventas, clientes) |
+| Reintentos y backoff en cliente | apiClient: requestWithRetry, timeout 30s, 3 intentos, backoff 1s/2s/4s; solo 5xx y errores de red | Implementado |
+| Detección offline en cliente | useOnlineStatus (navigator.onLine + eventos online/offline) | Implementado |
+| Banner "Sin conexión" en UI | AppShell y layout onboarding: banner cuando !isOnline | Implementado |
+| Cola de escrituras + Idempotency-Key | Backend: IdempotencyInterceptor (Redis cache 24h); Frontend: offlineQueueStore, apiClient idempotencyKey, useOfflineQueue, OfflineQueueBell; ventas con encolado en error de red | Implementado |
 
-**Archivos relacionados:** `apps/api/src/backups/backups.service.ts`, `backups.controller.ts`; `apps/web/src/infrastructure/api/client.ts`.
+**Archivos relacionados:** `apps/api/src/backups/backups.service.ts`, `backups.controller.ts`; `apps/web/src/infrastructure/api/client.ts`, `apps/web/src/shared/hooks/useOnlineStatus.ts`, `apps/web/src/shared/ui/AppShell.tsx`, `apps/web/src/app/(protected)/layout.tsx`.
 
 ### 3.6 Arquitectura modular SaaS (ARQUITECTURA_MODULAR_SAAS)
 
 | Entregable del diseño | Componente actual | Estado |
 |------------------------|-------------------|--------|
-| Plan, PlanFeature, Tenant, TenantModule, AddOn, TenantAddOn | No en schema | Por implementar |
-| TenantModulesService, getEnabledModules(tenantId) | No | Por implementar |
-| ModulesGuard, @RequireModule('inventory') | No | Por implementar |
-| GET /auth/me con enabledModules | GET /auth/me devuelve user + token; sin tenant ni modules | Por implementar |
-| Frontend: nav por moduleCode | Nav por roles; sin moduleCode ni enabledModules | Por implementar |
+| Plan, PlanFeature, Tenant, TenantModule, AddOn, TenantAddOn | Prisma: Plan, PlanFeature, Tenant.planId, TenantModule, AddOn, TenantAddOn; migración 20260202100000; seed plan "Todo incluido" | Implementado |
+| TenantModulesService, getEnabledModules(tenantId) | TenantModulesService.getEnabledModules; tenantId null = todos los módulos | Implementado |
+| ModulesGuard, @RequireModule('inventory') | ModulesGuard + @RequireModule; aplicado en Inventory, Suppliers, SupplierInvoices, Purchases, Dian, Reports, Audit, Backups | Implementado |
+| GET /auth/me con enabledModules | GET /auth/me devuelve user, permissions, tenant: { id, name, plan?, enabledModules } | Implementado |
+| Frontend: nav por moduleCode | config con moduleCode por ítem/sección; filterByRole(..., enabledModules); AuthProvider.enabledModules; página /plan-required | Implementado |
 
-**Archivos relacionados:** `apps/api/prisma/schema.prisma` (sin Tenant/Plan); `apps/api/src/auth/auth.service.ts`, auth.controller; `apps/web/src/shared/navigation/config.ts`.
+**Archivos relacionados:** `apps/api/prisma/schema.prisma`, `apps/api/src/auth/tenant-modules.service.ts`, `modules.guard.ts`, `require-module.decorator.ts`, `auth.service.ts`, `auth.controller.ts`; `apps/api/prisma/seed.ts`; `apps/web/src/features/auth/types.ts`, `shared/providers/AuthProvider.tsx`, `shared/navigation/config.ts`, `filterByRole.ts`, `routeModuleMap.ts`, `shared/ui/AppShell.tsx`, `app/(protected)/layout.tsx`, `app/(protected)/plan-required/page.tsx`.
 
 ### 3.7 Indicadores accionables (INDICADORES_Y_ACCIONES)
 
 | Entregable del diseño | Componente actual | Estado |
 |------------------------|-------------------|--------|
-| Productos con pérdida, margen erosionado | No en reportes | Por implementar |
-| Proveedores menos competitivos | No | Por implementar |
-| Patrones por empleado (ventas por usuario) | Sale sin soldBy; AuditLog entity=sale action=create con actorId | Parcial; requiere soldBy o uso de AuditLog |
-| Sin rotación, stock muerto, clientes inactivos, riesgo de caja | reports: inventory (lowStock), dashboard; no sin rotación ni riesgo caja estructurado | Parcial |
-| GET /reports/actionable-indicators (insight, action, actionHref) | No | Por implementar |
-| Sección “Acciones recomendadas” en dashboard | Dashboard con KPIs; sin bloque de acciones recomendadas | Por implementar |
+| Productos con pérdida, margen erosionado | ReportsService.getActionableIndicators: PRODUCTS_LOSS, PRODUCTS_LOW_MARGIN | Implementado |
+| Proveedores menos competitivos | SUPPLIERS_LESS_COMPETITIVE: precio por encima del promedio por producto (PurchaseOrderItem por supplierId/productId) | Implementado |
+| Patrones por empleado (ventas por usuario) | SALES_BY_EMPLOYEE: ventas por Sale.createdByUserId, total y cuenta por usuario | Implementado |
+| Sin rotación, facturas vencidas | PRODUCTS_NO_ROTATION, INVOICES_OVERDUE en getActionableIndicators | Implementado |
+| GET /reports/actionable-indicators (insight, action, actionHref) | GET /reports/actionable-indicators; ReportsService.getActionableIndicators | Implementado |
+| Sección “Acciones recomendadas” en dashboard | Dashboard con bloque que consume actionable-indicators | Implementado |
 
-**Archivos relacionados:** `apps/api/src/reports/reports.service.ts`; `apps/web/src/app/(protected)/app/page.tsx`, `apps/web/src/app/(protected)/reports/page.tsx`.
+**Archivos relacionados:** `apps/api/src/reports/reports.service.ts`, `reports.controller.ts`, `interfaces/actionable-indicators.interface.ts`; `apps/web/src/features/reports/api.ts`, `hooks.ts`, `types.ts`; `apps/web/src/app/(protected)/app/page.tsx`, `apps/web/src/app/(protected)/reports/page.tsx`.
 
 ---
 
@@ -136,13 +139,13 @@ Qué parte del código o del esquema materializa cada diseño.
 
 | Objetivo | Documento | Componente backend | Componente frontend | Estado |
 |----------|-----------|--------------------|---------------------|--------|
-| O1–O3 Roles, permisos, multi-tenant | ROLES_Y_PERMISOS, schema-roles-permisos, ARQUITECTURA_MODULAR_SAAS | Permission, Role, UserRole, Tenant, PermissionsService, Guards | Nav por permisos, enabledModules en contexto | Diseñado; backend parcial (RoleName) |
-| O4–O5 Estados y alertas | ESTADOS_OPERATIVOS_Y_ALERTAS | OperationalStateService o extensión Reports, reglas por estado | Dashboard con alertas y acciones | Parcial (KPIs); sin alerts[] |
-| O6–O7 Onboarding | ONBOARDING_UX_DISEÑO | Flag onboarding, opcional endpoint status | Flujo 3 pasos, panel Tu progreso | Por implementar |
+| O1–O3 Roles, permisos, multi-tenant | ROLES_Y_PERMISOS, schema-roles-permisos, ARQUITECTURA_MODULAR_SAAS | Tenant, Permission, Role, UserRole, PermissionsService, PermissionsGuard, GET /auth/me | Nav por permisos (requiredPermission), AuthProvider.permissions | Parcial (RBAC implementado; Plan/módulos pendiente) |
+| O4–O5 Estados y alertas | ESTADOS_OPERATIVOS_Y_ALERTAS | ReportsService.getOperationalState, reglas por estado | Dashboard con bloque "Alertas operativas" (alerts[]) | Implementado |
+| O6–O7 Onboarding | ONBOARDING_UX_DISEÑO | User.onboardingStatus, GET/PATCH /onboarding/status | Flujo 3 pasos, redirección primera vez, panel Tu progreso | Implementado |
 | O8–O9 Auditoría completa | AUDITORIA_Y_TRAZABILIDAD | AuditLog + ip, userAgent, severity; hash opcional | Consulta auditoría (existente) | Parcial (log básico) |
-| O10–O11 Backup y resiliencia | RESILIENCIA_Y_SINCRONIZACION | BackupsService, GET download, export CSV; cliente: reintentos, cola | Indicador conexión, pendientes | Parcial (backup automático) |
-| O12 Módulos por cliente | ARQUITECTURA_MODULAR_SAAS | Plan, Tenant, TenantModule, ModulesGuard, GET /me con modules | Nav por moduleCode | Por implementar |
-| O13–O14 Indicadores e IA | INDICADORES_Y_ACCIONES | Reports: productos pérdida, proveedores, empleado; actionable-indicators | Acciones recomendadas, reportes por categoría | Parcial (reportes descriptivos) |
+| O10–O11 Backup y resiliencia | RESILIENCIA_Y_SINCRONIZACION | BackupsService, GET download, export CSV, copia S3; apiClient reintentos/backoff/timeout/idempotencyKey; useOnlineStatus; IdempotencyInterceptor | Banner sin conexión; cola offline + UI Pendientes de enviar | Implementado |
+| O12 Módulos por cliente | ARQUITECTURA_MODULAR_SAAS | Plan, TenantModule, TenantModulesService, ModulesGuard, GET /me con tenant + enabledModules | Nav por moduleCode; página plan-required | Implementado |
+| O13–O14 Indicadores e IA | INDICADORES_Y_ACCIONES | Reports: productos pérdida/margen bajo, sin rotación, facturas vencidas, proveedores menos competitivos, ventas por empleado; GET actionable-indicators | Acciones recomendadas en dashboard; reportes por categoría | Implementado |
 
 ---
 

@@ -24,11 +24,13 @@ import { CreateSupplierInvoiceDto } from './dto/create-supplier-invoice.dto';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { UpdateStatusDto } from './dto/update-status.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { RolesGuard } from '../auth/roles.guard';
+import { ModulesGuard } from '../auth/modules.guard';
+import { RequireModule } from '../auth/require-module.decorator';
 import { SupplierInvoiceStatus } from '@prisma/client';
 
 @ApiTags('supplier-invoices')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, ModulesGuard)
+@RequireModule('suppliers')
 @Controller('supplier-invoices')
 export class SupplierInvoicesController {
   constructor(private readonly invoices: SupplierInvoicesService) {}
@@ -51,20 +53,30 @@ export class SupplierInvoicesController {
     required: false,
     description: 'Filtrar por ID de proveedor',
   })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    description: 'Buscar por número de factura o nombre del proveedor',
+  })
   @ApiResponse({
     status: 200,
     description: 'Lista paginada de facturas de proveedores',
   })
   @ApiResponse({ status: 401, description: 'No autenticado' })
   list(
-    @Query() pagination?: PaginationDto & { status?: SupplierInvoiceStatus; supplierId?: string },
+    @Query() pagination?: PaginationDto & { status?: SupplierInvoiceStatus; supplierId?: string; search?: string },
+    @Req() req?: { user?: { tenantId?: string } },
   ) {
-    return this.invoices.listSupplierInvoices({
-      page: pagination?.page,
-      limit: pagination?.limit,
-      status: pagination?.status,
-      supplierId: pagination?.supplierId,
-    });
+    return this.invoices.listSupplierInvoices(
+      {
+        page: pagination?.page,
+        limit: pagination?.limit,
+        status: pagination?.status,
+        supplierId: pagination?.supplierId,
+        search: pagination?.search,
+      },
+      req?.user?.tenantId,
+    );
   }
 
   @Get('pending')
@@ -79,8 +91,8 @@ export class SupplierInvoicesController {
     description: 'Lista de facturas pendientes con información de días hasta vencimiento',
   })
   @ApiResponse({ status: 401, description: 'No autenticado' })
-  getPendingPayments() {
-    return this.invoices.getPendingPayments();
+  getPendingPayments(@Req() req?: { user?: { tenantId?: string } }) {
+    return this.invoices.getPendingPayments(req?.user?.tenantId);
   }
 
   @Get(':id')
@@ -109,9 +121,9 @@ export class SupplierInvoicesController {
   @ApiResponse({ status: 401, description: 'No autenticado' })
   create(
     @Body() dto: CreateSupplierInvoiceDto,
-    @Req() req: { user?: { sub?: string } },
+    @Req() req: { user?: { sub?: string; tenantId?: string } },
   ) {
-    return this.invoices.createSupplierInvoice(dto, req.user?.sub);
+    return this.invoices.createSupplierInvoice(dto, req.user?.sub, req.user?.tenantId);
   }
 
   @Patch(':id/status')
@@ -127,9 +139,9 @@ export class SupplierInvoicesController {
   updateStatus(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Body() dto: UpdateStatusDto,
-    @Req() req: { user?: { sub?: string } },
+    @Req() req: { user?: { sub?: string; tenantId?: string } },
   ) {
-    return this.invoices.updateStatus(id, dto, req.user?.sub);
+    return this.invoices.updateStatus(id, dto, req.user?.sub, req.user?.tenantId);
   }
 
   @Post(':id/payments')
@@ -147,8 +159,8 @@ export class SupplierInvoicesController {
   createPayment(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Body() dto: CreatePaymentDto,
-    @Req() req: { user?: { sub?: string } },
+    @Req() req: { user?: { sub?: string; tenantId?: string } },
   ) {
-    return this.invoices.createPayment(id, dto, req.user?.sub);
+    return this.invoices.createPayment(id, dto, req.user?.sub, req.user?.tenantId);
   }
 }

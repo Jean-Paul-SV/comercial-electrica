@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
   Logger,
@@ -27,7 +28,9 @@ export class PurchasesService {
   async createPurchaseOrder(
     dto: CreatePurchaseOrderDto,
     createdByUserId?: string,
+    tenantId?: string,
   ) {
+    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
     if (!dto.items || dto.items.length === 0) {
       throw new BadRequestException('Debe incluir items.');
     }
@@ -53,54 +56,58 @@ export class PurchasesService {
 
     return this.prisma.$transaction(
       async (tx) => {
-        // Validar que los productos existan
+        // Validar que los productos existan y pertenezcan al tenant
         const products = await tx.product.findMany({
-          where: { id: { in: dto.items.map((i) => i.productId) } },
+          where: { id: { in: dto.items.map((i) => i.productId) }, tenantId },
         });
 
         if (products.length !== dto.items.length) {
           throw new BadRequestException('Uno o más productos no existen.');
         }
 
-        // Calcular totales
+        // Calcular totales (redondeados a 2 decimales para Decimal de Prisma)
+        const round2 = (n: number) => Math.round(n * 100) / 100;
         let subtotal = 0;
         let taxTotal = 0;
         const orderItems = dto.items.map((i) => {
           const p = products.find((pp) => pp.id === i.productId)!;
-          const unitCost = i.unitCost;
+          const unitCost = round2(Number(i.unitCost));
           const lineSubtotal = unitCost * i.qty;
-          const lineTax = (lineSubtotal * Number(p.taxRate ?? 0)) / 100;
-          const lineTotal = lineSubtotal + lineTax;
+          const lineTax = round2((lineSubtotal * Number(p.taxRate ?? 0)) / 100);
+          const lineTotal = round2(lineSubtotal + lineTax);
           subtotal += lineSubtotal;
           taxTotal += lineTax;
           return {
             productId: p.id,
             qty: i.qty,
-            unitCost,
-            taxRate: Number(p.taxRate ?? 0),
-            lineTotal,
+            unitCost: new Prisma.Decimal(unitCost),
+            taxRate: new Prisma.Decimal(round2(Number(p.taxRate ?? 0))),
+            lineTotal: new Prisma.Decimal(lineTotal),
             receivedQty: 0,
           };
         });
 
-        const grandTotal = subtotal + taxTotal;
+        subtotal = round2(subtotal);
+        taxTotal = round2(taxTotal);
+        const grandTotal = round2(subtotal + taxTotal);
 
-        // Generar número de pedido único
-        const orderNumber = await this.generateOrderNumber(tx);
+        // Generar número de pedido único por tenant
+        const orderNumber = await this.generateOrderNumber(tx, tenantId);
 
-        // Crear pedido
+        // Crear pedido (Decimal explícito para evitar PrismaClientValidationError)
         const purchaseOrder = await tx.purchaseOrder.create({
           data: {
+            tenantId,
             supplierId: dto.supplierId,
             orderNumber,
             status: PurchaseOrderStatus.DRAFT,
             orderDate: new Date(),
             expectedDate: dto.expectedDate ? new Date(dto.expectedDate) : null,
             notes: dto.notes,
-            subtotal,
-            taxTotal,
-            discountTotal: 0,
-            grandTotal,
+            subtotal: new Prisma.Decimal(subtotal),
+            taxTotal: new Prisma.Decimal(taxTotal),
+            discountTotal: new Prisma.Decimal(0),
+            grandTotal: new Prisma.Decimal(grandTotal),
             createdBy: createdByUserId,
             items: {
               create: orderItems,
@@ -143,13 +150,18 @@ export class PurchasesService {
     });
   }
 
-  async listPurchaseOrders(pagination?: { page?: number; limit?: number }) {
+  async listPurchaseOrders(
+    pagination?: { page?: number; limit?: number },
+    tenantId?: string | null,
+  ) {
+    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
     const page = pagination?.page ?? 1;
     const limit = pagination?.limit ?? 20;
     const skip = (page - 1) * limit;
 
     const [data, total] = await Promise.all([
       this.prisma.purchaseOrder.findMany({
+        where: { tenantId },
         orderBy: { orderDate: 'desc' },
         include: {
           supplier: true,
@@ -158,22 +170,23 @@ export class PurchasesService {
         skip,
         take: limit,
       }),
-      this.prisma.purchaseOrder.count(),
+      this.prisma.purchaseOrder.count({ where: { tenantId } }),
     ]);
 
     return createPaginatedResponse(data, total, page, limit);
   }
 
-  async getPurchaseOrder(id: string) {
-    const cacheKey = this.cache.buildKey('purchaseOrder', id);
+  async getPurchaseOrder(id: string, tenantId?: string | null) {
+    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
+    const cacheKey = this.cache.buildKey('purchaseOrder', id, tenantId);
     const cached = await this.cache.get(cacheKey);
     if (cached) {
       this.logger.debug(`PurchaseOrder ${id} retrieved from cache`);
       return cached;
     }
 
-    const order = await this.prisma.purchaseOrder.findUnique({
-      where: { id },
+    const order = await this.prisma.purchaseOrder.findFirst({
+      where: { id, tenantId },
       include: {
         supplier: true,
         items: { include: { product: true } },
@@ -193,9 +206,11 @@ export class PurchasesService {
     id: string,
     dto: ReceivePurchaseOrderDto,
     receivedByUserId?: string,
+    tenantId?: string | null,
   ) {
-    const purchaseOrder = await this.prisma.purchaseOrder.findUnique({
-      where: { id },
+    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
+    const purchaseOrder = await this.prisma.purchaseOrder.findFirst({
+      where: { id, tenantId },
       include: {
         items: { include: { product: true } },
         supplier: true,
@@ -302,6 +317,7 @@ export class PurchasesService {
         if (inventoryItems.length > 0) {
           const movement = await tx.inventoryMovement.create({
             data: {
+              tenantId: purchaseOrder.tenantId,
               type: InventoryMovementType.IN,
               reason: `Recepción de pedido ${purchaseOrder.orderNumber}`,
               supplierId: purchaseOrder.supplierId,
@@ -362,14 +378,16 @@ export class PurchasesService {
 
   private async generateOrderNumber(
     tx: Prisma.TransactionClient,
+    tenantId: string,
   ): Promise<string> {
     const today = new Date();
     const year = today.getFullYear();
     const month = String(today.getMonth() + 1).padStart(2, '0');
 
-    // Buscar el último número del mes
+    // Buscar el último número del mes para este tenant
     const lastOrder = await tx.purchaseOrder.findFirst({
       where: {
+        tenantId,
         orderNumber: {
           startsWith: `PO-${year}${month}`,
         },

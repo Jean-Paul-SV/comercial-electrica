@@ -29,8 +29,9 @@ import {
 } from '@shared/components/ui/dialog';
 import { Skeleton } from '@shared/components/ui/skeleton';
 import { Pagination } from '@shared/components/Pagination';
+import { EmptyState } from '@shared/components/EmptyState';
 import { formatMoney, formatDateTime } from '@shared/utils/format';
-import { RotateCcw, Plus } from 'lucide-react';
+import { RotateCcw, Plus, Search } from 'lucide-react';
 import { useReturnsList, useCreateReturn } from '@features/returns/hooks';
 import { useSalesList } from '@features/sales/hooks';
 
@@ -55,6 +56,7 @@ export default function ReturnsPage() {
   const [page, setPage] = useState(1);
   const [openNew, setOpenNew] = useState(false);
   const [saleId, setSaleId] = useState('');
+  const [saleSearch, setSaleSearch] = useState('');
   const [reason, setReason] = useState('');
   const [returnQty, setReturnQty] = useState<Record<string, number>>({});
 
@@ -71,6 +73,22 @@ export default function ReturnsPage() {
     () => (saleId ? sales.find((s) => s.id === saleId) : null),
     [saleId, sales]
   );
+
+  const filteredSales = useMemo(() => {
+    if (!saleSearch.trim()) return sales;
+    const q = saleSearch.trim().toLowerCase();
+    const matches = sales.filter(
+      (s) =>
+        (s.customer?.name ?? '').toLowerCase().includes(q) ||
+        formatDateTime(s.soldAt).toLowerCase().includes(q) ||
+        formatMoney(s.grandTotal).toLowerCase().includes(q)
+    );
+    const selected = saleId ? sales.find((s) => s.id === saleId) : null;
+    if (selected && !matches.some((s) => s.id === selected.id)) {
+      return [selected, ...matches];
+    }
+    return matches;
+  }, [sales, saleSearch, saleId]);
 
   useEffect(() => {
     if (openNew) salesQuery.refetch();
@@ -90,6 +108,7 @@ export default function ReturnsPage() {
 
   const resetForm = () => {
     setSaleId('');
+    setSaleSearch('');
     setReason('');
     setReturnQty({});
   };
@@ -137,10 +156,13 @@ export default function ReturnsPage() {
     Boolean(saleId && selectedSale) &&
     selectedSale?.items?.some((it) => (returnQty[it.productId] ?? 0) > 0);
 
+  const totalReturns = meta?.total ?? 0;
+  const hasData = rows.length > 0;
+
   return (
     <div className="space-y-6 sm:space-y-8">
       <div className="flex flex-col gap-1">
-        <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">
+        <h1 className="text-xl font-semibold tracking-tight sm:text-2xl text-foreground">
           Devoluciones
         </h1>
         <p className="text-sm text-muted-foreground">
@@ -148,49 +170,49 @@ export default function ReturnsPage() {
         </p>
       </div>
 
-      <Card className="border-0 shadow-sm">
-        <CardHeader className="pb-4">
+      <Card className="border border-border/80 shadow-sm rounded-xl overflow-hidden">
+        <CardHeader className="pb-4 border-b border-border/60">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <CardTitle className="text-lg font-medium flex items-center gap-2">
-                <RotateCcw className="h-5 w-5 shrink-0" />
+              <CardTitle className="text-lg font-medium flex items-center gap-2 text-foreground">
+                <RotateCcw className="h-5 w-5 shrink-0 text-primary" aria-hidden />
                 Listado
               </CardTitle>
               <CardDescription>
-                Devoluciones registradas
+                {hasData
+                  ? `${totalReturns} devolución${totalReturns !== 1 ? 'es' : ''} registrada${totalReturns !== 1 ? 's' : ''}`
+                  : 'Devoluciones registradas'}
               </CardDescription>
             </div>
             <Button
               size="sm"
               onClick={() => setOpenNew(true)}
-              className="gap-2 w-full sm:w-fit"
+              className="gap-2 w-full sm:w-fit shrink-0"
             >
               <Plus className="h-4 w-4" />
               Nueva devolución
             </Button>
           </div>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <Pagination meta={meta} onPageChange={setPage} label="Página" />
-
+        <CardContent className="pt-4 space-y-4">
           {query.isLoading && (
-            <div className="rounded-lg border border-border overflow-hidden">
+            <div className="rounded-lg border border-border/80 overflow-hidden">
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>Venta / Fecha</TableHead>
-                    <TableHead>Cliente</TableHead>
-                    <TableHead className="text-right">Total</TableHead>
-                    <TableHead>Motivo</TableHead>
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="font-medium text-muted-foreground">Venta / Fecha</TableHead>
+                    <TableHead className="font-medium text-muted-foreground">Cliente</TableHead>
+                    <TableHead className="text-right font-medium text-muted-foreground">Total</TableHead>
+                    <TableHead className="font-medium text-muted-foreground">Motivo</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {Array.from({ length: 5 }).map((_, i) => (
                     <TableRow key={i}>
-                      <TableCell><Skeleton className="h-5 w-24" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-28" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-20 ml-auto" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-32" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-24 rounded" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-28 rounded" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-20 ml-auto rounded" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-32 rounded" /></TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -199,52 +221,81 @@ export default function ReturnsPage() {
           )}
 
           {query.isError && (
-            <p className="text-sm text-destructive py-4">
-              {(query.error as { message?: string })?.message ?? 'Error al cargar devoluciones'}
-            </p>
+            <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3">
+              <p className="text-sm text-destructive">
+                {(query.error as { message?: string })?.message ?? 'Error al cargar devoluciones'}
+              </p>
+            </div>
           )}
 
-          {!query.isLoading && (
-            <div className="rounded-lg border border-border overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Venta / Fecha</TableHead>
-                    <TableHead>Cliente</TableHead>
-                    <TableHead className="text-right">Total</TableHead>
-                    <TableHead>Motivo</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {rows.map((r) => (
-                    <TableRow key={r.id}>
-                      <TableCell className="font-medium">
-                        {formatDateTime(r.returnedAt)}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {r.sale?.customer?.name ?? '—'}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums font-medium">
-                        {formatMoney(r.grandTotal)}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-sm max-w-[200px] truncate">
-                        {r.reason ?? '—'}
-                      </TableCell>
+          {!query.isLoading && !query.isError && (
+            <>
+              <div className="rounded-lg border border-border/80 overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="hover:bg-transparent border-b border-border/80">
+                      <TableHead className="font-medium text-muted-foreground">Venta / Fecha</TableHead>
+                      <TableHead className="font-medium text-muted-foreground">Cliente</TableHead>
+                      <TableHead className="text-right font-medium text-muted-foreground">Total</TableHead>
+                      <TableHead className="font-medium text-muted-foreground">Motivo</TableHead>
                     </TableRow>
-                  ))}
-                  {rows.length === 0 && (
-                    <TableRow>
-                      <TableCell
-                        colSpan={4}
-                        className="h-24 text-center text-muted-foreground"
+                  </TableHeader>
+                  <TableBody>
+                    {rows.map((r) => (
+                      <TableRow
+                        key={r.id}
+                        className="transition-colors hover:bg-muted/40"
                       >
-                        No hay devoluciones.
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </div>
+                        <TableCell className="font-medium text-foreground">
+                          {formatDateTime(r.returnedAt)}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {r.sale?.customer?.name ?? '—'}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums font-medium text-foreground">
+                          {formatMoney(r.grandTotal)}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-sm max-w-[200px] truncate">
+                          {r.reason ?? '—'}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {rows.length === 0 && (
+                      <TableRow className="hover:bg-transparent">
+                        <TableCell colSpan={4} className="p-0 align-top">
+                          <EmptyState
+                            message="No hay devoluciones"
+                            description="Registra una devolución desde una venta existente para llevar el control."
+                            icon={RotateCcw}
+                            action={
+                              <Button
+                                size="sm"
+                                onClick={() => setOpenNew(true)}
+                                className="gap-2"
+                              >
+                                <Plus className="h-4 w-4" />
+                                Nueva devolución
+                              </Button>
+                            }
+                            className="py-16"
+                          />
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+              {meta && (meta.total > 0 || meta.totalPages > 1) && (
+                <div className="flex items-center justify-between gap-4 flex-wrap">
+                  <p className="text-xs text-muted-foreground">
+                    {meta.total > 0
+                      ? `Mostrando ${(meta.page - 1) * meta.limit + 1}–${Math.min(meta.page * meta.limit, meta.total)} de ${meta.total}`
+                      : '0 resultados'}
+                  </p>
+                  <Pagination meta={meta} onPageChange={setPage} label="Página" />
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>
@@ -256,28 +307,60 @@ export default function ReturnsPage() {
               <RotateCcw className="h-4 w-4" />
               Nueva devolución
             </DialogTitle>
+            <p className="text-sm text-muted-foreground pt-1">
+              Elige la venta a la que corresponde la devolución, indica qué productos y cantidades se devuelven y, si quieres, un motivo.
+            </p>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label>Venta</Label>
+              <Label htmlFor="return-sale">Venta</Label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                <Input
+                  type="text"
+                  placeholder="Buscar por cliente, fecha o total..."
+                  value={saleSearch ?? ''}
+                  onChange={(e) => setSaleSearch(e.target.value)}
+                  autoComplete="off"
+                  className="pl-9 rounded-lg mb-2"
+                />
+              </div>
               <select
+                id="return-sale"
                 value={saleId}
                 onChange={(e) => setSaleId(e.target.value)}
                 className={selectClassName}
               >
-                <option value="">Selecciona una venta</option>
-                {sales.map((s) => (
+                <option value="">Selecciona una venta (fecha, cliente, total)</option>
+                {filteredSales.map((s) => (
                   <option key={s.id} value={s.id}>
                     {formatDateTime(s.soldAt)} — {s.customer?.name ?? 'Sin cliente'} — {formatMoney(s.grandTotal)}
                   </option>
                 ))}
               </select>
+              {filteredSales.length === 0 && sales.length > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  No hay ventas que coincidan con la búsqueda. Prueba con otro texto.
+                </p>
+              )}
+              <p className="text-xs text-muted-foreground">
+                Filtra arriba por cliente, fecha o total. Luego indica las cantidades a devolver por producto.
+              </p>
+              {selectedSale && (
+                <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-sm">
+                  <span className="font-medium">Venta seleccionada:</span>{' '}
+                  {selectedSale.customer?.name ?? 'Sin cliente'} · {formatDateTime(selectedSale.soldAt)} · Total {formatMoney(selectedSale.grandTotal)}
+                </div>
+              )}
             </div>
 
             {selectedSale?.items && selectedSale.items.length > 0 && (
               <>
                 <div className="space-y-2">
                   <Label>Productos a devolver</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Indica cuántas unidades de cada producto se devuelven. No puede superar la cantidad vendida.
+                  </p>
                   <div className="rounded-lg border border-border divide-y divide-border max-h-48 overflow-auto">
                     <div className="grid grid-cols-[1fr_80px_80px] gap-2 px-2 py-1.5 text-xs font-medium text-muted-foreground border-b border-border">
                       <span>Producto</span>
@@ -304,13 +387,17 @@ export default function ReturnsPage() {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label>Motivo (opcional)</Label>
+                  <Label htmlFor="return-reason">Motivo (opcional)</Label>
                   <Input
+                    id="return-reason"
                     value={reason}
                     onChange={(e) => setReason(e.target.value)}
                     placeholder="Ej. Producto defectuoso, cliente no conforme"
                     className="rounded-lg"
                   />
+                  <p className="text-xs text-muted-foreground">
+                    Sirve para trazabilidad. Ej.: producto defectuoso, cambio de opinión del cliente.
+                  </p>
                 </div>
               </>
             )}

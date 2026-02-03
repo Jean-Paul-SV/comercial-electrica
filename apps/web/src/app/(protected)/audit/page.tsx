@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import {
   Card,
   CardContent,
@@ -8,6 +8,9 @@ import {
   CardHeader,
   CardTitle,
 } from '@shared/components/ui/card';
+import { Button } from '@shared/components/ui/button';
+import { Input } from '@shared/components/ui/input';
+import { Label } from '@shared/components/ui/label';
 import {
   Table,
   TableBody,
@@ -22,21 +25,32 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@shared/components/ui/dialog';
-import { Button } from '@shared/components/ui/button';
 import { Skeleton } from '@shared/components/ui/skeleton';
 import { Pagination } from '@shared/components/Pagination';
 import { formatDateTime } from '@shared/utils/format';
-import { ClipboardList, Eye } from 'lucide-react';
-import { useAuditLogsList } from '@features/audit/hooks';
+import { ClipboardList, Eye, ShieldCheck } from 'lucide-react';
+import { useAuditLogsList, useVerifyAuditChain } from '@features/audit/hooks';
 import type { AuditLog } from '@features/audit/types';
+
+const SEARCH_DEBOUNCE_MS = 300;
 
 const ENTITY_LABELS: Record<string, string> = {
   expense: 'Gasto',
   sale: 'Venta',
+  quote: 'Cotización',
+  saleReturn: 'Devolución',
   customer: 'Cliente',
   product: 'Producto',
+  category: 'Categoría',
   supplier: 'Proveedor',
+  supplierInvoice: 'Factura proveedor',
+  supplierPayment: 'Pago proveedor',
+  inventoryMovement: 'Movimiento inventario',
+  cashSession: 'Sesión caja',
+  cashMovement: 'Movimiento caja',
   auth: 'Auth',
+  dianDocument: 'Documento DIAN',
+  backupRun: 'Backup',
 };
 
 const ACTION_LABELS: Record<string, string> = {
@@ -44,9 +58,16 @@ const ACTION_LABELS: Record<string, string> = {
   update: 'Actualización',
   delete: 'Eliminación',
   access: 'Acceso',
+  login: 'Login',
+  logout: 'Logout',
+  login_failed: 'Login fallido',
+  convert: 'Convertir',
+  update_status: 'Cambio estado',
+  expire_batch: 'Expiración (cron)',
+  status_update: 'Cambio estado',
 };
 
-function renderDetails(log: AuditLog): React.ReactNode {
+function renderDetailsSummary(log: AuditLog): string {
   const diff = log.diff;
   if (!diff || typeof diff !== 'object') return '—';
 
@@ -66,20 +87,106 @@ function renderDetails(log: AuditLog): React.ReactNode {
   return parts.join(' · ');
 }
 
+/** Formatea el diff para mostrar en el modal: claves conocidas en texto y JSON completo legible. */
+function formatDiffForDisplay(diff: Record<string, unknown>): { summaryLines: string[]; hasMore: boolean } {
+  const summaryLines: string[] = [];
+  if (typeof diff.deletionReason === 'string' && diff.deletionReason.trim()) {
+    summaryLines.push(`Justificación: ${diff.deletionReason}`);
+  }
+  if (typeof diff.description === 'string') {
+    summaryLines.push(`Descripción: ${diff.description}`);
+  }
+  if (typeof diff.amount === 'number' || typeof diff.amount === 'string') {
+    summaryLines.push(`Monto: ${Number(diff.amount).toLocaleString('es-CO')}`);
+  }
+  const knownKeys = new Set(['deletionReason', 'description', 'amount']);
+  const hasOtherKeys = Object.keys(diff).some((k) => !knownKeys.has(k));
+  return { summaryLines, hasMore: hasOtherKeys };
+}
+
+const ENTITY_OPTIONS = Object.entries(ENTITY_LABELS).map(([value, label]) => ({ value, label }));
+const ACTION_OPTIONS = Object.entries(ACTION_LABELS).map(([value, label]) => ({ value, label }));
+
 export default function AuditPage() {
   const [page, setPage] = useState(1);
   const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
+  const [searchInput, setSearchInput] = useState('');
+  const [search, setSearch] = useState('');
+  const [entityFilter, setEntityFilter] = useState('');
+  const [actionFilter, setActionFilter] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [verifyResult, setVerifyResult] = useState<{
+    valid: boolean;
+    totalChecked: number;
+    totalWithHash: number;
+    brokenAt?: string;
+    errors: string[];
+  } | null>(null);
+
   const limit = 20;
-  const params = useMemo(() => ({ page, limit }), [page, limit]);
+  const verifyChain = useVerifyAuditChain();
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setSearch(searchInput.trim());
+      setPage(1);
+    }, SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(t);
+  }, [searchInput]);
+
+  const params = useMemo(
+    () => ({
+      page,
+      limit,
+      search: search || undefined,
+      entity: entityFilter || undefined,
+      action: actionFilter || undefined,
+      startDate: startDate ? `${startDate}T00:00:00.000Z` : undefined,
+      endDate: endDate ? `${endDate}T23:59:59.999Z` : undefined,
+    }),
+    [page, limit, search, entityFilter, actionFilter, startDate, endDate],
+  );
   const query = useAuditLogsList(params);
 
   const rows = useMemo(() => query.data?.data ?? [], [query.data]);
   const meta = query.data?.meta;
 
+  const hasActiveFilters = Boolean(
+    searchInput.trim() || entityFilter || actionFilter || startDate || endDate,
+  );
+
+  const clearFilters = () => {
+    setSearchInput('');
+    setSearch('');
+    setEntityFilter('');
+    setActionFilter('');
+    setStartDate('');
+    setEndDate('');
+    setPage(1);
+  };
+
+  const runVerifyChain = () => {
+    setVerifyResult(null);
+    verifyChain.mutate(undefined, {
+      onSuccess: (data) => setVerifyResult(data),
+      onError: () =>
+        setVerifyResult({
+          valid: false,
+          totalChecked: 0,
+          totalWithHash: 0,
+          errors: ['Error al conectar con el servidor.'],
+        }),
+    });
+  };
+
+  const totalLogs = meta?.total ?? 0;
+  const hasData = rows.length > 0;
+
   return (
     <div className="space-y-6 sm:space-y-8">
       <div className="flex flex-col gap-1">
-        <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">
+        <h1 className="text-xl font-semibold tracking-tight sm:text-2xl text-foreground">
           Auditoría
         </h1>
         <p className="text-sm text-muted-foreground">
@@ -87,108 +194,213 @@ export default function AuditPage() {
         </p>
       </div>
 
-      <Card className="border-0 shadow-sm">
-        <CardHeader className="pb-4">
-          <CardTitle className="text-lg font-medium flex items-center gap-2">
-            <ClipboardList className="h-5 w-5 shrink-0" />
-            Registro de auditoría
-          </CardTitle>
-          <CardDescription>
-            Listado de logs (creaciones, actualizaciones, eliminaciones). Solo visible para ADMIN.
-          </CardDescription>
+      <Card className="border border-border/80 shadow-sm rounded-xl overflow-hidden">
+        <CardHeader className="pb-4 border-b border-border/60">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <CardTitle className="text-lg font-medium flex items-center gap-2 text-foreground">
+                <ClipboardList className="h-5 w-5 shrink-0 text-primary" aria-hidden />
+                Registro de auditoría
+              </CardTitle>
+              <CardDescription>
+                {hasData
+                  ? `${totalLogs} registro${totalLogs !== 1 ? 's' : ''}`
+                  : 'Listado de logs (creaciones, actualizaciones, eliminaciones). Cadena de integridad para inmutabilidad.'}
+              </CardDescription>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="shrink-0 gap-2"
+              onClick={runVerifyChain}
+              disabled={verifyChain.isPending}
+              aria-label="Verificar cadena de integridad"
+            >
+              <ShieldCheck className="h-4 w-4" />
+              {verifyChain.isPending ? 'Verificando…' : 'Verificar cadena'}
+            </Button>
+          </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-4">
           {query.isLoading ? (
-            <Skeleton className="h-64 w-full rounded-lg" />
-          ) : query.isError ? (
-            <p className="text-sm text-destructive">
-              No se pudo cargar el registro. Verifica que tengas rol ADMIN.
-            </p>
-          ) : (
-            <>
+            <div className="rounded-lg border border-border/80 overflow-hidden">
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>Fecha</TableHead>
-                    <TableHead>Entidad</TableHead>
-                    <TableHead>Acción</TableHead>
-                    <TableHead>Usuario</TableHead>
-                    <TableHead className="max-w-[280px]">Detalles</TableHead>
-                    <TableHead className="w-[100px] text-right">Acciones</TableHead>
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="font-medium text-muted-foreground">Fecha</TableHead>
+                    <TableHead className="font-medium text-muted-foreground">Entidad</TableHead>
+                    <TableHead className="font-medium text-muted-foreground">Acción</TableHead>
+                    <TableHead className="font-medium text-muted-foreground">Usuario</TableHead>
+                    <TableHead className="font-medium text-muted-foreground">Detalles</TableHead>
+                    <TableHead className="w-[100px] text-right font-medium text-muted-foreground">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {rows.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                        No hay registros de auditoría.
-                      </TableCell>
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <TableRow key={i}>
+                      <TableCell><Skeleton className="h-5 w-32 rounded" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-24 rounded" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-20 rounded" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-36 rounded" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-48 rounded" /></TableCell>
+                      <TableCell><Skeleton className="h-8 w-24 ml-auto rounded" /></TableCell>
                     </TableRow>
-                  ) : (
-                    rows.map((log) => (
-                      <TableRow key={log.id}>
-                        <TableCell className="whitespace-nowrap text-muted-foreground">
-                          {formatDateTime(log.createdAt)}
-                        </TableCell>
-                        <TableCell>
-                          {ENTITY_LABELS[log.entity] ?? log.entity}
-                        </TableCell>
-                        <TableCell>
-                          {ACTION_LABELS[log.action] ?? log.action}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {log.actor?.email ?? '—'}
-                        </TableCell>
-                        <TableCell className="text-sm max-w-[280px] truncate" title={String(renderDetails(log))}>
-                          {renderDetails(log)}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 gap-1"
-                            onClick={() => setSelectedLog(log)}
-                            aria-label="Ver detalles"
-                          >
-                            <Eye className="h-4 w-4" />
-                            Ver detalles
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
+                  ))}
                 </TableBody>
               </Table>
-              <Pagination meta={meta} onPageChange={setPage} label="Página" />
+            </div>
+          ) : query.isError ? (
+            <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3">
+              <p className="text-sm text-destructive">
+                No se pudo cargar el registro. Verifica que tengas rol ADMIN.
+              </p>
+            </div>
+          ) : (
+            <>
+              {verifyResult && (
+                <div
+                  className={`mb-4 rounded-lg border p-4 text-sm ${
+                    verifyResult.valid
+                      ? 'border-success/40 bg-success/10'
+                      : 'border-destructive/30 bg-destructive/5'
+                  }`}
+                >
+                  <p className="font-medium flex items-center gap-2">
+                    <ShieldCheck className={`h-4 w-4 shrink-0 ${verifyResult.valid ? 'text-success' : 'text-destructive'}`} />
+                    {verifyResult.valid
+                      ? 'Cadena de integridad correcta'
+                      : 'Cadena de integridad alterada'}
+                  </p>
+                  <p className="mt-1 text-muted-foreground">
+                    Revisados {verifyResult.totalChecked} registros, {verifyResult.totalWithHash} con hash.
+                    {verifyResult.brokenAt && (
+                      <span className="block mt-1">Primera inconsistencia en registro: {verifyResult.brokenAt}</span>
+                    )}
+                  </p>
+                  {verifyResult.errors.length > 0 && (
+                    <ul className="mt-2 list-disc list-inside text-destructive">
+                      {verifyResult.errors.map((e, i) => (
+                        <li key={i}>{e}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+              <div className="rounded-lg border border-border/80 overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="hover:bg-transparent border-b border-border/80">
+                      <TableHead className="font-medium text-muted-foreground">Fecha</TableHead>
+                      <TableHead className="font-medium text-muted-foreground">Entidad</TableHead>
+                      <TableHead className="font-medium text-muted-foreground">Acción</TableHead>
+                      <TableHead className="font-medium text-muted-foreground">Usuario</TableHead>
+                      <TableHead className="min-w-[200px] max-w-[360px] font-medium text-muted-foreground">Detalles</TableHead>
+                      <TableHead className="w-[120px] text-right font-medium text-muted-foreground">Acciones</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {rows.length === 0 ? (
+                      <TableRow className="hover:bg-transparent">
+                        <TableCell colSpan={6} className="text-center text-muted-foreground py-12">
+                          No hay registros de auditoría.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      rows.map((log) => (
+                        <TableRow key={log.id} className="transition-colors hover:bg-muted/40">
+                          <TableCell className="whitespace-nowrap text-sm text-foreground">
+                            {formatDateTime(log.createdAt)}
+                          </TableCell>
+                          <TableCell className="text-foreground">
+                            {ENTITY_LABELS[log.entity] ?? log.entity}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {ACTION_LABELS[log.action] ?? log.action}
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {log.actor?.email ?? '—'}
+                          </TableCell>
+                          <TableCell className="text-sm min-w-[200px] max-w-[360px] align-top">
+                            <span
+                              className="line-clamp-2 text-muted-foreground break-words"
+                              title={String(renderDetailsSummary(log))}
+                            >
+                              {renderDetailsSummary(log)}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-right align-top">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 gap-1.5 text-muted-foreground hover:text-foreground"
+                              onClick={() => setSelectedLog(log)}
+                              aria-label="Ver detalles completos"
+                            >
+                              <Eye className="h-4 w-4 shrink-0" />
+                              Ver detalles
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+              {meta && (meta.total > 0 || meta.totalPages > 1) && (
+                <div className="flex items-center justify-between gap-4 flex-wrap mt-4">
+                  <p className="text-xs text-muted-foreground">
+                    {meta.total > 0
+                      ? `Mostrando ${(meta.page - 1) * meta.limit + 1}–${Math.min(meta.page * meta.limit, meta.total)} de ${meta.total}`
+                      : '0 resultados'}
+                  </p>
+                  <Pagination meta={meta} onPageChange={setPage} label="Página" />
+                </div>
+              )}
 
               <Dialog open={!!selectedLog} onOpenChange={(open) => !open && setSelectedLog(null)}>
-                <DialogContent showClose className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
+                <DialogContent showClose className="sm:max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
                   <DialogHeader>
                     <DialogTitle>Detalles del registro</DialogTitle>
                   </DialogHeader>
                   {selectedLog && (
-                    <div className="space-y-4 text-sm">
-                      <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2">
-                        <dt className="text-muted-foreground">Fecha</dt>
-                        <dd>{formatDateTime(selectedLog.createdAt)}</dd>
-                        <dt className="text-muted-foreground">Entidad</dt>
-                        <dd>{ENTITY_LABELS[selectedLog.entity] ?? selectedLog.entity}</dd>
-                        <dt className="text-muted-foreground">ID entidad</dt>
-                        <dd className="font-mono text-xs break-all">{selectedLog.entityId}</dd>
-                        <dt className="text-muted-foreground">Acción</dt>
-                        <dd>{ACTION_LABELS[selectedLog.action] ?? selectedLog.action}</dd>
-                        <dt className="text-muted-foreground">Usuario</dt>
-                        <dd>{selectedLog.actor?.email ?? '—'}</dd>
+                    <div className="space-y-4 text-sm overflow-y-auto flex-1 min-h-0 pr-1">
+                      <dl className="grid grid-cols-[100px_1fr] gap-x-4 gap-y-2.5">
+                        <dt className="text-muted-foreground font-medium">Fecha</dt>
+                        <dd className="text-foreground">{formatDateTime(selectedLog.createdAt)}</dd>
+                        <dt className="text-muted-foreground font-medium">Entidad</dt>
+                        <dd className="text-foreground">{ENTITY_LABELS[selectedLog.entity] ?? selectedLog.entity}</dd>
+                        <dt className="text-muted-foreground font-medium">ID entidad</dt>
+                        <dd className="font-mono text-xs break-all text-foreground">{selectedLog.entityId}</dd>
+                        <dt className="text-muted-foreground font-medium">Acción</dt>
+                        <dd className="text-foreground">{ACTION_LABELS[selectedLog.action] ?? selectedLog.action}</dd>
+                        <dt className="text-muted-foreground font-medium">Usuario</dt>
+                        <dd className="text-foreground">{selectedLog.actor?.email ?? '—'}</dd>
                       </dl>
-                      {selectedLog.diff && typeof selectedLog.diff === 'object' && Object.keys(selectedLog.diff).length > 0 && (
-                        <div>
-                          <p className="font-medium text-muted-foreground mb-2">Datos (diff)</p>
-                          <pre className="rounded-lg border bg-muted/50 p-3 text-xs overflow-x-auto whitespace-pre-wrap break-words max-h-[280px] overflow-y-auto">
-                            {JSON.stringify(selectedLog.diff, null, 2)}
-                          </pre>
-                        </div>
-                      )}
+                      {selectedLog.diff && typeof selectedLog.diff === 'object' && Object.keys(selectedLog.diff).length > 0 && (() => {
+                        const { summaryLines, hasMore } = formatDiffForDisplay(selectedLog.diff as Record<string, unknown>);
+                        return (
+                          <div className="space-y-3">
+                            <p className="font-medium text-muted-foreground">Datos del cambio</p>
+                            {summaryLines.length > 0 && (
+                              <ul className="list-none space-y-1.5 text-foreground">
+                                {summaryLines.map((line, i) => (
+                                  <li key={i} className="leading-relaxed">{line}</li>
+                                ))}
+                              </ul>
+                            )}
+                            {hasMore && (
+                              <div>
+                                <p className="text-xs font-medium text-muted-foreground mb-1.5">JSON completo</p>
+                                <pre className="rounded-lg border border-border/80 bg-muted/30 p-4 text-sm font-mono leading-relaxed overflow-x-auto whitespace-pre-wrap break-words max-h-[320px] overflow-y-auto">
+                                  {JSON.stringify(selectedLog.diff, null, 2)}
+                                </pre>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
                       {(!selectedLog.diff || (typeof selectedLog.diff === 'object' && Object.keys(selectedLog.diff).length === 0)) && (
                         <p className="text-muted-foreground">Sin datos adicionales.</p>
                       )}

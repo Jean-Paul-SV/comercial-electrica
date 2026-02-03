@@ -21,12 +21,11 @@ import {
 } from '@nestjs/swagger';
 import { ExpensesService } from './expenses.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { RolesGuard } from '../auth/roles.guard';
 import { CreateExpenseDto } from './dto/create-expense.dto';
 import { ListExpensesDto } from './dto/list-expenses.dto';
 
 @ApiTags('expenses')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard)
 @Controller('expenses')
 export class ExpensesController {
   constructor(private readonly expenses: ExpensesService) {}
@@ -43,9 +42,9 @@ export class ExpensesController {
   @ApiResponse({ status: 404, description: 'Sesión de caja no encontrada' })
   create(
     @Body() dto: CreateExpenseDto,
-    @Req() req: { user?: { sub?: string } },
+    @Req() req: { user?: { sub?: string; tenantId?: string } },
   ) {
-    return this.expenses.create(dto, req.user?.sub);
+    return this.expenses.create(dto, req.user?.sub, req.user?.tenantId);
   }
 
   @Get()
@@ -55,11 +54,15 @@ export class ExpensesController {
     description: 'Lista gastos con filtros opcionales por fecha y categoría.',
   })
   @ApiResponse({ status: 200, description: 'Lista paginada de gastos' })
-  list(@Query() dto: ListExpensesDto) {
-    return this.expenses.list(dto, {
-      page: dto.page,
-      limit: dto.limit,
-    });
+  list(
+    @Query() dto: ListExpensesDto,
+    @Req() req?: { user?: { tenantId?: string } },
+  ) {
+    return this.expenses.list(
+      dto,
+      { page: dto.page, limit: dto.limit },
+      req?.user?.tenantId,
+    );
   }
 
   @Get(':id')
@@ -68,8 +71,11 @@ export class ExpensesController {
   @ApiParam({ name: 'id', description: 'ID del gasto' })
   @ApiResponse({ status: 200, description: 'Gasto encontrado' })
   @ApiResponse({ status: 404, description: 'Gasto no encontrado' })
-  getById(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string) {
-    return this.expenses.getById(id);
+  getById(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @Req() req?: { user?: { tenantId?: string } },
+  ) {
+    return this.expenses.getById(id, req?.user?.tenantId);
   }
 
   @Delete(':id')
@@ -87,12 +93,12 @@ export class ExpensesController {
   remove(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Query('reason') reason: string | undefined,
-    @Req() req: { user?: { sub?: string } },
+    @Req() req: { user?: { sub?: string; tenantId?: string } },
   ) {
     const trimmed = reason?.trim();
     if (!trimmed) {
       throw new BadRequestException('La justificación de eliminación es obligatoria.');
     }
-    return this.expenses.remove(id, req.user?.sub, trimmed);
+    return this.expenses.remove(id, req.user?.sub, trimmed, req.user?.tenantId);
   }
 }

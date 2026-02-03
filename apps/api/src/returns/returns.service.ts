@@ -23,7 +23,12 @@ export class ReturnsService {
   async createReturn(dto: CreateReturnDto, createdByUserId?: string) {
     const sale = await this.prisma.sale.findUnique({
       where: { id: dto.saleId },
-      include: { items: { include: { product: true } }, customer: true },
+      select: {
+        id: true,
+        status: true,
+        items: { include: { product: true } },
+        customer: true,
+      },
     });
 
     if (!sale) {
@@ -120,23 +125,14 @@ export class ReturnsService {
         });
       }
 
-      await tx.auditLog.create({
-        data: {
-          actorId: createdByUserId ?? null,
-          entity: 'saleReturn',
-          entityId: ret.id,
-          action: 'create',
-          diff: {
-            saleId: dto.saleId,
-            grandTotal: Number(ret.grandTotal),
-            itemsCount: ret.items.length,
-          },
-        },
-      });
-
       return ret;
     });
 
+    await this.audit.logCreate('saleReturn', saleReturn.id, createdByUserId, {
+      saleId: dto.saleId,
+      grandTotal: Number(saleReturn.grandTotal),
+      itemsCount: saleReturn.items.length,
+    });
     await this.cache.deletePattern('cache:returns:*');
     await this.cache.deletePattern('cache:sales:*');
 

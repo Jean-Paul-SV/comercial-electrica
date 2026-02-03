@@ -3,6 +3,7 @@ import { NotFoundException } from '@nestjs/common';
 import { DianService } from './dian.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
+import { AuditService } from '../common/services/audit.service';
 import {
   DianDocumentStatus,
   DianDocumentType,
@@ -94,6 +95,8 @@ describe('DianService', () => {
       }),
     };
 
+    const mockAudit = { log: jest.fn() };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         DianService,
@@ -104,6 +107,10 @@ describe('DianService', () => {
         {
           provide: ConfigService,
           useValue: mockConfig,
+        },
+        {
+          provide: AuditService,
+          useValue: mockAudit,
         },
       ],
     }).compile();

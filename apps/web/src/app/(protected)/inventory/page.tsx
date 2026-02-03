@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import {
   Card,
@@ -29,8 +29,8 @@ import {
 } from '@shared/components/ui/dialog';
 import { Skeleton } from '@shared/components/ui/skeleton';
 import { Pagination } from '@shared/components/Pagination';
-import { formatDateTime } from '@shared/utils/format';
-import { Boxes, Plus, Trash2 } from 'lucide-react';
+import { formatDateTime, formatMoney } from '@shared/utils/format';
+import { Boxes, Plus, Trash2, ChevronUp, ChevronDown, Search, Layers } from 'lucide-react';
 import { useMovementsList, useCreateMovement } from '@features/inventory/hooks';
 import { useProductsList } from '@features/products/hooks';
 import { useSuppliersList } from '@features/suppliers/hooks';
@@ -47,6 +47,181 @@ const TYPE_LABELS: Record<string, string> = {
 
 type MovementLine = { productId: string; qty: number; unitCost?: number };
 
+/** Tarjeta de stock actual por producto (código, nombre, categoría, cantidad). */
+function StockActualCard() {
+  const [stockPage, setStockPage] = useState(1);
+  const [stockSearch, setStockSearch] = useState('');
+  const [stockSort, setStockSort] = useState<'asc' | 'desc' | null>(null);
+  const limit = 20;
+  const stockParams = useMemo(
+    () => ({
+      page: stockPage,
+      limit,
+      search: stockSearch.trim() || undefined,
+      sortByStock: stockSort ?? undefined,
+    }),
+    [stockPage, limit, stockSearch, stockSort]
+  );
+  const stockQuery = useProductsList(stockParams);
+  const stockRows = useMemo(() => stockQuery.data?.data ?? [], [stockQuery.data]);
+  const stockMeta = stockQuery.data?.meta;
+
+  useEffect(() => {
+    setStockPage(1);
+  }, [stockSearch, stockSort]);
+
+  return (
+    <Card className="border-0 shadow-sm overflow-hidden">
+      <CardHeader className="pb-4 border-b border-border/50">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <CardTitle className="text-lg font-medium flex items-center gap-2">
+              <Layers className="h-5 w-5 shrink-0 text-primary" />
+              Stock actual
+            </CardTitle>
+            <CardDescription>
+              Cantidad en mano por producto. Para modificar stock, registra un movimiento (entrada, salida o ajuste) más abajo.
+            </CardDescription>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4 pt-4">
+        <div className="flex flex-wrap gap-3 pb-2 border-b border-border">
+          <div className="flex items-center gap-2 flex-1 min-w-[200px]">
+            <Label htmlFor="search-stock" className="text-xs text-muted-foreground whitespace-nowrap">
+              Buscar:
+            </Label>
+            <Input
+              id="search-stock"
+              type="search"
+              placeholder="Nombre o código del producto"
+              value={stockSearch}
+              onChange={(e) => {
+                setStockSearch(e.target.value);
+                setStockPage(1);
+              }}
+              className="h-9 rounded-lg text-sm flex-1 min-w-0"
+              autoComplete="off"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <Label className="text-xs text-muted-foreground whitespace-nowrap">
+              Ordenar por stock:
+            </Label>
+            <div className="flex items-center gap-1 border border-input rounded-lg p-0.5">
+              <button
+                type="button"
+                onClick={() => {
+                  if (stockSort === 'desc') setStockSort(null);
+                  else setStockSort('desc');
+                  setStockPage(1);
+                }}
+                className={`h-7 px-2 flex items-center gap-1 rounded text-xs transition-colors ${
+                  stockSort === 'desc' ? 'bg-primary text-primary-foreground' : 'hover:bg-accent text-muted-foreground'
+                }`}
+                title="Mayor a menor"
+              >
+                <ChevronUp className="h-3 w-3" />
+                Mayor
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (stockSort === 'asc') setStockSort(null);
+                  else setStockSort('asc');
+                  setStockPage(1);
+                }}
+                className={`h-7 px-2 flex items-center gap-1 rounded text-xs transition-colors ${
+                  stockSort === 'asc' ? 'bg-primary text-primary-foreground' : 'hover:bg-accent text-muted-foreground'
+                }`}
+                title="Menor a mayor"
+              >
+                <ChevronDown className="h-3 w-3" />
+                Menor
+              </button>
+            </div>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setStockSearch('');
+              setStockSort(null);
+              setStockPage(1);
+            }}
+            className="h-9 text-xs"
+          >
+            Limpiar
+          </Button>
+        </div>
+        <Pagination meta={stockMeta} onPageChange={setStockPage} label="Página" />
+        {stockQuery.isLoading && (
+          <div className="rounded-lg border border-border overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/40">
+                  <TableHead className="font-medium">Código</TableHead>
+                  <TableHead className="font-medium">Nombre</TableHead>
+                  <TableHead className="font-medium">Categoría</TableHead>
+                  <TableHead className="font-medium text-right">Stock</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <TableRow key={i}>
+                    <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-32" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-20" /></TableCell>
+                    <TableCell className="text-right"><Skeleton className="h-5 w-12 ml-auto" /></TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+        {stockQuery.isError && (
+          <p className="text-sm text-destructive py-4">
+            {(stockQuery.error as { message?: string })?.message ?? 'Error al cargar stock'}
+          </p>
+        )}
+        {!stockQuery.isLoading && (
+          <div className="rounded-lg border border-border overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/40 hover:bg-muted/40">
+                  <TableHead className="font-medium">Código</TableHead>
+                  <TableHead className="font-medium">Nombre</TableHead>
+                  <TableHead className="font-medium">Categoría</TableHead>
+                  <TableHead className="font-medium text-right">Stock</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {stockRows.map((p) => (
+                  <TableRow key={p.id} className="transition-colors hover:bg-muted/30">
+                    <TableCell className="font-mono text-muted-foreground text-sm">{p.internalCode}</TableCell>
+                    <TableCell className="font-medium">{p.name}</TableCell>
+                    <TableCell className="text-muted-foreground">{p.category?.name ?? '—'}</TableCell>
+                    <TableCell className="text-right tabular-nums font-medium">
+                      {p.stock?.qtyOnHand ?? 0}
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {stockRows.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={4} className="h-20 text-center text-muted-foreground">
+                      No hay productos. Crea productos en Catálogo → Productos.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function InventoryPage() {
   const [page, setPage] = useState(1);
   const [openNew, setOpenNew] = useState(false);
@@ -54,12 +229,22 @@ export default function InventoryPage() {
   const [reason, setReason] = useState('');
   const [supplierId, setSupplierId] = useState('');
   const [lines, setLines] = useState<MovementLine[]>([]);
+  const [openAddMultiple, setOpenAddMultiple] = useState(false);
+  const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(new Set());
+  const [addMultipleSearch, setAddMultipleSearch] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc' | null>(null);
 
   const limit = 20;
-  const query = useMovementsList({ page, limit });
+  const query = useMovementsList({
+    page,
+    limit,
+    search: searchTerm.trim() || undefined,
+    sortOrder: sortOrder ?? undefined,
+  });
   const createMutation = useCreateMovement();
   const productsQuery = useProductsList({ page: 1, limit: 100 });
-  const suppliersQuery = useSuppliersList({ page: 1, limit: 100 });
+  const suppliersQuery = useSuppliersList({ page: 1, limit: 100, isActive: true });
 
   const rows = useMemo(() => query.data?.data ?? [], [query.data]);
   const meta = query.data?.meta;
@@ -81,6 +266,44 @@ export default function InventoryPage() {
     setReason('');
     setSupplierId('');
     setLines([]);
+    setOpenAddMultiple(false);
+    setSelectedProductIds(new Set());
+    setAddMultipleSearch('');
+  };
+
+  const toggleProductSelection = (id: string) => {
+    setSelectedProductIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const confirmAddMultiple = () => {
+    if (selectedProductIds.size === 0) {
+      toast.error('Selecciona al menos un producto');
+      return;
+    }
+    const existingIds = new Set(lines.map((l) => l.productId));
+    const toAdd = [...selectedProductIds].filter((id) => !existingIds.has(id));
+    if (toAdd.length === 0) {
+      toast.info('Esos productos ya están en las líneas');
+      setOpenAddMultiple(false);
+      setSelectedProductIds(new Set());
+      setAddMultipleSearch('');
+      return;
+    }
+    const costByProduct = Object.fromEntries(products.map((p) => [p.id, Number(p.cost)]));
+    const newLines: MovementLine[] = toAdd.map((productId) => ({
+      productId,
+      qty: 1,
+      ...(type === 'IN' && costByProduct[productId] ? { unitCost: costByProduct[productId] } : {}),
+    }));
+    setLines((prev) => [...prev, ...newLines]);
+    setOpenAddMultiple(false);
+    setSelectedProductIds(new Set());
+    setAddMultipleSearch('');
   };
 
   const submitNew = () => {
@@ -125,16 +348,19 @@ export default function InventoryPage() {
           Inventario
         </h1>
         <p className="text-sm text-muted-foreground">
-          Movimientos de inventario
+          Stock actual por producto y movimientos (entradas, salidas, ajustes)
         </p>
       </div>
 
-      <Card className="border-0 shadow-sm">
-        <CardHeader className="pb-4">
+      {/* Stock actual por producto */}
+      <StockActualCard />
+
+      <Card className="border-0 shadow-sm overflow-hidden">
+        <CardHeader className="pb-4 bg-muted/30 border-b border-border/50">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <CardTitle className="text-lg font-medium flex items-center gap-2">
-                <Boxes className="h-5 w-5 shrink-0" />
+                <Boxes className="h-5 w-5 shrink-0 text-primary" />
                 Movimientos
               </CardTitle>
               <CardDescription>
@@ -144,25 +370,109 @@ export default function InventoryPage() {
             <Button
               size="sm"
               onClick={() => setOpenNew(true)}
-              className="gap-2 w-full sm:w-fit"
+              className="gap-2 w-full sm:w-fit shadow-sm"
             >
               <Plus className="h-4 w-4" />
               Nuevo movimiento
             </Button>
           </div>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <Pagination meta={meta} onPageChange={setPage} label="Página" />
+        <CardContent className="space-y-4 pt-4">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between rounded-lg bg-muted/20 border border-border/50 p-3">
+            <div className="flex flex-1 flex-wrap items-center gap-3 min-w-0">
+              <div className="flex items-center gap-2 flex-1 min-w-[200px] max-w-sm">
+                <Label htmlFor="search-movement" className="text-sm text-muted-foreground whitespace-nowrap">
+                  Buscar:
+                </Label>
+                <Input
+                  id="search-movement"
+                  type="search"
+                  placeholder="Nombre o código del producto"
+                  value={searchTerm}
+                  onChange={(e) => {
+                    setSearchTerm(e.target.value);
+                    setPage(1);
+                  }}
+                  className="h-9 rounded-lg bg-background border-border/80 text-sm flex-1 min-w-0"
+                  autoComplete="off"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <Label className="text-sm text-muted-foreground whitespace-nowrap">
+                  Ordenar:
+                </Label>
+                <div className="flex items-center gap-1 border border-input rounded-lg p-0.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (sortOrder === 'desc') {
+                      setSortOrder(null);
+                    } else {
+                      setSortOrder('desc');
+                    }
+                    setPage(1);
+                  }}
+                  className={`h-7 px-2 flex items-center gap-1 rounded text-xs transition-colors ${
+                    sortOrder === 'desc'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'hover:bg-accent text-muted-foreground'
+                  }`}
+                  title="Más reciente primero"
+                >
+                  <ChevronUp className="h-3 w-3" />
+                  Mayor
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (sortOrder === 'asc') {
+                      setSortOrder(null);
+                    } else {
+                      setSortOrder('asc');
+                    }
+                    setPage(1);
+                  }}
+                  className={`h-7 px-2 flex items-center gap-1 rounded text-xs transition-colors ${
+                    sortOrder === 'asc'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'hover:bg-accent text-muted-foreground'
+                  }`}
+                  title="Más antiguo primero"
+                >
+                  <ChevronDown className="h-3 w-3" />
+                  Menor
+                </button>
+                </div>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setSearchTerm('');
+                  setSortOrder(null);
+                  setPage(1);
+                }}
+                disabled={!searchTerm.trim() && sortOrder === null}
+                className="h-9 shrink-0 border-border bg-background text-foreground hover:bg-muted/50 disabled:opacity-50"
+                aria-label="Limpiar filtros"
+              >
+                Limpiar filtros
+              </Button>
+            </div>
+            <Pagination meta={meta} onPageChange={setPage} label="Página" />
+          </div>
 
           {query.isLoading && (
             <div className="rounded-lg border border-border overflow-hidden">
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>Fecha</TableHead>
-                    <TableHead>Tipo</TableHead>
-                    <TableHead>Motivo</TableHead>
-                    <TableHead>Items</TableHead>
+                  <TableRow className="bg-muted/40">
+                    <TableHead className="font-medium">Fecha</TableHead>
+                    <TableHead className="font-medium">Tipo</TableHead>
+                    <TableHead className="font-medium">Motivo</TableHead>
+                    <TableHead className="font-medium">Productos</TableHead>
+                    <TableHead className="font-medium">Cantidad</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -171,6 +481,7 @@ export default function InventoryPage() {
                       <TableCell><Skeleton className="h-5 w-32" /></TableCell>
                       <TableCell><Skeleton className="h-5 w-20" /></TableCell>
                       <TableCell><Skeleton className="h-5 w-28" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-24" /></TableCell>
                       <TableCell><Skeleton className="h-5 w-16" /></TableCell>
                     </TableRow>
                   ))}
@@ -190,16 +501,18 @@ export default function InventoryPage() {
             <div className="rounded-lg border border-border overflow-hidden">
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>Fecha</TableHead>
-                    <TableHead>Tipo</TableHead>
-                    <TableHead>Motivo</TableHead>
-                    <TableHead>Items</TableHead>
+                  <TableRow className="bg-muted/40 hover:bg-muted/40">
+                    <TableHead className="font-medium">Fecha</TableHead>
+                    <TableHead className="font-medium">Tipo</TableHead>
+                    <TableHead className="font-medium">Motivo</TableHead>
+                    <TableHead className="font-medium">Proveedor</TableHead>
+                    <TableHead className="font-medium">Productos</TableHead>
+                    <TableHead className="font-medium">Cantidad</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {rows.map((m) => (
-                    <TableRow key={m.id}>
+                    <TableRow key={m.id} className="transition-colors hover:bg-muted/30">
                       <TableCell className="text-muted-foreground text-sm">
                         {formatDateTime(m.createdAt)}
                       </TableCell>
@@ -211,15 +524,41 @@ export default function InventoryPage() {
                       <TableCell className="text-muted-foreground">
                         {m.reason ?? '—'}
                       </TableCell>
-                      <TableCell className="text-muted-foreground tabular-nums">
-                        {m.items?.length ?? 0} ítem(s)
+                      <TableCell className="text-muted-foreground text-sm">
+                        {m.supplier?.name ?? '—'}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground align-top">
+                        <div className="flex flex-col gap-0.5 max-h-24 overflow-y-auto">
+                          {m.items?.length ? (
+                            m.items.map((it) => (
+                              <span key={it.id} className="text-sm">
+                                {it.product?.name ?? it.productId}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground align-top tabular-nums">
+                        <div className="flex flex-col gap-0.5 max-h-24 overflow-y-auto">
+                          {m.items?.length ? (
+                            m.items.map((it) => (
+                              <span key={it.id} className="text-sm">
+                                {it.qty}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
                   {rows.length === 0 && (
                     <TableRow>
                       <TableCell
-                        colSpan={4}
+                        colSpan={6}
                         className="h-24 text-center text-muted-foreground"
                       >
                         No hay movimientos.
@@ -254,6 +593,11 @@ export default function InventoryPage() {
                   <option value="OUT">Salida</option>
                   <option value="ADJUST">Ajuste</option>
                 </select>
+                <p className="text-xs text-muted-foreground">
+                  {type === 'IN' && 'Ingreso de stock (ej. compra a proveedor, devolución).'}
+                  {type === 'OUT' && 'Egreso de stock (ej. venta, merma, uso interno).'}
+                  {type === 'ADJUST' && 'Corrección por conteo o inventario físico.'}
+                </p>
               </div>
               {type === 'IN' && (
                 <div className="space-y-2">
@@ -270,6 +614,9 @@ export default function InventoryPage() {
                       </option>
                     ))}
                   </select>
+                  <p className="text-xs text-muted-foreground">
+                    Indica el proveedor si este ingreso viene de una compra.
+                  </p>
                 </div>
               )}
               <div className="space-y-2 sm:col-span-2">
@@ -277,22 +624,36 @@ export default function InventoryPage() {
                 <Input
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
-                  placeholder="Ej. Ajuste por conteo"
+                  placeholder="Ej. Ajuste por conteo, Recepción pedido PO-001"
                   className="rounded-lg"
                 />
+                <p className="text-xs text-muted-foreground">
+                  Descripción breve para trazabilidad (conteo, pedido, devolución, etc.).
+                </p>
               </div>
             </div>
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label>Líneas</Label>
-                <Button type="button" variant="outline" size="sm" onClick={addLine} className="gap-1">
-                  <Plus className="h-3 w-3" />
-                  Agregar línea
-                </Button>
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div>
+                  <Label>Líneas</Label>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Productos y cantidades que {type === 'IN' ? 'entran' : type === 'OUT' ? 'salen' : 'ajustas'}. En entradas puedes indicar costo unitario.
+                  </p>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Button type="button" variant="outline" size="sm" onClick={addLine} className="gap-1 shrink-0">
+                    <Plus className="h-3 w-3" />
+                    Agregar línea
+                  </Button>
+                  <Button type="button" variant="outline" size="sm" onClick={() => setOpenAddMultiple(true)} className="gap-1 shrink-0">
+                    <Layers className="h-3 w-3" />
+                    Agregar varios
+                  </Button>
+                </div>
               </div>
               <div className="rounded-lg border border-border divide-y divide-border max-h-48 overflow-auto">
                 {lines.length === 0 && (
-                  <p className="p-3 text-sm text-muted-foreground">Agrega al menos un producto.</p>
+                  <p className="p-3 text-sm text-muted-foreground">Agrega al menos un producto con cantidad.</p>
                 )}
                 {lines.map((line, i) => (
                   <div key={i} className="flex items-center gap-2 p-2 text-sm">
@@ -302,11 +663,14 @@ export default function InventoryPage() {
                       className={`${selectClassName} flex-1 h-9`}
                     >
                       <option value="">Producto</option>
-                      {products.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.name}
-                        </option>
-                      ))}
+                      {products.map((p) => {
+                        const stockQty = p.stock?.qtyOnHand ?? 0;
+                        return (
+                          <option key={p.id} value={p.id}>
+                            {p.name} (Stock: {stockQty})
+                          </option>
+                        );
+                      })}
                     </select>
                     <Input
                       type="number"
@@ -347,6 +711,100 @@ export default function InventoryPage() {
             </Button>
             <Button onClick={submitNew} disabled={createMutation.isPending || !canSubmit}>
               {createMutation.isPending ? 'Guardando…' : 'Registrar movimiento'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal Agregar varios productos */}
+      <Dialog open={openAddMultiple} onOpenChange={setOpenAddMultiple}>
+        <DialogContent showClose className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Layers className="h-4 w-4" />
+              Agregar varios productos
+            </DialogTitle>
+            <p className="text-sm text-muted-foreground pt-1">
+              Marca los productos que quieras agregar al movimiento. Se añadirán con cantidad 1{type === 'IN' ? ' y costo del catálogo' : ''}.
+            </p>
+          </DialogHeader>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+            <Input
+              type="text"
+              placeholder="Buscar por nombre o código..."
+              value={addMultipleSearch}
+              onChange={(e) => setAddMultipleSearch(e.target.value)}
+              className="pl-9 rounded-lg mb-2"
+              autoComplete="off"
+            />
+          </div>
+          <div className="max-h-64 overflow-auto rounded-lg border border-border">
+            {(() => {
+              const term = addMultipleSearch.trim().toLowerCase();
+              const filtered = term
+                ? products.filter(
+                    (p) =>
+                      p.name.toLowerCase().includes(term) ||
+                      (p.internalCode && p.internalCode.toLowerCase().includes(term)),
+                  )
+                : products;
+              if (filtered.length === 0) {
+                return (
+                  <p className="p-4 text-sm text-muted-foreground text-center">
+                    {products.length === 0 ? 'No hay productos disponibles.' : 'Ningún producto coincide con la búsqueda.'}
+                  </p>
+                );
+              }
+              return (
+                <>
+                  <div className="grid grid-cols-[auto_1fr_auto_auto] gap-2 px-2 py-1.5 text-xs font-medium text-muted-foreground border-b border-border sticky top-0 bg-background">
+                    <span className="w-4" />
+                    <span>Producto</span>
+                    <span className="tabular-nums text-right w-14">Stock</span>
+                    {type === 'IN' && (
+                      <span className="tabular-nums text-right w-16">Costo</span>
+                    )}
+                  </div>
+                  {filtered.map((p) => {
+                    const stockQty = p.stock?.qtyOnHand ?? 0;
+                    return (
+                      <label
+                        key={p.id}
+                        className={`grid gap-2 items-center p-2 hover:bg-muted/30 cursor-pointer border-b border-border last:border-b-0 ${
+                          type === 'IN'
+                            ? 'grid-cols-[auto_1fr_auto_auto]'
+                            : 'grid-cols-[auto_1fr_auto]'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedProductIds.has(p.id)}
+                          onChange={() => toggleProductSelection(p.id)}
+                          className="h-4 w-4 rounded border-input"
+                        />
+                        <span className="text-sm truncate min-w-0">{p.name}</span>
+                        <span className="text-xs text-muted-foreground tabular-nums text-right w-14">
+                          {stockQty}
+                        </span>
+                        {type === 'IN' && (
+                          <span className="text-xs text-muted-foreground tabular-nums shrink-0 w-16 text-right">
+                            {formatMoney(p.cost)}
+                          </span>
+                        )}
+                      </label>
+                    );
+                  })}
+                </>
+              );
+            })()}
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => { setOpenAddMultiple(false); setSelectedProductIds(new Set()); setAddMultipleSearch(''); }}>
+              Cancelar
+            </Button>
+            <Button onClick={confirmAddMultiple} disabled={selectedProductIds.size === 0}>
+              Agregar {selectedProductIds.size > 0 ? selectedProductIds.size : ''} producto(s)
             </Button>
           </DialogFooter>
         </DialogContent>

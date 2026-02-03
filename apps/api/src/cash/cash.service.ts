@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
   Logger,
@@ -18,19 +19,24 @@ export class CashService {
     private readonly audit: AuditService,
   ) {}
 
-  async listSessions(pagination?: { page?: number; limit?: number }) {
+  async listSessions(
+    pagination?: { page?: number; limit?: number },
+    tenantId?: string | null,
+  ) {
+    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
     const page = pagination?.page ?? 1;
     const limit = pagination?.limit ?? 20;
     const skip = (page - 1) * limit;
 
     const [data, total] = await Promise.all([
       this.prisma.cashSession.findMany({
+        where: { tenantId },
         orderBy: { openedAt: 'desc' },
         skip,
         take: limit,
         include: { movements: { orderBy: { createdAt: 'desc' }, take: 50 } },
       }),
-      this.prisma.cashSession.count(),
+      this.prisma.cashSession.count({ where: { tenantId } }),
     ]);
 
     const totalPages = Math.ceil(total / limit);
@@ -48,13 +54,17 @@ export class CashService {
     };
   }
 
-  async getSession(id: string) {
-    const s = await this.prisma.cashSession.findUnique({ where: { id } });
+  async getSession(id: string, tenantId?: string | null) {
+    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
+    const s = await this.prisma.cashSession.findFirst({
+      where: { id, tenantId },
+    });
     if (!s) throw new NotFoundException('Caja no encontrada.');
     return s;
   }
 
-  async openSession(openingAmount: number, openedBy?: string) {
+  async openSession(openingAmount: number, openedBy?: string, tenantId?: string | null) {
+    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
     const startTime = Date.now();
     this.logger.log(`Abriendo sesión de caja`, {
       openingAmount,
@@ -66,6 +76,7 @@ export class CashService {
 
     const session = await this.prisma.cashSession.create({
       data: {
+        tenantId,
         openingAmount,
         openedBy: openedBy ?? null,
       },
@@ -89,7 +100,8 @@ export class CashService {
     return session;
   }
 
-  async closeSession(id: string, closingAmount: number, closedBy?: string) {
+  async closeSession(id: string, closingAmount: number, closedBy?: string, tenantId?: string | null) {
+    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
     const startTime = Date.now();
     this.logger.log(`Cerrando sesión de caja ${id}`, {
       sessionId: id,
@@ -97,7 +109,7 @@ export class CashService {
       userId: closedBy,
     });
 
-    const session = await this.getSession(id);
+    const session = await this.getSession(id, tenantId);
 
     // Validar que la sesión no esté ya cerrada
     if (session.closedAt) {
@@ -177,7 +189,10 @@ export class CashService {
   async listMovements(
     sessionId: string,
     pagination?: { page?: number; limit?: number },
+    tenantId?: string | null,
   ) {
+    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
+    const session = await this.getSession(sessionId, tenantId);
     const page = pagination?.page ?? 1;
     const limit = pagination?.limit ?? 50;
     const skip = (page - 1) * limit;
@@ -188,8 +203,74 @@ export class CashService {
         orderBy: { createdAt: 'desc' },
         skip,
         take: limit,
+        include: {
+          relatedExpense: {
+            select: { id: true, description: true, amount: true },
+          },
+        },
       }),
       this.prisma.cashMovement.count({ where: { sessionId } }),
+    ]);
+
+    const totalPages = Math.ceil(total / limit);
+
+    return {
+      data,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPreviousPage: page > 1,
+      },
+    };
+  }
+
+  async listAllMovements(
+    params: {
+      page?: number;
+      limit?: number;
+      sessionId?: string;
+      type?: 'IN' | 'OUT' | 'ADJUST';
+      startDate?: string;
+      endDate?: string;
+    },
+    tenantId?: string | null,
+  ) {
+    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
+    const page = params.page ?? 1;
+    const limit = params.limit ?? 20;
+    const skip = (page - 1) * limit;
+
+    const where: {
+      session?: { tenantId: string };
+      sessionId?: string;
+      type?: 'IN' | 'OUT' | 'ADJUST';
+      createdAt?: { gte?: Date; lte?: Date };
+    } = { session: { tenantId } };
+
+    if (params.sessionId) where.sessionId = params.sessionId;
+    if (params.type) where.type = params.type;
+    if (params.startDate || params.endDate) {
+      where.createdAt = {};
+      if (params.startDate) where.createdAt.gte = new Date(params.startDate);
+      if (params.endDate) where.createdAt.lte = new Date(params.endDate);
+    }
+
+    const [data, total] = await Promise.all([
+      this.prisma.cashMovement.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+        include: {
+          session: {
+            select: { id: true, openedAt: true, closedAt: true },
+          },
+        },
+      }),
+      this.prisma.cashMovement.count({ where }),
     ]);
 
     const totalPages = Math.ceil(total / limit);
@@ -211,9 +292,11 @@ export class CashService {
     sessionId: string,
     dto: { type: 'IN' | 'OUT' | 'ADJUST'; method: string; amount: number; reference?: string },
     createdBy?: string,
+    tenantId?: string | null,
   ) {
-    const session = await this.prisma.cashSession.findUnique({
-      where: { id: sessionId },
+    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
+    const session = await this.prisma.cashSession.findFirst({
+      where: { id: sessionId, tenantId },
     });
     if (!session) throw new NotFoundException('Caja no encontrada.');
     if (session.closedAt) {

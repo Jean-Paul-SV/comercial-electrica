@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
   Logger,
@@ -34,7 +35,8 @@ export class QuotesService {
     private readonly cache: CacheService,
   ) {}
 
-  async createQuote(dto: CreateQuoteDto, createdByUserId?: string) {
+  async createQuote(dto: CreateQuoteDto, createdByUserId?: string, tenantId?: string | null) {
+    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
     if (!dto.items || dto.items.length === 0) {
       throw new BadRequestException('Debe incluir items.');
     }
@@ -51,10 +53,10 @@ export class QuotesService {
       this.limits.validateQuoteValidUntil(validUntilDate);
     }
 
-    // Validar que el cliente existe si se proporciona
+    // Validar que el cliente existe y pertenece al tenant si se proporciona
     if (dto.customerId) {
-      const customer = await this.prisma.customer.findUnique({
-        where: { id: dto.customerId },
+      const customer = await this.prisma.customer.findFirst({
+        where: { id: dto.customerId, tenantId },
       });
       if (!customer) {
         throw new NotFoundException(
@@ -65,9 +67,9 @@ export class QuotesService {
 
     return this.prisma.$transaction(
       async (tx) => {
-        // Validar que los productos existan
+        // Validar que los productos existan y pertenezcan al tenant
         const products = await tx.product.findMany({
-          where: { id: { in: dto.items.map((i) => i.productId) } },
+          where: { id: { in: dto.items.map((i) => i.productId) }, tenantId },
         });
 
         if (products.length !== dto.items.length) {
@@ -94,7 +96,14 @@ export class QuotesService {
           };
         });
 
-        const grandTotal = subtotal + taxTotal;
+        const discountPercent = Math.min(
+          100,
+          Math.max(0, Number(dto.discountPercent ?? 0)),
+        );
+        const discountTotal = Math.round(
+          ((subtotal + taxTotal) * discountPercent) / 100,
+        );
+        const grandTotal = Math.max(0, subtotal + taxTotal - discountTotal);
 
         // Calcular fecha de validez (por defecto 30 días desde hoy)
         const validUntil = dto.validUntil
@@ -104,34 +113,19 @@ export class QuotesService {
         // Crear cotización
         const quote = await tx.quote.create({
           data: {
+            tenantId,
             customerId: dto.customerId ?? null,
             status: QuoteStatus.DRAFT,
             validUntil,
             subtotal,
             taxTotal,
-            discountTotal: 0,
+            discountTotal,
             grandTotal,
             items: { create: quoteItems },
           },
           include: {
             items: { include: { product: true } },
             customer: true,
-          },
-        });
-
-        // Audit log mejorado
-        await tx.auditLog.create({
-          data: {
-            actorId: createdByUserId ?? null,
-            entity: 'quote',
-            entityId: quote.id,
-            action: 'create',
-            diff: {
-              customerId: quote.customerId,
-              grandTotal: Number(quote.grandTotal),
-              itemsCount: quote.items.length,
-              validUntil: quote.validUntil?.toISOString(),
-            },
           },
         });
 
@@ -149,24 +143,35 @@ export class QuotesService {
     filters?: {
       status?: QuoteStatus;
       customerId?: string;
+      search?: string;
     },
     pagination?: { page?: number; limit?: number },
+    tenantId?: string | null,
   ) {
+    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
     // Cachear listados frecuentes (sin filtros o con filtros comunes)
-    if (!filters || (!filters.status && !filters.customerId)) {
-      const cacheKey = this.cache.buildKey('quotes', 'list', pagination?.page, pagination?.limit);
+    if (!filters || (!filters.status && !filters.customerId && !filters.search)) {
+      const cacheKey = this.cache.buildKey('quotes', 'list', tenantId, pagination?.page, pagination?.limit);
       const cached = await this.cache.get(cacheKey);
       if (cached) {
         this.logger.debug('Quotes list retrieved from cache');
         return cached;
       }
     }
-    const where: Prisma.QuoteWhereInput = {};
+    const where: Prisma.QuoteWhereInput = { tenantId };
     if (filters?.status) {
       where.status = filters.status;
     }
     if (filters?.customerId) {
       where.customerId = filters.customerId;
+    }
+    if (filters?.search) {
+      where.customer = {
+        OR: [
+          { name: { contains: filters.search, mode: 'insensitive' } },
+          { docNumber: { contains: filters.search, mode: 'insensitive' } },
+        ],
+      };
     }
 
     const page = pagination?.page ?? 1;
@@ -190,17 +195,18 @@ export class QuotesService {
     const result = createPaginatedResponse(data, total, page, limit);
 
     // Cachear si no hay filtros
-    if (!filters || (!filters.status && !filters.customerId)) {
-      const cacheKey = this.cache.buildKey('quotes', 'list', page, limit);
+    if (!filters || (!filters.status && !filters.customerId && !filters.search)) {
+      const cacheKey = this.cache.buildKey('quotes', 'list', tenantId, page, limit);
       await this.cache.set(cacheKey, result, 300); // 5 minutos
     }
 
     return result;
   }
 
-  async getQuoteById(id: string) {
-    const quote = await this.prisma.quote.findUnique({
-      where: { id },
+  async getQuoteById(id: string, tenantId?: string | null) {
+    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
+    const quote = await this.prisma.quote.findFirst({
+      where: { id, tenantId },
       include: {
         items: { include: { product: true } },
         customer: true,
@@ -214,8 +220,8 @@ export class QuotesService {
     return quote;
   }
 
-  async updateQuote(id: string, dto: UpdateQuoteDto, updatedByUserId?: string) {
-    const quote = await this.getQuoteById(id);
+  async updateQuote(id: string, dto: UpdateQuoteDto, updatedByUserId?: string, tenantId?: string | null) {
+    const quote = await this.getQuoteById(id, tenantId);
 
     // No permitir actualizar cotizaciones convertidas o canceladas
     if (
@@ -312,16 +318,6 @@ export class QuotesService {
           },
         });
 
-        // Audit log
-        await tx.auditLog.create({
-          data: {
-            actorId: updatedByUserId ?? null,
-            entity: 'quote',
-            entityId: id,
-            action: 'update',
-          },
-        });
-
         return updatedQuote;
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
@@ -336,8 +332,9 @@ export class QuotesService {
     id: string,
     dto: ConvertQuoteDto,
     convertedByUserId?: string,
+    tenantId?: string | null,
   ) {
-    const quote = await this.getQuoteById(id);
+    const quote = await this.getQuoteById(id, tenantId);
 
     // Validar que la cotización pueda ser convertida
     if (quote.status === QuoteStatus.CONVERTED) {
@@ -393,7 +390,9 @@ export class QuotesService {
           // Crear la venta desde la cotización
           const sale = await tx.sale.create({
             data: {
+              tenantId: quote.tenantId,
               customerId: quote.customerId ?? null,
+              createdByUserId: convertedByUserId ?? null,
               status: SaleStatus.PAID,
               subtotal: Number(quote.subtotal),
               taxTotal: Number(quote.taxTotal),
@@ -449,6 +448,7 @@ export class QuotesService {
           // Crear factura
           const invoice = await tx.invoice.create({
             data: {
+              tenantId: quote.tenantId,
               saleId: sale.id,
               customerId: sale.customerId,
               number: this.makeInvoiceNumber(),
@@ -474,27 +474,6 @@ export class QuotesService {
           await tx.quote.update({
             where: { id },
             data: { status: QuoteStatus.CONVERTED },
-          });
-
-          // Audit logs
-          await tx.auditLog.create({
-            data: {
-              actorId: convertedByUserId ?? null,
-              entity: 'quote',
-              entityId: id,
-              action: 'convert',
-              diff: { saleId: sale.id, invoiceId: invoice.id },
-            },
-          });
-
-          await tx.auditLog.create({
-            data: {
-              actorId: convertedByUserId ?? null,
-              entity: 'sale',
-              entityId: sale.id,
-              action: 'create',
-              diff: { fromQuote: id },
-            },
           });
 
           return {
@@ -533,8 +512,9 @@ export class QuotesService {
     id: string,
     status: QuoteStatus,
     updatedByUserId?: string,
+    tenantId?: string | null,
   ) {
-    const quote = await this.getQuoteById(id);
+    const quote = await this.getQuoteById(id, tenantId);
 
     // Validaciones de cambio de estado
     if (quote.status === QuoteStatus.CONVERTED) {
@@ -585,20 +565,12 @@ export class QuotesService {
           customer: true,
         },
       });
-
-      await tx.auditLog.create({
-        data: {
-          actorId: updatedByUserId ?? null,
-          entity: 'quote',
-          entityId: id,
-          action: 'update_status',
-          diff: { oldStatus: quote.status, newStatus: status },
-        },
-      });
-
       return updatedQuote;
     }).then(async (updated) => {
-      // Invalidar caché de listados
+      await this.audit.log('quote', id, 'update_status', updatedByUserId, {
+        oldStatus: quote.status,
+        newStatus: status,
+      });
       await this.cache.deletePattern('cache:quotes:*');
       return updated;
     });
@@ -621,6 +593,10 @@ export class QuotesService {
     });
 
     if (result.count > 0) {
+      await this.audit.log('quote', 'cron', 'expire_batch', null, {
+        count: result.count,
+        reason: 'validUntil < now',
+      });
       this.logger.log(`Se expiraron ${result.count} cotizaciones`);
     }
 

@@ -2,11 +2,10 @@ import { Body, Controller, Param, ParseUUIDPipe, Post, Req, UseGuards } from '@n
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { CashService } from './cash.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { RolesGuard } from '../auth/roles.guard';
 import { CreateCashMovementDto } from './dto/create-movement.dto';
 
 @ApiTags('cash')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard)
 @Controller('cash/sessions/:id')
 export class CashMovementsController {
   constructor(private readonly cash: CashService) {}
@@ -25,8 +24,8 @@ export class CashMovementsController {
   createMovement(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Body() dto: CreateCashMovementDto,
-    @Req() req: { user?: { sub?: string } },
+    @Req() req: { user?: { sub?: string; tenantId?: string } },
   ) {
-    return this.cash.createMovement(id, dto, req.user?.sub);
+    return this.cash.createMovement(id, dto, req.user?.sub, req.user?.tenantId);
   }
 }

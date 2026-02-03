@@ -13,6 +13,7 @@ export type SupplierInvoicesListParams = {
   limit?: number;
   status?: string;
   supplierId?: string;
+  search?: string;
 };
 
 export function listSupplierInvoices(
@@ -24,6 +25,7 @@ export function listSupplierInvoices(
   if (params.limit != null) qs.set('limit', String(params.limit));
   if (params.status) qs.set('status', params.status);
   if (params.supplierId) qs.set('supplierId', params.supplierId);
+  if (params.search && params.search.trim()) qs.set('search', params.search.trim());
   const query = qs.toString() ? `?${qs.toString()}` : '';
   return apiClient.get(`/supplier-invoices${query}`, { authToken });
 }

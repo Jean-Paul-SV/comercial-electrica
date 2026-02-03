@@ -88,62 +88,80 @@ const DialogOverlay = React.forwardRef<
 ));
 DialogOverlay.displayName = 'DialogOverlay';
 
-const DialogContent = React.forwardRef<
-  HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement> & { showClose?: boolean }
->(({ className, children, showClose = true, ...props }, ref) => {
-  const { open, onOpenChange } = useDialogContext();
+type DialogContentProps = React.HTMLAttributes<HTMLDivElement> & {
+  showClose?: boolean;
+  onPointerDownOutside?: (e: React.PointerEvent) => void;
+  onEscapeKeyDown?: (e: React.KeyboardEvent) => void;
+};
 
-  React.useEffect(() => {
-    const onEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onOpenChange(false);
+const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps>(
+  ({ className, children, showClose = true, onPointerDownOutside, onEscapeKeyDown, ...props }, ref) => {
+    const { open, onOpenChange } = useDialogContext();
+
+    React.useEffect(() => {
+      const onEscape = (e: KeyboardEvent) => {
+        if (e.key !== 'Escape') return;
+        if (onEscapeKeyDown) {
+          onEscapeKeyDown(e as unknown as React.KeyboardEvent);
+          if (!e.defaultPrevented) onOpenChange(false);
+        } else {
+          onOpenChange(false);
+        }
+      };
+      if (open) {
+        document.addEventListener('keydown', onEscape);
+        document.body.style.overflow = 'hidden';
+      }
+      return () => {
+        document.removeEventListener('keydown', onEscape);
+        document.body.style.overflow = '';
+      };
+    }, [open, onOpenChange, onEscapeKeyDown]);
+
+    if (!open) return null;
+
+    const handleOverlayPointerDown = (e: React.PointerEvent) => {
+      if (onPointerDownOutside) {
+        onPointerDownOutside(e);
+      }
+      if (!e.defaultPrevented) onOpenChange(false);
     };
-    if (open) {
-      document.addEventListener('keydown', onEscape);
-      document.body.style.overflow = 'hidden';
-    }
-    return () => {
-      document.removeEventListener('keydown', onEscape);
-      document.body.style.overflow = '';
-    };
-  }, [open, onOpenChange]);
 
-  if (!open) return null;
-
-  return createPortal(
-    <>
-      <div
-        className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm animate-fade-in"
-        aria-hidden
-        onClick={() => onOpenChange(false)}
-      />
-      <div
-        ref={ref}
-        role="dialog"
-        aria-modal
-        className={cn(
-          'fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg max-h-[90vh] overflow-y-auto translate-x-[-50%] translate-y-[-50%] gap-4 border border-border bg-background p-4 shadow-xl sm:rounded-xl sm:p-6 animate-fade-in-up',
-          className
-        )}
-        onClick={(e) => e.stopPropagation()}
-        {...props}
-      >
-        {children}
-        {showClose && (
-          <button
-            type="button"
-            onClick={() => onOpenChange(false)}
-            className="absolute right-4 top-4 rounded-lg opacity-70 hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 transition-opacity duration-200"
-            aria-label="Cerrar"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        )}
-      </div>
-    </>,
-    document.body
-  );
-});
+    return createPortal(
+      <>
+        <div
+          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm animate-fade-in"
+          aria-hidden
+          onPointerDown={handleOverlayPointerDown}
+        />
+        <div
+          ref={ref}
+          role="dialog"
+          aria-modal
+          className={cn(
+            'fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg max-h-[90vh] overflow-y-auto translate-x-[-50%] translate-y-[-50%] gap-4 border border-border bg-background p-4 shadow-xl sm:rounded-xl sm:p-6 animate-fade-in-up',
+            className
+          )}
+          onClick={(e) => e.stopPropagation()}
+          {...props}
+        >
+          {children}
+          {showClose && (
+            <button
+              type="button"
+              onClick={() => onOpenChange(false)}
+              className="absolute right-4 top-4 rounded-lg opacity-70 hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 transition-opacity duration-200"
+              aria-label="Cerrar"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+      </>,
+      document.body
+    );
+  }
+);
 DialogContent.displayName = 'DialogContent';
 
 const DialogHeader = ({

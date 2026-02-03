@@ -4,11 +4,11 @@ Esta carpeta contiene toda la documentación técnica y de análisis del proyect
 
 ---
 
-## 🧭 Fase Actual del Proyecto (Enero 2026)
+## 🧭 Fase actual del proyecto (Febrero 2026)
 
-- **Fase**: ✅ **Core API lista (inventario/ventas/caja/cotizaciones/reportes) + hardening de producción en progreso**
+- **Fase**: ✅ **API (NestJS) + Frontend (Next.js)** operativos; módulos: catálogo, ventas, caja, gastos, cotizaciones, inventario, proveedores, facturas proveedor, reportes, auditoría
 - **Pendiente crítico**: 🔴 **DIAN real** (XML UBL 2.1, firma digital, envío real, CUFE, PDF/QR, trazabilidad)
-- **Pendiente importante**: 🟡 **Frontend**
+- **Pendiente**: 🟡 Ajustes y mejoras de UX en frontend
 - **Checklist de producción (en curso)**: CORS por entorno, validación/fail-fast de envs, health check completo, observabilidad (métricas/alertas)
 - **Ya implementado (básico)**: `GET /metrics` + header `x-request-id`, health check incluye DB/Redis/colas
 
@@ -95,7 +95,13 @@ Ver `historico/README.md` para lista completa de documentos históricos.
 
 ### 🔧 **Configuración y Setup**
 
-- **[📚 Configuración de Swagger/OpenAPI](./SWAGGER_SETUP.md)** ⭐ **PRINCIPAL**
+- **[🚀 Levantar el proyecto](./LEVANTAR_PROYECTO.md)** ⭐ **PRINCIPAL - USO DIARIO**
+  - Levantar todo: Docker, `npm run db:up`, `npm run dev`
+  - URLs: Frontend http://localhost:3001, API http://localhost:3000, Swagger http://localhost:3000/api/docs
+  - Errores frecuentes: ERR_CONNECTION_REFUSED, 500, puerto en uso
+  - Primera vez desde cero y resumen rápido
+
+- **[📚 Configuración de Swagger/OpenAPI](./SWAGGER_SETUP.md)** ⭐
   - Guía de instalación
   - Configuración de endpoints
   - Solución de problemas
@@ -164,12 +170,13 @@ Ver `historico/README.md` para lista completa de documentos históricos.
 3. **Tercero:** Consulta los resúmenes técnicos según lo que necesites entender
 4. **Cuarto:** Revisa [Recuento de Pendientes](./RECUENTO_PENDIENTES.md) para ver qué falta
 
-### **⚙️ Para Configurar el Proyecto:**
+### **⚙️ Para configurar el proyecto:**
 
-1. **Guía principal:** [README principal](../README.md) - Sección "Inicio Rápido" ⭐
-2. **Si hay error EPERM:** [Solución Error EPERM](./SOLUCION_ERROR_EPERM_PRISMA.md) ⚠️ ⭐
-3. **Swagger:** Ya está configurado - Disponible en `/api/docs` después de iniciar la API
-4. **Otros problemas:** Consulta sección "Solución de Problemas" en README principal
+1. **Guía principal:** [Levantar el proyecto](./LEVANTAR_PROYECTO.md) ⭐ (uso diario, primera vez, errores frecuentes)
+2. **README raíz:** [README principal](../README.md) - Inicio rápido e instalación completa
+3. **Si hay error EPERM:** [Solución Error EPERM](./SOLUCION_ERROR_EPERM_PRISMA.md) ⚠️ ⭐
+4. **Swagger:** Ya está configurado - Disponible en `http://localhost:3000/api/docs` después de iniciar la API
+5. **Otros problemas:** Consulta sección "Solución de Problemas" en README principal
 
 ### **📚 Para Entender Funcionalidades:**
 
@@ -213,5 +220,5 @@ Los documentos marcados con 📚 contienen información útil pero menos actuali
 
 ---
 
-**Última actualización:** Enero 2026  
+**Última actualización:** Febrero 2026  
 **Nota:** Los documentos marcados con ⭐ son los más actualizados y recomendados.
