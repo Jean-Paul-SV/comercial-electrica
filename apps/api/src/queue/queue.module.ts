@@ -7,6 +7,7 @@ import { normalizeRedisUrl } from '../common/utils/redis-url';
 function parseRedis(urlStr: string) {
   const normalized = normalizeRedisUrl(urlStr);
   const u = new URL(normalized);
+  const isTls = normalized.startsWith('rediss://');
   return {
     host: u.hostname,
     port: u.port ? Number(u.port) : 6379,
@@ -16,6 +17,10 @@ function parseRedis(urlStr: string) {
       u.pathname && u.pathname !== '/'
         ? Number(u.pathname.replace('/', ''))
         : undefined,
+    ...(isTls && { tls: {} }),
+    // BullMQ/Workers: reintentos ilimitados para evitar MaxRetriesPerRequestError con Redis inestable (p. ej. Upstash)
+    maxRetriesPerRequest: null,
+    enableReadyCheck: false,
   };
 }
 

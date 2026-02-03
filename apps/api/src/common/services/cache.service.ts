@@ -3,6 +3,9 @@ import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
 import { normalizeRedisUrl } from '../utils/redis-url';
 
+/** Throttle: no loguear el mismo tipo de error más de una vez por minuto */
+const ERROR_LOG_THROTTLE_MS = 60_000;
+
 /**
  * Servicio de caché usando Redis
  * Proporciona métodos para cachear consultas frecuentes
@@ -12,6 +15,8 @@ export class CacheService {
   private readonly logger = new Logger(CacheService.name);
   private readonly redis: Redis;
   private readonly defaultTtl: number;
+  private lastErrorLog = 0;
+  private lastErrorCode: string | null = null;
 
   constructor(private readonly config: ConfigService) {
     const raw = this.config.get<string>(
@@ -23,17 +28,32 @@ export class CacheService {
 
     this.redis = new Redis(redisUrl, {
       retryStrategy: (times) => {
-        const delay = Math.min(times * 50, 2000);
+        const delay = Math.min(times * 100, 5000);
         return delay;
       },
-      maxRetriesPerRequest: 3,
+      maxRetriesPerRequest: null,
+      enableReadyCheck: false,
     });
 
-    this.redis.on('error', (err) => {
-      this.logger.error('Redis error:', err);
+    this.redis.on('error', (err: NodeJS.ErrnoException) => {
+      const code = err?.code ?? 'UNKNOWN';
+      const now = Date.now();
+      if (
+        code === 'ECONNRESET' ||
+        code === 'ETIMEDOUT' ||
+        code === 'ECONNREFUSED'
+      ) {
+        if (now - this.lastErrorLog < ERROR_LOG_THROTTLE_MS && this.lastErrorCode === code) {
+          return;
+        }
+        this.lastErrorLog = now;
+        this.lastErrorCode = code;
+      }
+      this.logger.warn(`Redis: ${code} - ${err?.message ?? err}`);
     });
 
     this.redis.on('connect', () => {
+      this.lastErrorCode = null;
       this.logger.log('Redis connected');
     });
   }
