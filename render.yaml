@@ -14,8 +14,8 @@ services:
     region: oregon
     rootDir: apps/api
     buildCommand: npm install && npx prisma generate && npm run build
-    preDeployCommand: npx prisma migrate deploy
-    startCommand: npm run start:prod
+    # preDeployCommand no está disponible en plan free; migraciones en start
+    startCommand: npx prisma migrate deploy && npm run start:prod
     healthCheckPath: /
     buildFilter:
       paths:
