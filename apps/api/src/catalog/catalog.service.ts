@@ -5,6 +5,7 @@ import {
   NotFoundException,
   Logger,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { CreateProductDto } from './dto/create-product.dto';
@@ -41,12 +42,7 @@ export class CatalogService {
     const limit = pagination?.limit ?? 20;
     const skip = (page - 1) * limit;
 
-    const where: {
-      tenantId: string;
-      isActive?: boolean;
-      stock?: { qtyOnHand: number | { lte?: number; gte?: number } };
-      OR?: Array<{ name?: { contains: string; mode: 'insensitive' }; internalCode?: { contains: string; mode: 'insensitive' } }>;
-    } = { tenantId };
+    const where: Prisma.ProductWhereInput = { tenantId };
 
     // Filtro por stock
     if (pagination?.zeroStock === true) {
@@ -77,9 +73,14 @@ export class CatalogService {
     }
 
     // Determinar el ordenamiento
-    let orderBy: Array<{ name?: 'asc' | 'desc' } | { stock?: { qtyOnHand: 'asc' | 'desc' } }> = [{ name: 'asc' }];
+    let orderBy: Array<
+      { name?: 'asc' | 'desc' } | { stock?: { qtyOnHand: 'asc' | 'desc' } }
+    > = [{ name: 'asc' }];
     if (pagination?.sortByStock) {
-      orderBy = [{ stock: { qtyOnHand: pagination.sortByStock } }, { name: 'asc' }];
+      orderBy = [
+        { stock: { qtyOnHand: pagination.sortByStock } },
+        { name: 'asc' },
+      ];
     }
 
     const [data, total] = await Promise.all([
@@ -128,7 +129,11 @@ export class CatalogService {
     return p;
   }
 
-  async createProduct(dto: CreateProductDto, createdByUserId?: string, tenantId?: string | null) {
+  async createProduct(
+    dto: CreateProductDto,
+    createdByUserId?: string,
+    tenantId?: string | null,
+  ) {
     if (!tenantId) throw new ForbiddenException('Tenant requerido.');
     const internalCode = dto.internalCode.trim();
     if (!internalCode) throw new BadRequestException('internalCode requerido.');
@@ -213,7 +218,11 @@ export class CatalogService {
     return updated;
   }
 
-  async deactivateProduct(id: string, deactivatedByUserId?: string, tenantId?: string | null) {
+  async deactivateProduct(
+    id: string,
+    deactivatedByUserId?: string,
+    tenantId?: string | null,
+  ) {
     if (!tenantId) throw new ForbiddenException('Tenant requerido.');
     const product = await this.getProduct(id, tenantId);
 
@@ -238,15 +247,12 @@ export class CatalogService {
     });
     const duration = Date.now() - startTime;
 
-    this.logger.log(
-      `Producto ${id} desactivado exitosamente (${duration}ms)`,
-      {
-        productId: id,
-        productName: (product as { name: string }).name,
-        duration,
-        userId: deactivatedByUserId,
-      },
-    );
+    this.logger.log(`Producto ${id} desactivado exitosamente (${duration}ms)`, {
+      productId: id,
+      productName: (product as { name: string }).name,
+      duration,
+      userId: deactivatedByUserId,
+    });
 
     await this.audit.logUpdate(
       'product',
@@ -282,7 +288,11 @@ export class CatalogService {
     return categories;
   }
 
-  async createCategory(dto: CreateCategoryDto, createdByUserId?: string, tenantId?: string | null) {
+  async createCategory(
+    dto: CreateCategoryDto,
+    createdByUserId?: string,
+    tenantId?: string | null,
+  ) {
     if (!tenantId) throw new ForbiddenException('Tenant requerido.');
     const name = dto.name.trim();
     if (!name) throw new BadRequestException('name requerido.');

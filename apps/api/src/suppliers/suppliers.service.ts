@@ -5,6 +5,7 @@ import {
   BadRequestException,
   ForbiddenException,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateSupplierDto } from './dto/create-supplier.dto';
 import { UpdateSupplierDto } from './dto/update-supplier.dto';
@@ -22,22 +23,19 @@ export class SuppliersService {
   ) {}
 
   async list(
-    pagination?: { page?: number; limit?: number; isActive?: boolean; search?: string },
+    pagination?: {
+      page?: number;
+      limit?: number;
+      isActive?: boolean;
+      search?: string;
+    },
     tenantId?: string | null,
   ) {
     if (!tenantId) throw new ForbiddenException('Tenant requerido.');
     const page = pagination?.page ?? 1;
     const limit = pagination?.limit ?? 20;
     const skip = (page - 1) * limit;
-    const where: {
-      tenantId: string;
-      isActive?: boolean;
-      OR?: Array<
-        | { nit: { contains: string; mode: 'insensitive' } }
-        | { name: { contains: string; mode: 'insensitive' } }
-        | { contactPerson: { contains: string; mode: 'insensitive' } }
-        | { email: { contains: string; mode: 'insensitive' } };
-    } = { tenantId };
+    const where: Prisma.SupplierWhereInput = { tenantId };
     if (pagination?.isActive === true) where.isActive = true;
     const searchTerm = pagination?.search?.trim();
     if (searchTerm) {
@@ -93,7 +91,11 @@ export class SuppliersService {
     return s;
   }
 
-  async create(dto: CreateSupplierDto, createdByUserId?: string, tenantId?: string | null) {
+  async create(
+    dto: CreateSupplierDto,
+    createdByUserId?: string,
+    tenantId?: string | null,
+  ) {
     if (!tenantId) throw new ForbiddenException('Tenant requerido.');
     const startTime = Date.now();
     this.logger.log(`Creando proveedor ${dto.nit}`, {
@@ -148,7 +150,12 @@ export class SuppliersService {
     }
   }
 
-  async update(id: string, dto: UpdateSupplierDto, updatedByUserId?: string, tenantId?: string | null) {
+  async update(
+    id: string,
+    dto: UpdateSupplierDto,
+    updatedByUserId?: string,
+    tenantId?: string | null,
+  ) {
     if (!tenantId) throw new ForbiddenException('Tenant requerido.');
     const oldSupplierData = await this.prisma.supplier.findFirst({
       where: { id, tenantId },
