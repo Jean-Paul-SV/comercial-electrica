@@ -3,10 +3,9 @@ import { ThrottlerGuard } from '@nestjs/throttler';
 
 /**
  * Guard personalizado para rate limiting.
- * - En desarrollo (NODE_ENV !== 'production'): no aplica límites para evitar 429 durante desarrollo.
- * - Usuarios autenticados: tracker por user id.
- * - POST /auth/forgot-password: tracker por email (límite por cuenta, no solo por IP).
- * - Resto: tracker por IP.
+ * - En desarrollo: no aplica límites.
+ * - En producción: solo limita POST /auth/forgot-password (3 por 15 min por email).
+ *   El resto de rutas no se limitan para evitar 429 al navegar (ventas, reportes, etc.).
  */
 @Injectable()
 export class ThrottleAuthGuard extends ThrottlerGuard {
@@ -16,24 +15,11 @@ export class ThrottleAuthGuard extends ThrottlerGuard {
     }
     const req = context.switchToHttp().getRequest<{ method?: string; url?: string; originalUrl?: string }>();
     const path = (req.originalUrl ?? req.url ?? '').split('?')[0];
-    if (req.method === 'GET' && (path === '' || path === '/')) {
-      return true;
-    }
-    // No limitar login para evitar 429 al iniciar sesión desde Vercel/frontend
-    if (req.method === 'POST' && (path === '/auth/login' || path === 'auth/login')) {
-      return true;
-    }
-    // Rutas que el frontend carga al entrar al dashboard; evitar 429 en carga inicial
-    const skipPaths = [
-      '/auth/me',
-      'auth/me',
-      '/onboarding/status',
-      'onboarding/status',
-    ];
-    if (req.method === 'GET' && skipPaths.some((p) => path === p || path.endsWith(p))) {
-      return true;
-    }
-    if (req.method === 'GET' && (path.startsWith('/reports/') || path.startsWith('reports/'))) {
+    const normalizedPath = path.replace(/^\/+/, '') || '/';
+    const isForgotPassword =
+      req.method === 'POST' &&
+      (normalizedPath === 'auth/forgot-password' || normalizedPath === '/auth/forgot-password');
+    if (!isForgotPassword) {
       return true;
     }
     return super.canActivate(context);

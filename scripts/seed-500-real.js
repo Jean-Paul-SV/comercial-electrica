@@ -25,11 +25,12 @@ const MODULE_CODES = [
 ];
 
 function parseArgs(argv) {
-  const out = { clean: false, force: false };
+  const out = { clean: false, force: false, fixTenantOnly: false };
   for (let i = 2; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--clean') out.clean = true;
     else if (a === '--force') out.force = true;
+    else if (a === '--fix-tenant-only') out.fixTenantOnly = true;
   }
   return out;
 }
@@ -168,8 +169,35 @@ async function main() {
       });
     }
     console.log('[OK] Tenant por defecto creado');
+  } else {
+    if (!tenant.planId) {
+      tenant = await prisma.tenant.update({
+        where: { id: tenant.id },
+        data: { planId: plan.id },
+      });
+      console.log('[OK] Tenant por defecto actualizado con planId');
+    }
+    const existingModules = await prisma.tenantModule.findMany({
+      where: { tenantId: tenant.id },
+      select: { moduleCode: true },
+    });
+    const existingSet = new Set(existingModules.map((m) => m.moduleCode));
+    for (const code of MODULE_CODES) {
+      if (!existingSet.has(code)) {
+        await prisma.tenantModule.create({
+          data: { tenantId: tenant.id, moduleCode: code, enabled: true },
+        });
+      }
+    }
+    console.log('[OK] Módulos del tenant asegurados (advanced_reports, etc.)');
   }
   const tenantId = tenant.id;
+
+  if (opts.fixTenantOnly) {
+    console.log('=== Solo corrección de tenant/plan/módulos (sin tocar datos de negocio) ===');
+    await prisma.$disconnect();
+    return;
+  }
 
   if (opts.clean) {
     console.log('\n[0] Limpiando datos de negocio...');

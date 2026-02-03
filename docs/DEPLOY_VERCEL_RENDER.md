@@ -49,14 +49,26 @@ Cuando el deploy termine, en la pestaña del servicio verás algo como:
 
 Guarda esta URL; la usarás en Vercel como `NEXT_PUBLIC_API_BASE_URL`.
 
-### 1.4 (Opcional) Datos iniciales en PostgreSQL
+### 1.4 Crear usuario para poder iniciar sesión (seed en producción)
 
-Si quieres datos de prueba en la base de Render:
+La base de Render viene vacía de usuarios. Para poder entrar con `admin@example.com` / `Admin123!`:
 
-- En local, apunta `DATABASE_URL` en `.env` a la base de Render (connection string en Render → base **comercial-electrica-db** → **Connect** → **Internal URL**).
-- Ejecuta migraciones si hace falta y luego:  
-  `node scripts/seed-dev.js --clean` (o el script que uses para seed).
-- No subas el `.env` con esa URL; solo úsalo puntualmente para el seed.
+1. En **Render** → base de datos **comercial-electrica-db** → **Connect**.
+2. Copia la **External Database URL** (para ejecutar desde tu PC; no uses Internal).
+3. En tu PC, desde la **raíz del proyecto**, ejecuta **solo esta vez** (sustituye `TU_EXTERNAL_URL` por la URL copiada):
+   ```bash
+   set DATABASE_URL=TU_EXTERNAL_URL
+   node scripts/seed-dev.js --force
+   ```
+   En PowerShell:
+   ```powershell
+   $env:DATABASE_URL="TU_EXTERNAL_URL"; node scripts/seed-dev.js --force
+   ```
+   **Importante:** `--force` es necesario porque el script por defecto solo permite bases locales; con `--force` acepta la URL de Render.
+4. No uses `--clean` si no quieres borrar datos; `--force` sin `--clean` crea solo los usuarios si no existen.
+5. Tras el seed, restaura tu `.env` local (o cierra la terminal) para no seguir apuntando a producción.
+
+**Credenciales creadas:** `admin@example.com` / `Admin123!` (y opcionalmente `vendedor@example.com` / `User123!`).
 
 ---
 
