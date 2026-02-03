@@ -23,6 +23,19 @@ export class ThrottleAuthGuard extends ThrottlerGuard {
     if (req.method === 'POST' && (path === '/auth/login' || path === 'auth/login')) {
       return true;
     }
+    // Rutas que el frontend carga al entrar al dashboard; evitar 429 en carga inicial
+    const skipPaths = [
+      '/auth/me',
+      'auth/me',
+      '/onboarding/status',
+      'onboarding/status',
+    ];
+    if (req.method === 'GET' && skipPaths.some((p) => path === p || path.endsWith(p))) {
+      return true;
+    }
+    if (req.method === 'GET' && (path.startsWith('/reports/') || path.startsWith('reports/'))) {
+      return true;
+    }
     return super.canActivate(context);
   }
 
