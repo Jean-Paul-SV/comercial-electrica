@@ -45,18 +45,18 @@ export class AuditService {
     context?: AuditLogContext,
   ) {
     // En modo test, no registrar auditoría para evitar problemas de foreign key constraints
-    if (
+    const isTestEnv =
       process.env.NODE_ENV === 'test' ||
       process.env.JEST_WORKER_ID !== undefined ||
       process.env.CI === 'true' ||
-      typeof jest !== 'undefined'
-    ) {
+      (typeof globalThis !== 'undefined' &&
+        (globalThis as unknown as { jest?: unknown }).jest !== undefined);
+    if (isTestEnv) {
       return;
     }
 
     const requestContext = getAuditContext();
-    const requestId =
-      context?.requestId ?? requestContext?.requestId ?? null;
+    const requestId = context?.requestId ?? requestContext?.requestId ?? null;
     const ip = context?.ip ?? requestContext?.ip ?? null;
     const userAgent = context?.userAgent ?? requestContext?.userAgent ?? null;
     const severity = context?.severity ?? null;
@@ -231,9 +231,7 @@ export class AuditService {
             ? log.createdAt.toISOString()
             : String(log.createdAt),
       });
-      const expectedHash = sha256Hex(
-        (previousEntryHash ?? '') + '|' + payload,
-      );
+      const expectedHash = sha256Hex((previousEntryHash ?? '') + '|' + payload);
       if (expectedHash !== log.entryHash) {
         errors.push(
           `Log ${log.id}: hash inválido (esperado ${expectedHash.slice(0, 16)}..., actual ${log.entryHash?.slice(0, 16)}...)`,
