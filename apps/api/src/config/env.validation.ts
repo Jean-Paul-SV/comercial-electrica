@@ -13,12 +13,18 @@ function requiredString(
   return v;
 }
 
-function optionalString(cfg: Record<string, unknown>, key: string): string | undefined {
+function optionalString(
+  cfg: Record<string, unknown>,
+  key: string,
+): string | undefined {
   const v = cfg[key];
   return typeof v === 'string' && v.trim().length > 0 ? v : undefined;
 }
 
-function optionalNumber(cfg: Record<string, unknown>, key: string): number | undefined {
+function optionalNumber(
+  cfg: Record<string, unknown>,
+  key: string,
+): number | undefined {
   const v = cfg[key];
   if (typeof v === 'number') return v;
   if (typeof v === 'string' && v.trim().length > 0) {
@@ -34,7 +40,9 @@ function optionalNumber(cfg: Record<string, unknown>, key: string): number | und
  * - En desarrollo/test: permite defaults donde aplica.
  */
 export function validateEnv(config: Record<string, unknown>) {
-  const nodeEnv = (optionalString(config, 'NODE_ENV') ?? 'development').toLowerCase();
+  const nodeEnv = (
+    optionalString(config, 'NODE_ENV') ?? 'development'
+  ).toLowerCase();
   const isProd = nodeEnv === 'production';
 
   // Siempre requeridas
@@ -47,13 +55,10 @@ export function validateEnv(config: Record<string, unknown>) {
   optionalNumber(config, 'CACHE_TTL_SECONDS');
 
   if (isProd) {
-    // En prod, CORS debe estar controlado por lista blanca (puede ser string vacío si la infraestructura lo resuelve,
-    // pero preferimos forzarlo para evitar despliegues inseguros).
-    requiredString(config, 'ALLOWED_ORIGINS');
-    // Refresh secret recomendado para sesiones largas.
+    // ALLOWED_ORIGINS opcional: si no está, la API usa CORS permitiendo todos (main.ts). Configurar en Render/Vercel para restringir.
+    optionalString(config, 'ALLOWED_ORIGINS');
     requiredString(config, 'JWT_REFRESH_SECRET');
   }
 
   return config;
 }
-

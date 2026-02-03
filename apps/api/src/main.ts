@@ -47,6 +47,12 @@ async function bootstrap() {
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean);
+  // En prod sin ALLOWED_ORIGINS configurado, permitir cualquier origen (p. ej. Render sin variable). Configurar en Dashboard para restringir.
+  const corsOrigin = isProd
+    ? allowedOrigins.length > 0
+      ? allowedOrigins
+      : true
+    : true;
 
   // Correlation / Request ID (útil para debugging y trazabilidad)
   app.use((req: Request, res: Response, next: NextFunction) => {
@@ -56,14 +62,15 @@ async function bootstrap() {
       (typeof req.headers['x-request-id'] === 'string'
         ? req.headers['x-request-id']
         : undefined);
-    const requestId = headerId && headerId.trim().length > 0 ? headerId : randomUUID();
+    const requestId =
+      headerId && headerId.trim().length > 0 ? headerId : randomUUID();
     r.requestId = requestId;
     res.setHeader('x-request-id', requestId);
     next();
   });
 
   app.enableCors({
-    origin: isProd ? allowedOrigins : true,
+    origin: corsOrigin,
     credentials: true,
   });
   // Filtro global de excepciones para respuestas consistentes
@@ -81,20 +88,19 @@ async function bootstrap() {
         // Personalizar mensajes de validación (incluye DTOs anidados: items[0].qty, etc.)
         const joinPath = (parent: string, prop: string) => {
           if (!parent) return prop;
-          return /^\d+$/.test(prop) ? `${parent}[${prop}]` : `${parent}.${prop}`;
+          return /^\d+$/.test(prop)
+            ? `${parent}[${prop}]`
+            : `${parent}.${prop}`;
         };
 
-        const flatten = (
-          errs: typeof errors,
-          parentPath = '',
-        ): string[] => {
+        const flatten = (errs: typeof errors, parentPath = ''): string[] => {
           return errs.flatMap((err) => {
             const path = joinPath(parentPath, err.property);
             const constraints = Object.values(err.constraints || {}).map(
               (msg) => `${path}: ${msg}`,
             );
             const children = err.children?.length
-              ? flatten(err.children as typeof errors, path)
+              ? flatten(err.children, path)
               : [];
             return constraints.length > 0
               ? [...constraints, ...children]
