@@ -31,12 +31,11 @@ services:
         generateValue: true
       - key: JWT_REFRESH_SECRET
         generateValue: true
-      # Añadir en el Dashboard de Render después del primer deploy:
-      # - ALLOWED_ORIGINS = https://tu-app.vercel.app (URL de Vercel)
-      # - REDIS_URL = redis://... (crear cuenta gratis en https://upstash.com)
-      # - FRONTEND_URL = https://tu-app.vercel.app
+      # Por defecto permite cualquier origen; en Dashboard cambia a la URL de Vercel.
       - key: ALLOWED_ORIGINS
-        sync: false
+        value: "*"
+      # Añadir en el Dashboard: REDIS_URL (Upstash), FRONTEND_URL (URL de Vercel).
+      # - key: REDIS_URL / FRONTEND_URL → sync: false o valor
       - key: REDIS_URL
         sync: false
       - key: FRONTEND_URL
