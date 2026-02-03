@@ -14,6 +14,11 @@ export class ThrottleAuthGuard extends ThrottlerGuard {
     if (process.env.NODE_ENV !== 'production') {
       return true;
     }
+    const req = context.switchToHttp().getRequest<{ method?: string; url?: string; originalUrl?: string }>();
+    const path = (req.originalUrl ?? req.url ?? '').split('?')[0];
+    if (req.method === 'GET' && (path === '' || path === '/')) {
+      return true;
+    }
     return super.canActivate(context);
   }
 
@@ -21,7 +26,9 @@ export class ThrottleAuthGuard extends ThrottlerGuard {
     const path = (req.url as string) ?? (req.originalUrl as string) ?? '';
     const body = req.body as { email?: string } | undefined;
     const isForgotPassword =
-      path.includes('forgot-password') && body?.email && typeof body.email === 'string';
+      path.includes('forgot-password') &&
+      body?.email &&
+      typeof body.email === 'string';
     if (isForgotPassword) {
       const email = String(body.email).toLowerCase().trim();
       return Promise.resolve(`forgot:${email}`);
