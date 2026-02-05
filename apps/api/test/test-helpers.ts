@@ -29,7 +29,9 @@ export const mockAuditService = {
 export function setupTestModule(
   moduleBuilder: TestingModuleBuilder,
 ): TestingModuleBuilder {
-  return moduleBuilder.overrideProvider(AuditService).useValue(mockAuditService);
+  return moduleBuilder
+    .overrideProvider(AuditService)
+    .useValue(mockAuditService);
 }
 
 /**
@@ -74,7 +76,10 @@ export async function cleanDatabase(prisma: PrismaService): Promise<void> {
     } catch (error) {
       // Ignorar errores de FK violations - pueden ocurrir si hay datos residuales
       // que serán limpiados en la siguiente iteración
-      if (error instanceof Error && error.message.includes('Foreign key constraint')) {
+      if (
+        error instanceof Error &&
+        error.message.includes('Foreign key constraint')
+      ) {
         // Continuar con la siguiente operación
         continue;
       }
@@ -120,7 +125,10 @@ export async function setupTestUser(
     });
 
   // Aceptar tanto 200 como 201 (algunos endpoints retornan 201 Created)
-  if ((loginResponse.status !== 200 && loginResponse.status !== 201) || !loginResponse.body?.accessToken) {
+  if (
+    (loginResponse.status !== 200 && loginResponse.status !== 201) ||
+    !loginResponse.body?.accessToken
+  ) {
     throw new Error(
       `Login failed. Status: ${loginResponse.status}, Body: ${JSON.stringify(loginResponse.body)}`,
     );
@@ -179,7 +187,9 @@ export async function closeTestQueues(app: INestApplication): Promise<void> {
 
   for (const name of queueNames) {
     try {
-      const queue = app.get<Queue>(getQueueToken(name), { strict: false } as any);
+      const queue = app.get<Queue>(getQueueToken(name), {
+        strict: false,
+      } as any);
       if (queue && typeof (queue as any).close === 'function') {
         await queue.close();
       }

@@ -6,7 +6,7 @@ import { useAuth } from '@shared/providers/AuthProvider';
 import { useOnlineStatus } from '@shared/hooks/useOnlineStatus';
 import { Button } from '@shared/components/ui/button';
 import { cn } from '@lib/utils';
-import { Menu, X, LogOut, WifiOff, KeyRound } from 'lucide-react';
+import { Menu, X, LogOut, WifiOff } from 'lucide-react';
 import { AlertsBell } from '@shared/components/AlertsBell';
 import { OfflineQueueBell } from '@shared/components/OfflineQueueBell';
 import { Sidebar, useSidebarOptional } from '@shared/ui/sidebar';
@@ -43,6 +43,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (mustChangePassword) setChangePasswordOpen(true);
   }, [mustChangePassword]);
+
+  useEffect(() => {
+    const openDialog = () => setChangePasswordOpen(true);
+    window.addEventListener('open-change-password', openDialog);
+    return () => window.removeEventListener('open-change-password', openDialog);
+  }, []);
 
   useEffect(() => {
     if (!isMobileOpen) return;
@@ -86,7 +92,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           userEmail={user?.email}
           userRole={user?.role}
           onLogout={logout}
-          onOpenChangePassword={() => setChangePasswordOpen(true)}
           collapsed={isCollapsed}
           showFooter={true}
           showCollapseToggle={true}
@@ -141,15 +146,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <span className="text-xs font-medium text-muted-foreground">{user.role}</span>
             </div>
           )}
-          <Button
-            variant="ghost"
-            size="sm"
-            className="w-full justify-start gap-2 text-muted-foreground hover:text-foreground"
-            onClick={() => { setChangePasswordOpen(true); setMobileOpenState(false); }}
-          >
-            <KeyRound className="h-4 w-4 shrink-0" />
-            Cambiar contraseña
-          </Button>
           <Button
             variant="ghost"
             size="sm"

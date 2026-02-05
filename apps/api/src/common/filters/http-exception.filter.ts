@@ -24,7 +24,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
     if (exception instanceof Prisma.PrismaClientKnownRequestError) {
       const prismaCode = exception.code;
-      const meta = (exception.meta ?? {}) as Record<string, unknown>;
+      const meta = exception.meta ?? {};
 
       // P2002: unique constraint violation
       if (prismaCode === 'P2002') {
@@ -132,7 +132,10 @@ export class AllExceptionsFilter implements ExceptionFilter {
           : exception.message || 'Datos inválidos para la operación.',
         details: isProd
           ? undefined
-          : { prisma: 'PrismaClientValidationError', message: exception.message },
+          : {
+              prisma: 'PrismaClientValidationError',
+              message: exception.message,
+            },
       };
     }
 
@@ -159,7 +162,10 @@ export class AllExceptionsFilter implements ExceptionFilter {
         message: 'Error interno del servidor (motor de base de datos).',
         details: isProd
           ? { prisma: 'PrismaClientRustPanicError' }
-          : { prisma: 'PrismaClientRustPanicError', message: exception.message },
+          : {
+              prisma: 'PrismaClientRustPanicError',
+              message: exception.message,
+            },
       };
     }
 
@@ -170,7 +176,10 @@ export class AllExceptionsFilter implements ExceptionFilter {
         message: 'Error interno del servidor (solicitud desconocida).',
         details: isProd
           ? { prisma: 'PrismaClientUnknownRequestError' }
-          : { prisma: 'PrismaClientUnknownRequestError', message: exception.message },
+          : {
+              prisma: 'PrismaClientUnknownRequestError',
+              message: exception.message,
+            },
       };
     }
 

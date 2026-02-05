@@ -20,6 +20,7 @@ import {
   RotateCcw,
   Receipt,
   ClipboardList,
+  Database,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -39,6 +40,7 @@ export const navIconMap: Record<string, LucideIcon> = {
   RotateCcw,
   Receipt,
   ClipboardList,
+  Database,
 };
 
 export function getNavIcon(name: string): LucideIcon | undefined {

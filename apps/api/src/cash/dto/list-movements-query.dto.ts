@@ -21,7 +21,8 @@ export class ListMovementsQueryDto extends PaginationDto {
   type?: CashMovementTypeDto;
 
   @ApiPropertyOptional({
-    description: 'Fecha inicial (ISO 8601). Filtra movimientos desde esta fecha.',
+    description:
+      'Fecha inicial (ISO 8601). Filtra movimientos desde esta fecha.',
     example: '2025-01-01T00:00:00.000Z',
   })
   @IsOptional()

@@ -53,7 +53,11 @@ export class QuotesController {
     @Body() dto: CreateQuoteDto,
     @Req() req: { user?: { sub?: string; tenantId?: string } },
   ) {
-    return this.quotesService.createQuote(dto, req.user?.sub, req.user?.tenantId);
+    return this.quotesService.createQuote(
+      dto,
+      req.user?.sub,
+      req.user?.tenantId,
+    );
   }
 
   @Get()
@@ -151,7 +155,12 @@ export class QuotesController {
     @Body() dto: UpdateQuoteDto,
     @Req() req: { user?: { sub?: string; tenantId?: string } },
   ) {
-    return this.quotesService.updateQuote(id, dto, req.user?.sub, req.user?.tenantId);
+    return this.quotesService.updateQuote(
+      id,
+      dto,
+      req.user?.sub,
+      req.user?.tenantId,
+    );
   }
 
   @Post(':id/convert')
@@ -201,6 +210,11 @@ export class QuotesController {
     @Body('status') status: QuoteStatus,
     @Req() req: { user?: { sub?: string; tenantId?: string } },
   ) {
-    return this.quotesService.updateQuoteStatus(id, status, req.user?.sub, req.user?.tenantId);
+    return this.quotesService.updateQuoteStatus(
+      id,
+      status,
+      req.user?.sub,
+      req.user?.tenantId,
+    );
   }
 }

@@ -30,7 +30,7 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useDashboard, useActionableIndicators, useDashboardSummary } from '@features/reports/hooks';
+import { useDashboard, useActionableIndicators, useDashboardSummary, useOperationalState } from '@features/reports/hooks';
 import { useOnboardingStatus } from '@features/onboarding/hooks';
 import { formatMoney } from '@shared/utils/format';
 import { KpiBarChart } from '@shared/components/charts/KpiBarChart';
@@ -52,6 +52,7 @@ export default function DashboardPage() {
   const dashboard = useDashboard();
   const actionable = useActionableIndicators({ days: 30, top: 10 });
   const dashboardSummary = useDashboardSummary({ days: 30, top: 10 });
+  const operationalState = useOperationalState();
   const onboarding = useOnboardingStatus();
   const [progressCollapsed, setProgressCollapsed] = useState(false);
   const [progressHidden, setProgressHidden] = useState(() => {
@@ -132,6 +133,50 @@ export default function DashboardPage() {
         </div>
       )}
 
+      {operationalState.data?.alerts && operationalState.data.alerts.length > 0 && (
+        <Card className="border-0 shadow-sm overflow-hidden">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4" />
+              Acciones recomendadas
+            </CardTitle>
+            <CardDescription>
+              Alertas por caja, inventario, cotizaciones, facturas proveedor y ventas
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <ul className="space-y-3">
+              {operationalState.data.alerts
+                .slice()
+                .sort((a, b) => a.priority - b.priority)
+                .map((alert) => (
+                  <li
+                    key={alert.code + (alert.entityIds?.[0] ?? '')}
+                    className={`flex flex-col gap-2 rounded-lg border-l-4 py-2 px-3 bg-muted/30 dark:bg-muted/20 ${severityBorderClass[alert.severity] ?? 'border-l-muted-foreground/40'}`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-foreground">{alert.title}</p>
+                        <p className="mt-0.5 text-xs text-muted-foreground">{alert.message}</p>
+                      </div>
+                      {alert.count > 0 && (
+                        <Badge variant="secondary" className="shrink-0 text-xs">
+                          {alert.count}
+                        </Badge>
+                      )}
+                    </div>
+                    {alert.actionLabel && alert.actionHref && (
+                      <Button asChild size="sm" variant="outline" className="w-fit">
+                        <Link href={alert.actionHref}>{alert.actionLabel}</Link>
+                      </Button>
+                    )}
+                  </li>
+                ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
+
       {showProgressPanel && onboardingData && (
         <Card className="border-0 shadow-sm">
           <CardHeader className="pb-2">
@@ -203,10 +248,15 @@ export default function DashboardPage() {
         <p className="text-sm text-muted-foreground">Cargando KPIs…</p>
       )}
       {dashboard.isError && (
-        <p className="text-sm text-destructive">
-          {(dashboard.error as { message?: string })?.message ??
-            'Error cargando dashboard'}
-        </p>
+        <div className="rounded-lg border border-destructive/50 bg-destructive/5 px-4 py-3">
+          <p className="text-sm font-medium text-destructive">
+            {(dashboard.error as { message?: string })?.message ??
+              'Error cargando dashboard'}
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Comprueba que la API esté en marcha (ej. <code className="rounded bg-muted px-1">npm run dev</code> en <code className="rounded bg-muted px-1">apps/api</code>) y que <code className="rounded bg-muted px-1">NEXT_PUBLIC_API_BASE_URL</code> en el frontend apunte a la API.
+          </p>
+        </div>
       )}
 
       {d && (

@@ -12,6 +12,10 @@ export class RegisterUserDto {
   @IsEmail()
   email!: string;
 
+  @IsOptional()
+  @IsString()
+  name?: string;
+
   /** Requerido si generateTempPassword no es true. Si generateTempPassword es true se ignora. */
   @IsOptional()
   @IsString()

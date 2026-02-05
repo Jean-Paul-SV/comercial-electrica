@@ -21,6 +21,31 @@ export type SaleListItem = {
   createdBy?: { id: string; email: string } | null;
 };
 
+/** Detalle de una venta (GET /sales/:id) */
+export type SaleDetail = SaleListItem & {
+  status: string;
+  discountTotal?: number;
+  createdAt: string;
+  updatedAt: string;
+  items: Array<{
+    id: string;
+    productId: string;
+    qty: number;
+    unitPrice: number;
+    lineTotal?: number;
+    product: { id: string; name: string; internalCode?: string };
+  }>;
+  invoices?: Array<{
+    id: string;
+    number: string;
+    issuedAt: string;
+    status: string;
+    subtotal: number;
+    taxTotal: number;
+    grandTotal: number;
+  }>;
+};
+
 export type CreateSaleItemPayload = {
   productId: string;
   qty: number;

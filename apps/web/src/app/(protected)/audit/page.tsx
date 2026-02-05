@@ -27,6 +27,7 @@ import {
 } from '@shared/components/ui/dialog';
 import { Skeleton } from '@shared/components/ui/skeleton';
 import { Pagination } from '@shared/components/Pagination';
+import { toast } from 'sonner';
 import { formatDateTime } from '@shared/utils/format';
 import { ClipboardList, Eye, ShieldCheck } from 'lucide-react';
 import { useAuditLogsList, useVerifyAuditChain } from '@features/audit/hooks';
@@ -169,14 +170,23 @@ export default function AuditPage() {
   const runVerifyChain = () => {
     setVerifyResult(null);
     verifyChain.mutate(undefined, {
-      onSuccess: (data) => setVerifyResult(data),
-      onError: () =>
+      onSuccess: (data) => {
+        setVerifyResult(data);
+        if (data?.valid) {
+          toast.success('Cadena de integridad verificada correctamente');
+        } else {
+          toast.warning('La cadena presenta inconsistencias. Revisa el resultado.');
+        }
+      },
+      onError: (e) => {
         setVerifyResult({
           valid: false,
           totalChecked: 0,
           totalWithHash: 0,
           errors: ['Error al conectar con el servidor.'],
-        }),
+        });
+        toast.error((e as Error)?.message ?? 'Error al verificar la cadena');
+      },
     });
   };
 

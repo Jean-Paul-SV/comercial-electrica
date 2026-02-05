@@ -22,6 +22,7 @@ import { AuditService } from '../common/services/audit.service';
 import { MailerService } from '../mailer/mailer.service';
 import { PermissionsService } from './permissions.service';
 import { TenantModulesService } from './tenant-modules.service';
+import { StorageService } from '../common/services/storage.service';
 
 export type JwtPayload = {
   sub: string;
@@ -32,7 +33,7 @@ export type JwtPayload = {
 };
 
 export type MeResponse = {
-  user: { id: string; email: string; role: RoleName };
+  user: { id: string; email: string; role: RoleName; profilePictureUrl?: string | null };
   permissions: string[];
   tenant?: {
     id: string;
@@ -52,6 +53,7 @@ export class AuthService {
     private readonly config: ConfigService,
     private readonly permissions: PermissionsService,
     private readonly tenantModules: TenantModulesService,
+    private readonly storage: StorageService,
   ) {}
 
   async bootstrapAdmin(dto: BootstrapAdminDto) {
@@ -88,18 +90,21 @@ export class AuthService {
       ? randomBytes(16).toString('hex')
       : (dto.password ?? '');
     if (!generateTemp && (!password || password.length < 8)) {
-      throw new BadRequestException('La contraseña debe tener al menos 8 caracteres.');
+      throw new BadRequestException(
+        'La contraseña debe tener al menos 8 caracteres.',
+      );
     }
     const passwordHash = await argon2.hash(password);
     const user = await this.prisma.user.create({
       data: {
         email,
+        name: dto.name?.trim() || undefined,
         passwordHash,
         role: dto.role ?? RoleName.USER,
         tenantId: tenantId ?? undefined,
         mustChangePassword: generateTemp,
       },
-      select: { id: true, email: true, role: true, createdAt: true },
+      select: { id: true, email: true, name: true, role: true, createdAt: true },
     });
     await this.audit.logCreate('user', user.id, createdByUserId, {
       email: user.email,
@@ -118,7 +123,8 @@ export class AuthService {
     const email = dto.email.toLowerCase();
     const existing = await this.prisma.user.findUnique({ where: { email } });
     if (existing) throw new BadRequestException('Email ya registrado.');
-    const tenantId = await this.tenantModules.getEffectiveTenantId(createdByUserId);
+    const tenantId =
+      await this.tenantModules.getEffectiveTenantId(createdByUserId);
     const tempPassword = randomBytes(16).toString('hex');
     const passwordHash = await argon2.hash(tempPassword);
     const user = await this.prisma.user.create({
@@ -140,27 +146,34 @@ export class AuthService {
       { expiresIn: '7d' },
     );
     const isDev = process.env.NODE_ENV !== 'production';
-    return isDev
-      ? { user, inviteToken, tempPassword }
-      : { user, inviteToken };
+    return isDev ? { user, inviteToken, tempPassword } : { user, inviteToken };
   }
 
   /** Aceptar invitación: establecer contraseña con el token recibido por correo (o en dev). */
   async acceptInvite(dto: AcceptInviteDto) {
     let payload: { sub?: string; type?: string };
     try {
-      payload = await this.jwt.verifyAsync<{ sub: string; type: string }>(dto.token);
+      payload = await this.jwt.verifyAsync<{ sub: string; type: string }>(
+        dto.token,
+      );
     } catch {
-      throw new BadRequestException('Enlace de invitación inválido o expirado.');
+      throw new BadRequestException(
+        'Enlace de invitación inválido o expirado.',
+      );
     }
     if (payload.type !== 'invite' || !payload.sub) {
-      throw new BadRequestException('Enlace de invitación inválido o expirado.');
+      throw new BadRequestException(
+        'Enlace de invitación inválido o expirado.',
+      );
     }
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
       select: { id: true },
     });
-    if (!user) throw new BadRequestException('Enlace de invitación inválido o expirado.');
+    if (!user)
+      throw new BadRequestException(
+        'Enlace de invitación inválido o expirado.',
+      );
 
     const passwordHash = await argon2.hash(dto.password);
     await this.prisma.user.update({
@@ -177,43 +190,72 @@ export class AuthService {
 
   /** Lista usuarios del mismo tenant. Requiere users:read. */
   async listUsers(tenantId: string | null) {
-    const effectiveTenantId = tenantId ?? (await this.tenantModules.getDefaultTenantId());
+    const effectiveTenantId =
+      tenantId ?? (await this.tenantModules.getDefaultTenantId());
     return this.prisma.user.findMany({
       where: { tenantId: effectiveTenantId, isActive: true },
-      select: { id: true, email: true, role: true, createdAt: true },
+      select: { id: true, email: true, name: true, role: true, profilePictureUrl: true, createdAt: true },
       orderBy: { createdAt: 'desc' },
     });
   }
 
-  /** Actualiza rol y/o contraseña de un usuario del mismo tenant. Requiere users:update. */
-  async updateUser(
-    userId: string,
-    dto: UpdateUserDto,
-    requestUserId: string,
-  ) {
-    if (dto.role == null && dto.password == null) {
-      throw new BadRequestException('Debe indicar rol y/o contraseña.');
+  /** Actualiza nombre, rol y/o contraseña de un usuario del mismo tenant. Requiere users:update. */
+  async updateUser(userId: string, dto: UpdateUserDto, requestUserId: string) {
+    if (dto.name == null && dto.role == null && dto.password == null) {
+      throw new BadRequestException('Debe indicar nombre, rol y/o contraseña.');
     }
-    const requestTenantId = await this.tenantModules.getEffectiveTenantId(requestUserId);
+    const requestTenantId =
+      await this.tenantModules.getEffectiveTenantId(requestUserId);
     const target = await this.prisma.user.findUnique({
       where: { id: userId },
       select: { id: true, tenantId: true },
     });
     if (!target) throw new BadRequestException('Usuario no encontrado.');
-    const targetTenantId = target.tenantId ?? (await this.tenantModules.getDefaultTenantId());
+    const targetTenantId =
+      target.tenantId ?? (await this.tenantModules.getDefaultTenantId());
     if (targetTenantId !== requestTenantId) {
       throw new BadRequestException('Usuario no encontrado.');
     }
-    const data: { role?: RoleName; passwordHash?: string } = {};
+    const data: { name?: string; role?: RoleName; passwordHash?: string } = {};
+    if (dto.name !== undefined) data.name = dto.name.trim() || undefined;
     if (dto.role != null) data.role = dto.role;
-    if (dto.password != null) data.passwordHash = await argon2.hash(dto.password);
+    if (dto.password != null)
+      data.passwordHash = await argon2.hash(dto.password);
     const user = await this.prisma.user.update({
       where: { id: userId },
       data,
-      select: { id: true, email: true, role: true, createdAt: true },
+      select: { id: true, email: true, name: true, role: true, createdAt: true },
     });
-    await this.audit.logUpdate('user', user.id, requestUserId, undefined, { role: user.role });
+    await this.audit.logUpdate('user', user.id, requestUserId, undefined, {
+      name: user.name,
+      role: user.role,
+    });
     return user;
+  }
+
+  /** Desactiva (soft delete) un usuario del mismo tenant. Requiere users:delete. No se puede eliminar a uno mismo. */
+  async deleteUser(userId: string, requestUserId: string) {
+    if (userId === requestUserId) {
+      throw new BadRequestException('No puedes eliminar tu propio usuario.');
+    }
+    const requestTenantId =
+      await this.tenantModules.getEffectiveTenantId(requestUserId);
+    const target = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, tenantId: true, email: true },
+    });
+    if (!target) throw new BadRequestException('Usuario no encontrado.');
+    const targetTenantId =
+      target.tenantId ?? (await this.tenantModules.getDefaultTenantId());
+    if (targetTenantId !== requestTenantId) {
+      throw new BadRequestException('Usuario no encontrado.');
+    }
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { isActive: false },
+    });
+    await this.audit.logDelete('user', userId, requestUserId);
+    return { success: true };
   }
 
   /** Cambiar contraseña del usuario actual. Cualquier usuario autenticado puede cambiar la suya. */
@@ -254,12 +296,19 @@ export class AuthService {
       { expiresIn: '1h' },
     );
     try {
-      await this.audit.log('auth', user.id, 'forgot_password_requested', user.id, {});
+      await this.audit.log(
+        'auth',
+        user.id,
+        'forgot_password_requested',
+        user.id,
+        {},
+      );
     } catch (auditErr) {
       console.error('Error al registrar auditoría forgot_password:', auditErr);
     }
 
-    const frontendUrl = this.config.get<string>('FRONTEND_URL')?.replace(/\/$/, '') || '';
+    const frontendUrl =
+      this.config.get<string>('FRONTEND_URL')?.replace(/\/$/, '') || '';
     const resetLink = frontendUrl
       ? `${frontendUrl}/reset-password?token=${encodeURIComponent(resetToken)}`
       : '';
@@ -276,7 +325,11 @@ export class AuthService {
         `,
         text: `Restablecer contraseña: ${resetLink}\nSi no solicitaste esto, ignora este correo.`,
       });
-      if (!sent) console.error('No se pudo enviar el correo de restablecimiento a', email);
+      if (!sent)
+        console.error(
+          'No se pudo enviar el correo de restablecimiento a',
+          email,
+        );
     }
 
     const isDev = process.env.NODE_ENV !== 'production';
@@ -288,18 +341,27 @@ export class AuthService {
   async resetPassword(dto: ResetPasswordDto) {
     let payload: { sub?: string; type?: string };
     try {
-      payload = await this.jwt.verifyAsync<{ sub: string; type: string }>(dto.token);
+      payload = await this.jwt.verifyAsync<{ sub: string; type: string }>(
+        dto.token,
+      );
     } catch {
-      throw new BadRequestException('Enlace inválido o expirado. Solicita uno nuevo.');
+      throw new BadRequestException(
+        'Enlace inválido o expirado. Solicita uno nuevo.',
+      );
     }
     if (payload.type !== 'password_reset' || !payload.sub) {
-      throw new BadRequestException('Enlace inválido o expirado. Solicita uno nuevo.');
+      throw new BadRequestException(
+        'Enlace inválido o expirado. Solicita uno nuevo.',
+      );
     }
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
       select: { id: true },
     });
-    if (!user) throw new BadRequestException('Enlace inválido o expirado. Solicita uno nuevo.');
+    if (!user)
+      throw new BadRequestException(
+        'Enlace inválido o expirado. Solicita uno nuevo.',
+      );
 
     const passwordHash = await argon2.hash(dto.newPassword);
     await this.prisma.user.update({
@@ -307,7 +369,13 @@ export class AuthService {
       data: { passwordHash },
     });
     try {
-      await this.audit.log('auth', user.id, 'password_reset_completed', user.id, {});
+      await this.audit.log(
+        'auth',
+        user.id,
+        'password_reset_completed',
+        user.id,
+        {},
+      );
     } catch (auditErr) {
       console.error('Error al registrar auditoría password_reset:', auditErr);
     }
@@ -318,7 +386,15 @@ export class AuthService {
     const email = dto.email.toLowerCase();
     const user = await this.prisma.user.findUnique({
       where: { email },
-      select: { id: true, email: true, role: true, tenantId: true, passwordHash: true, mustChangePassword: true, isActive: true },
+      select: {
+        id: true,
+        email: true,
+        role: true,
+        tenantId: true,
+        passwordHash: true,
+        mustChangePassword: true,
+        isActive: true,
+      },
     });
     if (!user || !user.isActive) {
       try {
@@ -352,7 +428,10 @@ export class AuthService {
     } catch (auditErr) {
       console.error('Error al registrar auditoría de login:', auditErr);
     }
-    return { accessToken, mustChangePassword: user.mustChangePassword ?? false };
+    return {
+      accessToken,
+      mustChangePassword: user.mustChangePassword ?? false,
+    };
   }
 
   async getMe(userId: string): Promise<MeResponse> {
@@ -363,6 +442,7 @@ export class AuthService {
         email: true,
         role: true,
         tenantId: true,
+        profilePictureUrl: true,
         tenant: {
           select: {
             id: true,
@@ -373,12 +453,13 @@ export class AuthService {
       },
     });
     if (!user) throw new UnauthorizedException('Usuario no encontrado.');
-    const permissions = await this.permissions.getEnabledPermissionsForUser(userId);
+    const permissions =
+      await this.permissions.getEnabledPermissionsForUser(userId);
     const tenantId = user.tenantId ?? null;
     const enabledModules = await this.tenantModules.getEnabledModules(tenantId);
 
     const response: MeResponse = {
-      user: { id: user.id, email: user.email, role: user.role },
+      user: { id: user.id, email: user.email, role: user.role, profilePictureUrl: user.profilePictureUrl },
       permissions,
     };
     if (user.tenant) {
@@ -398,5 +479,96 @@ export class AuthService {
       };
     }
     return response;
+  }
+
+  /**
+   * Actualiza la foto de perfil del usuario actual.
+   */
+  async updateProfilePicture(
+    userId: string,
+    file: Express.Multer.File,
+  ): Promise<{ profilePictureUrl: string }> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, profilePictureUrl: true },
+    });
+
+    if (!user) {
+      throw new BadRequestException('Usuario no encontrado.');
+    }
+
+    // Eliminar foto anterior si existe
+    if (user.profilePictureUrl) {
+      await this.storage.deleteFile(user.profilePictureUrl);
+    }
+
+    // Guardar nueva foto
+    const profilePictureUrl = await this.storage.saveFile(file, 'profiles');
+
+    // Actualizar en BD
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { profilePictureUrl },
+    });
+
+    await this.audit.logUpdate(
+      'user',
+      userId,
+      userId,
+      { profilePictureUrl: user.profilePictureUrl },
+      { profilePictureUrl },
+    );
+
+    return { profilePictureUrl };
+  }
+
+  /**
+   * Actualiza la foto de perfil de un empleado (requiere permisos de administración).
+   */
+  async updateEmployeePicture(
+    employeeId: string,
+    file: Express.Multer.File,
+    requestUserId: string,
+  ): Promise<{ profilePictureUrl: string }> {
+    const requestTenantId =
+      await this.tenantModules.getEffectiveTenantId(requestUserId);
+    const employee = await this.prisma.user.findUnique({
+      where: { id: employeeId },
+      select: { id: true, tenantId: true, profilePictureUrl: true },
+    });
+
+    if (!employee) {
+      throw new BadRequestException('Empleado no encontrado.');
+    }
+
+    const employeeTenantId =
+      employee.tenantId ?? (await this.tenantModules.getDefaultTenantId());
+    if (employeeTenantId !== requestTenantId) {
+      throw new BadRequestException('Empleado no encontrado.');
+    }
+
+    // Eliminar foto anterior si existe
+    if (employee.profilePictureUrl) {
+      await this.storage.deleteFile(employee.profilePictureUrl);
+    }
+
+    // Guardar nueva foto
+    const profilePictureUrl = await this.storage.saveFile(file, 'profiles');
+
+    // Actualizar en BD
+    await this.prisma.user.update({
+      where: { id: employeeId },
+      data: { profilePictureUrl },
+    });
+
+    await this.audit.logUpdate(
+      'user',
+      employeeId,
+      requestUserId,
+      { profilePictureUrl: employee.profilePictureUrl },
+      { profilePictureUrl },
+    );
+
+    return { profilePictureUrl };
   }
 }

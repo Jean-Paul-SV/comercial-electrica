@@ -59,7 +59,7 @@ export class DianProcessor extends WorkerHost {
         this.isTestEnv &&
         (errorMessage.includes('no encontrado') ||
           // Prisma "Record to update not found"
-          (error as any)?.code === 'P2025')
+          error?.code === 'P2025')
       ) {
         this.logger.debug(
           `[Job ${job.id}] Saltando DIAN en tests (documento no encontrado): ${dianDocumentId}`,

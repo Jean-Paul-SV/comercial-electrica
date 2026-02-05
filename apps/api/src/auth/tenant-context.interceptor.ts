@@ -8,6 +8,7 @@ import { Observable, from, switchMap } from 'rxjs';
 import { TenantModulesService } from './tenant-modules.service';
 import { JwtPayload } from './auth.service';
 
+/* eslint-disable @typescript-eslint/no-namespace -- Express.User augmentation requires namespace */
 declare global {
   namespace Express {
     interface User extends JwtPayload {
@@ -15,6 +16,7 @@ declare global {
     }
   }
 }
+/* eslint-enable @typescript-eslint/no-namespace */
 
 /**
  * Rellena req.user.tenantId cuando el usuario está autenticado pero el JWT no trae tenantId (tokens antiguos).
@@ -24,10 +26,7 @@ declare global {
 export class TenantContextInterceptor implements NestInterceptor {
   constructor(private readonly tenantModules: TenantModulesService) {}
 
-  intercept(
-    context: ExecutionContext,
-    next: CallHandler,
-  ): Observable<unknown> {
+  intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     const req = context.switchToHttp().getRequest<{ user?: Express.User }>();
     const user = req.user;
     if (!user?.sub || user.tenantId != null) {

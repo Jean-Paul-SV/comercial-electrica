@@ -144,9 +144,13 @@ export class AuditController {
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Obtener logs de una entidad específica',
-    description: 'Obtiene todos los logs de auditoría de una entidad específica (requiere ADMIN)',
+    description:
+      'Obtiene todos los logs de auditoría de una entidad específica (requiere ADMIN)',
   })
-  @ApiParam({ name: 'entity', description: 'Tipo de entidad (product, customer, sale, etc.)' })
+  @ApiParam({
+    name: 'entity',
+    description: 'Tipo de entidad (product, customer, sale, etc.)',
+  })
   @ApiParam({ name: 'entityId', description: 'ID de la entidad' })
   @ApiResponse({
     status: 200,

@@ -7,7 +7,8 @@ import { PaginationDto } from '../../common/dto/pagination.dto';
  */
 export class ListSalesQueryDto extends PaginationDto {
   @ApiPropertyOptional({
-    description: 'Buscar por nombre de cliente, número de factura o email del vendedor',
+    description:
+      'Buscar por nombre de cliente, número de factura o email del vendedor',
     example: 'Juan',
     type: String,
     maxLength: 100,

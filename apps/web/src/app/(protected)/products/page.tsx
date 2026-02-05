@@ -34,7 +34,8 @@ import { Skeleton } from '@shared/components/ui/skeleton';
 import { Pagination } from '@shared/components/Pagination';
 import { EmptyState } from '@shared/components/EmptyState';
 import { formatMoney } from '@shared/utils/format';
-import { Package, Plus, Tag, Pencil } from 'lucide-react';
+import Link from 'next/link';
+import { Package, Plus, Tag, Pencil, Eye } from 'lucide-react';
 import {
   useProductsList,
   useCreateProduct,
@@ -333,7 +334,12 @@ export default function ProductsPage() {
                           {p.internalCode}
                         </TableCell>
                         <TableCell className="font-medium text-foreground">
-                          {p.name}
+                          <Link
+                            href={`/products/${p.id}`}
+                            className="hover:underline text-foreground"
+                          >
+                            {p.name}
+                          </Link>
                         </TableCell>
                         <TableCell className="text-muted-foreground">
                           {p.category?.name ?? '—'}
@@ -342,16 +348,29 @@ export default function ProductsPage() {
                           {formatMoney(p.price)}
                         </TableCell>
                         <TableCell className="text-center">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
-                            onClick={() => setEditingProductId(p.id)}
-                            title="Editar producto"
-                            aria-label="Editar producto"
-                          >
-                            <Pencil className="h-3.5 w-3.5" />
-                          </Button>
+                          <div className="flex items-center justify-center gap-0.5">
+                            <Link href={`/products/${p.id}`}>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+                                title="Ver detalle"
+                                aria-label="Ver detalle"
+                              >
+                                <Eye className="h-3.5 w-3.5" />
+                              </Button>
+                            </Link>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+                              onClick={() => setEditingProductId(p.id)}
+                              title="Editar producto"
+                              aria-label="Editar producto"
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}

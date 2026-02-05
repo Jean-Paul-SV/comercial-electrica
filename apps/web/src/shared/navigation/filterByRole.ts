@@ -25,11 +25,12 @@ function itemVisible(
   if (!role) return false;
   if (item.disabled) return false;
   if (!moduleVisible(item.moduleCode, enabledModules)) return false;
+  // Administrador ve todo sin depender de la lista de permisos (p. ej. RBAC sin users:read).
+  if (role === 'ADMIN') return true;
   if (permissions && permissions.length > 0) {
     if (permissions.includes('*')) return true;
     if (item.requiredPermission && !permissions.includes(item.requiredPermission)) return false;
   }
-  if (role === 'ADMIN') return true;
   if (!item.roles || item.roles.length === 0) return true;
   return item.roles.includes(role);
 }
@@ -42,12 +43,13 @@ function sectionVisible(
 ): boolean {
   if (!role) return false;
   if (!moduleVisible(section.moduleCode, enabledModules)) return false;
+  // Administrador ve todas las secciones sin depender de la lista de permisos.
+  if (role === 'ADMIN') return true;
   if (permissions && permissions.length > 0) {
     if (permissions.includes('*')) return true;
     if (section.requiredPermission && !permissions.includes(section.requiredPermission))
       return false;
   }
-  if (role === 'ADMIN') return true;
   if (section.roles && section.roles.length > 0 && !section.roles.includes(role)) return false;
   const hasVisibleItem = section.items.some((item) =>
     itemVisible(item, role, permissions, enabledModules)

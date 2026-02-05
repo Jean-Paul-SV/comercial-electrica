@@ -90,9 +90,7 @@ export class MetricsService {
   getPrometheusText(): string {
     const uptimeSeconds = (Date.now() - this.startedAt) / 1000;
     const avgDurationMs =
-      this.totalRequests > 0
-        ? this.totalDurationMs / this.totalRequests
-        : 0;
+      this.totalRequests > 0 ? this.totalDurationMs / this.totalRequests : 0;
 
     const lines: string[] = [
       '# HELP api_http_requests_total Total HTTP requests.',
@@ -118,4 +116,3 @@ export class MetricsService {
     return lines.join('\n') + '\n';
   }
 }
-

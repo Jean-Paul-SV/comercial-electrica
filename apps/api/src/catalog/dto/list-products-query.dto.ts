@@ -27,7 +27,8 @@ export class ListProductsQueryDto extends PaginationDto {
   lowStock?: string;
 
   @ApiPropertyOptional({
-    description: 'Umbral de stock bajo (por defecto 10). Solo aplica cuando lowStock=true',
+    description:
+      'Umbral de stock bajo (por defecto 10). Solo aplica cuando lowStock=true',
     example: 10,
     minimum: 0,
     type: Number,

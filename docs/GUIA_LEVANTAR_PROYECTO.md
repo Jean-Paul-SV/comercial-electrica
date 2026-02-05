@@ -79,6 +79,8 @@ Revisar que `.env` tenga al menos:
 - `REDIS_URL="redis://localhost:6379"`
 - `JWT_ACCESS_SECRET` (puedes dejar el valor de ejemplo en desarrollo)
 
+**Resumen del día con IA (opcional):** para que el dashboard muestre el "Resumen del día" generado por IA, añade en `.env` tu clave de OpenAI (sin comillas): `OPENAI_API_KEY=sk-...`. Obtén la clave en [platform.openai.com/api-keys](https://platform.openai.com/api-keys). Si no la configuras, se mostrará el "Resumen automático" (sin LLM).
+
 El frontend usa por defecto `http://localhost:3000` para la API. Si cambias el puerto de la API, en `apps/web` crea o edita `.env.local` con:
 
 ```env
@@ -184,6 +186,7 @@ Cada uno se ejecuta en su propia ventana de terminal (si usas `concurrently`).
 | Docker no arranca | Abre Docker Desktop y vuelve a ejecutar `npm run db:up`. Si pide actualizar WSL, ejecuta `wsl --update` como administrador. |
 | Error de conexión a BD | Comprueba que `ce_postgres` esté en marcha (`docker ps`) y que `DATABASE_URL` en `.env` coincida con `infra/docker-compose.yml`. |
 | Prisma EPERM | Cerrar IDE, ejecutar PowerShell como administrador, `npm run prisma:generate` de nuevo. |
+| 500 / Error interno (esquema de base de datos) en /auth/users o /sales | Migraciones pendientes. Desde la raíz: `npm run prisma:migrate`. Luego reinicia la API. |
 | "npm no se reconoce" | Node.js no está en el PATH: reinstala Node.js (marca "Add to PATH") o abre una terminal nueva. |
 | “Bootstrap ya fue realizado” | Ya hay usuarios; usa ese usuario o crea uno por `POST /auth/users` (con token de admin). |
 
@@ -209,4 +212,12 @@ Cada uno se ejecuta en su propia ventana de terminal (si usas `concurrently`).
 
 ---
 
-**Última actualización:** Enero 2026
+## Cuando el programa esté finalizado
+
+Si el desarrollo está completo y quieres desplegar y operar en producción, sigue la guía:
+
+- **[Pasos cuando el programa esté finalizado](./PASOS_CUANDO_FINALICE.md)** — cierre de desarrollo, despliegue (Vercel + Render), primer usuario, CORS, backups y operación continua.
+
+---
+
+**Última actualización:** Febrero 2026

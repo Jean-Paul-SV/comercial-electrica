@@ -1,9 +1,4 @@
-import {
-  IsEmail,
-  IsOptional,
-  IsString,
-  MinLength,
-} from 'class-validator';
+import { IsEmail, IsOptional, IsString, MinLength } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateSupplierDto {
@@ -16,7 +11,10 @@ export class CreateSupplierDto {
   @MinLength(5)
   nit!: string;
 
-  @ApiProperty({ example: 'Distribuidora Eléctrica S.A.S.', description: 'Razón social' })
+  @ApiProperty({
+    example: 'Distribuidora Eléctrica S.A.S.',
+    description: 'Razón social',
+  })
   @IsString()
   @MinLength(2)
   name!: string;

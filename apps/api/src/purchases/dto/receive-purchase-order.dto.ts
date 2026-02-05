@@ -12,11 +12,18 @@ import {
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 class ReceivedItemDto {
-  @ApiProperty({ example: 'purchase-order-item-uuid-123', description: 'ID del item del pedido' })
+  @ApiProperty({
+    example: 'purchase-order-item-uuid-123',
+    description: 'ID del item del pedido',
+  })
   @IsUUID()
   itemId!: string;
 
-  @ApiProperty({ example: 95, description: 'Cantidad recibida (puede ser menor a la pedida)', minimum: 1 })
+  @ApiProperty({
+    example: 95,
+    description: 'Cantidad recibida (puede ser menor a la pedida)',
+    minimum: 1,
+  })
   @Type(() => Number)
   @IsInt()
   @Min(1)

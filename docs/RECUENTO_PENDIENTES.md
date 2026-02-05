@@ -2,7 +2,9 @@
 
 > **Fecha:** 2026-01-28  
 > **Estado del Proyecto:** 🟢 8.5/10 - EXCELENTE  
-> **Última actualización:** 2026-01-28
+> **Última actualización:** 2026-02-04
+>
+> **⚠️ Nota:** Las secciones **2 (Frontend Básico)** y **7 (Módulo de Backups)** están desactualizadas: el frontend Next.js ya tiene todas las pantallas principales (login, dashboard, productos, clientes, ventas, cotizaciones, caja, inventario, reportes, auditoría, etc.) y el módulo de backups (servicio + endpoints + S3) está implementado. Para una lista verificada contra el código, ver **`QUE_FALTA_TODO_EL_SOFTWARE.md`**.
 
 ---
 

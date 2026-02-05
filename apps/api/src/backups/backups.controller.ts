@@ -38,7 +38,8 @@ export class BackupsController {
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Crear backup',
-    description: 'Crea un backup de la base de datos (requiere permiso backups:manage)',
+    description:
+      'Crea un backup de la base de datos (requiere permiso backups:manage)',
   })
   @ApiResponse({ status: 201, description: 'Backup creado exitosamente' })
   @ApiResponse({ status: 401, description: 'No autenticado' })
@@ -73,14 +74,16 @@ export class BackupsController {
     description: 'Archivo del backup',
     content: { 'application/octet-stream': {} },
   })
-  @ApiResponse({ status: 404, description: 'Backup no encontrado o no disponible' })
+  @ApiResponse({
+    status: 404,
+    description: 'Backup no encontrado o no disponible',
+  })
   @ApiResponse({ status: 401, description: 'No autenticado' })
   @ApiResponse({ status: 403, description: 'No autorizado (requiere ADMIN)' })
   async download(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
   ): Promise<StreamableFile> {
-    const { filePath, fileName } =
-      await this.backups.getBackupDownload(id);
+    const { filePath, fileName } = await this.backups.getBackupDownload(id);
     const stream = createReadStream(filePath);
     return new StreamableFile(stream, {
       type: 'application/octet-stream',

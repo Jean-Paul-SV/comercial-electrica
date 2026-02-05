@@ -23,11 +23,14 @@ export class ExpensesService {
 
   /** Delegate Expense (cliente Prisma: ejecutar `npx prisma generate` en apps/api para tipos completos). */
   private get expenseDelegate() {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return (this.prisma as any).expense;
   }
 
-  async create(dto: CreateExpenseDto, createdBy?: string, tenantId?: string | null) {
+  async create(
+    dto: CreateExpenseDto,
+    createdBy?: string,
+    tenantId?: string | null,
+  ) {
     if (!tenantId) throw new ForbiddenException('Tenant requerido.');
     this.limits.validateCashAmount(Number(dto.amount), 'movement');
 
@@ -39,7 +42,8 @@ export class ExpensesService {
       const session = await this.prisma.cashSession.findFirst({
         where: { id: dto.cashSessionId, tenantId },
       });
-      if (!session) throw new NotFoundException('Sesión de caja no encontrada.');
+      if (!session)
+        throw new NotFoundException('Sesión de caja no encontrada.');
       if (session.closedAt) {
         throw new BadRequestException(
           'No se puede registrar el gasto en una sesión de caja cerrada.',
@@ -140,7 +144,11 @@ export class ExpensesService {
     } else if (dto.expenseType === 'otros') {
       where.OR = [
         { category: null },
-        { category: { notIn: [CATEGORY_FACTURA_PROVEEDOR, CATEGORY_PEDIDO_DE_COMPRA] } },
+        {
+          category: {
+            notIn: [CATEGORY_FACTURA_PROVEEDOR, CATEGORY_PEDIDO_DE_COMPRA],
+          },
+        },
       ];
     } else if (dto.category?.trim() && !search) {
       where.category = dto.category.trim();
@@ -192,7 +200,12 @@ export class ExpensesService {
     return expense;
   }
 
-  async remove(id: string, deletedByUserId?: string, deletionReason?: string, tenantId?: string | null) {
+  async remove(
+    id: string,
+    deletedByUserId?: string,
+    deletionReason?: string,
+    tenantId?: string | null,
+  ) {
     if (!tenantId) throw new ForbiddenException('Tenant requerido.');
     const expense = await this.expenseDelegate.findFirst({
       where: { id, tenantId },
@@ -218,12 +231,21 @@ export class ExpensesService {
       if (movement) {
         await tx.cashMovement.delete({ where: { id: movement.id } });
       }
-      await (tx as unknown as { expense: { delete: (args: { where: { id: string } }) => Promise<unknown> } }).expense.delete({
+      await (
+        tx as unknown as {
+          expense: {
+            delete: (args: { where: { id: string } }) => Promise<unknown>;
+          };
+        }
+      ).expense.delete({
         where: { id },
       });
     });
 
-    this.logger.log(`Gasto eliminado`, { expenseId: id, userId: deletedByUserId });
+    this.logger.log(`Gasto eliminado`, {
+      expenseId: id,
+      userId: deletedByUserId,
+    });
     await this.audit.logDelete('expense', id, deletedByUserId, {
       amount: Number(expense.amount),
       description: expense.description,

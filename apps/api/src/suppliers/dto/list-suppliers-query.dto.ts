@@ -17,7 +17,8 @@ export class ListSuppliersQueryDto extends PaginationDto {
   isActive?: string;
 
   @ApiPropertyOptional({
-    description: 'Buscar por NIT, nombre, contacto o email (contiene, sin distinguir mayúsculas)',
+    description:
+      'Buscar por NIT, nombre, contacto o email (contiene, sin distinguir mayúsculas)',
   })
   @IsOptional()
   @IsString()

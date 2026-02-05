@@ -25,6 +25,7 @@ export function bootstrapAdmin(payload: BootstrapAdminPayload) {
 
 export type RegisterUserPayload = {
   email: string;
+  name?: string;
   password?: string;
   role?: 'ADMIN' | 'USER';
   /** Si true, se genera contraseña temporal y el usuario debe cambiarla en el primer login. */
@@ -43,6 +44,7 @@ export function listUsers(authToken: string): Promise<UserListItem[]> {
 }
 
 export type UpdateUserPayload = {
+  name?: string;
   role?: 'ADMIN' | 'USER';
   password?: string;
 };
@@ -53,6 +55,10 @@ export function updateUser(
   authToken: string,
 ): Promise<UserListItem> {
   return apiClient.patch(`/auth/users/${id}`, payload, { authToken });
+}
+
+export function deleteUser(id: string, authToken: string): Promise<{ success: boolean }> {
+  return apiClient.delete(`/auth/users/${id}`, { authToken });
 }
 
 export type ChangeMyPasswordPayload = {
@@ -109,5 +115,40 @@ export function acceptInvite(
   payload: AcceptInvitePayload,
 ): Promise<{ success: boolean }> {
   return apiClient.post('/auth/accept-invite', payload);
+}
+
+export type UploadProfilePictureResponse = {
+  profilePictureUrl: string;
+};
+
+export function uploadProfilePicture(
+  file: File,
+  authToken: string,
+): Promise<UploadProfilePictureResponse> {
+  const formData = new FormData();
+  formData.append('file', file);
+  return apiClient.put<UploadProfilePictureResponse>(
+    '/auth/profile/picture',
+    formData,
+    {
+      authToken,
+    },
+  );
+}
+
+export function uploadEmployeePicture(
+  userId: string,
+  file: File,
+  authToken: string,
+): Promise<UploadProfilePictureResponse> {
+  const formData = new FormData();
+  formData.append('file', file);
+  return apiClient.put<UploadProfilePictureResponse>(
+    `/auth/users/${userId}/picture`,
+    formData,
+    {
+      authToken,
+    },
+  );
 }
 

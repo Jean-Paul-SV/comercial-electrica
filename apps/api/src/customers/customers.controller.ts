@@ -134,18 +134,26 @@ export class CustomersController {
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Eliminar cliente',
-    description: 'Elimina un cliente (requiere permiso customers:delete). No se puede eliminar si tiene ventas asociadas.',
+    description:
+      'Elimina un cliente (requiere permiso customers:delete). No se puede eliminar si tiene ventas asociadas.',
   })
   @ApiParam({ name: 'id', description: 'ID del cliente' })
   @ApiResponse({ status: 200, description: 'Cliente eliminado exitosamente' })
   @ApiResponse({ status: 404, description: 'Cliente no encontrado' })
   @ApiResponse({ status: 400, description: 'Cliente tiene ventas asociadas' })
   @ApiResponse({ status: 401, description: 'No autenticado' })
-  @ApiResponse({ status: 403, description: 'No autorizado (requiere permiso customers:delete)' })
+  @ApiResponse({
+    status: 403,
+    description: 'No autorizado (requiere permiso customers:delete)',
+  })
   delete(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Req() req: { user?: { sub?: string; tenantId?: string } },
   ) {
-    return this.customers.delete(id, req.user?.sub, req.user?.tenantId ?? undefined);
+    return this.customers.delete(
+      id,
+      req.user?.sub,
+      req.user?.tenantId ?? undefined,
+    );
   }
 }

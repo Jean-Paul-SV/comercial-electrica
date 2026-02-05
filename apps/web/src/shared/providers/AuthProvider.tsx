@@ -8,7 +8,11 @@ const TOKEN_KEY = 'ce_access_token';
 
 export type AuthState = {
   token: string | null;
-  user: { id: string; email: string; role: 'ADMIN' | 'USER' } | null;
+  /** False hasta que se lee localStorage en el cliente; evita hidratación #418 y redirección prematura. */
+  hasCheckedStorage: boolean;
+  /** True cuando hay token pero aún no se ha cargado el user (getMe); evita redirigir a login al refrescar. */
+  isRestoringSession: boolean;
+  user: { id: string; email: string; role: 'ADMIN' | 'USER'; profilePictureUrl?: string | null } | null;
   permissions: string[];
   /** Módulos habilitados para el tenant (SaaS). Si vacío/undefined, no se filtra nav por módulo. */
   enabledModules: string[];
@@ -34,11 +38,18 @@ function readStoredToken(): string | null {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [token, setToken] = useState<string | null>(readStoredToken);
-  const [user, setUser] = useState<{ id: string; email: string; role: 'ADMIN' | 'USER' } | null>(null);
+  const [token, setToken] = useState<string | null>(null);
+  const [hasCheckedStorage, setHasCheckedStorage] = useState(false);
+  const [user, setUser] = useState<{ id: string; email: string; role: 'ADMIN' | 'USER'; profilePictureUrl?: string | null } | null>(null);
   const [permissions, setPermissions] = useState<string[]>([]);
   const [enabledModules, setEnabledModules] = useState<string[]>([]);
   const [mustChangePassword, setMustChangePassword] = useState(false);
+
+  useEffect(() => {
+    const stored = readStoredToken();
+    if (stored) setToken(stored);
+    setHasCheckedStorage(true);
+  }, []);
 
   const refreshMe = useCallback(async () => {
     if (!token) return;
@@ -78,18 +89,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setPermissions(res.permissions ?? []);
         setEnabledModules(res.tenant?.enabledModules ?? []);
       })
-      .catch(() => {
-        localStorage.removeItem(TOKEN_KEY);
-        setToken(null);
-        setUser(null);
-        setPermissions([]);
-        setEnabledModules([]);
+      .catch((err: { status?: number }) => {
+        // Solo cerrar sesión si el servidor responde 401 (token inválido/expirado).
+        // Errores de red o 5xx no deben sacar al usuario.
+        if (err?.status === 401) {
+          localStorage.removeItem(TOKEN_KEY);
+          setToken(null);
+          setUser(null);
+          setPermissions([]);
+          setEnabledModules([]);
+        } else {
+          setPermissions([]);
+          setEnabledModules([]);
+        }
       });
   }, [token]);
 
   const value = useMemo<AuthState>(() => {
+    const isRestoringSession = Boolean(token && !user);
     return {
       token,
+      hasCheckedStorage,
+      isRestoringSession,
       user,
       permissions,
       enabledModules,
@@ -111,7 +132,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       clearMustChangePassword: () => setMustChangePassword(false),
       refreshMe,
     };
-  }, [token, user, permissions, enabledModules, mustChangePassword, refreshMe]);
+  }, [token, hasCheckedStorage, user, permissions, enabledModules, mustChangePassword, refreshMe]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

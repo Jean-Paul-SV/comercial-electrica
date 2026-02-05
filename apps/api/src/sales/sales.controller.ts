@@ -2,6 +2,9 @@ import {
   Body,
   Controller,
   Get,
+  Param,
+  ParseUUIDPipe,
+  Patch,
   Post,
   Query,
   Req,
@@ -16,6 +19,7 @@ import {
 import { SalesService } from './sales.service';
 import { CreateSaleDto } from './dto/create-sale.dto';
 import { ListSalesQueryDto } from './dto/list-sales-query.dto';
+import { ListInvoicesQueryDto } from './dto/list-invoices-query.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @ApiTags('sales')
@@ -70,6 +74,99 @@ export class SalesController {
     );
   }
 
+  @Get('invoices')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Listar facturas de venta',
+    description:
+      'Obtiene todas las facturas del tenant (paginado). Filtros opcionales por búsqueda y estado.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Lista paginada de facturas',
+    schema: {
+      type: 'object',
+      properties: {
+        data: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              id: { type: 'string' },
+              number: { type: 'string' },
+              issuedAt: { type: 'string', format: 'date-time' },
+              status: { type: 'string' },
+              grandTotal: { type: 'number' },
+              customer: { type: 'object' },
+              sale: { type: 'object' },
+            },
+          },
+        },
+        meta: {
+          type: 'object',
+          properties: {
+            total: { type: 'number' },
+            page: { type: 'number' },
+            limit: { type: 'number' },
+            totalPages: { type: 'number' },
+            hasNextPage: { type: 'boolean' },
+            hasPreviousPage: { type: 'boolean' },
+          },
+        },
+      },
+    },
+  })
+  @ApiResponse({ status: 401, description: 'No autenticado' })
+  listInvoices(
+    @Query() query: ListInvoicesQueryDto,
+    @Req() req: { user?: { tenantId?: string } },
+  ) {
+    return this.sales.listInvoices(req?.user?.tenantId ?? null, {
+      page: query?.page,
+      limit: query?.limit,
+      search: query?.search?.trim() || undefined,
+      status: query?.status,
+    });
+  }
+
+  @Patch('invoices/:id/void')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Anular factura',
+    description:
+      'Anula una factura emitida: estado VOIDED, venta CANCELLED, devuelve stock y registra movimiento de caja de reversión.',
+  })
+  @ApiResponse({ status: 200, description: 'Factura anulada' })
+  @ApiResponse({ status: 400, description: 'Factura ya anulada o no es emitida' })
+  @ApiResponse({ status: 404, description: 'Factura no encontrada' })
+  @ApiResponse({ status: 401, description: 'No autenticado' })
+  voidInvoice(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @Req() req: { user?: { sub?: string; tenantId?: string } },
+  ) {
+    return this.sales.voidInvoice(
+      id,
+      req?.user?.tenantId ?? null,
+      req?.user?.sub,
+    );
+  }
+
+  @Get(':id')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Obtener venta por ID',
+    description: 'Obtiene los detalles de una venta específica',
+  })
+  @ApiResponse({ status: 200, description: 'Venta encontrada' })
+  @ApiResponse({ status: 404, description: 'Venta no encontrada' })
+  @ApiResponse({ status: 401, description: 'No autenticado' })
+  getSale(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @Req() req: { user?: { tenantId?: string } },
+  ) {
+    return this.sales.getSale(id, req?.user?.tenantId ?? null);
+  }
+
   @Post()
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
@@ -84,7 +181,10 @@ export class SalesController {
       'Error de validación (stock insuficiente, productos inexistentes, etc.)',
   })
   @ApiResponse({ status: 401, description: 'No autenticado' })
-  create(@Body() dto: CreateSaleDto, @Req() req: { user?: { sub?: string; tenantId?: string } }) {
+  create(
+    @Body() dto: CreateSaleDto,
+    @Req() req: { user?: { sub?: string; tenantId?: string } },
+  ) {
     return this.sales.createSale(dto, req.user?.sub, req.user?.tenantId);
   }
 }

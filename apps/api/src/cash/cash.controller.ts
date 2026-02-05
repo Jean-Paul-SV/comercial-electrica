@@ -84,7 +84,11 @@ export class CashController {
     @Body() dto: OpenSessionDto,
     @Req() req: { user?: { sub?: string; tenantId?: string } },
   ) {
-    return this.cash.openSession(dto.openingAmount, req.user?.sub, req.user?.tenantId);
+    return this.cash.openSession(
+      dto.openingAmount,
+      req.user?.sub,
+      req.user?.tenantId,
+    );
   }
 
   @Post('sessions/:id/close')
@@ -103,7 +107,12 @@ export class CashController {
     @Body() dto: CloseSessionDto,
     @Req() req: { user?: { sub?: string; tenantId?: string } },
   ) {
-    return this.cash.closeSession(id, dto.closingAmount, req.user?.sub, req.user?.tenantId);
+    return this.cash.closeSession(
+      id,
+      dto.closingAmount,
+      req.user?.sub,
+      req.user?.tenantId,
+    );
   }
 
   @Get('sessions/:id/movements')

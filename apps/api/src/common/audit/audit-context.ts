@@ -12,7 +12,10 @@ export interface AuditContextData {
 
 const auditStorage = new AsyncLocalStorage<AuditContextData>();
 
-export function runWithAuditContext<T>(context: AuditContextData, fn: () => T): T {
+export function runWithAuditContext<T>(
+  context: AuditContextData,
+  fn: () => T,
+): T {
   return auditStorage.run(context, fn);
 }
 

@@ -33,7 +33,10 @@ export default function PurchasesPage() {
             El módulo de pedidos de compra está deshabilitado. Puedes registrar compras directamente con las facturas de proveedor en Facturas proveedor; los pagos se reflejan en Gastos.
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="flex flex-wrap gap-2">
+          <Button asChild variant="default" size="sm">
+            <Link href="/supplier-invoices">Ir a Facturas proveedor</Link>
+          </Button>
           <Button asChild variant="secondary" size="sm">
             <Link href="/app">Ir al Dashboard</Link>
           </Button>

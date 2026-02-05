@@ -2,13 +2,16 @@ export type AuthUser = {
   id: string;
   email: string;
   role: 'ADMIN' | 'USER';
+  profilePictureUrl?: string | null;
 };
 
 /** Usuario en lista (GET /auth/users). */
 export type UserListItem = {
   id: string;
   email: string;
+  name?: string | null;
   role: 'ADMIN' | 'USER';
+  profilePictureUrl?: string | null;
   createdAt: string;
 };
 

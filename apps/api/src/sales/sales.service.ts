@@ -6,6 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
+  CashMovementType,
   DianDocumentStatus,
   DianDocumentType,
   InvoiceStatus,
@@ -16,6 +17,7 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateSaleDto } from './dto/create-sale.dto';
+import type { ListInvoicesQueryDto } from './dto/list-invoices-query.dto';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { ValidationLimitsService } from '../common/services/validation-limits.service';
@@ -42,7 +44,11 @@ export class SalesService {
     private readonly cache: CacheService,
   ) {}
 
-  async createSale(dto: CreateSaleDto, createdByUserId?: string, tenantId?: string | null) {
+  async createSale(
+    dto: CreateSaleDto,
+    createdByUserId?: string,
+    tenantId?: string | null,
+  ) {
     if (!tenantId) throw new ForbiddenException('Tenant requerido.');
     this.logger.log(
       `Creando venta para usuario ${createdByUserId || 'anónimo'}`,
@@ -171,7 +177,7 @@ export class SalesService {
 
           await tx.cashMovement.create({
             data: {
-              sessionId: dto.cashSessionId!, // Ya validado arriba, seguro que existe
+              sessionId: dto.cashSessionId, // Ya validado arriba, seguro que existe
               type: 'IN',
               method: dto.paymentMethod ?? PaymentMethod.CASH,
               amount: grandTotal,
@@ -259,7 +265,11 @@ export class SalesService {
     if (search) {
       where.OR = [
         { customer: { name: { contains: search, mode: 'insensitive' } } },
-        { invoices: { some: { number: { contains: search, mode: 'insensitive' } } } },
+        {
+          invoices: {
+            some: { number: { contains: search, mode: 'insensitive' } },
+          },
+        },
         { createdBy: { email: { contains: search, mode: 'insensitive' } } },
       ];
     }
@@ -305,11 +315,193 @@ export class SalesService {
       },
     };
 
-    if (!search) {
-      const cacheKey = this.cache.buildKey('sales', 'list', page, limit);
-      await this.cache.set(cacheKey, result, 180); // 3 minutos
+    return result;
+  }
+
+  /**
+   * Obtiene una venta por ID (solo del tenant).
+   */
+  async getSale(id: string, tenantId: string | null) {
+    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
+    const sale = await this.prisma.sale.findFirst({
+      where: { id, tenantId },
+      select: {
+        id: true,
+        customerId: true,
+        createdByUserId: true,
+        status: true,
+        soldAt: true,
+        subtotal: true,
+        taxTotal: true,
+        discountTotal: true,
+        grandTotal: true,
+        createdAt: true,
+        updatedAt: true,
+        items: { include: { product: true } },
+        customer: true,
+        invoices: true,
+        createdBy: { select: { id: true, email: true } },
+      },
+    });
+    if (!sale) {
+      throw new NotFoundException(`Venta con id ${id} no encontrada.`);
+    }
+    return sale;
+  }
+
+  /**
+   * Lista todas las facturas de venta del tenant (paginado).
+   * Incluye cliente y venta asociada.
+   */
+  async listInvoices(
+    tenantId: string | null,
+    query?: { page?: number; limit?: number; search?: string; status?: InvoiceStatus },
+  ) {
+    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
+    const page = query?.page ?? 1;
+    const limit = query?.limit ?? 20;
+    const skip = (page - 1) * limit;
+    const search = query?.search?.trim();
+    const status = query?.status;
+
+    const where: Prisma.InvoiceWhereInput = { tenantId };
+    if (status) where.status = status;
+    if (search) {
+      where.OR = [
+        { number: { contains: search, mode: 'insensitive' } },
+        { customer: { name: { contains: search, mode: 'insensitive' } } },
+      ];
     }
 
-    return result;
+    const [data, total] = await Promise.all([
+      this.prisma.invoice.findMany({
+        where,
+        orderBy: { issuedAt: 'desc' },
+        select: {
+          id: true,
+          number: true,
+          issuedAt: true,
+          status: true,
+          subtotal: true,
+          taxTotal: true,
+          discountTotal: true,
+          grandTotal: true,
+          saleId: true,
+          customerId: true,
+          customer: { select: { id: true, name: true } },
+          sale: { select: { id: true, soldAt: true } },
+        },
+        skip,
+        take: limit,
+      }),
+      this.prisma.invoice.count({ where }),
+    ]);
+
+    const totalPages = Math.ceil(total / limit);
+    return {
+      data,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPreviousPage: page > 1,
+      },
+    };
+  }
+
+  /**
+   * Anula una factura (estado VOIDED): actualiza factura, venta a CANCELLED,
+   * devuelve stock, registra movimiento de caja OUT y movimiento de inventario IN por anulación.
+   */
+  async voidInvoice(invoiceId: string, tenantId: string | null, userId?: string) {
+    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
+    const invoice = await this.prisma.invoice.findFirst({
+      where: { id: invoiceId, tenantId },
+      include: {
+        sale: {
+          include: {
+            items: true,
+          },
+        },
+      },
+    });
+    if (!invoice) {
+      throw new NotFoundException(`Factura ${invoiceId} no encontrada.`);
+    }
+    if (invoice.status === InvoiceStatus.VOIDED) {
+      throw new BadRequestException('La factura ya está anulada.');
+    }
+    if (invoice.status !== InvoiceStatus.ISSUED) {
+      throw new BadRequestException('Solo se pueden anular facturas emitidas.');
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.invoice.update({
+        where: { id: invoiceId },
+        data: { status: InvoiceStatus.VOIDED },
+      });
+
+      if (invoice.saleId && invoice.sale) {
+        await tx.sale.update({
+          where: { id: invoice.saleId },
+          data: { status: SaleStatus.CANCELLED },
+        });
+
+        // Devolver stock
+        for (const item of invoice.sale.items) {
+          await tx.stockBalance.upsert({
+            where: { productId: item.productId },
+            create: { productId: item.productId, qtyOnHand: item.qty, qtyReserved: 0 },
+            update: { qtyOnHand: { increment: item.qty } },
+          });
+        }
+
+        // Movimiento de inventario (entrada por anulación)
+        await tx.inventoryMovement.create({
+          data: {
+            tenantId,
+            type: InventoryMovementType.IN,
+            reason: 'Anulación factura',
+            items: {
+              create: invoice.sale.items.map((it) => ({
+                productId: it.productId,
+                qty: it.qty,
+              })),
+            },
+          },
+        });
+
+        // Reversar movimiento de caja: buscar el IN de la venta y crear un OUT
+        const originalMovement = await tx.cashMovement.findFirst({
+          where: { relatedSaleId: invoice.saleId, type: CashMovementType.IN },
+        });
+        if (originalMovement) {
+          await tx.cashMovement.create({
+            data: {
+              sessionId: originalMovement.sessionId,
+              type: CashMovementType.OUT,
+              method: originalMovement.method,
+              amount: originalMovement.amount,
+              reference: `Anulación factura ${invoice.number}`,
+            },
+          });
+        }
+      }
+
+      return null;
+    });
+
+    await this.audit.log(
+      'invoice',
+      invoiceId,
+      'void',
+      userId ?? null,
+      { number: invoice.number, saleId: invoice.saleId },
+    );
+    this.logger.log(`Factura ${invoice.number} anulada.`);
+    await this.cache.deletePattern('cache:sales:*');
+    return { success: true, message: 'Factura anulada.' };
   }
 }

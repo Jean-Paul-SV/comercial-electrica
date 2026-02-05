@@ -131,8 +131,16 @@ export class ReportsController {
     description:
       'Indicadores que dicen "qué hacer": productos con pérdida, sin rotación, facturas vencidas, margen bajo. Cada uno incluye insight, acción sugerida y enlace.',
   })
-  @ApiQuery({ name: 'days', required: false, description: 'Días hacia atrás (7-365)' })
-  @ApiQuery({ name: 'top', required: false, description: 'Máximo ítems por indicador' })
+  @ApiQuery({
+    name: 'days',
+    required: false,
+    description: 'Días hacia atrás (7-365)',
+  })
+  @ApiQuery({
+    name: 'top',
+    required: false,
+    description: 'Máximo ítems por indicador',
+  })
   @ApiResponse({
     status: 200,
     description: 'Lista de indicadores accionables',
@@ -173,8 +181,16 @@ export class ReportsController {
     description:
       'Una o dos frases que resumen los indicadores accionables. Si OPENAI_API_KEY está configurado, usa LLM (gpt-4o-mini); si no, devuelve fallback con los primeros insights.',
   })
-  @ApiQuery({ name: 'days', required: false, description: 'Días hacia atrás (igual que actionable-indicators)' })
-  @ApiQuery({ name: 'top', required: false, description: 'Máximo ítems por indicador' })
+  @ApiQuery({
+    name: 'days',
+    required: false,
+    description: 'Días hacia atrás (igual que actionable-indicators)',
+  })
+  @ApiQuery({
+    name: 'top',
+    required: false,
+    description: 'Máximo ítems por indicador',
+  })
   @ApiResponse({
     status: 200,
     description: 'Resumen en texto',
@@ -198,8 +214,18 @@ export class ReportsController {
     description:
       'Segmenta clientes con ventas en el periodo usando K-means (monto total, días desde última compra, cantidad de compras). Devuelve k clusters con lista de clientes por segmento.',
   })
-  @ApiQuery({ name: 'days', required: false, description: 'Días hacia atrás (30-365)', default: 90 })
-  @ApiQuery({ name: 'k', required: false, description: 'Número de clusters (2-10)', default: 3 })
+  @ApiQuery({
+    name: 'days',
+    required: false,
+    description: 'Días hacia atrás (30-365)',
+    default: 90,
+  })
+  @ApiQuery({
+    name: 'k',
+    required: false,
+    description: 'Número de clusters (2-10)',
+    default: 3,
+  })
   @ApiResponse({
     status: 200,
     description: 'Clusters de clientes',
@@ -219,7 +245,10 @@ export class ReportsController {
                 type: 'array',
                 items: {
                   type: 'object',
-                  properties: { id: { type: 'string' }, name: { type: 'string' } },
+                  properties: {
+                    id: { type: 'string' },
+                    name: { type: 'string' },
+                  },
                 },
               },
             },
@@ -253,7 +282,10 @@ export class ReportsController {
             type: 'object',
             properties: {
               code: { type: 'string' },
-              severity: { type: 'string', enum: ['critical', 'high', 'medium', 'low', 'info'] },
+              severity: {
+                type: 'string',
+                enum: ['critical', 'high', 'medium', 'low', 'info'],
+              },
               priority: { type: 'number' },
               title: { type: 'string' },
               message: { type: 'string' },

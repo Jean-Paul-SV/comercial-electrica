@@ -91,7 +91,11 @@ export class CustomersService {
     return c;
   }
 
-  async create(dto: CreateCustomerDto, createdByUserId?: string, tenantId?: string | null) {
+  async create(
+    dto: CreateCustomerDto,
+    createdByUserId?: string,
+    tenantId?: string | null,
+  ) {
     if (!tenantId) throw new ForbiddenException('Tenant requerido.');
     const startTime = Date.now();
     this.logger.log(`Creando cliente ${dto.docNumber}`, {
@@ -138,7 +142,12 @@ export class CustomersService {
     return created;
   }
 
-  async update(id: string, dto: UpdateCustomerDto, updatedByUserId?: string, tenantId?: string | null) {
+  async update(
+    id: string,
+    dto: UpdateCustomerDto,
+    updatedByUserId?: string,
+    tenantId?: string | null,
+  ) {
     if (!tenantId) throw new ForbiddenException('Tenant requerido.');
     const oldCustomerData = await this.prisma.customer.findFirst({
       where: { id, tenantId },
@@ -250,7 +259,8 @@ export class CustomersService {
     });
 
     // Invalidar caché del cliente y listados
-    if (tenantId) await this.cache.delete(this.cache.buildKey('customer', id, tenantId));
+    if (tenantId)
+      await this.cache.delete(this.cache.buildKey('customer', id, tenantId));
     await this.cache.deletePattern('cache:customers:*');
   }
 }

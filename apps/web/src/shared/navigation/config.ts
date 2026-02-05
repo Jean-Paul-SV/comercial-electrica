@@ -17,10 +17,11 @@ export const navConfig: NavTreeConfig = {
       items: [
         { id: 'dashboard', href: '/app', label: 'Dashboard', icon: 'LayoutDashboard', order: 0, moduleCode: 'core' },
         { id: 'sales', href: '/sales', label: 'Ventas', icon: 'ShoppingCart', order: 1, moduleCode: 'core' },
-        { id: 'returns', href: '/returns', label: 'Devoluciones', icon: 'RotateCcw', order: 2, moduleCode: 'core' },
-        { id: 'cash', href: '/cash', label: 'Caja', icon: 'Wallet', order: 3, moduleCode: 'core' },
-        { id: 'expenses', href: '/expenses', label: 'Gastos', icon: 'Receipt', order: 4, moduleCode: 'core' },
-        { id: 'quotes', href: '/quotes', label: 'Cotizaciones', icon: 'FileSignature', order: 5, moduleCode: 'core' },
+        { id: 'invoices', href: '/invoices', label: 'Facturas', icon: 'FileText', order: 2, moduleCode: 'core' },
+        { id: 'returns', href: '/returns', label: 'Devoluciones', icon: 'RotateCcw', order: 3, moduleCode: 'core' },
+        { id: 'cash', href: '/cash', label: 'Caja', icon: 'Wallet', order: 4, moduleCode: 'core' },
+        { id: 'expenses', href: '/expenses', label: 'Gastos', icon: 'Receipt', order: 5, moduleCode: 'core' },
+        { id: 'quotes', href: '/quotes', label: 'Cotizaciones', icon: 'FileSignature', order: 6, moduleCode: 'core' },
       ],
     },
     {
@@ -73,6 +74,7 @@ export const navConfig: NavTreeConfig = {
       moduleCode: 'core',
       items: [
         { id: 'users', href: '/users', label: 'Usuarios', icon: 'UserPlus', order: 0, requiredPermission: 'users:read', moduleCode: 'core' },
+        { id: 'backups', href: '/backups', label: 'Backups', icon: 'Database', order: 1, requiredPermission: 'backups:manage', moduleCode: 'backups' },
       ],
     },
   ],

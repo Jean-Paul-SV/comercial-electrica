@@ -4,7 +4,8 @@ import { PaginationDto } from '../../common/dto/pagination.dto';
 
 export class ListAuditLogsQueryDto extends PaginationDto {
   @ApiPropertyOptional({
-    description: 'Filtrar por tipo de entidad (sale, quote, customer, product, expense, etc.)',
+    description:
+      'Filtrar por tipo de entidad (sale, quote, customer, product, expense, etc.)',
     example: 'sale',
   })
   @IsOptional()
@@ -13,7 +14,8 @@ export class ListAuditLogsQueryDto extends PaginationDto {
   entity?: string;
 
   @ApiPropertyOptional({
-    description: 'Filtrar por acción (create, update, delete, login, convert, etc.)',
+    description:
+      'Filtrar por acción (create, update, delete, login, convert, etc.)',
     example: 'create',
   })
   @IsOptional()

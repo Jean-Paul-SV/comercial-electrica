@@ -1,4 +1,18 @@
-import { Body, Controller, Get, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Put,
+  Req,
+  UploadedFile,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiTags,
   ApiOperation,
@@ -19,6 +33,7 @@ import { Throttle } from '@nestjs/throttler';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { PermissionsGuard } from './permissions.guard';
 import { RequirePermission } from './require-permission.decorator';
+import { BadRequestException } from '@nestjs/common';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -62,8 +77,14 @@ export class AuthController {
     description:
       'Envía un enlace por correo si SMTP está configurado; si no, en dev devuelve el token. No revela si el email existe. Límite: 3 solicitudes por 15 min por dirección de correo.',
   })
-  @ApiResponse({ status: 200, description: 'Mensaje genérico (si el correo existe, se envía el enlace)' })
-  @ApiResponse({ status: 429, description: 'Demasiadas solicitudes (3 por 15 min por email)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Mensaje genérico (si el correo existe, se envía el enlace)',
+  })
+  @ApiResponse({
+    status: 429,
+    description: 'Demasiadas solicitudes (3 por 15 min por email)',
+  })
   forgotPassword(@Body() dto: ForgotPasswordDto) {
     return this.auth.forgotPassword(dto);
   }
@@ -71,7 +92,8 @@ export class AuthController {
   @Post('reset-password')
   @ApiOperation({
     summary: 'Restablecer contraseña con el token',
-    description: 'Token recibido por correo o en respuesta de forgot-password (solo en dev).',
+    description:
+      'Token recibido por correo o en respuesta de forgot-password (solo en dev).',
   })
   @ApiResponse({ status: 200, description: 'Contraseña actualizada' })
   @ApiResponse({ status: 400, description: 'Token inválido o expirado' })
@@ -82,7 +104,8 @@ export class AuthController {
   @Post('accept-invite')
   @ApiOperation({
     summary: 'Aceptar invitación y establecer contraseña',
-    description: 'Token recibido por correo o en respuesta de invite (solo en dev).',
+    description:
+      'Token recibido por correo o en respuesta de invite (solo en dev).',
   })
   @ApiResponse({ status: 200, description: 'Contraseña establecida' })
   @ApiResponse({ status: 400, description: 'Token inválido o expirado' })
@@ -96,16 +119,21 @@ export class AuthController {
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Invitar usuario por correo',
-    description: 'Crea usuario con contraseña temporal y devuelve token de invitación (7 días). Requiere users:create.',
+    description:
+      'Crea usuario con contraseña temporal y devuelve token de invitación (7 días). Requiere users:create.',
   })
-  @ApiResponse({ status: 201, description: 'Usuario invitado (user, inviteToken; en dev también tempPassword)' })
+  @ApiResponse({
+    status: 201,
+    description:
+      'Usuario invitado (user, inviteToken; en dev también tempPassword)',
+  })
   @ApiResponse({ status: 400, description: 'Email ya registrado' })
   @ApiResponse({ status: 401, description: 'No autenticado' })
-  @ApiResponse({ status: 403, description: 'No autorizado (requiere permiso users:create)' })
-  invite(
-    @Body() dto: InviteUserDto,
-    @Req() req: { user?: { sub?: string } },
-  ) {
+  @ApiResponse({
+    status: 403,
+    description: 'No autorizado (requiere permiso users:create)',
+  })
+  invite(@Body() dto: InviteUserDto, @Req() req: { user?: { sub?: string } }) {
     return this.auth.inviteUser(dto, req.user!.sub!);
   }
 
@@ -114,7 +142,8 @@ export class AuthController {
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Usuario actual y permisos',
-    description: 'Devuelve el usuario autenticado y la lista de permisos (resource:action) para el frontend.',
+    description:
+      'Devuelve el usuario autenticado y la lista de permisos (resource:action) para el frontend.',
   })
   @ApiResponse({
     status: 200,
@@ -122,14 +151,27 @@ export class AuthController {
     schema: {
       type: 'object',
       properties: {
-        user: { type: 'object', properties: { id: { type: 'string' }, email: { type: 'string' }, role: { type: 'string' } } },
+        user: {
+          type: 'object',
+          properties: {
+            id: { type: 'string' },
+            email: { type: 'string' },
+            role: { type: 'string' },
+          },
+        },
         permissions: { type: 'array', items: { type: 'string' } },
         tenant: {
           type: 'object',
           properties: {
             id: { type: 'string' },
             name: { type: 'string' },
-            plan: { type: 'object', properties: { name: { type: 'string' }, slug: { type: 'string' } } },
+            plan: {
+              type: 'object',
+              properties: {
+                name: { type: 'string' },
+                slug: { type: 'string' },
+              },
+            },
             enabledModules: { type: 'array', items: { type: 'string' } },
           },
         },
@@ -146,10 +188,14 @@ export class AuthController {
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Cambiar mi contraseña',
-    description: 'Cualquier usuario autenticado puede cambiar su propia contraseña.',
+    description:
+      'Cualquier usuario autenticado puede cambiar su propia contraseña.',
   })
   @ApiResponse({ status: 200, description: 'Contraseña actualizada' })
-  @ApiResponse({ status: 400, description: 'Contraseña actual incorrecta o nueva inválida' })
+  @ApiResponse({
+    status: 400,
+    description: 'Contraseña actual incorrecta o nueva inválida',
+  })
   @ApiResponse({ status: 401, description: 'No autenticado' })
   changeMyPassword(
     @Body() dto: ChangePasswordDto,
@@ -169,7 +215,10 @@ export class AuthController {
   @ApiResponse({ status: 201, description: 'Usuario creado exitosamente' })
   @ApiResponse({ status: 400, description: 'Email ya registrado' })
   @ApiResponse({ status: 401, description: 'No autenticado' })
-  @ApiResponse({ status: 403, description: 'No autorizado (requiere permiso users:create)' })
+  @ApiResponse({
+    status: 403,
+    description: 'No autorizado (requiere permiso users:create)',
+  })
   register(
     @Body() dto: RegisterUserDto,
     @Req() req: { user?: { sub?: string } },
@@ -183,11 +232,18 @@ export class AuthController {
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Listar usuarios del tenant',
-    description: 'Requiere permiso users:read. Devuelve usuarios del mismo tenant.',
+    description:
+      'Requiere permiso users:read. Devuelve usuarios del mismo tenant.',
   })
-  @ApiResponse({ status: 200, description: 'Lista de usuarios (id, email, role, createdAt)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Lista de usuarios (id, email, role, createdAt)',
+  })
   @ApiResponse({ status: 401, description: 'No autenticado' })
-  @ApiResponse({ status: 403, description: 'No autorizado (requiere permiso users:read)' })
+  @ApiResponse({
+    status: 403,
+    description: 'No autorizado (requiere permiso users:read)',
+  })
   listUsers(@Req() req: { user?: { sub?: string; tenantId?: string | null } }) {
     return this.auth.listUsers(req.user?.tenantId ?? null);
   }
@@ -198,17 +254,112 @@ export class AuthController {
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Actualizar usuario (rol y/o contraseña)',
-    description: 'Requiere permiso users:update. Solo usuarios del mismo tenant.',
+    description:
+      'Requiere permiso users:update. Solo usuarios del mismo tenant.',
   })
   @ApiResponse({ status: 200, description: 'Usuario actualizado' })
-  @ApiResponse({ status: 400, description: 'Usuario no encontrado o datos inválidos' })
+  @ApiResponse({
+    status: 400,
+    description: 'Usuario no encontrado o datos inválidos',
+  })
   @ApiResponse({ status: 401, description: 'No autenticado' })
-  @ApiResponse({ status: 403, description: 'No autorizado (requiere permiso users:update)' })
+  @ApiResponse({
+    status: 403,
+    description: 'No autorizado (requiere permiso users:update)',
+  })
   updateUser(
     @Param('id') id: string,
     @Body() dto: UpdateUserDto,
     @Req() req: { user?: { sub?: string } },
   ) {
     return this.auth.updateUser(id, dto, req.user!.sub!);
+  }
+
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermission('users:delete')
+  @Delete('users/:id')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Eliminar usuario (soft delete)',
+    description:
+      'Requiere permiso users:delete. Desactiva al usuario del mismo tenant. No se puede eliminar a uno mismo.',
+  })
+  @ApiResponse({ status: 200, description: 'Usuario eliminado' })
+  @ApiResponse({
+    status: 400,
+    description: 'Usuario no encontrado o intento de eliminarse a sí mismo',
+  })
+  @ApiResponse({ status: 401, description: 'No autenticado' })
+  @ApiResponse({ status: 403, description: 'No autorizado (requiere permiso users:delete)' })
+  deleteUser(
+    @Param('id') id: string,
+    @Req() req: { user?: { sub?: string } },
+  ) {
+    return this.auth.deleteUser(id, req.user!.sub!);
+  }
+
+  @Put('profile/picture')
+  @UseGuards(JwtAuthGuard)
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Subir foto de perfil del usuario actual',
+    description:
+      'Sube una imagen de perfil para el usuario autenticado. Formatos permitidos: JPEG, PNG, WebP. Tamaño máximo: 5MB.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Foto de perfil actualizada',
+    schema: {
+      type: 'object',
+      properties: {
+        profilePictureUrl: { type: 'string' },
+      },
+    },
+  })
+  @ApiResponse({ status: 400, description: 'Archivo inválido o muy grande' })
+  @ApiResponse({ status: 401, description: 'No autenticado' })
+  uploadProfilePicture(
+    @UploadedFile() file: Express.Multer.File,
+    @Req() req: { user?: { sub?: string } },
+  ) {
+    if (!file) {
+      throw new BadRequestException('Debe enviar un archivo');
+    }
+    return this.auth.updateProfilePicture(req.user!.sub!, file);
+  }
+
+  @Put('users/:id/picture')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermission('users:update')
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Subir foto de perfil de un empleado',
+    description:
+      'Requiere permiso users:update. Sube una imagen de perfil para un empleado. Formatos permitidos: JPEG, PNG, WebP. Tamaño máximo: 5MB.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Foto de perfil del empleado actualizada',
+    schema: {
+      type: 'object',
+      properties: {
+        profilePictureUrl: { type: 'string' },
+      },
+    },
+  })
+  @ApiResponse({ status: 400, description: 'Archivo inválido o empleado no encontrado' })
+  @ApiResponse({ status: 401, description: 'No autenticado' })
+  @ApiResponse({ status: 403, description: 'No autorizado (requiere permiso users:update)' })
+  uploadEmployeePicture(
+    @Param('id') id: string,
+    @UploadedFile() file: Express.Multer.File,
+    @Req() req: { user?: { sub?: string } },
+  ) {
+    if (!file) {
+      throw new BadRequestException('Debe enviar un archivo');
+    }
+    return this.auth.updateEmployeePicture(id, file, req.user!.sub!);
   }
 }

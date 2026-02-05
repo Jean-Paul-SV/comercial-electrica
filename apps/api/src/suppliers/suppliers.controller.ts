@@ -72,7 +72,11 @@ export class SuppliersController {
     @Req() req?: { user?: { tenantId?: string } },
   ) {
     const isActive =
-      query?.isActive === 'true' ? true : query?.isActive === 'false' ? false : undefined;
+      query?.isActive === 'true'
+        ? true
+        : query?.isActive === 'false'
+          ? false
+          : undefined;
     return this.suppliers.list(
       {
         page: query?.page,
@@ -124,7 +128,10 @@ export class SuppliersController {
     description: 'Actualiza un proveedor existente',
   })
   @ApiParam({ name: 'id', description: 'ID del proveedor' })
-  @ApiResponse({ status: 200, description: 'Proveedor actualizado exitosamente' })
+  @ApiResponse({
+    status: 200,
+    description: 'Proveedor actualizado exitosamente',
+  })
   @ApiResponse({ status: 404, description: 'Proveedor no encontrado' })
   @ApiResponse({ status: 401, description: 'No autenticado' })
   update(
@@ -140,14 +147,24 @@ export class SuppliersController {
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Eliminar proveedor',
-    description: 'Desactiva un proveedor (requiere permiso suppliers:delete). No se puede eliminar si tiene movimientos asociados.',
+    description:
+      'Desactiva un proveedor (requiere permiso suppliers:delete). No se puede eliminar si tiene movimientos asociados.',
   })
   @ApiParam({ name: 'id', description: 'ID del proveedor' })
-  @ApiResponse({ status: 200, description: 'Proveedor desactivado exitosamente' })
+  @ApiResponse({
+    status: 200,
+    description: 'Proveedor desactivado exitosamente',
+  })
   @ApiResponse({ status: 404, description: 'Proveedor no encontrado' })
-  @ApiResponse({ status: 400, description: 'Proveedor tiene movimientos asociados' })
+  @ApiResponse({
+    status: 400,
+    description: 'Proveedor tiene movimientos asociados',
+  })
   @ApiResponse({ status: 401, description: 'No autenticado' })
-  @ApiResponse({ status: 403, description: 'No autorizado (requiere permiso suppliers:delete)' })
+  @ApiResponse({
+    status: 403,
+    description: 'No autorizado (requiere permiso suppliers:delete)',
+  })
   delete(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Req() req: { user?: { sub?: string; tenantId?: string } },

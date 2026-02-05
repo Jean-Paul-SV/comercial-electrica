@@ -93,10 +93,7 @@ export class ValidationLimitsService {
   /**
    * Valida cantidad de items en venta/cotización/pedido de compra
    */
-  validateItemsCount(
-    count: number,
-    type: 'sale' | 'quote' | 'purchase',
-  ): void {
+  validateItemsCount(count: number, type: 'sale' | 'quote' | 'purchase'): void {
     const max =
       type === 'sale'
         ? this.MAX_ITEMS_PER_SALE

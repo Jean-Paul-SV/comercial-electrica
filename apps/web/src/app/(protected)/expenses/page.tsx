@@ -424,7 +424,14 @@ export default function ExpensesPage() {
                       <TableCell className="text-muted-foreground text-sm">
                         {formatDate(e.expenseDate)}
                       </TableCell>
-                      <TableCell className="font-medium">{e.description}</TableCell>
+                      <TableCell className="font-medium">
+                        <Link
+                          href={`/expenses/${e.id}`}
+                          className="text-primary hover:underline"
+                        >
+                          {e.description}
+                        </Link>
+                      </TableCell>
                       <TableCell className="text-muted-foreground text-sm">
                         {e.category ?? '—'}
                       </TableCell>

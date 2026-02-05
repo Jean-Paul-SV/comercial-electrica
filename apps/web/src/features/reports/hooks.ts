@@ -1,6 +1,6 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import {
   getSalesReport,
   getInventoryReport,
@@ -11,7 +11,9 @@ import {
   getDashboardSummary,
   getOperationalState,
   getCustomerClusters,
+  downloadExportCsv,
 } from './api';
+import type { ExportReportParams } from './api';
 import type {
   SalesReportParams,
   InventoryReportParams,
@@ -114,5 +116,14 @@ export function useCustomerClusters(params: CustomerClustersParams = {}) {
     queryKey: ['reports', 'customer-clusters', params],
     enabled: Boolean(token),
     queryFn: () => getCustomerClusters(token!, params),
+  });
+}
+
+export function useExportReportCsv() {
+  const { token } = useAuth();
+
+  return useMutation({
+    mutationFn: (params: ExportReportParams) =>
+      downloadExportCsv(token!, params),
   });
 }

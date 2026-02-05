@@ -23,12 +23,13 @@ export default function ProtectedLayout({
 }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { isAuthenticated, user, enabledModules, token } = useAuth();
+  const { isAuthenticated, user, enabledModules, hasCheckedStorage, isRestoringSession } = useAuth();
   const isOnline = useOnlineStatus();
-  const isLoadingSession = Boolean(token && !user);
 
   useEffect(() => {
-    if (isLoadingSession) return;
+    if (!hasCheckedStorage) return;
+    // No redirigir a login mientras se restaura la sesión (token en localStorage, getMe en curso).
+    if (isRestoringSession) return;
     if (!isAuthenticated) {
       router.replace('/login');
       return;
@@ -43,9 +44,9 @@ export default function ProtectedLayout({
         router.replace(`/plan-required?module=${encodeURIComponent(requiredModule)}`);
       }
     }
-  }, [isAuthenticated, user?.role, pathname, router, enabledModules, isLoadingSession]);
+  }, [isAuthenticated, isRestoringSession, user?.role, pathname, router, enabledModules, hasCheckedStorage]);
 
-  if (isLoadingSession) {
+  if (!hasCheckedStorage || isRestoringSession) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <p className="text-muted-foreground text-sm">Cargando sesión…</p>

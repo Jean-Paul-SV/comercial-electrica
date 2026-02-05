@@ -14,7 +14,11 @@ const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function isValidIdempotencyKey(key: string): boolean {
-  return typeof key === 'string' && key.trim().length > 0 && UUID_REGEX.test(key.trim());
+  return (
+    typeof key === 'string' &&
+    key.trim().length > 0 &&
+    UUID_REGEX.test(key.trim())
+  );
 }
 
 @Injectable()
@@ -54,8 +58,8 @@ export class IdempotencyInterceptor implements NestInterceptor {
     }
 
     return next.handle().pipe(
-      tap(async (data) => {
-        await this.cache.set(cacheKey, { body: data }, IDEMPOTENCY_TTL_SECONDS);
+      tap((data) => {
+        void this.cache.set(cacheKey, { body: data }, IDEMPOTENCY_TTL_SECONDS);
       }),
     );
   }

@@ -71,11 +71,12 @@ export default function SupplierInvoicesPage() {
   const router = useRouter();
   const pathname = usePathname();
   const statusFilter = getStatusFromUrl(searchParams);
+  const supplierIdFromUrl = searchParams.get('supplierId') ?? '';
   const [page, setPage] = useState(1);
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [openNew, setOpenNew] = useState(false);
-  const [supplierId, setSupplierId] = useState('');
+  const [supplierId, setSupplierId] = useState(supplierIdFromUrl);
   const [purchaseOrderId, setPurchaseOrderId] = useState('');
   const [invoiceNumber, setInvoiceNumber] = useState('');
   const [invoiceDate, setInvoiceDate] = useState(toDateInput(new Date()));
@@ -113,10 +114,15 @@ export default function SupplierInvoicesPage() {
       limit,
       status: statusFilter !== 'all' ? statusFilter : undefined,
       search: search || undefined,
+      supplierId: supplierId?.trim() || undefined,
     }),
-    [page, limit, statusFilter, search]
+    [page, limit, statusFilter, search, supplierId]
   );
   const query = useSupplierInvoicesList(listParams);
+
+  useEffect(() => {
+    setSupplierId(supplierIdFromUrl);
+  }, [supplierIdFromUrl]);
 
   useEffect(() => {
     setPage(1);
@@ -452,9 +458,25 @@ export default function SupplierInvoicesPage() {
                   {rows.map((inv) => (
                     <TableRow key={inv.id} className="transition-colors hover:bg-muted/30">
                       <TableCell className="font-mono text-muted-foreground text-sm">
-                        {inv.invoiceNumber}
+                        <Link
+                          href={`/supplier-invoices/${inv.id}`}
+                          className="text-primary hover:underline"
+                        >
+                          {inv.invoiceNumber}
+                        </Link>
                       </TableCell>
-                      <TableCell>{inv.supplier?.name ?? '—'}</TableCell>
+                      <TableCell>
+                        {inv.supplier ? (
+                          <Link
+                            href={`/suppliers/${inv.supplier.id}`}
+                            className="text-primary hover:underline"
+                          >
+                            {inv.supplier.name}
+                          </Link>
+                        ) : (
+                          '—'
+                        )}
+                      </TableCell>
                       <TableCell className="text-muted-foreground text-sm">
                         {new Date(inv.dueDate).toLocaleDateString('es-CO')}
                       </TableCell>

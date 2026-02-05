@@ -74,7 +74,9 @@ describe('Suppliers + Purchases + Payables (e2e)', () => {
       .set('Authorization', `Bearer ${authToken}`)
       .send({
         supplierId,
-        expectedDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        expectedDate: new Date(
+          Date.now() + 7 * 24 * 60 * 60 * 1000,
+        ).toISOString(),
         notes: 'Pedido de prueba',
         items: [{ productId, qty: 10, unitCost: 1500 }],
       });
@@ -183,4 +185,3 @@ describe('Suppliers + Purchases + Payables (e2e)', () => {
     expect(found).toBeUndefined();
   });
 });
-

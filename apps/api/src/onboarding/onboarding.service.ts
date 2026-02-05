@@ -45,9 +45,13 @@ export class OnboardingService {
 
     type UserWithOnboarding = { onboardingStatus?: string | null } | null;
     const stored =
-      ((user as UserWithOnboarding)?.onboardingStatus as OnboardingStatus | null) ?? null;
+      ((user as UserWithOnboarding)
+        ?.onboardingStatus as OnboardingStatus | null) ?? null;
     let status: OnboardingStatus =
-      stored ?? (totalSessionsCount === 0 && productsCount === 0 ? 'not_started' : 'in_progress');
+      stored ??
+      (totalSessionsCount === 0 && productsCount === 0
+        ? 'not_started'
+        : 'in_progress');
     if (!stored && totalSessionsCount > 0) status = 'in_progress';
 
     let step: 1 | 2 | 3 = 1;
@@ -91,8 +95,7 @@ export class OnboardingService {
       where: { id: userId },
       data: {
         onboardingStatus: status,
-        onboardingCompletedAt:
-          status === 'completed' ? new Date() : undefined,
+        onboardingCompletedAt: status === 'completed' ? new Date() : undefined,
       } as { onboardingStatus?: string; onboardingCompletedAt?: Date },
     });
     return { status };

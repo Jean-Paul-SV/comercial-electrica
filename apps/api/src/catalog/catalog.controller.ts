@@ -65,13 +65,48 @@ export class CatalogController {
       },
     },
   })
-  @ApiQuery({ name: 'zeroStock', required: false, type: Boolean, description: 'Solo productos con 0 unidades' })
-  @ApiQuery({ name: 'lowStock', required: false, type: Boolean, description: 'Solo productos con stock bajo' })
-  @ApiQuery({ name: 'lowStockThreshold', required: false, type: Number, description: 'Umbral de stock bajo (por defecto 10)' })
-  @ApiQuery({ name: 'minStock', required: false, type: Number, description: 'Stock mínimo' })
-  @ApiQuery({ name: 'maxStock', required: false, type: Number, description: 'Stock máximo' })
-  @ApiQuery({ name: 'search', required: false, type: String, description: 'Buscar por nombre o código' })
-  @ApiQuery({ name: 'sortByStock', required: false, enum: ['asc', 'desc'], description: 'Ordenar por stock: asc = menor a mayor, desc = mayor a menor' })
+  @ApiQuery({
+    name: 'zeroStock',
+    required: false,
+    type: Boolean,
+    description: 'Solo productos con 0 unidades',
+  })
+  @ApiQuery({
+    name: 'lowStock',
+    required: false,
+    type: Boolean,
+    description: 'Solo productos con stock bajo',
+  })
+  @ApiQuery({
+    name: 'lowStockThreshold',
+    required: false,
+    type: Number,
+    description: 'Umbral de stock bajo (por defecto 10)',
+  })
+  @ApiQuery({
+    name: 'minStock',
+    required: false,
+    type: Number,
+    description: 'Stock mínimo',
+  })
+  @ApiQuery({
+    name: 'maxStock',
+    required: false,
+    type: Number,
+    description: 'Stock máximo',
+  })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    type: String,
+    description: 'Buscar por nombre o código',
+  })
+  @ApiQuery({
+    name: 'sortByStock',
+    required: false,
+    enum: ['asc', 'desc'],
+    description: 'Ordenar por stock: asc = menor a mayor, desc = mayor a menor',
+  })
   @ApiResponse({ status: 401, description: 'No autenticado' })
   listProducts(
     @Query() query?: ListProductsQueryDto,
@@ -146,7 +181,12 @@ export class CatalogController {
     @Body() dto: UpdateProductDto,
     @Req() req: { user?: { sub?: string; tenantId?: string } },
   ) {
-    return this.catalog.updateProduct(id, dto, req.user?.sub, req.user?.tenantId);
+    return this.catalog.updateProduct(
+      id,
+      dto,
+      req.user?.sub,
+      req.user?.tenantId,
+    );
   }
 
   @RequirePermission('catalog:delete')
@@ -163,12 +203,19 @@ export class CatalogController {
   })
   @ApiResponse({ status: 404, description: 'Producto no encontrado' })
   @ApiResponse({ status: 401, description: 'No autenticado' })
-  @ApiResponse({ status: 403, description: 'No autorizado (requiere permiso catalog:delete)' })
+  @ApiResponse({
+    status: 403,
+    description: 'No autorizado (requiere permiso catalog:delete)',
+  })
   deactivate(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Req() req: { user?: { sub?: string; tenantId?: string } },
   ) {
-    return this.catalog.deactivateProduct(id, req.user?.sub, req.user?.tenantId);
+    return this.catalog.deactivateProduct(
+      id,
+      req.user?.sub,
+      req.user?.tenantId,
+    );
   }
 
   @Get('categories')

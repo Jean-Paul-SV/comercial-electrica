@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { listSales, createSale, type SalesListParams } from './api';
+import { listSales, getSale, createSale, type SalesListParams } from './api';
 import type { CreateSalePayload } from './types';
 import { useAuth } from '@shared/providers/AuthProvider';
 import { addToQueue } from '@shared/offline-queue/useOfflineQueue';
@@ -14,6 +14,16 @@ export function useSalesList(params: SalesListParams) {
     queryKey: ['sales', 'list', params],
     enabled: Boolean(token),
     queryFn: () => listSales(params, token!),
+  });
+}
+
+export function useSale(id: string | null) {
+  const { token } = useAuth();
+
+  return useQuery({
+    queryKey: ['sales', id],
+    enabled: Boolean(token && id),
+    queryFn: () => getSale(id!, token!),
   });
 }
 

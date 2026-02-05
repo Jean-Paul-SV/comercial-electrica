@@ -63,7 +63,11 @@ export class CashService {
     return s;
   }
 
-  async openSession(openingAmount: number, openedBy?: string, tenantId?: string | null) {
+  async openSession(
+    openingAmount: number,
+    openedBy?: string,
+    tenantId?: string | null,
+  ) {
     if (!tenantId) throw new ForbiddenException('Tenant requerido.');
     const startTime = Date.now();
     this.logger.log(`Abriendo sesión de caja`, {
@@ -100,7 +104,12 @@ export class CashService {
     return session;
   }
 
-  async closeSession(id: string, closingAmount: number, closedBy?: string, tenantId?: string | null) {
+  async closeSession(
+    id: string,
+    closingAmount: number,
+    closedBy?: string,
+    tenantId?: string | null,
+  ) {
     if (!tenantId) throw new ForbiddenException('Tenant requerido.');
     const startTime = Date.now();
     this.logger.log(`Cerrando sesión de caja ${id}`, {
@@ -290,7 +299,12 @@ export class CashService {
 
   async createMovement(
     sessionId: string,
-    dto: { type: 'IN' | 'OUT' | 'ADJUST'; method: string; amount: number; reference?: string },
+    dto: {
+      type: 'IN' | 'OUT' | 'ADJUST';
+      method: string;
+      amount: number;
+      reference?: string;
+    },
     createdBy?: string,
     tenantId?: string | null,
   ) {

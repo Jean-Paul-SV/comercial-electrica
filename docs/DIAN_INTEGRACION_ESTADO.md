@@ -60,3 +60,9 @@
 - **generateXML:** Líneas de factura generadas como elementos hermanos `<cac:InvoiceLine>` (UBL 2.1 correcto). Eliminado wrapper incorrecto.
 - **escapeXml:** Añadido escape de textos dinámicos (nombre producto, cliente, número factura, etc.) para evitar XML inválido.
 - **Comentarios y referencias:** Actualizada normativa (Res. 000165/2023, Anexo 1.9) y enlace a documentación técnica DIAN.
+
+---
+
+## Guía de configuración y troubleshooting
+
+Para variables de entorno, certificado, ambientes (habilitación/producción) y resolución de errores típicos, ver **`GUIA_CONFIGURACION_DIAN_Y_TROUBLESHOOTING.md`**.

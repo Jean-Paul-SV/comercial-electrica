@@ -17,7 +17,8 @@ import { SignedXml } from 'xml-crypto';
 const DIAN_SIGNATURE_ALG = 'http://www.w3.org/2001/04/xmldsig-more#rsa-sha256';
 const DIAN_DIGEST_ALG = 'http://www.w3.org/2001/04/xmlenc#sha256';
 const DIAN_C14N_ALG = 'http://www.w3.org/2001/10/xml-exc-c14n#';
-const DIAN_TRANSFORM_ENVELOPED = 'http://www.w3.org/2000/09/xmldsig#enveloped-signature';
+const DIAN_TRANSFORM_ENVELOPED =
+  'http://www.w3.org/2000/09/xmldsig#enveloped-signature';
 
 /**
  * Servicio para procesamiento de documentos DIAN
@@ -98,7 +99,9 @@ export class DianService {
     });
 
     if (!dianDoc) {
-      throw new NotFoundException(`Documento DIAN ${dianDocumentId} no encontrado.`);
+      throw new NotFoundException(
+        `Documento DIAN ${dianDocumentId} no encontrado.`,
+      );
     }
 
     if (dianDoc.status === DianDocumentStatus.ACCEPTED) {
@@ -147,7 +150,7 @@ export class DianService {
       // En tests, si el documento ya no existe, no generar ruido ni reintentos
       if (
         this.isTestEnv &&
-        (errorMessage.includes('no encontrado') || (error as any)?.code === 'P2025')
+        (errorMessage.includes('no encontrado') || error?.code === 'P2025')
       ) {
         this.logger.debug(
           `Error DIAN ignorado en tests (documento no encontrado): ${dianDocumentId}`,
@@ -427,10 +430,7 @@ export class DianService {
       publicCert: certPem,
       signatureAlgorithm: DIAN_SIGNATURE_ALG,
       canonicalizationAlgorithm: DIAN_C14N_ALG,
-      implicitTransforms: [
-        DIAN_TRANSFORM_ENVELOPED,
-        DIAN_C14N_ALG,
-      ],
+      implicitTransforms: [DIAN_TRANSFORM_ENVELOPED, DIAN_C14N_ALG],
     });
 
     // Referencia al documento completo (firma enveloped): se firma el elemento raíz Invoice
@@ -573,11 +573,17 @@ export class DianService {
           sentAt: new Date(),
         },
       });
-      await this.audit.log('dianDocument', dianDocumentId, 'status_update', null, {
-        oldStatus: docBefore?.status ?? 'DRAFT',
-        newStatus: DianDocumentStatus.REJECTED,
-        error: response.message,
-      });
+      await this.audit.log(
+        'dianDocument',
+        dianDocumentId,
+        'status_update',
+        null,
+        {
+          oldStatus: docBefore?.status ?? 'DRAFT',
+          newStatus: DianDocumentStatus.REJECTED,
+          error: response.message,
+        },
+      );
 
       // Registrar evento de rechazo
       await this.prisma.dianEvent.create({

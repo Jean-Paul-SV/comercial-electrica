@@ -5,7 +5,11 @@ import {
   NotFoundException,
   Logger,
 } from '@nestjs/common';
-import { Prisma, PurchaseOrderStatus, InventoryMovementType } from '@prisma/client';
+import {
+  Prisma,
+  PurchaseOrderStatus,
+  InventoryMovementType,
+} from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreatePurchaseOrderDto } from './dto/create-purchase-order.dto';
 import { ReceivePurchaseOrderDto } from './dto/receive-purchase-order.dto';
@@ -54,100 +58,106 @@ export class PurchasesService {
       throw new BadRequestException('El proveedor está inactivo.');
     }
 
-    return this.prisma.$transaction(
-      async (tx) => {
-        // Validar que los productos existan y pertenezcan al tenant
-        const products = await tx.product.findMany({
-          where: { id: { in: dto.items.map((i) => i.productId) }, tenantId },
-        });
+    return this.prisma
+      .$transaction(
+        async (tx) => {
+          // Validar que los productos existan y pertenezcan al tenant
+          const products = await tx.product.findMany({
+            where: { id: { in: dto.items.map((i) => i.productId) }, tenantId },
+          });
 
-        if (products.length !== dto.items.length) {
-          throw new BadRequestException('Uno o más productos no existen.');
-        }
+          if (products.length !== dto.items.length) {
+            throw new BadRequestException('Uno o más productos no existen.');
+          }
 
-        // Calcular totales (redondeados a 2 decimales para Decimal de Prisma)
-        const round2 = (n: number) => Math.round(n * 100) / 100;
-        let subtotal = 0;
-        let taxTotal = 0;
-        const orderItems = dto.items.map((i) => {
-          const p = products.find((pp) => pp.id === i.productId)!;
-          const unitCost = round2(Number(i.unitCost));
-          const lineSubtotal = unitCost * i.qty;
-          const lineTax = round2((lineSubtotal * Number(p.taxRate ?? 0)) / 100);
-          const lineTotal = round2(lineSubtotal + lineTax);
-          subtotal += lineSubtotal;
-          taxTotal += lineTax;
-          return {
-            productId: p.id,
-            qty: i.qty,
-            unitCost: new Prisma.Decimal(unitCost),
-            taxRate: new Prisma.Decimal(round2(Number(p.taxRate ?? 0))),
-            lineTotal: new Prisma.Decimal(lineTotal),
-            receivedQty: 0,
-          };
-        });
+          // Calcular totales (redondeados a 2 decimales para Decimal de Prisma)
+          const round2 = (n: number) => Math.round(n * 100) / 100;
+          let subtotal = 0;
+          let taxTotal = 0;
+          const orderItems = dto.items.map((i) => {
+            const p = products.find((pp) => pp.id === i.productId)!;
+            const unitCost = round2(Number(i.unitCost));
+            const lineSubtotal = unitCost * i.qty;
+            const lineTax = round2(
+              (lineSubtotal * Number(p.taxRate ?? 0)) / 100,
+            );
+            const lineTotal = round2(lineSubtotal + lineTax);
+            subtotal += lineSubtotal;
+            taxTotal += lineTax;
+            return {
+              productId: p.id,
+              qty: i.qty,
+              unitCost: new Prisma.Decimal(unitCost),
+              taxRate: new Prisma.Decimal(round2(Number(p.taxRate ?? 0))),
+              lineTotal: new Prisma.Decimal(lineTotal),
+              receivedQty: 0,
+            };
+          });
 
-        subtotal = round2(subtotal);
-        taxTotal = round2(taxTotal);
-        const grandTotal = round2(subtotal + taxTotal);
+          subtotal = round2(subtotal);
+          taxTotal = round2(taxTotal);
+          const grandTotal = round2(subtotal + taxTotal);
 
-        // Generar número de pedido único por tenant
-        const orderNumber = await this.generateOrderNumber(tx, tenantId);
+          // Generar número de pedido único por tenant
+          const orderNumber = await this.generateOrderNumber(tx, tenantId);
 
-        // Crear pedido (Decimal explícito para evitar PrismaClientValidationError)
-        const purchaseOrder = await tx.purchaseOrder.create({
-          data: {
-            tenantId,
-            supplierId: dto.supplierId,
-            orderNumber,
-            status: PurchaseOrderStatus.DRAFT,
-            orderDate: new Date(),
-            expectedDate: dto.expectedDate ? new Date(dto.expectedDate) : null,
-            notes: dto.notes,
-            subtotal: new Prisma.Decimal(subtotal),
-            taxTotal: new Prisma.Decimal(taxTotal),
-            discountTotal: new Prisma.Decimal(0),
-            grandTotal: new Prisma.Decimal(grandTotal),
-            createdBy: createdByUserId,
-            items: {
-              create: orderItems,
+          // Crear pedido (Decimal explícito para evitar PrismaClientValidationError)
+          const purchaseOrder = await tx.purchaseOrder.create({
+            data: {
+              tenantId,
+              supplierId: dto.supplierId,
+              orderNumber,
+              status: PurchaseOrderStatus.DRAFT,
+              orderDate: new Date(),
+              expectedDate: dto.expectedDate
+                ? new Date(dto.expectedDate)
+                : null,
+              notes: dto.notes,
+              subtotal: new Prisma.Decimal(subtotal),
+              taxTotal: new Prisma.Decimal(taxTotal),
+              discountTotal: new Prisma.Decimal(0),
+              grandTotal: new Prisma.Decimal(grandTotal),
+              createdBy: createdByUserId,
+              items: {
+                create: orderItems,
+              },
             },
-          },
-          include: {
-            supplier: true,
-            items: { include: { product: true } },
-          },
-        });
+            include: {
+              supplier: true,
+              items: { include: { product: true } },
+            },
+          });
 
-        this.logger.log(
-          `Pedido de compra ${purchaseOrder.id} creado exitosamente`,
-          {
-            orderNumber: purchaseOrder.orderNumber,
-            supplierId: dto.supplierId,
-            itemsCount: dto.items.length,
-            userId: createdByUserId,
-          },
-        );
+          this.logger.log(
+            `Pedido de compra ${purchaseOrder.id} creado exitosamente`,
+            {
+              orderNumber: purchaseOrder.orderNumber,
+              supplierId: dto.supplierId,
+              itemsCount: dto.items.length,
+              userId: createdByUserId,
+            },
+          );
 
-        await this.audit.logCreate(
-          'purchaseOrder',
-          purchaseOrder.id,
-          createdByUserId,
-          {
-            orderNumber: purchaseOrder.orderNumber,
-            supplierId: dto.supplierId,
-            itemsCount: dto.items.length,
-            grandTotal: Number(grandTotal),
-          },
-        );
+          await this.audit.logCreate(
+            'purchaseOrder',
+            purchaseOrder.id,
+            createdByUserId,
+            {
+              orderNumber: purchaseOrder.orderNumber,
+              supplierId: dto.supplierId,
+              itemsCount: dto.items.length,
+              grandTotal: Number(grandTotal),
+            },
+          );
 
+          return purchaseOrder;
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      )
+      .then(async (purchaseOrder) => {
+        await this.cache.deletePattern('cache:purchaseOrders:*');
         return purchaseOrder;
-      },
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
-    ).then(async (purchaseOrder) => {
-      await this.cache.deletePattern('cache:purchaseOrders:*');
-      return purchaseOrder;
-    });
+      });
   }
 
   async listPurchaseOrders(
@@ -229,151 +239,158 @@ export class PurchasesService {
       throw new BadRequestException('No se puede recibir un pedido cancelado.');
     }
 
-    return this.prisma.$transaction(
-      async (tx) => {
-        const receivedDate = dto.receivedDate
-          ? new Date(dto.receivedDate)
-          : new Date();
+    return this.prisma
+      .$transaction(
+        async (tx) => {
+          const receivedDate = dto.receivedDate
+            ? new Date(dto.receivedDate)
+            : new Date();
 
-        // Validar y actualizar items recibidos
-        const inventoryItems: Array<{
-          productId: string;
-          qty: number;
-          unitCost: number;
-        }> = [];
+          // Validar y actualizar items recibidos
+          const inventoryItems: Array<{
+            productId: string;
+            qty: number;
+            unitCost: number;
+          }> = [];
 
-        for (const receivedItem of dto.items) {
-          const orderItem = purchaseOrder.items.find(
-            (item) => item.id === receivedItem.itemId,
+          for (const receivedItem of dto.items) {
+            const orderItem = purchaseOrder.items.find(
+              (item) => item.id === receivedItem.itemId,
+            );
+
+            if (!orderItem) {
+              throw new NotFoundException(
+                `Item ${receivedItem.itemId} no encontrado en el pedido.`,
+              );
+            }
+
+            const totalReceived =
+              orderItem.receivedQty + receivedItem.receivedQty;
+            if (totalReceived > orderItem.qty) {
+              throw new BadRequestException(
+                `Cantidad recibida excede lo pedido para item ${orderItem.id}. Pedido: ${orderItem.qty}, Ya recibido: ${orderItem.receivedQty}, Intenta recibir: ${receivedItem.receivedQty}`,
+              );
+            }
+
+            // Actualizar cantidad recibida del item
+            await tx.purchaseOrderItem.update({
+              where: { id: receivedItem.itemId },
+              data: { receivedQty: totalReceived },
+            });
+
+            // Agregar a items de inventario
+            inventoryItems.push({
+              productId: orderItem.productId,
+              qty: receivedItem.receivedQty,
+              unitCost: Number(orderItem.unitCost),
+            });
+          }
+
+          // Determinar nuevo estado del pedido
+          const allItemsReceived = purchaseOrder.items.every(
+            (item) =>
+              item.receivedQty +
+                (dto.items.find((ri) => ri.itemId === item.id)?.receivedQty ??
+                  0) >=
+              item.qty,
           );
 
-          if (!orderItem) {
-            throw new NotFoundException(
-              `Item ${receivedItem.itemId} no encontrado en el pedido.`,
-            );
+          const someItemsReceived = purchaseOrder.items.some(
+            (item) =>
+              item.receivedQty +
+                (dto.items.find((ri) => ri.itemId === item.id)?.receivedQty ??
+                  0) >
+              0,
+          );
+
+          let newStatus = purchaseOrder.status;
+          if (allItemsReceived) {
+            newStatus = PurchaseOrderStatus.COMPLETED;
+          } else if (someItemsReceived) {
+            newStatus = PurchaseOrderStatus.PARTIALLY_RECEIVED;
+          } else {
+            newStatus = PurchaseOrderStatus.RECEIVED;
           }
 
-          const totalReceived = orderItem.receivedQty + receivedItem.receivedQty;
-          if (totalReceived > orderItem.qty) {
-            throw new BadRequestException(
-              `Cantidad recibida excede lo pedido para item ${orderItem.id}. Pedido: ${orderItem.qty}, Ya recibido: ${orderItem.receivedQty}, Intenta recibir: ${receivedItem.receivedQty}`,
-            );
-          }
-
-          // Actualizar cantidad recibida del item
-          await tx.purchaseOrderItem.update({
-            where: { id: receivedItem.itemId },
-            data: { receivedQty: totalReceived },
-          });
-
-          // Agregar a items de inventario
-          inventoryItems.push({
-            productId: orderItem.productId,
-            qty: receivedItem.receivedQty,
-            unitCost: Number(orderItem.unitCost),
-          });
-        }
-
-        // Determinar nuevo estado del pedido
-        const allItemsReceived = purchaseOrder.items.every(
-          (item) =>
-            item.receivedQty +
-              (dto.items.find((ri) => ri.itemId === item.id)?.receivedQty ??
-                0) >=
-            item.qty,
-        );
-
-        const someItemsReceived = purchaseOrder.items.some(
-          (item) =>
-            item.receivedQty +
-              (dto.items.find((ri) => ri.itemId === item.id)?.receivedQty ??
-                0) >
-            0,
-        );
-
-        let newStatus = purchaseOrder.status;
-        if (allItemsReceived) {
-          newStatus = PurchaseOrderStatus.COMPLETED;
-        } else if (someItemsReceived) {
-          newStatus = PurchaseOrderStatus.PARTIALLY_RECEIVED;
-        } else {
-          newStatus = PurchaseOrderStatus.RECEIVED;
-        }
-
-        // Actualizar pedido
-        const updatedOrder = await tx.purchaseOrder.update({
-          where: { id },
-          data: {
-            status: newStatus,
-            receivedDate: receivedDate,
-          },
-          include: {
-            supplier: true,
-            items: { include: { product: true } },
-          },
-        });
-
-        // Crear movimiento de inventario automático
-        if (inventoryItems.length > 0) {
-          const movement = await tx.inventoryMovement.create({
+          // Actualizar pedido
+          const updatedOrder = await tx.purchaseOrder.update({
+            where: { id },
             data: {
-              tenantId: purchaseOrder.tenantId,
-              type: InventoryMovementType.IN,
-              reason: `Recepción de pedido ${purchaseOrder.orderNumber}`,
-              supplierId: purchaseOrder.supplierId,
-              createdBy: receivedByUserId,
-              items: {
-                create: inventoryItems.map((it) => ({
-                  productId: it.productId,
-                  qty: it.qty,
-                  unitCost: it.unitCost,
-                })),
-              },
+              status: newStatus,
+              receivedDate: receivedDate,
             },
-            include: { items: true },
+            include: {
+              supplier: true,
+              items: { include: { product: true } },
+            },
           });
 
-          // Actualizar stock
-          for (const it of inventoryItems) {
-            const current = await tx.stockBalance.upsert({
-              where: { productId: it.productId },
-              create: { productId: it.productId, qtyOnHand: 0, qtyReserved: 0 },
-              update: {},
+          // Crear movimiento de inventario automático
+          if (inventoryItems.length > 0) {
+            const movement = await tx.inventoryMovement.create({
+              data: {
+                tenantId: purchaseOrder.tenantId,
+                type: InventoryMovementType.IN,
+                reason: `Recepción de pedido ${purchaseOrder.orderNumber}`,
+                supplierId: purchaseOrder.supplierId,
+                createdBy: receivedByUserId,
+                items: {
+                  create: inventoryItems.map((it) => ({
+                    productId: it.productId,
+                    qty: it.qty,
+                    unitCost: it.unitCost,
+                  })),
+                },
+              },
+              include: { items: true },
             });
 
-            await tx.stockBalance.update({
-              where: { productId: it.productId },
-              data: { qtyOnHand: current.qtyOnHand + it.qty },
-            });
+            // Actualizar stock
+            for (const it of inventoryItems) {
+              const current = await tx.stockBalance.upsert({
+                where: { productId: it.productId },
+                create: {
+                  productId: it.productId,
+                  qtyOnHand: 0,
+                  qtyReserved: 0,
+                },
+                update: {},
+              });
+
+              await tx.stockBalance.update({
+                where: { productId: it.productId },
+                data: { qtyOnHand: current.qtyOnHand + it.qty },
+              });
+            }
+
+            this.logger.log(
+              `Movimiento de inventario ${movement.id} creado automáticamente para pedido ${purchaseOrder.orderNumber}`,
+            );
           }
 
-          this.logger.log(
-            `Movimiento de inventario ${movement.id} creado automáticamente para pedido ${purchaseOrder.orderNumber}`,
+          await this.audit.logUpdate(
+            'purchaseOrder',
+            id,
+            receivedByUserId,
+            {
+              status: purchaseOrder.status,
+              receivedDate: purchaseOrder.receivedDate,
+            },
+            {
+              status: newStatus,
+              receivedDate: receivedDate,
+            },
           );
-        }
 
-        await this.audit.logUpdate(
-          'purchaseOrder',
-          id,
-          receivedByUserId,
-          {
-            status: purchaseOrder.status,
-            receivedDate: purchaseOrder.receivedDate,
-          },
-          {
-            status: newStatus,
-            receivedDate: receivedDate,
-          },
-        );
-
+          return updatedOrder;
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      )
+      .then(async (updatedOrder) => {
+        await this.cache.delete(this.cache.buildKey('purchaseOrder', id));
+        await this.cache.deletePattern('cache:purchaseOrders:*');
         return updatedOrder;
-      },
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
-    ).then(async (updatedOrder) => {
-      await this.cache.delete(this.cache.buildKey('purchaseOrder', id));
-      await this.cache.deletePattern('cache:purchaseOrders:*');
-      return updatedOrder;
-    });
+      });
   }
 
   private async generateOrderNumber(

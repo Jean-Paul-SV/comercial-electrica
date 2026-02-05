@@ -32,6 +32,7 @@ import {
 } from '@shared/components/ui/dialog';
 import { Skeleton } from '@shared/components/ui/skeleton';
 import { Pagination } from '@shared/components/Pagination';
+import Link from 'next/link';
 import { Truck, Plus, Power, PowerOff, Search, FilterX } from 'lucide-react';
 import { useSuppliersList, useCreateSupplier, useUpdateSupplier } from '@features/suppliers/hooks';
 
@@ -228,7 +229,14 @@ export default function SuppliersPage() {
                       <TableCell className="font-mono text-muted-foreground text-sm">
                         {s.nit}
                       </TableCell>
-                      <TableCell className="font-medium">{s.name}</TableCell>
+                      <TableCell className="font-medium">
+                        <Link
+                          href={`/suppliers/${s.id}`}
+                          className="text-primary hover:underline"
+                        >
+                          {s.name}
+                        </Link>
+                      </TableCell>
                       <TableCell className="text-muted-foreground">
                         {s.contactPerson ?? s.email ?? s.phone ?? '—'}
                       </TableCell>

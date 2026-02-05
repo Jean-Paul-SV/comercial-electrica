@@ -35,7 +35,11 @@ export class QuotesService {
     private readonly cache: CacheService,
   ) {}
 
-  async createQuote(dto: CreateQuoteDto, createdByUserId?: string, tenantId?: string | null) {
+  async createQuote(
+    dto: CreateQuoteDto,
+    createdByUserId?: string,
+    tenantId?: string | null,
+  ) {
     if (!tenantId) throw new ForbiddenException('Tenant requerido.');
     if (!dto.items || dto.items.length === 0) {
       throw new BadRequestException('Debe incluir items.');
@@ -65,78 +69,80 @@ export class QuotesService {
       }
     }
 
-    return this.prisma.$transaction(
-      async (tx) => {
-        // Validar que los productos existan y pertenezcan al tenant
-        const products = await tx.product.findMany({
-          where: { id: { in: dto.items.map((i) => i.productId) }, tenantId },
-        });
+    return this.prisma
+      .$transaction(
+        async (tx) => {
+          // Validar que los productos existan y pertenezcan al tenant
+          const products = await tx.product.findMany({
+            where: { id: { in: dto.items.map((i) => i.productId) }, tenantId },
+          });
 
-        if (products.length !== dto.items.length) {
-          throw new BadRequestException('Uno o más productos no existen.');
-        }
+          if (products.length !== dto.items.length) {
+            throw new BadRequestException('Uno o más productos no existen.');
+          }
 
-        // Calcular totales
-        let subtotal = 0;
-        let taxTotal = 0;
-        const quoteItems = dto.items.map((i) => {
-          const p = products.find((pp) => pp.id === i.productId)!;
-          const unitPrice = i.unitPrice ?? Number(p.price);
-          const lineSubtotal = unitPrice * i.qty;
-          const lineTax = (lineSubtotal * Number(p.taxRate ?? 0)) / 100;
-          const lineTotal = lineSubtotal + lineTax;
-          subtotal += lineSubtotal;
-          taxTotal += lineTax;
-          return {
-            productId: p.id,
-            qty: i.qty,
-            unitPrice,
-            taxRate: Number(p.taxRate ?? 0),
-            lineTotal,
-          };
-        });
+          // Calcular totales
+          let subtotal = 0;
+          let taxTotal = 0;
+          const quoteItems = dto.items.map((i) => {
+            const p = products.find((pp) => pp.id === i.productId)!;
+            const unitPrice = i.unitPrice ?? Number(p.price);
+            const lineSubtotal = unitPrice * i.qty;
+            const lineTax = (lineSubtotal * Number(p.taxRate ?? 0)) / 100;
+            const lineTotal = lineSubtotal + lineTax;
+            subtotal += lineSubtotal;
+            taxTotal += lineTax;
+            return {
+              productId: p.id,
+              qty: i.qty,
+              unitPrice,
+              taxRate: Number(p.taxRate ?? 0),
+              lineTotal,
+            };
+          });
 
-        const discountPercent = Math.min(
-          100,
-          Math.max(0, Number(dto.discountPercent ?? 0)),
-        );
-        const discountTotal = Math.round(
-          ((subtotal + taxTotal) * discountPercent) / 100,
-        );
-        const grandTotal = Math.max(0, subtotal + taxTotal - discountTotal);
+          const discountPercent = Math.min(
+            100,
+            Math.max(0, Number(dto.discountPercent ?? 0)),
+          );
+          const discountTotal = Math.round(
+            ((subtotal + taxTotal) * discountPercent) / 100,
+          );
+          const grandTotal = Math.max(0, subtotal + taxTotal - discountTotal);
 
-        // Calcular fecha de validez (por defecto 30 días desde hoy)
-        const validUntil = dto.validUntil
-          ? new Date(dto.validUntil)
-          : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+          // Calcular fecha de validez (por defecto 30 días desde hoy)
+          const validUntil = dto.validUntil
+            ? new Date(dto.validUntil)
+            : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
-        // Crear cotización
-        const quote = await tx.quote.create({
-          data: {
-            tenantId,
-            customerId: dto.customerId ?? null,
-            status: QuoteStatus.DRAFT,
-            validUntil,
-            subtotal,
-            taxTotal,
-            discountTotal,
-            grandTotal,
-            items: { create: quoteItems },
-          },
-          include: {
-            items: { include: { product: true } },
-            customer: true,
-          },
-        });
+          // Crear cotización
+          const quote = await tx.quote.create({
+            data: {
+              tenantId,
+              customerId: dto.customerId ?? null,
+              status: QuoteStatus.DRAFT,
+              validUntil,
+              subtotal,
+              taxTotal,
+              discountTotal,
+              grandTotal,
+              items: { create: quoteItems },
+            },
+            include: {
+              items: { include: { product: true } },
+              customer: true,
+            },
+          });
 
+          return quote;
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      )
+      .then(async (quote) => {
+        // Invalidar caché de listados
+        await this.cache.deletePattern('cache:quotes:*');
         return quote;
-      },
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
-    ).then(async (quote) => {
-      // Invalidar caché de listados
-      await this.cache.deletePattern('cache:quotes:*');
-      return quote;
-    });
+      });
   }
 
   async listQuotes(
@@ -150,8 +156,17 @@ export class QuotesService {
   ) {
     if (!tenantId) throw new ForbiddenException('Tenant requerido.');
     // Cachear listados frecuentes (sin filtros o con filtros comunes)
-    if (!filters || (!filters.status && !filters.customerId && !filters.search)) {
-      const cacheKey = this.cache.buildKey('quotes', 'list', tenantId, pagination?.page, pagination?.limit);
+    if (
+      !filters ||
+      (!filters.status && !filters.customerId && !filters.search)
+    ) {
+      const cacheKey = this.cache.buildKey(
+        'quotes',
+        'list',
+        tenantId,
+        pagination?.page,
+        pagination?.limit,
+      );
       const cached = await this.cache.get(cacheKey);
       if (cached) {
         this.logger.debug('Quotes list retrieved from cache');
@@ -195,8 +210,17 @@ export class QuotesService {
     const result = createPaginatedResponse(data, total, page, limit);
 
     // Cachear si no hay filtros
-    if (!filters || (!filters.status && !filters.customerId && !filters.search)) {
-      const cacheKey = this.cache.buildKey('quotes', 'list', tenantId, page, limit);
+    if (
+      !filters ||
+      (!filters.status && !filters.customerId && !filters.search)
+    ) {
+      const cacheKey = this.cache.buildKey(
+        'quotes',
+        'list',
+        tenantId,
+        page,
+        limit,
+      );
       await this.cache.set(cacheKey, result, 300); // 5 minutos
     }
 
@@ -220,7 +244,12 @@ export class QuotesService {
     return quote;
   }
 
-  async updateQuote(id: string, dto: UpdateQuoteDto, updatedByUserId?: string, tenantId?: string | null) {
+  async updateQuote(
+    id: string,
+    dto: UpdateQuoteDto,
+    updatedByUserId?: string,
+    tenantId?: string | null,
+  ) {
     const quote = await this.getQuoteById(id, tenantId);
 
     // No permitir actualizar cotizaciones convertidas o canceladas
@@ -245,87 +274,89 @@ export class QuotesService {
       }
     }
 
-    return this.prisma.$transaction(
-      async (tx) => {
-        // Si se actualizan los items, recalcular totales
-        let updateData: Prisma.QuoteUpdateInput = {};
+    return this.prisma
+      .$transaction(
+        async (tx) => {
+          // Si se actualizan los items, recalcular totales
+          let updateData: Prisma.QuoteUpdateInput = {};
 
-        if (dto.items && dto.items.length > 0) {
-          // Validar productos
-          const products = await tx.product.findMany({
-            where: { id: { in: dto.items.map((i) => i.productId) } },
-          });
+          if (dto.items && dto.items.length > 0) {
+            // Validar productos
+            const products = await tx.product.findMany({
+              where: { id: { in: dto.items.map((i) => i.productId) } },
+            });
 
-          if (products.length !== dto.items.length) {
-            throw new BadRequestException('Uno o más productos no existen.');
-          }
+            if (products.length !== dto.items.length) {
+              throw new BadRequestException('Uno o más productos no existen.');
+            }
 
-          // Recalcular totales
-          let subtotal = 0;
-          let taxTotal = 0;
-          const quoteItems = dto.items.map((i) => {
-            const p = products.find((pp) => pp.id === i.productId)!;
-            const unitPrice = i.unitPrice ?? Number(p.price);
-            const lineSubtotal = unitPrice * i.qty;
-            const lineTax = (lineSubtotal * Number(p.taxRate ?? 0)) / 100;
-            const lineTotal = lineSubtotal + lineTax;
-            subtotal += lineSubtotal;
-            taxTotal += lineTax;
-            return {
-              productId: p.id,
-              qty: i.qty,
-              unitPrice,
-              taxRate: Number(p.taxRate ?? 0),
-              lineTotal,
+            // Recalcular totales
+            let subtotal = 0;
+            let taxTotal = 0;
+            const quoteItems = dto.items.map((i) => {
+              const p = products.find((pp) => pp.id === i.productId)!;
+              const unitPrice = i.unitPrice ?? Number(p.price);
+              const lineSubtotal = unitPrice * i.qty;
+              const lineTax = (lineSubtotal * Number(p.taxRate ?? 0)) / 100;
+              const lineTotal = lineSubtotal + lineTax;
+              subtotal += lineSubtotal;
+              taxTotal += lineTax;
+              return {
+                productId: p.id,
+                qty: i.qty,
+                unitPrice,
+                taxRate: Number(p.taxRate ?? 0),
+                lineTotal,
+              };
+            });
+
+            const grandTotal = subtotal + taxTotal;
+
+            // Eliminar items antiguos y crear nuevos
+            await tx.quoteItem.deleteMany({ where: { quoteId: id } });
+
+            updateData = {
+              subtotal,
+              taxTotal,
+              grandTotal,
+              items: { create: quoteItems },
             };
+          }
+
+          if (dto.status) {
+            updateData.status = dto.status;
+          }
+
+          if (dto.validUntil) {
+            updateData.validUntil = new Date(dto.validUntil);
+          }
+
+          if (dto.customerId !== undefined) {
+            if (dto.customerId) {
+              updateData.customer = { connect: { id: dto.customerId } };
+            } else {
+              updateData.customer = { disconnect: true };
+            }
+          }
+
+          const updatedQuote = await tx.quote.update({
+            where: { id },
+            data: updateData,
+            include: {
+              items: { include: { product: true } },
+              customer: true,
+            },
           });
 
-          const grandTotal = subtotal + taxTotal;
-
-          // Eliminar items antiguos y crear nuevos
-          await tx.quoteItem.deleteMany({ where: { quoteId: id } });
-
-          updateData = {
-            subtotal,
-            taxTotal,
-            grandTotal,
-            items: { create: quoteItems },
-          };
-        }
-
-        if (dto.status) {
-          updateData.status = dto.status;
-        }
-
-        if (dto.validUntil) {
-          updateData.validUntil = new Date(dto.validUntil);
-        }
-
-        if (dto.customerId !== undefined) {
-          if (dto.customerId) {
-            updateData.customer = { connect: { id: dto.customerId } };
-          } else {
-            updateData.customer = { disconnect: true };
-          }
-        }
-
-        const updatedQuote = await tx.quote.update({
-          where: { id },
-          data: updateData,
-          include: {
-            items: { include: { product: true } },
-            customer: true,
-          },
-        });
-
-        return updatedQuote;
-      },
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
-    ).then(async (updated) => {
-      // Invalidar caché de listados
-      await this.cache.deletePattern('cache:quotes:*');
-      return updated;
-    });
+          return updatedQuote;
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      )
+      .then(async (updated) => {
+        // Invalidar caché de listados
+        await this.cache.deletePattern('cache:quotes:*');
+        return updated;
+      });
   }
 
   async convertQuoteToSale(
@@ -556,24 +587,26 @@ export class QuotesService {
       );
     }
 
-    return this.prisma.$transaction(async (tx) => {
-      const updatedQuote = await tx.quote.update({
-        where: { id },
-        data: { status },
-        include: {
-          items: { include: { product: true } },
-          customer: true,
-        },
+    return this.prisma
+      .$transaction(async (tx) => {
+        const updatedQuote = await tx.quote.update({
+          where: { id },
+          data: { status },
+          include: {
+            items: { include: { product: true } },
+            customer: true,
+          },
+        });
+        return updatedQuote;
+      })
+      .then(async (updated) => {
+        await this.audit.log('quote', id, 'update_status', updatedByUserId, {
+          oldStatus: quote.status,
+          newStatus: status,
+        });
+        await this.cache.deletePattern('cache:quotes:*');
+        return updated;
       });
-      return updatedQuote;
-    }).then(async (updated) => {
-      await this.audit.log('quote', id, 'update_status', updatedByUserId, {
-        oldStatus: quote.status,
-        newStatus: status,
-      });
-      await this.cache.deletePattern('cache:quotes:*');
-      return updated;
-    });
   }
 
   /**

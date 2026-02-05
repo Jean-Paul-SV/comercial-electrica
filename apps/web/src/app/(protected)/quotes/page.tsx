@@ -32,7 +32,8 @@ import { Skeleton } from '@shared/components/ui/skeleton';
 import { Pagination } from '@shared/components/Pagination';
 import { formatMoney, formatDate } from '@shared/utils/format';
 import { downloadQuotePdf } from '@shared/utils/quotePdf';
-import { FileSignature, Plus, Trash2, ShoppingCart, FileDown, Search, Layers } from 'lucide-react';
+import Link from 'next/link';
+import { FileSignature, Plus, Trash2, ShoppingCart, FileDown, Search, Layers, Info } from 'lucide-react';
 import { useQuotesList, useCreateQuote, useConvertQuote, useUpdateQuoteStatus } from '@features/quotes/hooks';
 import { useProductsList } from '@features/products/hooks';
 import { useCustomersList } from '@features/customers/hooks';
@@ -361,6 +362,19 @@ export default function QuotesPage() {
             <Pagination meta={meta} onPageChange={setPage} label="Página" />
           </div>
 
+          {openSessions.length === 0 && (
+            <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 flex items-start gap-3 text-sm text-amber-800 dark:text-amber-200 dark:bg-amber-500/15 dark:border-amber-500/30">
+              <Info className="h-5 w-5 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+              <p className="flex-1 min-w-0">
+                Para convertir una cotización a factura (venta) debes tener al menos una <strong>sesión de caja abierta</strong>. Ve a{' '}
+                <Link href="/cash" className="font-medium text-primary hover:underline">
+                  Caja
+                </Link>{' '}
+                y abre una sesión para habilitar el botón &quot;Convertir a factura&quot;.
+              </p>
+            </div>
+          )}
+
           {query.isLoading && (
             <div className="rounded-lg border border-border overflow-hidden">
               <Table>
@@ -426,6 +440,17 @@ export default function QuotesPage() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1 flex-wrap">
+                          <Link href={`/quotes/${q.id}`}>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="gap-1"
+                              title="Ver detalle"
+                            >
+                              <Info className="h-3 w-3" />
+                              Ver
+                            </Button>
+                          </Link>
                           <Button
                             size="sm"
                             variant="ghost"
@@ -443,6 +468,11 @@ export default function QuotesPage() {
                               className="gap-1"
                               onClick={() => setOpenConvert(q.id)}
                               disabled={openSessions.length === 0}
+                              title={
+                                openSessions.length === 0
+                                  ? 'Abre una sesión de caja en Caja para poder convertir esta cotización a factura.'
+                                  : 'Convertir esta cotización en una venta (factura)'
+                              }
                             >
                               <ShoppingCart className="h-3 w-3" />
                               Convertir a factura

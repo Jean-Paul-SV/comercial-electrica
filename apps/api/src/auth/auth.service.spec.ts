@@ -276,7 +276,10 @@ describe('AuthService', () => {
 
       const result = await service.login(dto);
 
-      expect(result).toEqual({ accessToken: 'jwt-token-123', mustChangePassword: false });
+      expect(result).toEqual({
+        accessToken: 'jwt-token-123',
+        mustChangePassword: false,
+      });
       expect(prisma.user.findUnique).toHaveBeenCalledWith({
         where: { email: 'admin@test.com' },
         select: {

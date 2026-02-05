@@ -28,7 +28,10 @@ export class OnboardingController {
     schema: {
       type: 'object',
       properties: {
-        status: { type: 'string', enum: ['not_started', 'in_progress', 'completed', 'skipped'] },
+        status: {
+          type: 'string',
+          enum: ['not_started', 'in_progress', 'completed', 'skipped'],
+        },
         step: { type: 'number', enum: [1, 2, 3] },
         hasOpenCashSession: { type: 'boolean' },
         hasAtLeastOneProduct: { type: 'boolean' },
@@ -36,7 +39,12 @@ export class OnboardingController {
           type: 'array',
           items: {
             type: 'object',
-            properties: { id: { type: 'string' }, label: { type: 'string' }, done: { type: 'boolean' }, href: { type: 'string' } },
+            properties: {
+              id: { type: 'string' },
+              label: { type: 'string' },
+              done: { type: 'boolean' },
+              href: { type: 'string' },
+            },
           },
         },
       },

@@ -59,14 +59,18 @@ export class AppController {
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Estadísticas generales del sistema',
-    description: 'Obtiene estadísticas generales del sistema (requiere permiso reports:read)',
+    description:
+      'Obtiene estadísticas generales del sistema (requiere permiso reports:read)',
   })
   @ApiResponse({
     status: 200,
     description: 'Estadísticas del sistema',
   })
   @ApiResponse({ status: 401, description: 'No autenticado' })
-  @ApiResponse({ status: 403, description: 'No autorizado (requiere permiso reports:read)' })
+  @ApiResponse({
+    status: 403,
+    description: 'No autorizado (requiere permiso reports:read)',
+  })
   getStats() {
     return this.appService.getStats();
   }

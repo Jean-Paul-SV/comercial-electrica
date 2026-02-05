@@ -5,7 +5,8 @@ import { Type } from 'class-transformer';
 export class CustomerClustersDto {
   @ApiPropertyOptional({
     example: 90,
-    description: 'Días hacia atrás para ventas del cliente (monto total, última compra, cantidad de compras)',
+    description:
+      'Días hacia atrás para ventas del cliente (monto total, última compra, cantidad de compras)',
     minimum: 30,
     maximum: 365,
     default: 90,

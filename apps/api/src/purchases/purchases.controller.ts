@@ -83,7 +83,11 @@ export class PurchasesController {
     @Body() dto: CreatePurchaseOrderDto,
     @Req() req: { user?: { sub?: string; tenantId?: string } },
   ) {
-    return this.purchases.createPurchaseOrder(dto, req.user?.sub, req.user?.tenantId);
+    return this.purchases.createPurchaseOrder(
+      dto,
+      req.user?.sub,
+      req.user?.tenantId,
+    );
   }
 
   @Post(':id/receive')
@@ -104,6 +108,11 @@ export class PurchasesController {
     @Body() dto: ReceivePurchaseOrderDto,
     @Req() req: { user?: { sub?: string; tenantId?: string } },
   ) {
-    return this.purchases.receivePurchaseOrder(id, dto, req.user?.sub, req.user?.tenantId);
+    return this.purchases.receivePurchaseOrder(
+      id,
+      dto,
+      req.user?.sub,
+      req.user?.tenantId,
+    );
   }
 }

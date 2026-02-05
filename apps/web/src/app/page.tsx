@@ -6,7 +6,7 @@ import { useAuth } from '@shared/providers/AuthProvider';
 
 export default function Home() {
   const router = useRouter();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, hasCheckedStorage } = useAuth();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -14,12 +14,11 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (!mounted) return;
+    if (!mounted || !hasCheckedStorage) return;
     router.replace(isAuthenticated ? '/app' : '/login');
-  }, [mounted, isAuthenticated, router]);
+  }, [mounted, hasCheckedStorage, isAuthenticated, router]);
 
-  // Evitar hidratación que falle en servidor: mostrar carga mínima hasta montar en cliente
-  if (!mounted) {
+  if (!mounted || !hasCheckedStorage) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background" aria-busy="true">
         <div className="animate-pulse text-muted-foreground text-sm">Cargando…</div>

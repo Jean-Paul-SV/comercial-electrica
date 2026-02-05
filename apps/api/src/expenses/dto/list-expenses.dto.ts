@@ -21,7 +21,8 @@ export class ListExpensesDto {
 
   @ApiPropertyOptional({
     example: 'all',
-    description: 'Tipo: all = todos, compras = gastos por compras (Factura proveedor), otros = resto',
+    description:
+      'Tipo: all = todos, compras = gastos por compras (Factura proveedor), otros = resto',
     enum: ['all', 'compras', 'otros'],
   })
   @IsOptional()
@@ -30,7 +31,8 @@ export class ListExpensesDto {
 
   @ApiPropertyOptional({
     example: 'Oficina',
-    description: 'Filtrar por categoría exacta (solo cuando expenseType es all)',
+    description:
+      'Filtrar por categoría exacta (solo cuando expenseType es all)',
   })
   @IsOptional()
   @IsString()
@@ -38,7 +40,8 @@ export class ListExpensesDto {
 
   @ApiPropertyOptional({
     example: 'inventario',
-    description: 'Buscar en categoría o descripción (contiene, sin distinguir mayúsculas)',
+    description:
+      'Buscar en categoría o descripción (contiene, sin distinguir mayúsculas)',
   })
   @IsOptional()
   @IsString()
@@ -52,14 +55,23 @@ export class ListExpensesDto {
   @IsString()
   cashSessionId?: string;
 
-  @ApiPropertyOptional({ example: 1, description: 'Página (desde 1)', minimum: 1 })
+  @ApiPropertyOptional({
+    example: 1,
+    description: 'Página (desde 1)',
+    minimum: 1,
+  })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
   page?: number;
 
-  @ApiPropertyOptional({ example: 20, description: 'Resultados por página', minimum: 1, maximum: 100 })
+  @ApiPropertyOptional({
+    example: 20,
+    description: 'Resultados por página',
+    minimum: 1,
+    maximum: 100,
+  })
   @IsOptional()
   @Type(() => Number)
   @IsInt()

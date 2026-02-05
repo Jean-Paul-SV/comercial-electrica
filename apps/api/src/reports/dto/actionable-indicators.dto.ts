@@ -5,7 +5,8 @@ import { Type } from 'class-transformer';
 export class ActionableIndicatorsDto {
   @ApiPropertyOptional({
     example: 30,
-    description: 'Días hacia atrás para calcular indicadores (ventas, rotación, etc.)',
+    description:
+      'Días hacia atrás para calcular indicadores (ventas, rotación, etc.)',
     minimum: 7,
     maximum: 365,
     default: 30,

@@ -8,7 +8,8 @@ import { PaginationDto } from '../../common/dto/pagination.dto';
  */
 export class ListMovementsQueryDto extends PaginationDto {
   @ApiPropertyOptional({
-    description: 'Buscar movimientos que contengan un producto con este nombre o código',
+    description:
+      'Buscar movimientos que contengan un producto con este nombre o código',
     example: 'cable',
     maxLength: 100,
   })
@@ -18,7 +19,8 @@ export class ListMovementsQueryDto extends PaginationDto {
   search?: string;
 
   @ApiPropertyOptional({
-    description: 'Ordenar por fecha: desc = más reciente primero (Mayor), asc = más antiguo primero (Menor)',
+    description:
+      'Ordenar por fecha: desc = más reciente primero (Mayor), asc = más antiguo primero (Menor)',
     enum: ['asc', 'desc'],
   })
   @IsOptional()

@@ -70,7 +70,8 @@ export class CreateSaleDto {
 
   @ApiPropertyOptional({
     example: 0,
-    description: 'Descuento total en COP (se resta del total). No puede superar subtotal + IVA.',
+    description:
+      'Descuento total en COP (se resta del total). No puede superar subtotal + IVA.',
   })
   @IsOptional()
   @Type(() => Number)

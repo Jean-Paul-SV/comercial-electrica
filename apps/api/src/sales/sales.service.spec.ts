@@ -295,9 +295,9 @@ describe('SalesService', () => {
         message: 'Uno o más productos no existen o están inactivos.',
         missingProductIds: expect.any(Array),
       });
-      expect((response as { missingProductIds: string[] }).missingProductIds).toContain(
-        createSaleDto.items[0].productId,
-      );
+      expect(
+        (response as { missingProductIds: string[] }).missingProductIds,
+      ).toContain(createSaleDto.items[0].productId);
     });
 
     it('debe lanzar error si stock es insuficiente', async () => {

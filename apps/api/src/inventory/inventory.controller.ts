@@ -91,6 +91,10 @@ export class InventoryController {
     @Body() dto: CreateInventoryMovementDto,
     @Req() req: { user?: { sub?: string; tenantId?: string } },
   ) {
-    return this.inventory.createMovement(dto, req.user?.sub, req.user?.tenantId);
+    return this.inventory.createMovement(
+      dto,
+      req.user?.sub,
+      req.user?.tenantId,
+    );
   }
 }

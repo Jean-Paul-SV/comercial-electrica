@@ -14,12 +14,18 @@ import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateProductDto {
-  @ApiProperty({ example: 'INT-0001', description: 'Código interno del producto' })
+  @ApiProperty({
+    example: 'INT-0001',
+    description: 'Código interno del producto',
+  })
   @IsString()
   @MinLength(1)
   internalCode!: string;
 
-  @ApiProperty({ example: 'Cable THHN 12 AWG', description: 'Nombre del producto' })
+  @ApiProperty({
+    example: 'Cable THHN 12 AWG',
+    description: 'Nombre del producto',
+  })
   @IsString()
   @MinLength(2)
   name!: string;

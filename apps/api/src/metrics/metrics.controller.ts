@@ -31,12 +31,14 @@ export class MetricsController {
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Métricas básicas del proceso',
-    description:
-      'Métricas en JSON (snapshot). Requiere permiso metrics:read.',
+    description: 'Métricas en JSON (snapshot). Requiere permiso metrics:read.',
   })
   @ApiResponse({ status: 200, description: 'Snapshot de métricas' })
   @ApiResponse({ status: 401, description: 'No autenticado' })
-  @ApiResponse({ status: 403, description: 'No autorizado (requiere permiso metrics:read)' })
+  @ApiResponse({
+    status: 403,
+    description: 'No autorizado (requiere permiso metrics:read)',
+  })
   @ApiResponse({ status: 404, description: 'Métricas deshabilitadas' })
   getMetrics() {
     const enabled = this.config.get<string>('METRICS_ENABLED', 'true');
@@ -68,4 +70,3 @@ export class MetricsController {
     return this.metrics.getPrometheusText();
   }
 }
-

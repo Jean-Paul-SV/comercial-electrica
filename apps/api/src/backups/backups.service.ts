@@ -1,4 +1,9 @@
-import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
 import { AuditService } from '../common/services/audit.service';
@@ -77,7 +82,9 @@ export class BackupsService {
         await execAsync('pg_dump --version', { timeout: 2000 });
         // pg_dump está disponible, usarlo directamente
         command = `pg_dump -h ${dbHost} -p ${dbPort} -U ${dbUser} -d ${dbName} -F c -f "${filepath}"`;
-        this.logger.log(`Usando pg_dump directamente para backup: ${backupRun.id}`);
+        this.logger.log(
+          `Usando pg_dump directamente para backup: ${backupRun.id}`,
+        );
       } catch {
         // pg_dump no está disponible, usar Docker como fallback
         // En Windows/Mac, usar host.docker.internal para conectar al host desde Docker
@@ -212,7 +219,10 @@ export class BackupsService {
   /**
    * Elimina un backup
    */
-  async deleteBackup(id: string, deletedByUserId?: string | null): Promise<void> {
+  async deleteBackup(
+    id: string,
+    deletedByUserId?: string | null,
+  ): Promise<void> {
     const backup = await this.getBackup(id);
     if (backup.storagePath && existsSync(backup.storagePath)) {
       await unlink(backup.storagePath);

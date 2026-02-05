@@ -17,8 +17,7 @@ import { runWithAuditContext } from '../audit/audit-context';
 export class AuditContextInterceptor implements NestInterceptor {
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     const req = context.switchToHttp().getRequest<Request>();
-    const requestId =
-      (req.headers['x-request-id'] as string) || randomUUID();
+    const requestId = (req.headers['x-request-id'] as string) || randomUUID();
     const ip =
       (req.ip as string) ||
       (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||

@@ -147,7 +147,9 @@ describe('Sales (e2e)', () => {
       expect(cashMovements.length).toBeGreaterThan(0);
       expect(cashMovements[0].type).toBe('IN');
       // Decimal se serializa como string, convertir a número
-      expect(Number(cashMovements[0].amount)).toBe(Number(response.body.sale.grandTotal));
+      expect(Number(cashMovements[0].amount)).toBe(
+        Number(response.body.sale.grandTotal),
+      );
     });
 
     it('debe fallar si no hay stock suficiente', async () => {

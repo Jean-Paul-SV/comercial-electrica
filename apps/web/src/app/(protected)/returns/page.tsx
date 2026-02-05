@@ -30,6 +30,7 @@ import {
 import { Skeleton } from '@shared/components/ui/skeleton';
 import { Pagination } from '@shared/components/Pagination';
 import { EmptyState } from '@shared/components/EmptyState';
+import Link from 'next/link';
 import { formatMoney, formatDateTime } from '@shared/utils/format';
 import { RotateCcw, Plus, Search } from 'lucide-react';
 import { useReturnsList, useCreateReturn } from '@features/returns/hooks';
@@ -247,7 +248,12 @@ export default function ReturnsPage() {
                         className="transition-colors hover:bg-muted/40"
                       >
                         <TableCell className="font-medium text-foreground">
-                          {formatDateTime(r.returnedAt)}
+                          <Link
+                            href={`/returns/${r.id}`}
+                            className="text-primary hover:underline"
+                          >
+                            {formatDateTime(r.returnedAt)}
+                          </Link>
                         </TableCell>
                         <TableCell className="text-muted-foreground">
                           {r.sale?.customer?.name ?? '—'}

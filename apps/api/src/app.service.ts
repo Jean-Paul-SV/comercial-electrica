@@ -27,7 +27,13 @@ export class AppService {
     let redisStatus: 'connected' | 'disconnected' | 'unknown' = 'unknown';
     const queues: Record<
       string,
-      | { status: 'connected'; waiting: number; active: number; delayed: number; failed: number }
+      | {
+          status: 'connected';
+          waiting: number;
+          active: number;
+          delayed: number;
+          failed: number;
+        }
       | { status: 'disconnected' }
     > = {};
 
@@ -48,7 +54,12 @@ export class AppService {
 
     const checkQueue = async (name: string, q: Queue) => {
       try {
-        const counts = await q.getJobCounts('waiting', 'active', 'delayed', 'failed');
+        const counts = await q.getJobCounts(
+          'waiting',
+          'active',
+          'delayed',
+          'failed',
+        );
         queues[name] = {
           status: 'connected',
           waiting: counts.waiting ?? 0,

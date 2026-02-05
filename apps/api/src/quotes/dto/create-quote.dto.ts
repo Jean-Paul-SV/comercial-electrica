@@ -66,7 +66,8 @@ export class CreateQuoteDto {
 
   @ApiPropertyOptional({
     example: 10,
-    description: 'Descuento en porcentaje (0-100) aplicado al total (subtotal + IVA).',
+    description:
+      'Descuento en porcentaje (0-100) aplicado al total (subtotal + IVA).',
   })
   @IsOptional()
   @Type(() => Number)

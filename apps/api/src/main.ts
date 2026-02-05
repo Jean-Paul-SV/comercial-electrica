@@ -2,12 +2,13 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe, HttpException } from '@nestjs/common';
 import { config } from 'dotenv';
-import { resolve } from 'path';
+import { resolve, join } from 'path';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AllExceptionsFilter } from './common/filters/http-exception.filter';
 import { JsonLogger } from './common/logger/json-logger';
 import { randomUUID } from 'crypto';
 import type { Request, Response, NextFunction } from 'express';
+import { NestExpressApplication } from '@nestjs/platform-express';
 
 // Cargar .env manualmente antes de que NestJS inicie
 // Intenta diferentes ubicaciones
@@ -39,8 +40,15 @@ if (!envLoaded) {
 
 async function bootstrap() {
   const useJsonLog = process.env.LOG_FORMAT === 'json';
-  const app = await NestFactory.create(AppModule, {
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     logger: useJsonLog ? new JsonLogger() : undefined,
+  });
+
+  // Configurar servidor de archivos estáticos para storage
+  const storageBasePath = process.env.OBJECT_STORAGE_BASE_PATH || './storage';
+  const storagePath = resolve(process.cwd(), storageBasePath);
+  app.useStaticAssets(storagePath, {
+    prefix: '/storage',
   });
   const isProd = process.env.NODE_ENV === 'production';
   const allowedOrigins = (process.env.ALLOWED_ORIGINS ?? '')
@@ -79,7 +87,16 @@ async function bootstrap() {
     origin: corsOrigin,
     credentials: true,
     methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With', 'X-Request-Id'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'Accept',
+      'Origin',
+      'X-Requested-With',
+      'X-Request-Id',
+      'Idempotency-Key',
+      'idempotency-key', // algunos clientes envían el header en minúsculas en el preflight
+    ],
   });
   // Filtro global de excepciones para respuestas consistentes
   app.useGlobalFilters(new AllExceptionsFilter());

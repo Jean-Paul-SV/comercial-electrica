@@ -1,4 +1,9 @@
-import { BadRequestException, ForbiddenException, Injectable, Logger } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+} from '@nestjs/common';
 import { Prisma, InventoryMovementType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateInventoryMovementDto } from './dto/create-movement.dto';
@@ -15,7 +20,11 @@ export class InventoryService {
     private readonly audit: AuditService,
   ) {}
 
-  async createMovement(dto: CreateInventoryMovementDto, createdByUserId?: string, tenantId?: string | null) {
+  async createMovement(
+    dto: CreateInventoryMovementDto,
+    createdByUserId?: string,
+    tenantId?: string | null,
+  ) {
     if (!tenantId) throw new ForbiddenException('Tenant requerido.');
     const startTime = Date.now();
     this.logger.log(`Creando movimiento de inventario tipo ${dto.type}`, {
@@ -183,7 +192,11 @@ export class InventoryService {
         where,
         orderBy: { createdAt: order },
         include: {
-          items: { include: { product: { select: { name: true, internalCode: true } } } },
+          items: {
+            include: {
+              product: { select: { name: true, internalCode: true } },
+            },
+          },
           supplier: true,
         },
         skip,

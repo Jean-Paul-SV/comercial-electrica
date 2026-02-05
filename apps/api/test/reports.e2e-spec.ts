@@ -237,11 +237,9 @@ describe('Reports (e2e)', () => {
 
       expect(response.body.period.sessionId).toBe(cashSessionId);
       // Todas las sesiones deben ser la especificada
-      response.body.sessions.forEach(
-        (session: { id: string }) => {
-          expect(session.id).toBe(cashSessionId);
-        },
-      );
+      response.body.sessions.forEach((session: { id: string }) => {
+        expect(session.id).toBe(cashSessionId);
+      });
     });
   });
 

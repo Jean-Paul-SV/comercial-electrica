@@ -7,7 +7,10 @@ import {
   registerUser,
   listUsers,
   updateUser,
+  deleteUser,
   changeMyPassword,
+  uploadProfilePicture,
+  uploadEmployeePicture,
   forgotPassword,
   resetPassword,
   inviteUser,
@@ -74,12 +77,45 @@ export function useUpdateUser() {
   });
 }
 
+export function useDeleteUser() {
+  const queryClient = useQueryClient();
+  const { token } = useAuth();
+
+  return useMutation({
+    mutationFn: (id: string) => deleteUser(id, token!),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: USERS_QUERY_KEY });
+    },
+  });
+}
+
 export function useChangeMyPassword() {
   const { token } = useAuth();
 
   return useMutation({
     mutationFn: (payload: ChangeMyPasswordPayload) =>
       changeMyPassword(payload, token!),
+  });
+}
+
+export function useUploadProfilePicture() {
+  const { token } = useAuth();
+
+  return useMutation({
+    mutationFn: (file: File) => uploadProfilePicture(file, token!),
+  });
+}
+
+export function useUploadEmployeePicture() {
+  const queryClient = useQueryClient();
+  const { token } = useAuth();
+
+  return useMutation({
+    mutationFn: ({ userId, file }: { userId: string; file: File }) =>
+      uploadEmployeePicture(userId, file, token!),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: USERS_QUERY_KEY });
+    },
   });
 }
 

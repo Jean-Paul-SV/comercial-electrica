@@ -64,7 +64,12 @@ export class SupplierInvoicesController {
   })
   @ApiResponse({ status: 401, description: 'No autenticado' })
   list(
-    @Query() pagination?: PaginationDto & { status?: SupplierInvoiceStatus; supplierId?: string; search?: string },
+    @Query()
+    pagination?: PaginationDto & {
+      status?: SupplierInvoiceStatus;
+      supplierId?: string;
+      search?: string;
+    },
     @Req() req?: { user?: { tenantId?: string } },
   ) {
     return this.invoices.listSupplierInvoices(
@@ -88,7 +93,8 @@ export class SupplierInvoicesController {
   })
   @ApiResponse({
     status: 200,
-    description: 'Lista de facturas pendientes con información de días hasta vencimiento',
+    description:
+      'Lista de facturas pendientes con información de días hasta vencimiento',
   })
   @ApiResponse({ status: 401, description: 'No autenticado' })
   getPendingPayments(@Req() req?: { user?: { tenantId?: string } }) {
@@ -99,7 +105,8 @@ export class SupplierInvoicesController {
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Obtener factura de proveedor por ID',
-    description: 'Obtiene los detalles de una factura de proveedor específica con historial de pagos',
+    description:
+      'Obtiene los detalles de una factura de proveedor específica con historial de pagos',
   })
   @ApiParam({ name: 'id', description: 'ID de la factura de proveedor' })
   @ApiResponse({ status: 200, description: 'Factura encontrada' })
@@ -123,14 +130,19 @@ export class SupplierInvoicesController {
     @Body() dto: CreateSupplierInvoiceDto,
     @Req() req: { user?: { sub?: string; tenantId?: string } },
   ) {
-    return this.invoices.createSupplierInvoice(dto, req.user?.sub, req.user?.tenantId);
+    return this.invoices.createSupplierInvoice(
+      dto,
+      req.user?.sub,
+      req.user?.tenantId,
+    );
   }
 
   @Patch(':id/status')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Actualizar estado de la factura',
-    description: 'Cambia el estado de una factura de proveedor (ej. Pendiente, Pagada, Cancelada).',
+    description:
+      'Cambia el estado de una factura de proveedor (ej. Pendiente, Pagada, Cancelada).',
   })
   @ApiParam({ name: 'id', description: 'ID de la factura de proveedor' })
   @ApiResponse({ status: 200, description: 'Factura actualizada' })
@@ -141,7 +153,12 @@ export class SupplierInvoicesController {
     @Body() dto: UpdateStatusDto,
     @Req() req: { user?: { sub?: string; tenantId?: string } },
   ) {
-    return this.invoices.updateStatus(id, dto, req.user?.sub, req.user?.tenantId);
+    return this.invoices.updateStatus(
+      id,
+      dto,
+      req.user?.sub,
+      req.user?.tenantId,
+    );
   }
 
   @Post(':id/payments')
@@ -161,6 +178,11 @@ export class SupplierInvoicesController {
     @Body() dto: CreatePaymentDto,
     @Req() req: { user?: { sub?: string; tenantId?: string } },
   ) {
-    return this.invoices.createPayment(id, dto, req.user?.sub, req.user?.tenantId);
+    return this.invoices.createPayment(
+      id,
+      dto,
+      req.user?.sub,
+      req.user?.tenantId,
+    );
   }
 }

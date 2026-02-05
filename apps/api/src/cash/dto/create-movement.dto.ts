@@ -9,7 +9,8 @@ export type CashMovementTypeDto = (typeof CashMovementTypeDto)[number];
 export class CreateCashMovementDto {
   @ApiProperty({
     enum: CashMovementTypeDto,
-    description: 'Tipo de movimiento: IN (entrada), OUT (salida), ADJUST (ajuste)',
+    description:
+      'Tipo de movimiento: IN (entrada), OUT (salida), ADJUST (ajuste)',
     example: 'ADJUST',
   })
   @IsEnum(CashMovementTypeDto)

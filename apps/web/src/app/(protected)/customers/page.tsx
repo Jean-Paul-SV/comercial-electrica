@@ -32,7 +32,8 @@ import {
 } from '@shared/components/ui/dialog';
 import { Skeleton } from '@shared/components/ui/skeleton';
 import { Pagination } from '@shared/components/Pagination';
-import { Users, Plus, Search, ChevronUp, ChevronDown } from 'lucide-react';
+import Link from 'next/link';
+import { Users, Plus, Search, ChevronUp, ChevronDown, Eye } from 'lucide-react';
 import { useCustomersList, useCreateCustomer } from '@features/customers/hooks';
 import type { CustomerDocType } from '@features/customers/types';
 
@@ -284,6 +285,7 @@ export default function CustomersPage() {
                     <TableHead className="font-medium">Nombre</TableHead>
                     <TableHead className="font-medium">Email</TableHead>
                     <TableHead className="font-medium">Teléfono</TableHead>
+                    <TableHead className="w-20 text-center font-medium">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -292,19 +294,36 @@ export default function CustomersPage() {
                       <TableCell className="text-muted-foreground text-sm">
                         {DOC_LABELS[c.docType] ?? c.docType} {c.docNumber}
                       </TableCell>
-                      <TableCell className="font-medium">{c.name}</TableCell>
+                      <TableCell className="font-medium">
+                        <Link href={`/customers/${c.id}`} className="hover:underline text-foreground">
+                          {c.name}
+                        </Link>
+                      </TableCell>
                       <TableCell className="text-muted-foreground">
                         {c.email ?? '—'}
                       </TableCell>
                       <TableCell className="text-muted-foreground">
                         {c.phone ?? '—'}
                       </TableCell>
+                      <TableCell className="text-center">
+                        <Link href={`/customers/${c.id}`}>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+                            title="Ver detalle"
+                            aria-label="Ver detalle"
+                          >
+                            <Eye className="h-3.5 w-3.5" />
+                          </Button>
+                        </Link>
+                      </TableCell>
                     </TableRow>
                   ))}
                   {rows.length === 0 && (
                     <TableRow>
                       <TableCell
-                        colSpan={4}
+                        colSpan={5}
                         className="h-24 text-center text-muted-foreground"
                       >
                         {search

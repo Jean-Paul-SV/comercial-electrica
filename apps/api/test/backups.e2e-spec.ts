@@ -154,7 +154,7 @@ describe('Backups (e2e)', () => {
           await request(app.getHttpServer())
             .post('/backups')
             .set('Authorization', `Bearer ${authToken}`);
-          
+
           const newBackups = await prisma.backupRun.findMany({ take: 1 });
           if (newBackups.length === 0) {
             return; // No hay backups para probar

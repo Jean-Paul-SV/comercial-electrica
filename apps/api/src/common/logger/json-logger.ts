@@ -6,7 +6,12 @@ import { LoggerService } from '@nestjs/common';
  * Campos: timestamp (ISO), level, context, message; opcional trace para error.
  */
 export class JsonLogger implements LoggerService {
-  private format(level: string, message: string, context?: string, trace?: string) {
+  private format(
+    level: string,
+    message: string,
+    context?: string,
+    trace?: string,
+  ) {
     const payload: Record<string, string> = {
       timestamp: new Date().toISOString(),
       level,

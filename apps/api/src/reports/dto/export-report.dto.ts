@@ -23,7 +23,8 @@ export class ExportReportDto {
 
   @ApiPropertyOptional({
     example: '2026-01-01',
-    description: 'Fecha de inicio (ventas: soldAt; clientes: sin filtro por defecto)',
+    description:
+      'Fecha de inicio (ventas: soldAt; clientes: sin filtro por defecto)',
   })
   @IsOptional()
   @IsDateString()

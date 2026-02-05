@@ -30,7 +30,12 @@ async function requestWithRetry<T>(
 ): Promise<T> {
   const url = `${API_BASE_URL}${path}`;
   const headers = new Headers(options.headers);
-  headers.set('Content-Type', 'application/json');
+  
+  // Solo establecer Content-Type si no es FormData (el navegador lo hace automáticamente)
+  const isFormData = options.body instanceof FormData;
+  if (!isFormData) {
+    headers.set('Content-Type', 'application/json');
+  }
 
   if (options.authToken) {
     headers.set('Authorization', `Bearer ${options.authToken}`);
@@ -48,9 +53,19 @@ async function requestWithRetry<T>(
     );
 
     try {
+      // Para FormData, no establecer Content-Type (el navegador lo hace con boundary)
+      // pero sí mantener Authorization y otros headers
+      const finalHeaders = isFormData ? (() => {
+        const h = new Headers();
+        if (options.authToken) h.set('Authorization', `Bearer ${options.authToken}`);
+        if (options.idempotencyKey) h.set('Idempotency-Key', options.idempotencyKey);
+        return h;
+      })() : headers;
+
       const res = await fetch(url, {
         ...options,
-        headers,
+        headers: finalHeaders,
+        body: options.body,
         signal: controller.signal,
       });
       clearTimeout(timeoutId);
@@ -110,7 +125,17 @@ export const apiClient = {
     requestWithRetry<T>(path, {
       ...init,
       method: 'POST',
-      body: body !== undefined ? JSON.stringify(body) : undefined,
+      body: body instanceof FormData ? body : body !== undefined ? JSON.stringify(body) : undefined,
+    }),
+  put: <T>(
+    path: string,
+    body?: unknown,
+    init?: RequestInit & ApiClientOptions,
+  ) =>
+    requestWithRetry<T>(path, {
+      ...init,
+      method: 'PUT',
+      body: body instanceof FormData ? body : body !== undefined ? JSON.stringify(body) : undefined,
     }),
   patch: <T>(
     path: string,
@@ -120,7 +145,7 @@ export const apiClient = {
     requestWithRetry<T>(path, {
       ...init,
       method: 'PATCH',
-      body: body !== undefined ? JSON.stringify(body) : undefined,
+      body: body instanceof FormData ? body : body !== undefined ? JSON.stringify(body) : undefined,
     }),
   delete: <T>(path: string, init?: RequestInit & ApiClientOptions) =>
     requestWithRetry<T>(path, { ...init, method: 'DELETE' }),

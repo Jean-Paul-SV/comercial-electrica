@@ -20,7 +20,10 @@ describe('Inventory (e2e)', () => {
     ).compile();
 
     // Setup simplificado usando helper común
-    const setup = await setupTestApp(moduleFixture, 'inventory-test@example.com');
+    const setup = await setupTestApp(
+      moduleFixture,
+      'inventory-test@example.com',
+    );
     ({ app, prisma, authToken } = setup);
   });
 
@@ -220,16 +223,18 @@ describe('Inventory (e2e)', () => {
       // Verificar que el stock se ajustó (ADJUST suma)
       // Esperar un poco para asegurar que la transacción se complete
       await new Promise((resolve) => setTimeout(resolve, 100));
-      
+
       const stock = await prisma.stockBalance.findUnique({
         where: { productId },
       });
-      
+
       // Verificar que el producto aún existe (puede haber sido eliminado por otra suite)
       if (!stock) {
-        throw new Error(`StockBalance no encontrado para productId=${productId}. El producto puede haber sido eliminado por otra suite de tests.`);
+        throw new Error(
+          `StockBalance no encontrado para productId=${productId}. El producto puede haber sido eliminado por otra suite de tests.`,
+        );
       }
-      
+
       expect(stock.qtyOnHand).toBe(75); // 50 + 25
     });
 

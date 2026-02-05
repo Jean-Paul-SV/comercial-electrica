@@ -33,7 +33,11 @@ import {
   useCustomersReport,
   useCustomerClusters,
   useActionableIndicators,
+  useExportReportCsv,
 } from '@features/reports/hooks';
+import { Button } from '@shared/components/ui/button';
+import { toast } from 'sonner';
+import { Download } from 'lucide-react';
 
 type TabId = 'dashboard' | 'sales' | 'inventory' | 'cash' | 'customers' | 'clusters' | 'sales-by-employee' | 'no-rotation';
 
@@ -75,6 +79,7 @@ export default function ReportsPage() {
   const customersReport = useCustomersReport({ top: 20 });
   const customerClusters = useCustomerClusters({ days: 90, k: 3 });
   const actionableIndicators = useActionableIndicators({ days: 30, top: 50 });
+  const exportCsv = useExportReportCsv();
   const salesByEmployeeIndicator = actionableIndicators.data?.indicators?.find(
     (i) => i.code === 'SALES_BY_EMPLOYEE'
   );
@@ -102,6 +107,49 @@ export default function ReportsPage() {
           <CardDescription>
             Ventas, inventario, caja, clientes desde GET /reports/*
           </CardDescription>
+          <div className="flex flex-wrap items-center gap-2 pt-2">
+            <span className="text-xs text-muted-foreground mr-1">Exportar CSV:</span>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              disabled={exportCsv.isPending}
+              onClick={() => {
+                exportCsv.mutate(
+                  { entity: 'sales' },
+                  {
+                    onSuccess: () => toast.success('Descarga de ventas iniciada'),
+                    onError: (e) =>
+                      toast.error((e as Error)?.message ?? 'Error al exportar ventas'),
+                  }
+                );
+              }}
+            >
+              <Download className="h-4 w-4" />
+              {exportCsv.isPending ? 'Exportando…' : 'Ventas'}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              disabled={exportCsv.isPending}
+              onClick={() => {
+                exportCsv.mutate(
+                  { entity: 'customers' },
+                  {
+                    onSuccess: () => toast.success('Descarga de clientes iniciada'),
+                    onError: (e) =>
+                      toast.error((e as Error)?.message ?? 'Error al exportar clientes'),
+                  }
+                );
+              }}
+            >
+              <Download className="h-4 w-4" />
+              Clientes
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="pt-4 space-y-4">
           <div className="flex flex-wrap gap-2 border-b border-border/60 pb-3">

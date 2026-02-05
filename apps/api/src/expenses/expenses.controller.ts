@@ -86,7 +86,11 @@ export class ExpensesController {
       'Elimina un gasto. Requiere justificación. Si estaba descontado de una sesión de caja, también se elimina ese movimiento.',
   })
   @ApiParam({ name: 'id', description: 'ID del gasto' })
-  @ApiQuery({ name: 'reason', required: true, description: 'Justificación de la eliminación' })
+  @ApiQuery({
+    name: 'reason',
+    required: true,
+    description: 'Justificación de la eliminación',
+  })
   @ApiResponse({ status: 200, description: 'Gasto eliminado' })
   @ApiResponse({ status: 400, description: 'Justificación requerida' })
   @ApiResponse({ status: 404, description: 'Gasto no encontrado' })
@@ -97,7 +101,9 @@ export class ExpensesController {
   ) {
     const trimmed = reason?.trim();
     if (!trimmed) {
-      throw new BadRequestException('La justificación de eliminación es obligatoria.');
+      throw new BadRequestException(
+        'La justificación de eliminación es obligatoria.',
+      );
     }
     return this.expenses.remove(id, req.user?.sub, trimmed, req.user?.tenantId);
   }

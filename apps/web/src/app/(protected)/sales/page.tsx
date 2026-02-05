@@ -34,7 +34,8 @@ const selectClassName =
   'flex h-10 w-full items-center rounded-lg border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:opacity-50';
 import { Pagination } from '@shared/components/Pagination';
 import { formatMoney, formatDateTime } from '@shared/utils/format';
-import { ShoppingCart, Plus, Trash2, Search, FileText, Printer, Layers } from 'lucide-react';
+import Link from 'next/link';
+import { ShoppingCart, Plus, Trash2, Search, FileText, Printer, Layers, Eye } from 'lucide-react';
 import { useSalesList, useCreateSale } from '@features/sales/hooks';
 import { useCashSessionsList } from '@features/cash/hooks';
 import { useCustomersList } from '@features/customers/hooks';
@@ -472,6 +473,7 @@ export default function SalesPage() {
                     <TableHead>Factura</TableHead>
                     <TableHead>Vendedor</TableHead>
                     <TableHead className="text-right">Total</TableHead>
+                    <TableHead className="w-20 text-center">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -490,12 +492,25 @@ export default function SalesPage() {
                       <TableCell className="text-right tabular-nums font-medium">
                         {formatMoney(Number(s.grandTotal))}
                       </TableCell>
+                      <TableCell className="text-center">
+                        <Link href={`/sales/${s.id}`}>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+                            title="Ver detalle"
+                            aria-label="Ver detalle"
+                          >
+                            <Eye className="h-3.5 w-3.5" />
+                          </Button>
+                        </Link>
+                      </TableCell>
                     </TableRow>
                   ))}
                   {rows.length === 0 && (
                     <TableRow>
                       <TableCell
-                        colSpan={5}
+                        colSpan={6}
                         className="h-24 text-center text-muted-foreground"
                       >
                         {search

@@ -106,7 +106,9 @@ describe('Quotes (e2e) - Flujo Completo', () => {
     it('debe actualizar una cotización', async () => {
       // Asegurarse de que quoteId esté definido
       if (!quoteId) {
-        throw new Error('quoteId no está definido. El test anterior debe haber fallado.');
+        throw new Error(
+          'quoteId no está definido. El test anterior debe haber fallado.',
+        );
       }
       const response = await request(app.getHttpServer())
         .patch(`/quotes/${quoteId}`)
@@ -128,9 +130,11 @@ describe('Quotes (e2e) - Flujo Completo', () => {
     it('debe enviar una cotización (cambiar a SENT)', async () => {
       // Asegurarse de que quoteId esté definido
       if (!quoteId) {
-        throw new Error('quoteId no está definido. El test anterior debe haber fallado.');
+        throw new Error(
+          'quoteId no está definido. El test anterior debe haber fallado.',
+        );
       }
-      
+
       const response = await request(app.getHttpServer())
         .patch(`/quotes/${quoteId}/status`)
         .set('Authorization', `Bearer ${authToken}`)
@@ -151,18 +155,22 @@ describe('Quotes (e2e) - Flujo Completo', () => {
       expect(response.body.data).toBeDefined();
       expect(Array.isArray(response.body.data)).toBe(true);
       expect(response.body.meta).toBeDefined();
-      
+
       // Verificar que hay al menos una cotización SENT (la que creamos antes)
-      const sentQuotes = response.body.data.filter((q: { status: string }) => q.status === 'SENT');
+      const sentQuotes = response.body.data.filter(
+        (q: { status: string }) => q.status === 'SENT',
+      );
       expect(sentQuotes.length).toBeGreaterThan(0);
     });
 
     it('debe convertir una cotización a venta', async () => {
       // Asegurarse de que quoteId esté definido
       if (!quoteId) {
-        throw new Error('quoteId no está definido. El test anterior debe haber fallado.');
+        throw new Error(
+          'quoteId no está definido. El test anterior debe haber fallado.',
+        );
       }
-      
+
       // Crear sesión de caja primero
       const cashSession = await prisma.cashSession.create({
         data: {
