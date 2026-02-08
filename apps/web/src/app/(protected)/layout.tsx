@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@shared/providers/AuthProvider';
 import { useOnlineStatus } from '@shared/hooks/useOnlineStatus';
@@ -21,6 +21,21 @@ export default function ProtectedLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
+  if (!mounted) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <p className="text-muted-foreground text-sm">Cargando…</p>
+      </div>
+    );
+  }
+
+  return <ProtectedLayoutContent>{children}</ProtectedLayoutContent>;
+}
+
+function ProtectedLayoutContent({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const { isAuthenticated, user, enabledModules, hasCheckedStorage, isRestoringSession } = useAuth();

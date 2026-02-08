@@ -128,8 +128,11 @@ export class QuotesController {
   @ApiResponse({ status: 200, description: 'Cotización encontrada' })
   @ApiResponse({ status: 404, description: 'Cotización no encontrada' })
   @ApiResponse({ status: 401, description: 'No autenticado' })
-  getById(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string) {
-    return this.quotesService.getQuoteById(id);
+  getById(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @Req() req: { user?: { tenantId?: string } },
+  ) {
+    return this.quotesService.getQuoteById(id, req?.user?.tenantId);
   }
 
   @Patch(':id')

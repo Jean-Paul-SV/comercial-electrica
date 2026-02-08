@@ -141,6 +141,8 @@ export type ActionableIndicatorItem = {
   suggestedPrice?: number;
   /** Total en ventas (numérico). Solo en indicador SALES_BY_EMPLOYEE para gráficos. */
   totalSales?: number;
+  /** Stock (unidades en mano). Solo en indicador PRODUCTS_NO_ROTATION. */
+  stock?: number;
 };
 
 export type ActionableIndicator = {
@@ -164,6 +166,8 @@ export type ActionableIndicatorsResponse = {
 export type ActionableIndicatorsParams = {
   days?: number;
   top?: number;
+  startDate?: string;
+  endDate?: string;
 };
 
 // Resumen del dashboard en lenguaje natural (GET /reports/dashboard-summary)
@@ -236,5 +240,34 @@ export type CustomerClustersResponse = {
     avgAmount: number;
     avgDaysAgo: number;
     avgCount: number;
+  }>;
+};
+
+// Artículos en tendencias (GET /reports/trending-products)
+export type TrendingProductsParams = {
+  days?: number;
+  top?: number;
+  sortBy?: 'revenue' | 'qty';
+  period?: 'last_days' | 'current_month';
+  /** Período por mes: si se envían, se usa este rango en lugar de period/days */
+  startDate?: string;
+  endDate?: string;
+};
+
+export type TrendingProductsResponse = {
+  periodDays: number;
+  period?: 'last_days' | 'current_month';
+  sortBy?: 'revenue' | 'qty';
+  items: Array<{
+    product: {
+      id: string;
+      internalCode: string;
+      name: string;
+      category: { name: string } | null;
+      price: number | string;
+    };
+    totalRevenue: number;
+    totalQty: number;
+    salesCount: number;
   }>;
 };

@@ -11,6 +11,7 @@ import {
   getDashboardSummary,
   getOperationalState,
   getCustomerClusters,
+  getTrendingProducts,
   downloadExportCsv,
 } from './api';
 import type { ExportReportParams } from './api';
@@ -21,6 +22,7 @@ import type {
   CustomersReportParams,
   ActionableIndicatorsParams,
   CustomerClustersParams,
+  TrendingProductsParams,
 } from './types';
 import { useAuth } from '@shared/providers/AuthProvider';
 
@@ -116,6 +118,16 @@ export function useCustomerClusters(params: CustomerClustersParams = {}) {
     queryKey: ['reports', 'customer-clusters', params],
     enabled: Boolean(token),
     queryFn: () => getCustomerClusters(token!, params),
+  });
+}
+
+export function useTrendingProducts(params: TrendingProductsParams = {}) {
+  const { token } = useAuth();
+
+  return useQuery({
+    queryKey: ['reports', 'trending-products', params],
+    enabled: Boolean(token),
+    queryFn: () => getTrendingProducts(params, token!),
   });
 }
 

@@ -10,8 +10,13 @@ function base64UrlDecode(input: string): string {
     const padded = input.replace(/-/g, '+').replace(/_/g, '/');
     const padLength = (4 - (padded.length % 4)) % 4;
     const normalized = padded + '='.repeat(padLength);
-    if (typeof atob !== 'function') return '';
-    return atob(normalized);
+    if (typeof globalThis !== 'undefined' && typeof (globalThis as unknown as { atob?: (s: string) => string }).atob === 'function') {
+      return (globalThis as unknown as { atob: (s: string) => string }).atob(normalized);
+    }
+    if (typeof Buffer !== 'undefined') {
+      return Buffer.from(normalized, 'base64').toString('utf-8');
+    }
+    return '';
   } catch {
     return '';
   }

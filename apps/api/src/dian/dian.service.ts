@@ -55,6 +55,7 @@ export class DianService {
     this.softwareId = this.config.get<string>('DIAN_SOFTWARE_ID', '') || '';
     this.softwarePin = this.config.get<string>('DIAN_SOFTWARE_PIN', '') || '';
     this.certPath = this.config.get<string>('DIAN_CERT_PATH', '') || '';
+    // En producción, inyectar DIAN_CERT_PASSWORD desde un gestor de secretos (AWS Secrets Manager, Vault, etc.)
     this.certPassword = this.config.get<string>('DIAN_CERT_PASSWORD', '') || '';
 
     if (!this.softwareId || !this.softwarePin) {

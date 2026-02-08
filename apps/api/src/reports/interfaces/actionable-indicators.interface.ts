@@ -10,6 +10,8 @@ export interface ActionableIndicatorItem {
   suggestedPrice?: number;
   /** Total en ventas (numérico). Solo en indicador SALES_BY_EMPLOYEE para gráficos. */
   totalSales?: number;
+  /** Stock (unidades en mano). Solo en indicador PRODUCTS_NO_ROTATION. */
+  stock?: number;
 }
 
 export interface ActionableIndicator {

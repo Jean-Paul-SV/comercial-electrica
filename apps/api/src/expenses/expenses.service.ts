@@ -38,6 +38,15 @@ export class ExpensesService {
       ? new Date(dto.expenseDate)
       : new Date();
 
+    // Validación de negocio: la fecha del gasto no puede ser futura
+    const now = new Date();
+    const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    if (expenseDate > todayEnd) {
+      throw new BadRequestException(
+        'La fecha del gasto no puede ser futura.',
+      );
+    }
+
     if (dto.cashSessionId) {
       const session = await this.prisma.cashSession.findFirst({
         where: { id: dto.cashSessionId, tenantId },

@@ -35,7 +35,7 @@ import { Pagination } from '@shared/components/Pagination';
 import { EmptyState } from '@shared/components/EmptyState';
 import { formatMoney } from '@shared/utils/format';
 import Link from 'next/link';
-import { Package, Plus, Tag, Pencil, Eye } from 'lucide-react';
+import { Package, Plus, Tag, Pencil, Eye, BookOpen } from 'lucide-react';
 import {
   useProductsList,
   useCreateProduct,
@@ -43,6 +43,7 @@ import {
   useProduct,
   useCategories,
   useCreateCategory,
+  useCreateProductDictionaryEntry,
 } from '@features/products/hooks';
 
 const productSchema = z.object({
@@ -64,6 +65,10 @@ export default function ProductsPage() {
   const [page, setPage] = useState(1);
   const [openNewProduct, setOpenNewProduct] = useState(false);
   const [openNewCategory, setOpenNewCategory] = useState(false);
+  const [openAddTerm, setOpenAddTerm] = useState(false);
+  const [addTermText, setAddTermText] = useState('');
+  const [addTermProductId, setAddTermProductId] = useState<string>('');
+  const [addCategoryFromProductForm, setAddCategoryFromProductForm] = useState(false);
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>('');
   const limit = 20;
@@ -84,9 +89,28 @@ export default function ProductsPage() {
   const createProduct = useCreateProduct();
   const updateProduct = useUpdateProduct();
   const createCategory = useCreateCategory();
+  const createDictionaryEntry = useCreateProductDictionaryEntry();
   const productToEdit = useProduct(editingProductId);
+  const productsForDictionary = useProductsList({ page: 1, limit: 100 });
 
-  const rows = useMemo(() => query.data?.data ?? [], [query.data]);
+  const rowsRaw = useMemo(() => query.data?.data ?? [], [query.data]);
+  const rows = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase();
+    if (!term || rowsRaw.length === 0) return rowsRaw;
+    return [...rowsRaw].sort((a, b) => {
+      const nameA = (a.name ?? '').toLowerCase();
+      const nameB = (b.name ?? '').toLowerCase();
+      const codeA = (a.internalCode ?? '').toLowerCase();
+      const codeB = (b.internalCode ?? '').toLowerCase();
+      const score = (name: string, code: string) => {
+        if (name === term || code === term) return 0;
+        if (name.startsWith(term) || code.startsWith(term)) return 1;
+        if (name.includes(term) || code.includes(term)) return 2;
+        return 3;
+      };
+      return score(nameA, codeA) - score(nameB, codeB);
+    });
+  }, [rowsRaw, searchTerm]);
   const meta = query.data?.meta;
 
   const productForm = useForm<ProductFormValues>({
@@ -185,16 +209,25 @@ export default function ProductsPage() {
     createCategory.mutate(
       { name: values.name.trim() },
       {
-        onSuccess: () => {
+        onSuccess: (data) => {
           toast.success('Categoría creada');
           setOpenNewCategory(false);
           categoryForm.reset();
+          if (addCategoryFromProductForm && data?.id) {
+            productForm.setValue('categoryId', data.id);
+            setAddCategoryFromProductForm(false);
+          }
         },
         onError: (e: { message?: string }) => {
           toast.error(e?.message ?? 'No se pudo crear la categoría');
         },
       }
     );
+  };
+
+  const openNewCategoryFromProductForm = () => {
+    setAddCategoryFromProductForm(true);
+    setOpenNewCategory(true);
   };
 
   const totalProducts = meta?.total ?? 0;
@@ -235,6 +268,16 @@ export default function ProductsPage() {
                 <Tag className="h-4 w-4 shrink-0" />
                 Nueva categoría
               </Button>
+              <Button asChild size="sm" variant="outline" className="gap-2 w-full sm:w-auto">
+                <Link href="/products/dictionary" className="flex items-center gap-2">
+                  <BookOpen className="h-4 w-4 shrink-0" />
+                  Diccionario de búsqueda
+                </Link>
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => setOpenAddTerm(true)} className="gap-2 w-full sm:w-auto">
+                <BookOpen className="h-4 w-4 shrink-0" />
+                Agregar término
+              </Button>
               <Button size="sm" onClick={() => setOpenNewProduct(true)} className="gap-2 w-full sm:w-auto">
                 <Plus className="h-4 w-4 shrink-0" />
                 Nuevo producto
@@ -272,6 +315,11 @@ export default function ProductsPage() {
               >
                 Limpiar búsqueda
               </Button>
+            )}
+            {searchTerm.trim() && (
+              <p className="text-xs text-muted-foreground w-full">
+                Buscando «<span className="font-medium text-foreground">{searchTerm.trim()}</span>» — {rows.length} resultado{rows.length !== 1 ? 's' : ''} (ordenados por lo más parecido)
+              </p>
             )}
           </div>
 
@@ -414,7 +462,13 @@ export default function ProductsPage() {
         </CardContent>
       </Card>
 
-      <Dialog open={openNewCategory} onOpenChange={setOpenNewCategory}>
+      <Dialog
+        open={openNewCategory}
+        onOpenChange={(open) => {
+          if (!open) setAddCategoryFromProductForm(false);
+          setOpenNewCategory(open);
+        }}
+      >
         <DialogContent showClose className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -462,6 +516,75 @@ export default function ProductsPage() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={openAddTerm} onOpenChange={setOpenAddTerm}>
+        <DialogContent showClose className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <BookOpen className="h-4 w-4" />
+              Agregar término al diccionario
+            </DialogTitle>
+            <p className="text-sm text-muted-foreground pt-1">
+              El término se agregará al diccionario de búsqueda. Opcionalmente puedes vincularlo a un producto.
+            </p>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="add-term-text">Término o frase</Label>
+              <Input
+                id="add-term-text"
+                value={addTermText}
+                onChange={(e) => setAddTermText(e.target.value)}
+                placeholder="Ej: cable 2.5, foco led"
+                className="rounded-lg"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="add-term-product">Producto vinculado (opcional)</Label>
+              <select
+                id="add-term-product"
+                value={addTermProductId}
+                onChange={(e) => setAddTermProductId(e.target.value)}
+                className="flex h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+              >
+                <option value="">Ninguno</option>
+                {(productsForDictionary.data?.data ?? []).map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name} ({p.internalCode})
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setOpenAddTerm(false)}>
+              Cancelar
+            </Button>
+            <Button
+              disabled={!addTermText.trim() || createDictionaryEntry.isPending}
+              onClick={() => {
+                const term = addTermText.trim();
+                if (!term) return;
+                createDictionaryEntry.mutate(
+                  { term, productId: addTermProductId || undefined },
+                  {
+                    onSuccess: () => {
+                      toast.success('Término agregado al diccionario');
+                      setOpenAddTerm(false);
+                      setAddTermText('');
+                      setAddTermProductId('');
+                    },
+                    onError: (e) =>
+                      toast.error((e as Error)?.message ?? 'Error al agregar al diccionario'),
+                  }
+                );
+              }}
+            >
+              {createDictionaryEntry.isPending ? 'Agregando…' : 'Agregar al diccionario'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -532,7 +655,19 @@ export default function ProductsPage() {
                 )}
               </div>
               <div className="space-y-2 sm:col-span-2">
-                <Label htmlFor="categoryId">Categoría</Label>
+                <div className="flex items-center justify-between gap-2">
+                  <Label htmlFor="categoryId">Categoría</Label>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 text-xs text-primary hover:text-primary"
+                    onClick={openNewCategoryFromProductForm}
+                  >
+                    <Plus className="h-3.5 w-3.5 mr-1" />
+                    Agregar categoría
+                  </Button>
+                </div>
                 <select
                   id="categoryId"
                   {...productForm.register('categoryId')}
@@ -546,7 +681,7 @@ export default function ProductsPage() {
                   ))}
                 </select>
                 <p className="text-xs text-muted-foreground">
-                  Opcional. Organiza tus productos por categorías para facilitar la búsqueda y el filtrado.
+                  Opcional. Si no existe la categoría, usa &quot;Agregar categoría&quot; para crearla y asignarla.
                 </p>
               </div>
               <div className="space-y-2">

@@ -6,7 +6,6 @@ import {
   IsString,
   IsUUID,
   Min,
-  MinLength,
 } from 'class-validator';
 import { PaymentMethod } from '@prisma/client';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
@@ -43,7 +42,6 @@ export class CreatePaymentDto {
   })
   @IsOptional()
   @IsString()
-  @MinLength(3)
   reference?: string;
 
   @ApiPropertyOptional({

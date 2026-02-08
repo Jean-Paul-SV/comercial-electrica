@@ -30,7 +30,7 @@ export class TenantModulesService {
   }
 
   /**
-   * Tenant efectivo para un usuario: su tenantId o el default si no tiene.
+   * Tenant efectivo para un usuario: su tenantId, el default (slug 'default') o el primer tenant si no hay default.
    */
   async getEffectiveTenantId(userId: string): Promise<string | null> {
     const user = await this.prisma.user.findUnique({
@@ -38,7 +38,14 @@ export class TenantModulesService {
       select: { tenantId: true },
     });
     if (user?.tenantId) return user.tenantId;
-    return this.getDefaultTenantId();
+    const defaultId = await this.getDefaultTenantId();
+    if (defaultId) return defaultId;
+    // Fallback: primer tenant (p. ej. si el seed usó otro slug)
+    const first = await this.prisma.tenant.findFirst({
+      select: { id: true },
+      orderBy: { createdAt: 'asc' },
+    });
+    return first?.id ?? null;
   }
 
   /**

@@ -223,6 +223,7 @@ async function main() {
     await prisma.inventoryMovement.deleteMany({ where: { tenantId } });
     await prisma.stockBalance.deleteMany();
     await prisma.backupRun.deleteMany({ where: { tenantId } });
+    await prisma.productDictionaryEntry.deleteMany({ where: { tenantId } });
     await prisma.product.deleteMany({ where: { tenantId } });
     await prisma.category.deleteMany({ where: { tenantId } });
     await prisma.customer.deleteMany({ where: { tenantId } });

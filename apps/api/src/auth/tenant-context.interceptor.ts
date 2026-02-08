@@ -29,7 +29,10 @@ export class TenantContextInterceptor implements NestInterceptor {
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     const req = context.switchToHttp().getRequest<{ user?: Express.User }>();
     const user = req.user;
-    if (!user?.sub || user.tenantId != null) {
+    // Rellenar tenantId cuando falta (undefined) o es null (JWT antiguo o usuario sin tenant)
+    const hasTenant =
+      user?.tenantId !== undefined && user?.tenantId !== null && user?.tenantId !== '';
+    if (!user?.sub || hasTenant) {
       return next.handle();
     }
     return from(this.tenantModules.getEffectiveTenantId(user.sub)).pipe(

@@ -139,9 +139,10 @@ model Tenant {
   users      User[]
   roles      Role[]
   userRoles  UserRole[]
-  categories Category[]
-  products   Product[]
-  customers  Customer[]
+  categories               Category[]
+  products                 Product[]
+  productDictionaryEntries ProductDictionaryEntry[]
+  customers                Customer[]
   suppliers  Supplier[]
   sales      Sale[]
   quotes     Quote[]
@@ -288,8 +289,9 @@ model Category {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  products Product[]
+  tenant              Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  products            Product[]
+  dictionaryEntries   ProductDictionaryEntry[]
 
   @@unique([tenantId, name])
   @@index([tenantId])
@@ -317,6 +319,7 @@ model Product {
   quoteItems             QuoteItem[]
   inventoryMovementItems InventoryMovementItem[]
   purchaseOrderItems     PurchaseOrderItem[]
+  dictionaryEntries      ProductDictionaryEntry[]
 
   @@unique([tenantId, internalCode])
   @@index([tenantId])
@@ -324,6 +327,25 @@ model Product {
   @@index([categoryId])
   @@index([isActive])
   @@index([createdAt])
+}
+
+/// Términos o frases que los clientes escriben al preguntar por productos (sinónimos, búsquedas frecuentes).
+model ProductDictionaryEntry {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @db.Uuid
+  term       String   @db.VarChar(200)
+  productId  String?  @db.Uuid
+  categoryId String?  @db.Uuid
+  createdAt  DateTime @default(now())
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  product  Product?  @relation(fields: [productId], references: [id], onDelete: SetNull)
+  category Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@index([term])
+  @@index([productId])
+  @@index([categoryId])
 }
 
 model StockBalance {
@@ -542,6 +564,7 @@ model Sale {
 
   @@index([tenantId])
   @@index([soldAt])
+  @@index([tenantId, soldAt])
   @@index([customerId])
   @@index([status])
   @@index([createdByUserId])

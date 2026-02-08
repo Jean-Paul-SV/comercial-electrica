@@ -216,6 +216,16 @@ export class CashService {
           relatedExpense: {
             select: { id: true, description: true, amount: true },
           },
+          relatedSale: {
+            select: {
+              id: true,
+              invoices: {
+                select: { number: true },
+                take: 1,
+                orderBy: { issuedAt: 'desc' },
+              },
+            },
+          },
         },
       }),
       this.prisma.cashMovement.count({ where: { sessionId } }),

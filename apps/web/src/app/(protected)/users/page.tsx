@@ -39,19 +39,12 @@ import { useRegisterUser, useUsersList, useUpdateUser, useDeleteUser, useUploadE
 import type { UserListItem } from '@features/auth/types';
 import { useAuth } from '@shared/providers/AuthProvider';
 
-const createUserSchema = z
-  .object({
-    name: z.string().optional(),
-    email: z.string().email('Correo electrónico inválido'),
-    password: z.string().optional(),
-    role: z.enum(['ADMIN', 'USER']).optional().default('USER'),
-    generateTempPassword: z.boolean().optional().default(false),
-  })
-  .refine(
-    (data) =>
-      data.generateTempPassword === true || (typeof data.password === 'string' && data.password.length >= 8),
-    { message: 'La contraseña debe tener al menos 8 caracteres', path: ['password'] },
-  );
+const createUserSchema = z.object({
+  name: z.string().optional(),
+  email: z.string().email('Correo electrónico inválido'),
+  password: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres'),
+  role: z.enum(['ADMIN', 'USER']).optional().default('USER'),
+});
 type CreateUserFormValues = z.infer<typeof createUserSchema>;
 
 const editUserSchema = z.object({
@@ -100,18 +93,14 @@ export default function UsersPage() {
 
   const onSubmit = form.handleSubmit(async (values) => {
     try {
-      const res = await registerUser.mutateAsync({
+      await registerUser.mutateAsync({
         email: values.email,
         name: values.name?.trim() || undefined,
-        password: values.generateTempPassword ? undefined : (values.password ?? ''),
+        password: values.password,
         role: values.role,
-        generateTempPassword: values.generateTempPassword,
       });
       toast.success('Usuario creado correctamente');
-      if (values.generateTempPassword && 'tempPassword' in res && typeof (res as { tempPassword?: string }).tempPassword === 'string') {
-        toast.info(`Contraseña temporal (guárdala): ${(res as { tempPassword: string }).tempPassword}`, { duration: 15000 });
-      }
-      form.reset({ name: '', email: '', password: '', role: 'USER', generateTempPassword: false });
+      form.reset({ name: '', email: '', password: '', role: 'USER' });
     } catch (err: unknown) {
       const message =
         err && typeof err === 'object' && 'message' in err
@@ -463,45 +452,21 @@ export default function UsersPage() {
                 </p>
               </div>
 
-              <div className="space-y-4 rounded-xl border border-border/60 bg-muted/30 p-4">
-                <div className="flex items-start gap-3">
-                  <input
-                    type="checkbox"
-                    id="generate-temp"
-                    {...form.register('generateTempPassword')}
-                    className="h-4 w-4 mt-0.5 rounded border-input accent-primary"
-                  />
-                  <div className="space-y-0.5">
-                    <Label htmlFor="generate-temp" className="font-medium cursor-pointer text-sm text-foreground">
-                      Generar contraseña temporal
-                    </Label>
-                    <p className="text-xs text-muted-foreground">
-                      El usuario la recibirá y deberá cambiarla en el primer acceso.
-                    </p>
-                  </div>
-                </div>
-                {form.watch('generateTempPassword') ? (
-                  <p className="text-xs text-muted-foreground bg-muted/50 rounded-lg px-3 py-2">
-                    No hace falta escribir contraseña; se generará una automáticamente.
-                  </p>
-                ) : (
-                  <div className="space-y-2">
-                    <Label htmlFor="password" className="text-sm font-medium text-foreground">Contraseña</Label>
-                    <Input
-                      id="password"
-                      type="password"
-                      placeholder="Escribe una contraseña"
-                      autoComplete="new-password"
-                      className="rounded-lg h-10 border-border/80 focus-visible:ring-2"
-                      {...form.register('password')}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Mínimo 8 caracteres. El usuario podrá cambiarla después.
-                    </p>
-                    {form.formState.errors.password && (
-                      <p className="text-destructive text-sm">{form.formState.errors.password.message}</p>
-                    )}
-                  </div>
+              <div className="space-y-2">
+                <Label htmlFor="password" className="text-sm font-medium text-foreground">Contraseña</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="Escribe una contraseña"
+                  autoComplete="new-password"
+                  className="rounded-lg h-10 border-border/80 focus-visible:ring-2"
+                  {...form.register('password')}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Mínimo 8 caracteres. El usuario podrá cambiarla después.
+                </p>
+                {form.formState.errors.password && (
+                  <p className="text-destructive text-sm">{form.formState.errors.password.message}</p>
                 )}
               </div>
 
@@ -635,7 +600,17 @@ export default function UsersPage() {
           </DialogHeader>
           {userToChangePicture && (
             <div className="flex flex-col items-center gap-4 py-4">
-              <div className="relative flex h-24 w-24 items-center justify-center overflow-hidden rounded-full border-2 border-border bg-muted text-muted-foreground">
+              <button
+                type="button"
+                onClick={() => {
+                  if (employeeAvatarUrl(userToChangePicture.profilePictureUrl)) {
+                    setUserPhotoPreview(userToChangePicture);
+                  }
+                }}
+                className="relative flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-border bg-muted text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none cursor-pointer hover:opacity-90 transition-opacity"
+                disabled={!employeeAvatarUrl(userToChangePicture.profilePictureUrl)}
+                title={employeeAvatarUrl(userToChangePicture.profilePictureUrl) ? 'Ver foto ampliada' : undefined}
+              >
                 {employeeAvatarUrl(userToChangePicture.profilePictureUrl) ? (
                   <img
                     src={employeeAvatarUrl(userToChangePicture.profilePictureUrl)!}
@@ -645,7 +620,7 @@ export default function UsersPage() {
                 ) : (
                   <User className="h-12 w-12" />
                 )}
-              </div>
+              </button>
               <input
                 ref={pictureInputRef}
                 type="file"

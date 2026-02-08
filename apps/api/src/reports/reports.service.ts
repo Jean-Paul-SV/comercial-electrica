@@ -17,6 +17,7 @@ import {
 } from './interfaces/actionable-indicators.interface';
 import { ActionableIndicatorsDto } from './dto/actionable-indicators.dto';
 import { CustomerClustersDto } from './dto/customer-clusters.dto';
+import { TrendingProductsDto } from './dto/trending-products.dto';
 import { Prisma } from '@prisma/client';
 import { CacheService } from '../common/services/cache.service';
 import { kmeans } from 'ml-kmeans';
@@ -496,6 +497,115 @@ export class ReportsService {
     };
   }
 
+  /**
+   * Artículos en tendencias: productos ordenados por ingreso total o por unidades vendidas
+   * en el período indicado (últimos N días o mes actual).
+   */
+  async getTrendingProducts(dto: TrendingProductsDto) {
+    const top = Math.min(Math.max(dto.top ?? 20, 1), 100);
+    const sortBy = dto.sortBy ?? 'revenue';
+    const period = dto.period ?? 'last_days';
+
+    let since: Date;
+    let end: Date;
+    let periodDays: number;
+    if (dto.startDate && dto.endDate) {
+      since = new Date(dto.startDate);
+      end = new Date(dto.endDate);
+      end.setHours(23, 59, 59, 999);
+      periodDays = Math.ceil((end.getTime() - since.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    } else if (period === 'current_month') {
+      const now = new Date();
+      since = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+      end = new Date();
+      periodDays = Math.ceil((end.getTime() - since.getTime()) / (1000 * 60 * 60 * 24));
+    } else {
+      const days = Math.min(Math.max(dto.days ?? 30, 1), 365);
+      since = new Date();
+      since.setDate(since.getDate() - days);
+      since.setHours(0, 0, 0, 0);
+      end = new Date();
+      periodDays = days;
+    }
+
+    const saleItems = await this.prisma.saleItem.findMany({
+      where: {
+        sale: {
+          status: 'PAID',
+          soldAt: { gte: since, ...(end ? { lte: end } : {}) },
+        },
+      },
+      select: {
+        productId: true,
+        lineTotal: true,
+        qty: true,
+        product: {
+          select: {
+            id: true,
+            internalCode: true,
+            name: true,
+            category: { select: { name: true } },
+            price: true,
+          },
+        },
+      },
+    });
+
+    type ProductStat = {
+      product: {
+        id: string;
+        internalCode: string;
+        name: string;
+        category: { name: string } | null;
+        price: unknown;
+      };
+      totalRevenue: number;
+      totalQty: number;
+      salesCount: number;
+    };
+
+    const byProduct = new Map<string, ProductStat>();
+
+    saleItems.forEach((item) => {
+      const pid = item.productId;
+      const existing = byProduct.get(pid);
+      const revenue = Number(item.lineTotal);
+      const qty = Number(item.qty);
+      if (existing) {
+        existing.totalRevenue += revenue;
+        existing.totalQty += qty;
+        existing.salesCount += 1;
+      } else {
+        byProduct.set(pid, {
+          product: item.product,
+          totalRevenue: revenue,
+          totalQty: qty,
+          salesCount: 1,
+        });
+      }
+    });
+
+    const trending = Array.from(byProduct.values())
+      .sort((a, b) =>
+        sortBy === 'qty'
+          ? b.totalQty - a.totalQty
+          : b.totalRevenue - a.totalRevenue
+      )
+      .slice(0, top);
+
+    return {
+      periodDays,
+      period: period === 'current_month' ? 'current_month' : 'last_days',
+      sortBy,
+      items: trending.map((stat) => ({
+        product: stat.product,
+        totalRevenue: stat.totalRevenue,
+        totalQty: stat.totalQty,
+        salesCount: stat.salesCount,
+      })),
+    };
+  }
+
   async getDashboard() {
     return this.wrapReport(async () => {
       const cacheKey = this.cache.buildKey('dashboard', 'main');
@@ -945,8 +1055,28 @@ export class ReportsService {
     return this.wrapReport(async () => {
       const days = Math.min(dto.days ?? 30, 365);
       const top = Math.min(dto.top ?? 10, 50);
-      const periodStart = new Date();
-      periodStart.setDate(periodStart.getDate() - days);
+      let periodStart: Date;
+      let periodEnd: Date;
+      let periodDays: number;
+      if (dto.startDate && dto.endDate) {
+        periodStart = new Date(dto.startDate);
+        periodEnd = new Date(dto.endDate);
+        periodEnd.setHours(23, 59, 59, 999);
+        if (periodStart > periodEnd) {
+          throw new BadRequestException(
+            'La fecha de inicio no puede ser mayor que la de fin',
+          );
+        }
+        periodDays = Math.ceil(
+          (periodEnd.getTime() - periodStart.getTime()) / (1000 * 60 * 60 * 24),
+        );
+      } else {
+        periodStart = new Date();
+        periodStart.setDate(periodStart.getDate() - days);
+        periodEnd = new Date();
+        periodDays = days;
+      }
+      const soldAtRange = { gte: periodStart, lte: periodEnd };
       const now = new Date();
       const todayStart = new Date(
         now.getFullYear(),
@@ -962,7 +1092,7 @@ export class ReportsService {
         where: {
           sale: {
             status: 'PAID',
-            soldAt: { gte: periodStart },
+            soldAt: soldAtRange,
           },
         },
         include: { product: { select: { id: true, name: true, cost: true } } },
@@ -1029,7 +1159,7 @@ export class ReportsService {
         where: {
           sale: {
             status: 'PAID',
-            soldAt: { gte: periodStart },
+            soldAt: soldAtRange,
           },
         },
         select: { productId: true },
@@ -1041,7 +1171,11 @@ export class ReportsService {
           isActive: true,
           id: { notIn: Array.from(soldIds) },
         },
-        select: { id: true, name: true },
+        select: {
+          id: true,
+          name: true,
+          stock: { select: { qtyOnHand: true } },
+        },
         take: top,
       });
 
@@ -1062,7 +1196,11 @@ export class ReportsService {
             'Promocionar, bajar precio o descontinuar según el caso.',
           actionLabel: 'Ver productos sin rotación',
           actionHref: '/reports?tab=no-rotation',
-          items: noRotationProducts.map((p) => ({ id: p.id, name: p.name })),
+          items: noRotationProducts.map((p) => ({
+            id: p.id,
+            name: p.name,
+            stock: p.stock?.qtyOnHand ?? 0,
+          })),
           detectedAt,
         });
       }
@@ -1272,7 +1410,7 @@ export class ReportsService {
       const poItems = await this.prisma.purchaseOrderItem.findMany({
         where: {
           purchaseOrder: {
-            orderDate: { gte: periodStart },
+            orderDate: { gte: periodStart, lte: periodEnd },
           },
         },
         include: {
@@ -1431,7 +1569,7 @@ export class ReportsService {
       const salesByUser = await this.prisma.sale.findMany({
         where: {
           status: 'PAID',
-          soldAt: { gte: periodStart },
+          soldAt: soldAtRange,
           createdByUserId: { not: null },
         },
         select: {
@@ -1487,7 +1625,7 @@ export class ReportsService {
         indicators.push({
           code: 'SALES_BY_EMPLOYEE',
           title: 'Ventas por empleado',
-          insight: `${userSales.size} usuario(s) con ventas en los últimos ${days} días. Total $${Math.round(totalSales).toLocaleString()}.`,
+          insight: `${userSales.size} usuario(s) con ventas en el período (${periodDays} días). Total $${Math.round(totalSales).toLocaleString()}.`,
           metric: totalSales,
           severity: 'info',
           suggestedAction:
@@ -1503,7 +1641,7 @@ export class ReportsService {
       const salesForForecast = await this.prisma.sale.findMany({
         where: {
           status: 'PAID',
-          soldAt: { gte: periodStart },
+          soldAt: soldAtRange,
         },
         select: { soldAt: true, grandTotal: true },
       });
@@ -1563,7 +1701,7 @@ export class ReportsService {
       const customerSales = await this.prisma.sale.findMany({
         where: {
           status: 'PAID',
-          soldAt: { gte: periodStart },
+          soldAt: soldAtRange,
           customerId: { not: null },
         },
         select: {
@@ -1656,7 +1794,7 @@ export class ReportsService {
 
       // 9) Score de proveedores (precio + cumplimiento: entregas a tiempo, facturas al día)
       const posWithSupplier = await this.prisma.purchaseOrder.findMany({
-        where: { orderDate: { gte: periodStart } },
+        where: { orderDate: { gte: periodStart, lte: periodEnd } },
         select: {
           supplierId: true,
           expectedDate: true,
@@ -1746,7 +1884,7 @@ export class ReportsService {
         });
       }
 
-      return { periodDays: days, indicators };
+      return { periodDays, indicators };
     });
   }
 

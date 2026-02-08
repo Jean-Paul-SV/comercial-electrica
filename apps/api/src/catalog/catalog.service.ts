@@ -10,6 +10,9 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
+import { CreateProductDictionaryEntryDto } from './dto/create-product-dictionary-entry.dto';
+import { UpdateProductDictionaryEntryDto } from './dto/update-product-dictionary-entry.dto';
+import { ListProductDictionaryQueryDto } from './dto/list-product-dictionary-query.dto';
 import { AuditService } from '../common/services/audit.service';
 import { CacheService } from '../common/services/cache.service';
 
@@ -309,5 +312,142 @@ export class CatalogService {
     await this.cache.delete(this.cache.buildKey('categories', 'list'));
 
     return created;
+  }
+
+  // --- Diccionario de términos que los clientes escriben al preguntar por productos ---
+
+  async listProductDictionary(
+    query: ListProductDictionaryQueryDto,
+    tenantId?: string | null,
+  ) {
+    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
+
+    const where: Prisma.ProductDictionaryEntryWhereInput = { tenantId };
+    if (query?.search?.trim()) {
+      where.term = { contains: query.search.trim(), mode: 'insensitive' };
+    }
+    if (query?.productId) {
+      where.productId = query.productId;
+    }
+
+    try {
+      const entries = await this.prisma.productDictionaryEntry.findMany({
+        where,
+        orderBy: { term: 'asc' },
+        include: {
+          product: { select: { id: true, name: true, internalCode: true } },
+          category: { select: { id: true, name: true } },
+        },
+      });
+      return { data: entries };
+    } catch (err) {
+      // Si falta la columna categoryId (migración no aplicada), listar sin include category
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        (err.code === 'P2021' || err.code === 'P2022')
+      ) {
+        this.logger.warn(
+          'ProductDictionaryEntry: categoryId no encontrada en BD. Ejecuta: npm run prisma:migrate',
+        );
+        const entries = await this.prisma.productDictionaryEntry.findMany({
+          where,
+          orderBy: { term: 'asc' },
+          include: {
+            product: { select: { id: true, name: true, internalCode: true } },
+          },
+        });
+        return { data: entries };
+      }
+      throw err;
+    }
+  }
+
+  async createProductDictionaryEntry(
+    dto: CreateProductDictionaryEntryDto,
+    tenantId?: string | null,
+  ) {
+    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
+    const term = dto.term.trim();
+    if (!term) throw new BadRequestException('El término no puede estar vacío.');
+
+    if (dto.productId) {
+      const product = await this.prisma.product.findFirst({
+        where: { id: dto.productId, tenantId },
+      });
+      if (!product) throw new NotFoundException('Producto no encontrado.');
+    }
+    if (dto.categoryId) {
+      const category = await this.prisma.category.findFirst({
+        where: { id: dto.categoryId, tenantId },
+      });
+      if (!category) throw new NotFoundException('Categoría no encontrada.');
+    }
+
+    const created = await this.prisma.productDictionaryEntry.create({
+      data: {
+        tenantId,
+        term: term.slice(0, 200),
+        productId: dto.productId ?? null,
+        categoryId: dto.categoryId ?? null,
+      },
+      include: {
+        product: { select: { id: true, name: true, internalCode: true } },
+        category: { select: { id: true, name: true } },
+      },
+    });
+
+    return created;
+  }
+
+  async updateProductDictionaryEntry(
+    id: string,
+    dto: UpdateProductDictionaryEntryDto,
+    tenantId?: string | null,
+  ) {
+    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
+
+    const existing = await this.prisma.productDictionaryEntry.findFirst({
+      where: { id, tenantId },
+    });
+    if (!existing) throw new NotFoundException('Entrada del diccionario no encontrada.');
+
+    if (dto.productId !== undefined && dto.productId !== null) {
+      const product = await this.prisma.product.findFirst({
+        where: { id: dto.productId, tenantId },
+      });
+      if (!product) throw new NotFoundException('Producto no encontrado.');
+    }
+    if (dto.categoryId !== undefined && dto.categoryId !== null) {
+      const category = await this.prisma.category.findFirst({
+        where: { id: dto.categoryId, tenantId },
+      });
+      if (!category) throw new NotFoundException('Categoría no encontrada.');
+    }
+
+    const updated = await this.prisma.productDictionaryEntry.update({
+      where: { id },
+      data: {
+        productId: dto.productId === undefined ? undefined : (dto.productId || null),
+        categoryId: dto.categoryId === undefined ? undefined : (dto.categoryId || null),
+      },
+      include: {
+        product: { select: { id: true, name: true, internalCode: true } },
+        category: { select: { id: true, name: true } },
+      },
+    });
+
+    return updated;
+  }
+
+  async deleteProductDictionaryEntry(id: string, tenantId?: string | null) {
+    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
+
+    const existing = await this.prisma.productDictionaryEntry.findFirst({
+      where: { id, tenantId },
+    });
+    if (!existing) throw new NotFoundException('Entrada del diccionario no encontrada.');
+
+    await this.prisma.productDictionaryEntry.delete({ where: { id } });
+    return { deleted: true };
   }
 }

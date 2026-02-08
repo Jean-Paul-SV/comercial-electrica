@@ -9,10 +9,20 @@ import {
   deleteProduct,
   listCategories,
   createCategory,
+  listProductDictionary,
+  createProductDictionaryEntry,
+  updateProductDictionaryEntry,
+  deleteProductDictionaryEntry,
   type ProductsListParams,
   type CreateCategoryPayload,
 } from './api';
-import type { CreateProductPayload, UpdateProductPayload } from './types';
+import type {
+  CreateProductPayload,
+  UpdateProductPayload,
+  ProductDictionaryListParams,
+  CreateProductDictionaryEntryPayload,
+  UpdateProductDictionaryEntryPayload,
+} from './types';
 import { useAuth } from '@shared/providers/AuthProvider';
 
 export function useProductsList(params: ProductsListParams) {
@@ -98,6 +108,61 @@ export function useDeleteProduct() {
     mutationFn: (id: string) => deleteProduct(id, token!),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
+    },
+  });
+}
+
+// --- Diccionario de búsqueda ---
+
+export function useProductDictionary(params: ProductDictionaryListParams = {}) {
+  const { token } = useAuth();
+
+  return useQuery({
+    queryKey: ['product-dictionary', params],
+    enabled: Boolean(token),
+    queryFn: () => listProductDictionary(params, token!),
+  });
+}
+
+export function useCreateProductDictionaryEntry() {
+  const queryClient = useQueryClient();
+  const { token } = useAuth();
+
+  return useMutation({
+    mutationFn: (payload: CreateProductDictionaryEntryPayload) =>
+      createProductDictionaryEntry(payload, token!),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['product-dictionary'] });
+    },
+  });
+}
+
+export function useUpdateProductDictionaryEntry() {
+  const queryClient = useQueryClient();
+  const { token } = useAuth();
+
+  return useMutation({
+    mutationFn: ({
+      id,
+      payload,
+    }: {
+      id: string;
+      payload: UpdateProductDictionaryEntryPayload;
+    }) => updateProductDictionaryEntry(id, payload, token!),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['product-dictionary'] });
+    },
+  });
+}
+
+export function useDeleteProductDictionaryEntry() {
+  const queryClient = useQueryClient();
+  const { token } = useAuth();
+
+  return useMutation({
+    mutationFn: (id: string) => deleteProductDictionaryEntry(id, token!),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['product-dictionary'] });
     },
   });
 }

@@ -45,3 +45,31 @@ export type Category = {
   id: string;
   name: string;
 };
+
+// Diccionario de términos que los clientes escriben al preguntar por productos
+export type ProductDictionaryEntry = {
+  id: string;
+  term: string;
+  productId: string | null;
+  categoryId: string | null;
+  createdAt: string;
+  product?: { id: string; name: string; internalCode: string } | null;
+  category?: { id: string; name: string } | null;
+};
+
+export type ProductDictionaryListParams = {
+  search?: string;
+  productId?: string;
+  categoryId?: string;
+};
+
+export type CreateProductDictionaryEntryPayload = {
+  term: string;
+  productId?: string | null;
+  categoryId?: string | null;
+};
+
+export type UpdateProductDictionaryEntryPayload = {
+  productId?: string | null;
+  categoryId?: string | null;
+};

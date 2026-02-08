@@ -20,6 +20,7 @@ import { CustomersReportDto } from './dto/customers-report.dto';
 import { ExportReportDto } from './dto/export-report.dto';
 import { ActionableIndicatorsDto } from './dto/actionable-indicators.dto';
 import { CustomerClustersDto } from './dto/customer-clusters.dto';
+import { TrendingProductsDto } from './dto/trending-products.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ModulesGuard } from '../auth/modules.guard';
 import { RequireModule } from '../auth/require-module.decorator';
@@ -260,6 +261,61 @@ export class ReportsController {
   @ApiResponse({ status: 401, description: 'No autenticado' })
   getCustomerClusters(@Query() dto: CustomerClustersDto) {
     return this.reportsService.getCustomerClusters(dto);
+  }
+
+  @Get('trending-products')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Artículos en tendencias',
+    description:
+      'Productos ordenados por ingreso total (ventas pagadas) en el período. Incluye ingreso, cantidad vendida y número de ventas.',
+  })
+  @ApiQuery({
+    name: 'days',
+    required: false,
+    description: 'Días hacia atrás (1-365)',
+    default: 30,
+  })
+  @ApiQuery({
+    name: 'top',
+    required: false,
+    description: 'Cantidad máxima de artículos (1-100)',
+    default: 20,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Lista de artículos en tendencia por ingreso',
+    schema: {
+      type: 'object',
+      properties: {
+        periodDays: { type: 'number' },
+        items: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              product: {
+                type: 'object',
+                properties: {
+                  id: { type: 'string' },
+                  internalCode: { type: 'string' },
+                  name: { type: 'string' },
+                  category: { type: 'object' },
+                  price: { type: 'number' },
+                },
+              },
+              totalRevenue: { type: 'number' },
+              totalQty: { type: 'number' },
+              salesCount: { type: 'number' },
+            },
+          },
+        },
+      },
+    },
+  })
+  @ApiResponse({ status: 401, description: 'No autenticado' })
+  getTrendingProducts(@Query() dto: TrendingProductsDto) {
+    return this.reportsService.getTrendingProducts(dto);
   }
 
   @Get('operational-state')

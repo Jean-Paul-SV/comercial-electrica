@@ -23,7 +23,7 @@ import { KpiBarChart } from '@shared/components/charts/KpiBarChart';
 import { SalesByDayChart } from '@shared/components/charts/SalesByDayChart';
 import { TopCustomersChart } from '@shared/components/charts/TopCustomersChart';
 import { CashInOutChart } from '@shared/components/charts/CashInOutChart';
-import { FileText, BarChart3, Package, Wallet, Users, UserCircle, PieChart, PackageX } from 'lucide-react';
+import { FileText, BarChart3, Package, Wallet, Users, UserCircle, PieChart, PackageX, TrendingUp } from 'lucide-react';
 import Link from 'next/link';
 import {
   useDashboard,
@@ -33,33 +33,140 @@ import {
   useCustomersReport,
   useCustomerClusters,
   useActionableIndicators,
+  useTrendingProducts,
   useExportReportCsv,
 } from '@features/reports/hooks';
 import { Button } from '@shared/components/ui/button';
+import { Label } from '@shared/components/ui/label';
 import { toast } from 'sonner';
 import { Download } from 'lucide-react';
 
-type TabId = 'dashboard' | 'sales' | 'inventory' | 'cash' | 'customers' | 'clusters' | 'sales-by-employee' | 'no-rotation';
+type TabId = 'dashboard' | 'sales' | 'inventory' | 'cash' | 'customers' | 'clusters' | 'sales-by-employee' | 'no-rotation' | 'trending';
 
 const tabs: { id: TabId; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
+  { id: 'trending', label: 'Artículos en tendencias', icon: TrendingUp },
   { id: 'sales', label: 'Ventas', icon: FileText },
   { id: 'sales-by-employee', label: 'Ventas por empleado', icon: UserCircle },
   { id: 'no-rotation', label: 'Productos sin rotación', icon: PackageX },
   { id: 'inventory', label: 'Inventario', icon: Package },
   { id: 'cash', label: 'Caja', icon: Wallet },
   { id: 'customers', label: 'Clientes', icon: Users },
-  { id: 'clusters', label: 'Clusters (K-means)', icon: PieChart },
+  { id: 'clusters', label: 'Segmentos de clientes', icon: PieChart },
 ];
+
+type TrendingPeriodKey = 'last_days' | 'current_month' | 'prev_month' | 'prev_month_2' | 'prev_month_3';
+
+const MONTH_NAMES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+
+function getMonthRange(monthsAgo: number): { startDate: string; endDate: string; label: string } {
+  const d = new Date();
+  d.setMonth(d.getMonth() - monthsAgo);
+  const y = d.getFullYear();
+  const m = d.getMonth();
+  const start = new Date(y, m, 1);
+  const end = new Date(y, m + 1, 0);
+  return {
+    startDate: start.toISOString().slice(0, 10),
+    endDate: end.toISOString().slice(0, 10),
+    label: `${MONTH_NAMES[m]} ${y}`,
+  };
+}
+
+function getTrendingParams(period: TrendingPeriodKey, sortBy: 'revenue' | 'qty') {
+  if (period === 'prev_month') {
+    const { startDate, endDate } = getMonthRange(1);
+    return { startDate, endDate, top: 20, sortBy };
+  }
+  if (period === 'prev_month_2') {
+    const { startDate, endDate } = getMonthRange(2);
+    return { startDate, endDate, top: 20, sortBy };
+  }
+  if (period === 'prev_month_3') {
+    const { startDate, endDate } = getMonthRange(3);
+    return { startDate, endDate, top: 20, sortBy };
+  }
+  return { days: 30, top: 20, period, sortBy };
+}
+
+type SalesPeriodKey = 'last_days' | 'current_month' | 'prev_month' | 'prev_month_2' | 'prev_month_3';
+
+function getSalesReportParams(period: SalesPeriodKey): { startDate?: string; endDate?: string; limit?: number } {
+  if (period === 'current_month') {
+    const now = new Date();
+    const start = new Date(now.getFullYear(), now.getMonth(), 1);
+    const end = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    return {
+      startDate: start.toISOString().slice(0, 10),
+      endDate: end.toISOString().slice(0, 10),
+      limit: 500,
+    };
+  }
+  if (period === 'prev_month') {
+    const { startDate, endDate } = getMonthRange(1);
+    return { startDate, endDate, limit: 500 };
+  }
+  if (period === 'prev_month_2') {
+    const { startDate, endDate } = getMonthRange(2);
+    return { startDate, endDate, limit: 500 };
+  }
+  if (period === 'prev_month_3') {
+    const { startDate, endDate } = getMonthRange(3);
+    return { startDate, endDate, limit: 500 };
+  }
+  return { limit: 200 };
+}
+
+function getSalesPeriodLabel(period: SalesPeriodKey): string {
+  if (period === 'current_month') return `${MONTH_NAMES[new Date().getMonth()]} ${new Date().getFullYear()} (este mes)`;
+  if (period === 'prev_month') return getMonthRange(1).label + ' (mes anterior)';
+  if (period === 'prev_month_2') return getMonthRange(2).label + ' (hace 2 meses)';
+  if (period === 'prev_month_3') return getMonthRange(3).label + ' (hace 3 meses)';
+  return 'Últimos 14 días con datos';
+}
+
+function getSalesByEmployeeParams(period: SalesPeriodKey): { days?: number; startDate?: string; endDate?: string; top: number } {
+  if (period === 'current_month') {
+    const now = new Date();
+    const start = new Date(now.getFullYear(), now.getMonth(), 1);
+    const end = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    return { startDate: start.toISOString().slice(0, 10), endDate: end.toISOString().slice(0, 10), top: 50 };
+  }
+  if (period === 'prev_month') {
+    const { startDate, endDate } = getMonthRange(1);
+    return { startDate, endDate, top: 50 };
+  }
+  if (period === 'prev_month_2') {
+    const { startDate, endDate } = getMonthRange(2);
+    return { startDate, endDate, top: 50 };
+  }
+  if (period === 'prev_month_3') {
+    const { startDate, endDate } = getMonthRange(3);
+    return { startDate, endDate, top: 50 };
+  }
+  return { days: 30, top: 50 };
+}
+
+function getSalesByEmployeePeriodLabel(period: SalesPeriodKey): string {
+  if (period === 'current_month') return `${MONTH_NAMES[new Date().getMonth()]} ${new Date().getFullYear()} (este mes)`;
+  if (period === 'prev_month') return getMonthRange(1).label + ' (mes anterior)';
+  if (period === 'prev_month_2') return getMonthRange(2).label + ' (hace 2 meses)';
+  if (period === 'prev_month_3') return getMonthRange(3).label + ' (hace 3 meses)';
+  return 'Últimos 30 días';
+}
 
 export default function ReportsPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const tabParam = searchParams.get('tab') as TabId | null;
-  const validTabs: TabId[] = ['dashboard', 'sales', 'inventory', 'cash', 'customers', 'clusters', 'sales-by-employee', 'no-rotation'];
+  const validTabs: TabId[] = ['dashboard', 'sales', 'inventory', 'cash', 'customers', 'clusters', 'sales-by-employee', 'no-rotation', 'trending'];
   const [activeTab, setActiveTab] = useState<TabId>(() => {
     return tabParam && validTabs.includes(tabParam) ? tabParam : 'dashboard';
   });
+  const [trendingSortOrder, setTrendingSortOrder] = useState<'desc' | 'asc'>('desc');
+  const [trendingPeriod, setTrendingPeriod] = useState<TrendingPeriodKey>('current_month');
+  const [trendingSortBy, setTrendingSortBy] = useState<'revenue' | 'qty'>('revenue');
+  const [salesByEmployeePeriod, setSalesByEmployeePeriod] = useState<SalesPeriodKey>('current_month');
 
   useEffect(() => {
     if (tabParam && tabParam !== activeTab && validTabs.includes(tabParam)) {
@@ -73,12 +180,20 @@ export default function ReportsPage() {
   };
 
   const dashboard = useDashboard();
-  const salesReport = useSalesReport({});
+  const [salesPeriod, setSalesPeriod] = useState<SalesPeriodKey>('current_month');
+  const salesReport = useSalesReport(getSalesReportParams(salesPeriod));
   const inventoryReport = useInventoryReport({});
   const cashReport = useCashReport({});
   const customersReport = useCustomersReport({ top: 20 });
   const customerClusters = useCustomerClusters({ days: 90, k: 3 });
-  const actionableIndicators = useActionableIndicators({ days: 30, top: 50 });
+  const actionableIndicators = useActionableIndicators(
+    activeTab === 'sales-by-employee'
+      ? getSalesByEmployeeParams(salesByEmployeePeriod)
+      : { days: 30, top: 50 }
+  );
+  const trendingProducts = useTrendingProducts(
+    getTrendingParams(trendingPeriod, trendingSortBy)
+  );
   const exportCsv = useExportReportCsv();
   const salesByEmployeeIndicator = actionableIndicators.data?.indicators?.find(
     (i) => i.code === 'SALES_BY_EMPLOYEE'
@@ -250,10 +365,225 @@ export default function ReportsPage() {
             </div>
           )}
 
+          {activeTab === 'trending' && (
+            <div className="space-y-4">
+              {(() => {
+                const isMonthRange = trendingPeriod === 'prev_month' || trendingPeriod === 'prev_month_2' || trendingPeriod === 'prev_month_3';
+                const monthLabel = trendingPeriod === 'prev_month' ? getMonthRange(1).label : trendingPeriod === 'prev_month_2' ? getMonthRange(2).label : trendingPeriod === 'prev_month_3' ? getMonthRange(3).label : null;
+                return (
+                  <p className="text-sm text-muted-foreground">
+                    {trendingSortBy === 'qty'
+                      ? isMonthRange && monthLabel
+                        ? `Productos más vendidos (unidades) en ${monthLabel}. Solo ventas pagadas.`
+                        : trendingPeriod === 'current_month'
+                          ? 'Productos más vendidos (unidades) en el mes actual. Solo ventas pagadas.'
+                          : `Productos más vendidos (unidades) en los últimos ${trendingProducts.data?.periodDays ?? 30} días.`
+                      : isMonthRange && monthLabel
+                        ? `Ingreso por producto en ${monthLabel}. Ventas pagadas.`
+                        : trendingPeriod === 'current_month'
+                          ? `Ingreso por producto en el mes actual (${trendingProducts.data?.periodDays ?? 0} días). Ventas pagadas.`
+                          : `Productos ordenados por ingreso total (ventas pagadas) en los últimos ${trendingProducts.data?.periodDays ?? 30} días.`}
+                  </p>
+                );
+              })()}
+              {trendingProducts.isLoading && (
+                <div className="rounded-lg border border-border/80 overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="hover:bg-transparent">
+                        <TableHead className="font-medium text-muted-foreground">#</TableHead>
+                        <TableHead className="font-medium text-muted-foreground">Producto</TableHead>
+                        <TableHead className="font-medium text-muted-foreground">Categoría</TableHead>
+                        <TableHead className="text-right font-medium text-muted-foreground">Ingreso</TableHead>
+                        <TableHead className="text-right font-medium text-muted-foreground">Unid.</TableHead>
+                        <TableHead className="text-right font-medium text-muted-foreground">Ventas</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {Array.from({ length: 8 }).map((_, i) => (
+                        <TableRow key={i}>
+                          <TableCell><Skeleton className="h-5 w-8 rounded" /></TableCell>
+                          <TableCell><Skeleton className="h-5 w-40 rounded" /></TableCell>
+                          <TableCell><Skeleton className="h-5 w-24 rounded" /></TableCell>
+                          <TableCell><Skeleton className="h-5 w-20 ml-auto rounded" /></TableCell>
+                          <TableCell><Skeleton className="h-5 w-12 ml-auto rounded" /></TableCell>
+                          <TableCell><Skeleton className="h-5 w-12 ml-auto rounded" /></TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+              {trendingProducts.isError && (
+                <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3">
+                  <p className="text-sm text-destructive">
+                    {(trendingProducts.error as { message?: string })?.message ??
+                      'Error cargando artículos en tendencias'}
+                  </p>
+                </div>
+              )}
+              {trendingProducts.data && !trendingProducts.isLoading && (
+                <>
+                  <div className="flex flex-wrap items-center gap-4 py-2 border-b border-border/60" id="trending-filters">
+                    <span className="text-sm text-muted-foreground font-medium">Período y orden</span>
+                    <div className="flex items-center gap-2">
+                      <Label htmlFor="trending-period" className="text-sm text-muted-foreground whitespace-nowrap">
+                        Período:
+                      </Label>
+                      <select
+                        id="trending-period"
+                        value={trendingPeriod}
+                        onChange={(e) => setTrendingPeriod(e.target.value as TrendingPeriodKey)}
+                        className="h-9 rounded-lg border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                      >
+                        <option value="current_month">Este mes</option>
+                        <option value="prev_month">{getMonthRange(1).label} (mes anterior)</option>
+                        <option value="prev_month_2">{getMonthRange(2).label} (hace 2 meses)</option>
+                        <option value="prev_month_3">{getMonthRange(3).label} (hace 3 meses)</option>
+                        <option value="last_days">Últimos 30 días</option>
+                      </select>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Label htmlFor="trending-sort-by" className="text-sm text-muted-foreground whitespace-nowrap">
+                        Ordenar por:
+                      </Label>
+                      <select
+                        id="trending-sort-by"
+                        value={trendingSortBy}
+                        onChange={(e) => setTrendingSortBy(e.target.value as 'revenue' | 'qty')}
+                        className="h-9 rounded-lg border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                      >
+                        <option value="revenue">Por ingreso</option>
+                        <option value="qty">Más vendidos (unidades)</option>
+                      </select>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Label htmlFor="trending-sort-table" className="text-sm text-muted-foreground whitespace-nowrap">
+                        Orden:
+                      </Label>
+                      <select
+                        id="trending-sort-table"
+                        value={trendingSortOrder}
+                        onChange={(e) => setTrendingSortOrder(e.target.value as 'desc' | 'asc')}
+                        className="h-9 rounded-lg border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                      >
+                        <option value="desc">Mayor a menor</option>
+                        <option value="asc">Menor a mayor</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {trendingProducts.data.items && trendingProducts.data.items.length > 0 ? (() => {
+                    const sortByQty = trendingProducts.data!.sortBy === 'qty';
+                    const items = [...trendingProducts.data!.items].sort((a, b) => {
+                      const desc = trendingSortOrder === 'desc';
+                      if (sortByQty) return desc ? b.totalQty - a.totalQty : a.totalQty - b.totalQty;
+                      return desc ? b.totalRevenue - a.totalRevenue : a.totalRevenue - b.totalRevenue;
+                    });
+                    const maxLabelLen = 22;
+                    const chartValueKey = sortByQty ? 'totalQty' : 'totalRevenue';
+                    const chartData = items.map((item) => {
+                      const name = item.product.name?.trim() || item.product.internalCode || '—';
+                      const shortName = name.length > maxLabelLen ? `${name.slice(0, maxLabelLen - 1)}…` : name;
+                      const fullName = item.product.internalCode ? `${name} (${item.product.internalCode})` : name;
+                      return {
+                        name: shortName,
+                        fullName,
+                        value: chartValueKey === 'totalQty' ? item.totalQty : item.totalRevenue,
+                        format: (chartValueKey === 'totalQty' ? 'number' : 'money') as const,
+                      };
+                    });
+                    return (
+                      <>
+                        <div className="rounded-xl border border-border/80 p-4 bg-muted/20">
+                          <p className="text-sm font-medium text-muted-foreground mb-3">
+                            {trendingProducts.data!.sortBy === 'qty'
+                              ? (trendingPeriod === 'prev_month' || trendingPeriod === 'prev_month_2' || trendingPeriod === 'prev_month_3')
+                                ? `Unidades vendidas por artículo (${getMonthRange(trendingPeriod === 'prev_month' ? 1 : trendingPeriod === 'prev_month_2' ? 2 : 3).label})`
+                                : trendingProducts.data!.period === 'current_month'
+                                  ? 'Unidades vendidas por artículo (este mes)'
+                                  : `Unidades vendidas por artículo (últimos ${trendingProducts.data!.periodDays} días)`
+                              : (trendingPeriod === 'prev_month' || trendingPeriod === 'prev_month_2' || trendingPeriod === 'prev_month_3')
+                                ? `Ingreso por artículo (${getMonthRange(trendingPeriod === 'prev_month' ? 1 : trendingPeriod === 'prev_month_2' ? 2 : 3).label})`
+                                : `Ingreso por artículo (últimos ${trendingProducts.data!.periodDays} días)`}
+                          </p>
+                          <KpiBarChart
+                            className="min-h-[280px] h-80 w-full"
+                            data={chartData}
+                          />
+                        </div>
+                        <div className="rounded-lg border border-border/80 overflow-hidden">
+                          <Table>
+                            <TableHeader>
+                              <TableRow className="bg-muted/40 hover:bg-muted/40">
+                                <TableHead className="font-medium w-10">#</TableHead>
+                                <TableHead className="font-medium">Producto</TableHead>
+                                <TableHead className="font-medium text-muted-foreground">Categoría</TableHead>
+                                <TableHead className="text-right font-medium">Ingreso</TableHead>
+                                <TableHead className="text-right font-medium text-muted-foreground">Unid.</TableHead>
+                                <TableHead className="text-right font-medium text-muted-foreground">Ventas</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {items.map((item, index) => (
+                                <TableRow key={item.product.id} className="hover:bg-muted/30">
+                                  <TableCell className="tabular-nums text-muted-foreground w-10">{index + 1}</TableCell>
+                                  <TableCell className="font-medium">
+                                    <Link href={`/products/${item.product.id}`} className="text-primary hover:underline">
+                                      {item.product.name || item.product.internalCode}
+                                    </Link>
+                                  </TableCell>
+                                  <TableCell className="text-muted-foreground">{item.product.category?.name ?? '—'}</TableCell>
+                                  <TableCell className="text-right tabular-nums font-medium">
+                                    {formatMoney(item.totalRevenue)}
+                                  </TableCell>
+                                  <TableCell className="text-right tabular-nums text-muted-foreground">{item.totalQty}</TableCell>
+                                  <TableCell className="text-right tabular-nums text-muted-foreground">{item.salesCount}</TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </>
+                    );
+                  })() : (
+                    <div className="flex flex-col gap-2 py-6">
+                      <p className="text-sm text-muted-foreground">
+                        No hay ventas en el período. Los artículos en tendencias se calculan a partir de ventas pagadas.
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        Elige otro período arriba (Este mes, Mes anterior, etc.) para ver datos de otro mes.
+                      </p>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+
           {activeTab === 'sales-by-employee' && (
             <div className="space-y-4">
+              <div className="flex flex-wrap items-center gap-3">
+                <Label htmlFor="sales-by-employee-period" className="text-sm font-medium text-muted-foreground">
+                  Período:
+                </Label>
+                <select
+                  id="sales-by-employee-period"
+                  value={salesByEmployeePeriod}
+                  onChange={(e) => setSalesByEmployeePeriod(e.target.value as SalesPeriodKey)}
+                  className="h-9 rounded-lg border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                >
+                  <option value="current_month">{getSalesByEmployeePeriodLabel('current_month')}</option>
+                  <option value="prev_month">{getSalesByEmployeePeriodLabel('prev_month')}</option>
+                  <option value="prev_month_2">{getSalesByEmployeePeriodLabel('prev_month_2')}</option>
+                  <option value="prev_month_3">{getSalesByEmployeePeriodLabel('prev_month_3')}</option>
+                  <option value="last_days">{getSalesByEmployeePeriodLabel('last_days')}</option>
+                </select>
+              </div>
               <p className="text-sm text-muted-foreground">
-                Ventas registradas por empleado en los últimos {actionableIndicators.data?.periodDays ?? 30} días.
+                {salesByEmployeePeriod === 'last_days'
+                  ? `Ventas registradas por empleado en los últimos ${actionableIndicators.data?.periodDays ?? 30} días.`
+                  : `Ventas registradas por empleado en ${salesByEmployeePeriod === 'current_month' ? MONTH_NAMES[new Date().getMonth()] + ' ' + new Date().getFullYear() : getMonthRange(salesByEmployeePeriod === 'prev_month' ? 1 : salesByEmployeePeriod === 'prev_month_2' ? 2 : 3).label}.`}
               </p>
               {actionableIndicators.isLoading && (
                 <div className="rounded-lg border border-border/80 overflow-hidden">
@@ -287,7 +617,9 @@ export default function ReportsPage() {
                 <>
                   <div className="rounded-xl border border-border/80 p-4 bg-muted/20 space-y-4">
                     <p className="text-sm font-medium text-muted-foreground">
-                      Ventas totales por empleado (últimos {actionableIndicators.data?.periodDays ?? 30} días)
+                      {salesByEmployeePeriod === 'last_days'
+                        ? `Ventas totales por empleado (últimos ${actionableIndicators.data?.periodDays ?? 30} días)`
+                        : `Ventas totales por empleado (${salesByEmployeePeriod === 'current_month' ? MONTH_NAMES[new Date().getMonth()] + ' ' + new Date().getFullYear() : getMonthRange(salesByEmployeePeriod === 'prev_month' ? 1 : salesByEmployeePeriod === 'prev_month_2' ? 2 : 3).label})`}
                     </p>
                     <KpiBarChart
                       className="h-72 w-full"
@@ -370,6 +702,7 @@ export default function ReportsPage() {
                         <TableRow className="bg-muted/40 hover:bg-muted/40">
                           <TableHead className="font-medium">#</TableHead>
                           <TableHead className="font-medium">Producto</TableHead>
+                          <TableHead className="font-medium text-right">Stock</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -377,6 +710,7 @@ export default function ReportsPage() {
                           <TableRow key={item.id} className="hover:bg-muted/30">
                             <TableCell className="text-muted-foreground tabular-nums w-10">{index + 1}</TableCell>
                             <TableCell className="font-medium">{item.name}</TableCell>
+                            <TableCell className="text-right tabular-nums">{typeof item.stock === 'number' ? item.stock : '—'}</TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
@@ -394,6 +728,23 @@ export default function ReportsPage() {
 
           {activeTab === 'sales' && (
             <div className="space-y-4">
+              <div className="flex flex-wrap items-center gap-3">
+                <Label htmlFor="sales-period" className="text-sm font-medium text-muted-foreground">
+                  Período:
+                </Label>
+                <select
+                  id="sales-period"
+                  value={salesPeriod}
+                  onChange={(e) => setSalesPeriod(e.target.value as SalesPeriodKey)}
+                  className="h-9 rounded-lg border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                >
+                  <option value="current_month">{getSalesPeriodLabel('current_month')}</option>
+                  <option value="prev_month">{getSalesPeriodLabel('prev_month')}</option>
+                  <option value="prev_month_2">{getSalesPeriodLabel('prev_month_2')}</option>
+                  <option value="prev_month_3">{getSalesPeriodLabel('prev_month_3')}</option>
+                  <option value="last_days">{getSalesPeriodLabel('last_days')}</option>
+                </select>
+              </div>
               {salesReport.isLoading && (
                 <div className="rounded-lg border border-border/80 overflow-hidden">
                   <Table>
@@ -442,13 +793,15 @@ export default function ReportsPage() {
                   cur.count += 1;
                   byDay.set(day, cur);
                 });
-                const chartData = Array.from(byDay.entries())
-                  .sort(([a], [b]) => a.localeCompare(b))
-                  .slice(-14)
-                  .map(([date, { total, count }]) => ({ date, total, count }));
+                const isMonthPeriod = salesPeriod !== 'last_days';
+                const sorted = Array.from(byDay.entries()).sort(([a], [b]) => a.localeCompare(b));
+                const chartData = (isMonthPeriod ? sorted : sorted.slice(-14)).map(([date, { total, count }]) => ({ date, total, count }));
+                const chartTitle = isMonthPeriod
+                  ? `Ventas por día (${salesPeriod === 'current_month' ? MONTH_NAMES[new Date().getMonth()] + ' ' + new Date().getFullYear() : getMonthRange(salesPeriod === 'prev_month' ? 1 : salesPeriod === 'prev_month_2' ? 2 : 3).label})`
+                  : 'Ventas por día (últimos 14 días con datos)';
                 return chartData.length > 0 ? (
                   <div className="rounded-xl border border-border/80 p-4 bg-muted/20 space-y-4">
-                    <p className="text-sm font-medium text-muted-foreground">Ventas por día (últimos 14 días con datos)</p>
+                    <p className="text-sm font-medium text-muted-foreground">{chartTitle}</p>
                     <SalesByDayChart data={chartData} className="h-72 w-full" />
                   </div>
                 ) : null;
@@ -510,27 +863,27 @@ export default function ReportsPage() {
           {activeTab === 'clusters' && (
             <div className="space-y-4">
               {customerClusters.isLoading && (
-                <p className="text-sm text-muted-foreground">Cargando clusters de clientes (K-means)…</p>
+                <p className="text-sm text-muted-foreground">Cargando segmentos de clientes…</p>
               )}
               {customerClusters.isError && (
                 <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3">
                   <p className="text-sm text-destructive">
                     {(customerClusters.error as { message?: string })?.message ??
-                      'Error cargando clusters'}
+                      'Error cargando segmentos de clientes'}
                   </p>
                 </div>
               )}
               {customerClusters.data?.clusters && customerClusters.data.clusters.length === 0 && !customerClusters.isLoading && (
                 <p className="text-sm text-muted-foreground">
-                  Se necesitan al menos {customerClusters.data.k} clientes con ventas en los últimos {customerClusters.data.periodDays} días para generar clusters.
+                  Se necesitan al menos {customerClusters.data.k} clientes con ventas en los últimos {customerClusters.data.periodDays} días para ver los segmentos.
                 </p>
               )}
               {customerClusters.data?.clusters && customerClusters.data.clusters.length > 0 && !customerClusters.isLoading && (
                 <div className="space-y-6">
                   <div className="rounded-lg border border-border/60 bg-muted/30 p-4">
-                    <p className="text-sm font-medium text-foreground mb-1">¿Qué son estos segmentos?</p>
+                    <p className="text-sm font-medium text-foreground mb-1">¿Para qué sirve esto?</p>
                     <p className="text-sm text-muted-foreground">
-                      Agrupamos clientes por su comportamiento: monto total comprado, días desde la última compra y cantidad de compras (últimos {customerClusters.data.periodDays} días). Así puedes priorizar fidelización, ofertas o reactivación según el segmento.
+                      Agrupamos a tus clientes según cuánto compran, hace cuánto compraron y con qué frecuencia (últimos {customerClusters.data.periodDays} días). Así puedes ver de un vistazo quiénes son tus clientes más valiosos, quiénes compran poco y quiénes hace tiempo no compran, para decidir a quién dar ofertas, recordatorios o atención prioritaria.
                     </p>
                   </div>
                   <div className="grid gap-4 sm:grid-cols-1 lg:grid-cols-2">
@@ -604,7 +957,7 @@ export default function ReportsPage() {
                         sales: item.statistics.totalSales,
                       }))}
                       maxBars={10}
-                      className="h-72 w-full"
+                      className="min-h-[300px] h-80 w-full"
                     />
                   </div>
                   <div className="rounded-lg border border-border/80 overflow-hidden">

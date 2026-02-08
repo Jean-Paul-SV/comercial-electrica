@@ -25,6 +25,9 @@ import { ListProductsQueryDto } from './dto/list-products-query.dto';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { CreateCategoryDto } from './dto/create-category.dto';
+import { CreateProductDictionaryEntryDto } from './dto/create-product-dictionary-entry.dto';
+import { UpdateProductDictionaryEntryDto } from './dto/update-product-dictionary-entry.dto';
+import { ListProductDictionaryQueryDto } from './dto/list-product-dictionary-query.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionsGuard } from '../auth/permissions.guard';
 import { RequirePermission } from '../auth/require-permission.decorator';
@@ -244,5 +247,75 @@ export class CatalogController {
     @Req() req: { user?: { sub?: string; tenantId?: string } },
   ) {
     return this.catalog.createCategory(dto, req.user?.sub, req.user?.tenantId);
+  }
+
+  // --- Diccionario de términos que los clientes escriben al preguntar por productos ---
+
+  @Get('product-dictionary')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Listar diccionario de búsqueda',
+    description:
+      'Términos o frases que los clientes escriben al preguntar por productos. Opcionalmente vinculados a un producto.',
+  })
+  @ApiQuery({ name: 'search', required: false, description: 'Filtrar por texto en el término' })
+  @ApiQuery({ name: 'productId', required: false, description: 'Filtrar por producto asociado' })
+  @ApiResponse({ status: 200, description: 'Lista de entradas del diccionario' })
+  @ApiResponse({ status: 401, description: 'No autenticado' })
+  listProductDictionary(
+    @Query() query: ListProductDictionaryQueryDto,
+    @Req() req?: { user?: { tenantId?: string } },
+  ) {
+    return this.catalog.listProductDictionary(query, req?.user?.tenantId);
+  }
+
+  @Post('product-dictionary')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Agregar término al diccionario',
+    description: 'Registra un término o frase que los clientes escriben al preguntar por productos.',
+  })
+  @ApiResponse({ status: 201, description: 'Entrada creada' })
+  @ApiResponse({ status: 400, description: 'Validación fallida' })
+  @ApiResponse({ status: 401, description: 'No autenticado' })
+  createProductDictionaryEntry(
+    @Body() dto: CreateProductDictionaryEntryDto,
+    @Req() req: { user?: { tenantId?: string } },
+  ) {
+    return this.catalog.createProductDictionaryEntry(dto, req.user?.tenantId);
+  }
+
+  @Patch('product-dictionary/:id')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Actualizar entrada del diccionario',
+    description: 'Cambia el producto asociado a un término.',
+  })
+  @ApiParam({ name: 'id', description: 'ID de la entrada' })
+  @ApiResponse({ status: 200, description: 'Entrada actualizada' })
+  @ApiResponse({ status: 404, description: 'Entrada no encontrada' })
+  @ApiResponse({ status: 401, description: 'No autenticado' })
+  updateProductDictionaryEntry(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @Body() dto: UpdateProductDictionaryEntryDto,
+    @Req() req?: { user?: { tenantId?: string } },
+  ) {
+    return this.catalog.updateProductDictionaryEntry(id, dto, req?.user?.tenantId);
+  }
+
+  @Delete('product-dictionary/:id')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Eliminar entrada del diccionario',
+  })
+  @ApiParam({ name: 'id', description: 'ID de la entrada' })
+  @ApiResponse({ status: 200, description: 'Entrada eliminada' })
+  @ApiResponse({ status: 404, description: 'Entrada no encontrada' })
+  @ApiResponse({ status: 401, description: 'No autenticado' })
+  deleteProductDictionaryEntry(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @Req() req?: { user?: { tenantId?: string } },
+  ) {
+    return this.catalog.deleteProductDictionaryEntry(id, req?.user?.tenantId);
   }
 }

@@ -6,6 +6,10 @@ import type {
   CreateProductPayload,
   UpdateProductPayload,
   Category,
+  ProductDictionaryEntry,
+  ProductDictionaryListParams,
+  CreateProductDictionaryEntryPayload,
+  UpdateProductDictionaryEntryPayload,
 } from './types';
 
 export type ProductsListParams = {
@@ -72,4 +76,39 @@ export function createCategory(
   authToken: string,
 ): Promise<Category> {
   return apiClient.post('/categories', payload, { authToken });
+}
+
+// --- Diccionario de búsqueda (términos que los clientes escriben al preguntar) ---
+
+export function listProductDictionary(
+  params: ProductDictionaryListParams,
+  authToken: string,
+): Promise<{ data: ProductDictionaryEntry[] }> {
+  const qs = new URLSearchParams();
+  if (params.search?.trim()) qs.set('search', params.search.trim());
+  if (params.productId) qs.set('productId', params.productId);
+  const query = qs.toString() ? `?${qs.toString()}` : '';
+  return apiClient.get(`/product-dictionary${query}`, { authToken });
+}
+
+export function createProductDictionaryEntry(
+  payload: CreateProductDictionaryEntryPayload,
+  authToken: string,
+): Promise<ProductDictionaryEntry> {
+  return apiClient.post('/product-dictionary', payload, { authToken });
+}
+
+export function updateProductDictionaryEntry(
+  id: string,
+  payload: UpdateProductDictionaryEntryPayload,
+  authToken: string,
+): Promise<ProductDictionaryEntry> {
+  return apiClient.patch(`/product-dictionary/${id}`, payload, { authToken });
+}
+
+export function deleteProductDictionaryEntry(
+  id: string,
+  authToken: string,
+): Promise<{ deleted: boolean }> {
+  return apiClient.delete(`/product-dictionary/${id}`, { authToken });
 }

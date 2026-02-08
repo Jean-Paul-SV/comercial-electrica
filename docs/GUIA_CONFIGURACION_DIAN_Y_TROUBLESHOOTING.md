@@ -104,7 +104,17 @@ Definir en `.env` (o en el entorno de despliegue). No subir valores reales a rep
 
 ---
 
-## 5. Checklist antes de producción DIAN
+## 5. Almacenamiento seguro del certificado y contraseña
+
+Para reducir el riesgo de exposición de secretos:
+
+- **Archivo .p12:** Mantenerlo fuera del repositorio y en una ruta con permisos restringidos (solo el usuario que ejecuta la API). En producción, considerar un almacenamiento cifrado o un servicio de secretos que exponga la ruta o el contenido del certificado de forma controlada.
+- **Contraseña del certificado:** No commitear `DIAN_CERT_PASSWORD` en `.env` en el repositorio. En producción, usar un **gestor de secretos** (AWS Secrets Manager, HashiCorp Vault, variables secretas del proveedor de despliegue, etc.) e inyectar la contraseña como variable de entorno en tiempo de ejecución. La API lee la contraseña desde `DIAN_CERT_PASSWORD`; el gestor de secretos puede poblar esa variable.
+- **Encriptación en reposo:** Si en el futuro la contraseña o el certificado se almacenaran en base de datos, deben cifrarse antes de guardar y descifrarse solo en memoria al usar. Por ahora, al usar solo archivo y variables de entorno, la protección se logra con permisos de archivo y uso de secretos en el despliegue.
+
+---
+
+## 6. Checklist antes de producción DIAN
 
 - [ ] `DIAN_ENV=PRODUCCION`
 - [ ] `DIAN_SOFTWARE_ID` y `DIAN_SOFTWARE_PIN` correctos y seguros (secretos)
@@ -117,7 +127,7 @@ Definir en `.env` (o en el entorno de despliegue). No subir valores reales a rep
 
 ---
 
-## 6. Documentos relacionados
+## 7. Documentos relacionados
 
 | Documento | Contenido |
 |-----------|------------|

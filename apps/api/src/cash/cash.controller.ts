@@ -148,14 +148,17 @@ export class CashController {
     },
   })
   @ApiResponse({ status: 401, description: 'No autenticado' })
+  @ApiResponse({ status: 403, description: 'Sin tenant o sin acceso a la sesión' })
   movements(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Query() pagination?: PaginationDto,
+    @Req() req?: { user?: { tenantId?: string } },
   ) {
-    return this.cash.listMovements(id, {
-      page: pagination?.page,
-      limit: pagination?.limit,
-    });
+    return this.cash.listMovements(
+      id,
+      { page: pagination?.page, limit: pagination?.limit },
+      req?.user?.tenantId,
+    );
   }
 
   @Get('movements')

@@ -265,4 +265,22 @@ describe('Reports (e2e)', () => {
       expect(response.body.topCustomers.length).toBeLessThanOrEqual(5);
     });
   });
+
+  describe('GET /reports/operational-state', () => {
+    it('debe retornar estado operativo con indicadores y alertas', async () => {
+      const response = await request(app.getHttpServer())
+        .get('/reports/operational-state')
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(200);
+
+      expect(response.body).toHaveProperty('indicators');
+      expect(response.body).toHaveProperty('alerts');
+      expect(response.body.indicators).toHaveProperty('cash');
+      expect(response.body.indicators).toHaveProperty('inventory');
+      expect(response.body.indicators).toHaveProperty('quotes');
+      expect(response.body.indicators).toHaveProperty('sales');
+      expect(response.body.indicators).toHaveProperty('supplierInvoices');
+      expect(Array.isArray(response.body.alerts)).toBe(true);
+    });
+  });
 });

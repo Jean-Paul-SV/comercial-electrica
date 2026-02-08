@@ -66,15 +66,15 @@ export default function SupplierDetailPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <Link href="/suppliers">
-          <Button variant="ghost" size="sm" className="gap-2">
+          <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground hover:text-foreground">
             <ArrowLeft className="h-4 w-4" />
             Volver a proveedores
           </Button>
         </Link>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button asChild variant="outline" size="sm" className="gap-2">
             <Link href={`/supplier-invoices?supplierId=${supplier.id}`}>
               <FileText className="h-4 w-4" />
@@ -91,72 +91,93 @@ export default function SupplierDetailPage() {
       </div>
 
       <div className="flex flex-col gap-1">
-        <h1 className="text-xl font-semibold tracking-tight sm:text-2xl text-foreground">
+        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl text-foreground">
           Detalle del proveedor
         </h1>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-sm text-muted-foreground mt-0.5">
           {supplier.name} · NIT {supplier.nit}
         </p>
       </div>
 
-      <Card className="border border-border/80 shadow-sm rounded-xl overflow-hidden">
-        <CardHeader className="pb-4 border-b border-border/60">
-          <div className="flex items-center justify-between gap-2">
-            <CardTitle className="text-lg font-medium flex items-center gap-2 text-foreground">
-              <Truck className="h-5 w-5 shrink-0 text-primary" aria-hidden />
-              {supplier.name}
-            </CardTitle>
-            <Badge variant={supplier.isActive ? 'default' : 'secondary'}>
+      <Card className="border border-border/80 shadow-sm rounded-2xl overflow-hidden bg-card">
+        <CardHeader className="pb-5 pt-6 px-6 sm:px-8 border-b border-border/60 bg-muted/20">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                <Truck className="h-6 w-6" aria-hidden />
+              </div>
+              <div className="min-w-0">
+                <CardTitle className="text-xl font-semibold tracking-tight text-foreground truncate">
+                  {supplier.name}
+                </CardTitle>
+                <CardDescription className="text-sm mt-0.5">
+                  NIT {supplier.nit}
+                </CardDescription>
+              </div>
+            </div>
+            <Badge
+              variant={supplier.isActive ? 'default' : 'secondary'}
+              className="shrink-0 font-medium px-3 py-1"
+            >
               {supplier.isActive ? 'Activo' : 'Inactivo'}
             </Badge>
           </div>
-          <CardDescription>
-            NIT {supplier.nit}
-          </CardDescription>
         </CardHeader>
-        <CardContent className="pt-6 space-y-4">
-          <dl className="grid gap-3 sm:grid-cols-2">
-            <div>
-              <dt className="text-xs font-medium text-muted-foreground">NIT</dt>
-              <dd className="text-sm font-mono text-foreground">{supplier.nit}</dd>
+        <CardContent className="pt-6 pb-6 px-6 sm:px-8">
+          <dl className="grid gap-x-8 gap-y-5 sm:grid-cols-2">
+            <div className="flex flex-col gap-1">
+              <dt className="text-sm font-medium text-muted-foreground">NIT</dt>
+              <dd className="text-base font-medium text-foreground font-mono tabular-nums">{supplier.nit}</dd>
             </div>
-            <div>
-              <dt className="text-xs font-medium text-muted-foreground">Nombre</dt>
-              <dd className="text-sm text-foreground">{supplier.name}</dd>
+            <div className="flex flex-col gap-1">
+              <dt className="text-sm font-medium text-muted-foreground">Nombre</dt>
+              <dd className="text-base font-medium text-foreground">{supplier.name}</dd>
             </div>
-            <div>
-              <dt className="text-xs font-medium text-muted-foreground">Email</dt>
-              <dd className="text-sm text-foreground">{supplier.email ?? '—'}</dd>
+            <div className="flex flex-col gap-1">
+              <dt className="text-sm font-medium text-muted-foreground">Email</dt>
+              <dd className="text-base font-medium text-foreground break-all">{supplier.email ?? '—'}</dd>
             </div>
-            <div>
-              <dt className="text-xs font-medium text-muted-foreground">Teléfono</dt>
-              <dd className="text-sm text-foreground">{supplier.phone ?? '—'}</dd>
+            <div className="flex flex-col gap-1">
+              <dt className="text-sm font-medium text-muted-foreground">Teléfono</dt>
+              <dd className="text-base font-medium text-foreground">{supplier.phone ?? '—'}</dd>
             </div>
-            {supplier.contactPerson && (
-              <div>
-                <dt className="text-xs font-medium text-muted-foreground">Contacto</dt>
-                <dd className="text-sm text-foreground">{supplier.contactPerson}</dd>
+            {supplier.contactPerson ? (
+              <div className="flex flex-col gap-1">
+                <dt className="text-sm font-medium text-muted-foreground">Contacto</dt>
+                <dd className="text-base font-medium text-foreground">{supplier.contactPerson}</dd>
               </div>
+            ) : (
+              <div className="hidden sm:block" aria-hidden />
             )}
+            <div className="flex flex-col gap-1 sm:col-start-2">
+              <dt className="text-sm font-medium text-muted-foreground">Descripción</dt>
+              <dd className="text-base text-foreground/90 whitespace-pre-wrap mt-0.5 min-h-[1.5rem]">
+                {supplier.description?.trim() ? (
+                  supplier.description
+                ) : (
+                  <span className="text-muted-foreground italic">Sin descripción</span>
+                )}
+              </dd>
+            </div>
             {supplier.address && (
-              <div className="sm:col-span-2">
-                <dt className="text-xs font-medium text-muted-foreground">Dirección</dt>
-                <dd className="text-sm text-foreground">{supplier.address}</dd>
+              <div className="flex flex-col gap-1 sm:col-span-2">
+                <dt className="text-sm font-medium text-muted-foreground">Dirección</dt>
+                <dd className="text-base font-medium text-foreground">{supplier.address}</dd>
               </div>
             )}
             {supplier.cityCode && (
-              <div>
-                <dt className="text-xs font-medium text-muted-foreground">Código ciudad</dt>
-                <dd className="text-sm text-foreground">{supplier.cityCode}</dd>
+              <div className="flex flex-col gap-1">
+                <dt className="text-sm font-medium text-muted-foreground">Código ciudad</dt>
+                <dd className="text-base font-medium text-foreground font-mono">{supplier.cityCode}</dd>
               </div>
             )}
-            <div>
-              <dt className="text-xs font-medium text-muted-foreground">Creado</dt>
-              <dd className="text-sm text-foreground">{formatDate(supplier.createdAt)}</dd>
+            <div className="flex flex-col gap-1">
+              <dt className="text-sm font-medium text-muted-foreground">Creado</dt>
+              <dd className="text-base font-medium text-foreground tabular-nums">{formatDate(supplier.createdAt)}</dd>
             </div>
-            <div>
-              <dt className="text-xs font-medium text-muted-foreground">Actualizado</dt>
-              <dd className="text-sm text-foreground">{formatDate(supplier.updatedAt)}</dd>
+            <div className="flex flex-col gap-1">
+              <dt className="text-sm font-medium text-muted-foreground">Actualizado</dt>
+              <dd className="text-base font-medium text-foreground tabular-nums">{formatDate(supplier.updatedAt)}</dd>
             </div>
           </dl>
         </CardContent>

@@ -15,6 +15,8 @@ import type {
   InventoryReportParams,
   CashReportParams,
   CustomersReportParams,
+  TrendingProductsResponse,
+  TrendingProductsParams,
 } from './types';
 
 function buildQuery(params: Record<string, string | number | boolean | undefined>): string {
@@ -87,6 +89,15 @@ export function getCustomerClusters(
   params?: CustomerClustersParams,
 ): Promise<CustomerClustersResponse> {
   return apiClient.get(`/reports/customer-clusters${buildQuery(params ?? {})}`, {
+    authToken,
+  });
+}
+
+export function getTrendingProducts(
+  params: TrendingProductsParams,
+  authToken: string,
+): Promise<TrendingProductsResponse> {
+  return apiClient.get(`/reports/trending-products${buildQuery(params ?? {})}`, {
     authToken,
   });
 }

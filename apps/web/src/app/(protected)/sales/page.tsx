@@ -65,6 +65,7 @@ export default function SalesPage() {
   const [openAddMultiple, setOpenAddMultiple] = useState(false);
   const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(new Set());
   const [addMultipleSearch, setAddMultipleSearch] = useState('');
+  const [saleProductSearch, setSaleProductSearch] = useState('');
   const [discountPercent, setDiscountPercent] = useState<number>(0);
 
   const limit = 20;
@@ -76,7 +77,11 @@ export default function SalesPage() {
   const createSaleMutation = useCreateSale();
   const cashSessionsQuery = useCashSessionsList({});
   const customersQuery = useCustomersList({ page: 1, limit: 100 });
-  const productsQuery = useProductsList({ page: 1, limit: 100 });
+  const productsQuery = useProductsList({
+    page: 1,
+    limit: 100,
+    search: openNewSale ? (saleProductSearch.trim() || undefined) : undefined,
+  });
 
   const rows = useMemo(() => salesQuery.data?.data ?? [], [salesQuery.data]);
   const meta = salesQuery.data?.meta;
@@ -86,10 +91,35 @@ export default function SalesPage() {
     [cashSessionsQuery.data]
   );
   const customers = useMemo(() => customersQuery.data?.data ?? [], [customersQuery.data]);
-  const products = useMemo(
+  const productsRaw = useMemo(
     () => (productsQuery.data?.data ?? []).filter((p) => p.isActive !== false),
     [productsQuery.data]
   );
+  const products = useMemo(() => {
+    const term = saleProductSearch.trim().toLowerCase();
+    let list = productsRaw;
+    if (term) {
+      list = productsRaw.filter(
+        (p) =>
+          (p.name ?? '').toLowerCase().includes(term) ||
+          (p.internalCode ?? '').toLowerCase().includes(term),
+      );
+      list = [...list].sort((a, b) => {
+        const nameA = (a.name ?? '').toLowerCase();
+        const nameB = (b.name ?? '').toLowerCase();
+        const codeA = (a.internalCode ?? '').toLowerCase();
+        const codeB = (b.internalCode ?? '').toLowerCase();
+        const score = (name: string, code: string) => {
+          if (name === term || code === term) return 0;
+          if (name.startsWith(term) || code.startsWith(term)) return 1;
+          if (name.includes(term) || code.includes(term)) return 2;
+          return 3;
+        };
+        return score(nameA, codeA) - score(nameB, codeB);
+      });
+    }
+    return list;
+  }, [productsRaw, saleProductSearch]);
   const productsLoading = productsQuery.isLoading;
   const productsFetching = productsQuery.isFetching;
   const productsError = productsQuery.isError;
@@ -295,6 +325,7 @@ export default function SalesPage() {
     setOpenAddMultiple(false);
     setSelectedProductIds(new Set());
     setAddMultipleSearch('');
+    setSaleProductSearch('');
     setDiscountPercent(0);
   };
 
@@ -621,13 +652,33 @@ export default function SalesPage() {
               <p className="text-xs text-muted-foreground">
                 Elige producto, cantidad y opcionalmente modifica el precio unitario.
               </p>
+              <div className="space-y-1.5">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                  <Input
+                    type="text"
+                    placeholder="Buscar producto por nombre o código..."
+                    value={saleProductSearch}
+                    onChange={(e) => setSaleProductSearch(e.target.value)}
+                    className="pl-9 h-9 rounded-lg"
+                    autoComplete="off"
+                  />
+                </div>
+                {saleProductSearch.trim() && (
+                  <p className="text-xs text-muted-foreground">
+                    Buscando «<span className="font-medium text-foreground">{saleProductSearch.trim()}</span>» — {products.length} resultado{products.length !== 1 ? 's' : ''} (ordenados por lo más parecido)
+                  </p>
+                )}
+              </div>
               {!productsLoading && !productsFetching && products.length === 0 && (
                 <div
                   className="rounded-lg border border-warning/30 bg-warning/10 p-3 text-sm text-warning-foreground dark:text-warning flex flex-col gap-2"
                   role="alert"
                 >
                   <span>
-                    No hay productos disponibles. Ve a <strong>Productos</strong> para crear algunos o ejecuta el script de carga inicial (seed) de la base de datos.
+                    {saleProductSearch.trim()
+                      ? `Ningún producto coincide con «${saleProductSearch.trim()}». Prueba con otra palabra o código.`
+                      : 'No hay productos disponibles. Ve a Productos para crear algunos o ejecuta el script de carga inicial (seed) de la base de datos.'}
                   </span>
                   <Button
                     type="button"
@@ -637,13 +688,13 @@ export default function SalesPage() {
                     onClick={() => productsQuery.refetch()}
                     disabled={productsQuery.isFetching}
                   >
-                    Reintentar cargar productos
+                    Reintentar
                   </Button>
                 </div>
               )}
-              {productsFetching && products.length === 0 && (
+              {productsFetching && saleProductSearch.trim() && products.length === 0 && (
                 <p className="text-sm text-muted-foreground p-2">
-                  Actualizando lista de productos…
+                  Buscando «{saleProductSearch.trim()}»…
                 </p>
               )}
               <div className="rounded-lg border border-border overflow-hidden shadow-sm">
@@ -878,21 +929,28 @@ export default function SalesPage() {
               Marca los productos que quieras agregar a la venta. Se añadirán con cantidad 1 y precio del catálogo.
             </p>
           </DialogHeader>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-            <Input
-              type="text"
-              placeholder="Buscar por ID, nombre o código..."
-              value={addMultipleSearch}
-              onChange={(e) => setAddMultipleSearch(e.target.value)}
-              className="pl-9 rounded-lg mb-2"
-              autoComplete="off"
-            />
+          <div className="space-y-1.5 mb-2">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+              <Input
+                type="text"
+                placeholder="Buscar por nombre o código..."
+                value={addMultipleSearch}
+                onChange={(e) => setAddMultipleSearch(e.target.value)}
+                className="pl-9 rounded-lg"
+                autoComplete="off"
+              />
+            </div>
+            {addMultipleSearch.trim() && (
+              <p className="text-xs text-muted-foreground">
+                Buscando «<span className="font-medium text-foreground">{addMultipleSearch.trim()}</span>» — ordenado por lo más parecido
+              </p>
+            )}
           </div>
           <div className="max-h-64 overflow-auto rounded-lg border border-border divide-y divide-border">
             {(() => {
               const term = addMultipleSearch.trim().toLowerCase();
-              const filtered = term
+              let filtered = term
                 ? products.filter(
                     (p) =>
                       (p.id ?? '').toLowerCase().includes(term) ||
@@ -900,6 +958,20 @@ export default function SalesPage() {
                       (p.internalCode ?? '').toLowerCase().includes(term),
                   )
                 : products;
+              if (term && filtered.length > 0) {
+                filtered = [...filtered].sort((a, b) => {
+                  const nameA = (a.name ?? '').toLowerCase();
+                  const nameB = (b.name ?? '').toLowerCase();
+                  const codeA = (a.internalCode ?? '').toLowerCase();
+                  const codeB = (b.internalCode ?? '').toLowerCase();
+                  const score = (name: string, code: string) => {
+                    if (name === term || code === term) return 0;
+                    if (name.startsWith(term) || code.startsWith(term)) return 1;
+                    return 2;
+                  };
+                  return score(nameA, codeA) - score(nameB, codeB);
+                });
+              }
               if (filtered.length === 0) {
                 return (
                   <p className="p-4 text-sm text-muted-foreground text-center">

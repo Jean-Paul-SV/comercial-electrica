@@ -33,7 +33,7 @@ import {
 import { Skeleton } from '@shared/components/ui/skeleton';
 import { Pagination } from '@shared/components/Pagination';
 import Link from 'next/link';
-import { Truck, Plus, Power, PowerOff, Search, FilterX } from 'lucide-react';
+import { Truck, Plus, Power, PowerOff, Search, FilterX, Pencil, Eye } from 'lucide-react';
 import { useSuppliersList, useCreateSupplier, useUpdateSupplier } from '@features/suppliers/hooks';
 
 const supplierSchema = z.object({
@@ -53,6 +53,15 @@ export default function SuppliersPage() {
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [openNewSupplier, setOpenNewSupplier] = useState(false);
+  const [supplierToDisable, setSupplierToDisable] = useState<{ id: string; name: string } | null>(null);
+  const [supplierToEdit, setSupplierToEdit] = useState<{
+    id: string;
+    nit: string;
+    name: string;
+    email: string | null;
+    phone: string | null;
+    contactPerson: string | null;
+  } | null>(null);
   const limit = 20;
 
   useEffect(() => {
@@ -85,6 +94,30 @@ export default function SuppliersPage() {
     },
   });
 
+  const editForm = useForm<SupplierFormValues>({
+    resolver: zodResolver(supplierSchema),
+    defaultValues: {
+      nit: '',
+      name: '',
+      email: '',
+      phone: '',
+      contactPerson: '',
+    },
+  });
+
+  useEffect(() => {
+    if (supplierToEdit) {
+      editForm.reset({
+        nit: supplierToEdit.nit,
+        name: supplierToEdit.name,
+        email: supplierToEdit.email ?? '',
+        phone: supplierToEdit.phone ?? '',
+        contactPerson: supplierToEdit.contactPerson ?? '',
+        description: '',
+      });
+    }
+  }, [supplierToEdit, editForm]);
+
   const onNewSupplier = (values: SupplierFormValues) => {
     createSupplier.mutate(
       {
@@ -103,6 +136,31 @@ export default function SuppliersPage() {
         },
         onError: (e: { message?: string }) => {
           toast.error(e?.message ?? 'No se pudo crear el proveedor');
+        },
+      }
+    );
+  };
+
+  const onEditSupplier = (values: SupplierFormValues) => {
+    if (!supplierToEdit) return;
+    updateSupplier.mutate(
+      {
+        id: supplierToEdit.id,
+        payload: {
+          nit: values.nit.trim(),
+          name: values.name.trim(),
+          email: values.email?.trim() || undefined,
+          phone: values.phone?.trim() || undefined,
+          contactPerson: values.contactPerson?.trim() || undefined,
+        },
+      },
+      {
+        onSuccess: () => {
+          toast.success('Proveedor actualizado');
+          setSupplierToEdit(null);
+        },
+        onError: (e: { message?: string }) => {
+          toast.error(e?.message ?? 'No se pudo actualizar el proveedor');
         },
       }
     );
@@ -186,7 +244,7 @@ export default function SuppliersPage() {
                     <TableHead className="font-medium">Nombre</TableHead>
                     <TableHead className="font-medium">Contacto</TableHead>
                     <TableHead className="font-medium">Estado</TableHead>
-                    <TableHead className="w-24 text-center font-medium">Acciones</TableHead>
+                    <TableHead className="w-36 text-center font-medium">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -220,7 +278,7 @@ export default function SuppliersPage() {
                     <TableHead className="font-medium">Nombre</TableHead>
                     <TableHead className="font-medium">Contacto</TableHead>
                     <TableHead className="font-medium">Estado</TableHead>
-                    <TableHead className="w-24 text-center font-medium">Acciones</TableHead>
+                    <TableHead className="w-36 text-center font-medium">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -230,12 +288,7 @@ export default function SuppliersPage() {
                         {s.nit}
                       </TableCell>
                       <TableCell className="font-medium">
-                        <Link
-                          href={`/suppliers/${s.id}`}
-                          className="text-primary hover:underline"
-                        >
-                          {s.name}
-                        </Link>
+                        {s.name}
                       </TableCell>
                       <TableCell className="text-muted-foreground">
                         {s.contactPerson ?? s.email ?? s.phone ?? '—'}
@@ -252,28 +305,51 @@ export default function SuppliersPage() {
                         </span>
                       </TableCell>
                       <TableCell className="text-center">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          title={s.isActive ? 'Deshabilitar proveedor' : 'Habilitar proveedor'}
-                          onClick={() => {
-                            updateSupplier.mutate(
-                              { id: s.id, payload: { isActive: !s.isActive } },
-                              {
-                                onSuccess: () => {
-                                  toast.success(
-                                    s.isActive
-                                      ? 'Proveedor deshabilitado'
-                                      : 'Proveedor habilitado'
-                                  );
-                                },
-                                onError: (e: { message?: string }) => {
-                                  toast.error(
-                                    e?.message ?? 'No se pudo actualizar el estado'
-                                  );
-                                },
-                              }
-                            );
+                        <div className="flex items-center justify-center gap-1">
+                          <Button asChild variant="outline" size="sm" title="Ver detalle (descripción y datos)">
+                            <Link href={`/suppliers/${s.id}`}>
+                              <Eye className="h-4 w-4" />
+                            </Link>
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            title="Editar proveedor"
+                            onClick={() =>
+                              setSupplierToEdit({
+                                id: s.id,
+                                nit: s.nit,
+                                name: s.name,
+                                email: s.email,
+                                phone: s.phone,
+                                contactPerson: s.contactPerson,
+                              })
+                            }
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            title={s.isActive ? 'Deshabilitar proveedor' : 'Habilitar proveedor'}
+                            onClick={() => {
+                            if (s.isActive) {
+                              setSupplierToDisable({ id: s.id, name: s.name });
+                            } else {
+                              updateSupplier.mutate(
+                                { id: s.id, payload: { isActive: true } },
+                                {
+                                  onSuccess: () => {
+                                    toast.success('Proveedor habilitado');
+                                  },
+                                  onError: (e: { message?: string }) => {
+                                    toast.error(
+                                      e?.message ?? 'No se pudo actualizar el estado'
+                                    );
+                                  },
+                                }
+                              );
+                            }
                           }}
                           disabled={updateSupplier.isPending && updateSupplier.variables?.id === s.id}
                           className={
@@ -288,6 +364,7 @@ export default function SuppliersPage() {
                             <Power className="h-4 w-4" />
                           )}
                         </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -307,6 +384,151 @@ export default function SuppliersPage() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog
+        open={!!supplierToDisable}
+        onOpenChange={(open) => { if (!open) setSupplierToDisable(null); }}
+      >
+        <DialogContent showClose className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <PowerOff className="h-5 w-5 text-destructive" />
+              Deshabilitar proveedor
+            </DialogTitle>
+            <p className="text-sm text-muted-foreground pt-1">
+              ¿Está seguro de deshabilitar el proveedor{supplierToDisable?.name ? ` «${supplierToDisable.name}»` : ''}? No se eliminarán sus datos; podrá habilitarlo de nuevo cuando lo necesite.
+            </p>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setSupplierToDisable(null)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={updateSupplier.isPending}
+              onClick={() => {
+                if (!supplierToDisable) return;
+                updateSupplier.mutate(
+                  { id: supplierToDisable.id, payload: { isActive: false } },
+                  {
+                    onSuccess: () => {
+                      toast.success('Proveedor deshabilitado');
+                      setSupplierToDisable(null);
+                    },
+                    onError: (e: { message?: string }) => {
+                      toast.error(
+                        e?.message ?? 'No se pudo deshabilitar el proveedor'
+                      );
+                    },
+                  }
+                );
+              }}
+            >
+              {updateSupplier.isPending ? 'Deshabilitando…' : 'Sí, deshabilitar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={!!supplierToEdit}
+        onOpenChange={(open) => { if (!open) setSupplierToEdit(null); }}
+      >
+        <DialogContent showClose className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="h-4 w-4" />
+              Editar proveedor
+            </DialogTitle>
+            <p className="text-sm text-muted-foreground pt-1">
+              Modifique el nombre, NIT o datos de contacto del proveedor.
+            </p>
+          </DialogHeader>
+          <form
+            onSubmit={editForm.handleSubmit(onEditSupplier)}
+            className="space-y-4"
+          >
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="edit-nit">NIT</Label>
+                <Input
+                  id="edit-nit"
+                  {...editForm.register('nit')}
+                  placeholder="Ej: 900123456-7"
+                  className="rounded-lg"
+                />
+                {editForm.formState.errors.nit && (
+                  <p className="text-sm text-destructive">
+                    {editForm.formState.errors.nit.message}
+                  </p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-name">Razón social</Label>
+                <Input
+                  id="edit-name"
+                  {...editForm.register('name')}
+                  placeholder="Ej: Distribuidora Eléctrica S.A.S."
+                  className="rounded-lg"
+                />
+                {editForm.formState.errors.name && (
+                  <p className="text-sm text-destructive">
+                    {editForm.formState.errors.name.message}
+                  </p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-email">Email</Label>
+                <Input
+                  id="edit-email"
+                  type="email"
+                  {...editForm.register('email')}
+                  placeholder="Ej: contacto@proveedor.com"
+                  className="rounded-lg"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-phone">Teléfono</Label>
+                <Input
+                  id="edit-phone"
+                  {...editForm.register('phone')}
+                  placeholder="Ej: 300 123 4567"
+                  className="rounded-lg"
+                />
+              </div>
+              <div className="space-y-2 sm:col-span-2">
+                <Label htmlFor="edit-contactPerson">Persona de contacto</Label>
+                <Input
+                  id="edit-contactPerson"
+                  {...editForm.register('contactPerson')}
+                  placeholder="Ej: Juan Pérez — Ventas"
+                  className="rounded-lg"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setSupplierToEdit(null)}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                disabled={updateSupplier.isPending}
+              >
+                {updateSupplier.isPending ? 'Guardando…' : 'Guardar cambios'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={openNewSupplier} onOpenChange={setOpenNewSupplier}>
         <DialogContent showClose className="sm:max-w-lg">

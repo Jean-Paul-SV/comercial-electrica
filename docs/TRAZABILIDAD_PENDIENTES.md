@@ -29,11 +29,11 @@
 | P-005 | DIAN: CUFE según Anexo Técnico | Crítico | Pendiente |
 | P-006 | Toasts en mutaciones (formularios sin feedback) | Opcional | Hecho (auditoría: verificar cadena) |
 | P-007 | Pulido UX (errores, carga, responsive) | Opcional | Hecho (dashboard: mensaje error + hint API) |
-| P-008 | Tests E2E adicionales | Opcional | Pendiente |
-| P-009 | Caché/índices (Redis, consultas lentas) | Opcional | Pendiente |
-| P-010 | Validaciones de negocio (caja, fechas) | Opcional | Pendiente |
+| P-008 | Tests E2E adicionales | Opcional | Hecho (GET /reports/operational-state en reports.e2e-spec) |
+| P-009 | Caché/índices (Redis, consultas lentas) | Opcional | Hecho (índice Sale tenantId+soldAt; dashboard ya con cache) |
+| P-010 | Validaciones de negocio (caja, fechas) | Opcional | Hecho (gasto: fecha no futura; caja: ventas pendientes ya existía) |
 | P-011 | Guía configuración DIAN + troubleshooting | Opcional | Hecho (`GUIA_CONFIGURACION_DIAN_Y_TROUBLESHOOTING.md`) |
-| P-012 | Encriptación certificados DIAN (almacenamiento) | Opcional | Pendiente |
+| P-012 | Encriptación certificados DIAN (almacenamiento) | Opcional | Hecho (guía §5 + comentario en dian.service.ts) |
 
 ---
 
@@ -206,6 +206,10 @@
 | P-006 Toasts | Hecho | `audit/page.tsx` — toast en verificar cadena (éxito / advertencia / error) |
 | P-007 Pulido UX | Hecho | `app/page.tsx` — mensaje de error del dashboard con hint (API, NEXT_PUBLIC_API_BASE_URL) |
 | P-011 Guía DIAN + troubleshooting | Hecho | `docs/GUIA_CONFIGURACION_DIAN_Y_TROUBLESHOOTING.md` |
+| P-008 Tests E2E | Hecho | `apps/api/test/reports.e2e-spec.ts` — GET /reports/operational-state |
+| P-009 Índice Sale | Hecho | `schema.prisma` @@index([tenantId, soldAt]); migración 20260204100000 |
+| P-010 Validación gasto fecha | Hecho | `expenses.service.ts` — fecha del gasto no puede ser futura |
+| P-012 Almacenamiento seguro DIAN | Hecho | Guía §5 + comentario en `dian.service.ts` (secrets manager) |
 
 ---
 

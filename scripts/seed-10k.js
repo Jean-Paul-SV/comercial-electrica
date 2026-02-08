@@ -104,6 +104,16 @@ async function main() {
 
   const start = Date.now();
 
+  // Tenant por defecto (debe existir; ejecutar antes: npm run prisma:seed)
+  let tenant = await prisma.tenant.findFirst({ where: { slug: 'default' } });
+  if (!tenant) {
+    console.error('[ABORT] No hay tenant por defecto. Ejecuta antes: npm run prisma:seed');
+    await prisma.$disconnect();
+    process.exit(1);
+  }
+  const tenantId = tenant.id;
+  console.log('Tenant por defecto:', tenantId);
+
   if (opts.clean) {
     console.log('\n[0] Limpiando tablas...');
     await prisma.auditLog.deleteMany();
@@ -143,7 +153,7 @@ async function main() {
   if (!admin) {
     const adminHash = await argon2.hash(adminPass);
     admin = await prisma.user.create({
-      data: { email: adminEmail, passwordHash: adminHash, role: 'ADMIN' },
+      data: { email: adminEmail, passwordHash: adminHash, role: 'ADMIN', tenantId },
     });
     console.log(`  ADMIN: ${adminEmail} / ${adminPass}`);
   }
@@ -151,7 +161,7 @@ async function main() {
   if (!user) {
     const userHash = await argon2.hash(userPass);
     user = await prisma.user.create({
-      data: { email: userEmail, passwordHash: userHash, role: 'USER' },
+      data: { email: userEmail, passwordHash: userHash, role: 'USER', tenantId },
     });
     console.log(`  USER: ${userEmail} / ${userPass}`);
   }
@@ -162,6 +172,7 @@ async function main() {
   for (let b = 0; b < N; b += BATCH) {
     const size = Math.min(BATCH, N - b);
     const data = Array.from({ length: size }, (_, i) => ({
+      tenantId,
       name: `Categoría ${String(b + i + 1).padStart(6, '0')}`,
     }));
     await prisma.category.createMany({ data, skipDuplicates: true });
@@ -181,6 +192,7 @@ async function main() {
       const cost = 500 + (idx % 150000);
       const price = cost + 1000 + (idx % 50000);
       return {
+        tenantId,
         internalCode: code,
         name: `Producto ${String(idx).padStart(6, '0')}`,
         categoryId: cat?.id ?? null,
@@ -227,6 +239,7 @@ async function main() {
           ? `9${String(10000000 + idx).padStart(8, '0')}`
           : String(1000000000 + idx);
       return {
+        tenantId,
         docType,
         docNumber,
         name: `Cliente ${String(idx).padStart(6, '0')}`,
@@ -249,6 +262,7 @@ async function main() {
     const data = Array.from({ length: size }, (_, i) => {
       const idx = b + i + 1;
       return {
+        tenantId,
         nit: `9${String(80000000 + idx).padStart(8, '0')}`,
         name: `Proveedor ${String(idx).padStart(6, '0')}`,
         email: `proveedor${idx}@test.com`,
@@ -275,6 +289,7 @@ async function main() {
       const isLast = isLastBatch && i === size - 1;
       const openedAt = new Date(Date.now() - (N - idx) * 3600000);
       const base = {
+        tenantId,
         openedAt,
         openingAmount: money(50000 + (idx % 500000)),
         openedBy: adminId,
@@ -329,6 +344,7 @@ async function main() {
     const grandTotal = subtotal + taxTotal;
     await prisma.purchaseOrder.create({
       data: {
+        tenantId,
         supplierId: supplier.id,
         orderNumber,
         status: 'DRAFT',
@@ -361,6 +377,7 @@ async function main() {
     const taxTotal = grandTotal - subtotal;
     await prisma.supplierInvoice.create({
       data: {
+        tenantId,
         supplierId: supplier.id,
         purchaseOrderId: null,
         invoiceNumber: `FV-${year}-${String(i + 1).padStart(6, '0')}`,
@@ -387,6 +404,7 @@ async function main() {
     const qty = type === 'OUT' ? 1 + (i % 10) : 10 + (i % 50);
     await prisma.inventoryMovement.create({
       data: {
+        tenantId,
         type,
         reason: type === 'IN' ? 'Compra' : type === 'OUT' ? 'Venta' : 'Ajuste',
         supplierId: type === 'IN' ? pick(suppliers, i).id : null,
@@ -436,6 +454,7 @@ async function main() {
     const soldAt = new Date(Date.now() - (N - i) * 86400000);
     const sale = await prisma.sale.create({
       data: {
+        tenantId,
         customerId: customer.id,
         status: 'PAID',
         soldAt,
@@ -450,6 +469,7 @@ async function main() {
     const invNum = `INV-${year}-${String(i + 1).padStart(6, '0')}`;
     await prisma.invoice.create({
       data: {
+        tenantId,
         saleId: sale.id,
         customerId: customer.id,
         number: invNum,
@@ -506,6 +526,7 @@ async function main() {
     const status = quoteStatuses[i % 5];
     await prisma.quote.create({
       data: {
+        tenantId,
         customerId: customer.id,
         status,
         validUntil,

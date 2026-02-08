@@ -31,7 +31,8 @@ export const navConfig: NavTreeConfig = {
       moduleCode: 'core',
       items: [
         { id: 'products', href: '/products', label: 'Productos', icon: 'Package', order: 0, moduleCode: 'core' },
-        { id: 'customers', href: '/customers', label: 'Clientes', icon: 'Users', order: 1, moduleCode: 'core' },
+        { id: 'product-dictionary', href: '/products/dictionary', label: 'Diccionario de búsqueda', icon: 'BookOpen', order: 1, moduleCode: 'core' },
+        { id: 'customers', href: '/customers', label: 'Clientes', icon: 'Users', order: 2, moduleCode: 'core' },
       ],
     },
     {

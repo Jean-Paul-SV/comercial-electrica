@@ -32,6 +32,7 @@ export type CashMovement = {
   reference: string | null;
   relatedSaleId: string | null;
   relatedExpense?: { id: string; description: string; amount: string | number } | null;
+  relatedSale?: { id: string; invoices: { number: string }[] } | null;
   createdAt: string;
 };
 

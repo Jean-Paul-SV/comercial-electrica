@@ -32,6 +32,22 @@ El script instala dependencias, crea `.env` si falta, levanta Docker, aplica mig
 - **Swagger:** http://localhost:3000/api/docs  
 - **Frontend:** http://localhost:3001  
 
+### Base de datos nueva con 1000 registros (incluye nuevas implementaciones)
+
+Con **Postgres y Redis en marcha** (p. ej. `npm run db:up` con Docker), desde la raíz:
+
+```powershell
+npm run db:fresh:1000
+```
+
+Esto **reinicia la base de datos**, aplica todas las migraciones, ejecuta el seed de Prisma (tenant, roles, permisos) y luego inserta **1000 registros** de categorías, productos, clientes, proveedores, sesiones de caja, ventas, facturas, cotizaciones, etc. Usuarios de acceso: `admin@example.com` / `Admin123!` y `vendedor@example.com` / `User123!`.
+
+Después levanta el servidor:
+
+```powershell
+npm run dev
+```
+
 ---
 
 ## Paso 1: Ubicarse en la raíz del proyecto

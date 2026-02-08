@@ -16,6 +16,8 @@ export default function Error({
     console.error('App error:', error);
   }, [error]);
 
+  const isDev = process.env.NODE_ENV === 'development';
+
   return (
     <main className="min-h-screen flex items-center justify-center p-6 bg-background">
       <Card className="w-full max-w-md border-destructive/30">
@@ -29,8 +31,16 @@ export default function Error({
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {isDev && error?.message && (
+            <div className="rounded-md bg-destructive/10 border border-destructive/30 p-3 text-sm">
+              <p className="font-medium text-destructive">{error.message}</p>
+              {error.stack && (
+                <pre className="mt-2 text-xs overflow-auto max-h-32 whitespace-pre-wrap break-words">{error.stack}</pre>
+              )}
+            </div>
+          )}
           <p className="text-sm text-muted-foreground">
-            Si el error continúa, abre la consola del navegador (F12) para ver más detalles.
+            Si el error continúa, abre la consola del navegador (F12) o la terminal de <code className="rounded bg-muted px-1">npm run dev</code> para ver más detalles.
           </p>
           <Button onClick={reset} className="w-full">
             Reintentar

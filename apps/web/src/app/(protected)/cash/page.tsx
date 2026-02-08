@@ -459,7 +459,12 @@ export default function CashPage() {
                   ) : (
                     <ul className="text-xs text-muted-foreground space-y-0.5 max-h-40 overflow-y-auto">
                       {sessionMovements.slice(0, 25).map((m) => {
-                        const label = m.relatedExpense?.description ?? m.reference ?? '—';
+                        const label =
+                          m.relatedExpense?.description ??
+                          m.relatedSale?.invoices?.[0]?.number ??
+                          (m.relatedSaleId ? 'Venta' : null) ??
+                          m.reference ??
+                          '—';
                         return (
                           <li key={m.id} className="flex justify-between gap-2">
                             <span className="truncate">

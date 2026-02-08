@@ -14,6 +14,7 @@ export type SupplierListItem = {
   id: string;
   nit: string;
   name: string;
+  description: string | null;
   email: string | null;
   phone: string | null;
   address: string | null;
