@@ -57,9 +57,9 @@ export function KpiBarChart({ data, className, barColor = 'hsl(var(--primary))' 
             tick={{
               fontSize: 12,
               fill: 'hsl(var(--muted-foreground))',
-              angle: -45,
               textAnchor: 'end',
             }}
+            angle={-45}
             tickLine={false}
             axisLine={{ stroke: 'hsl(var(--border) / 0.8)' }}
             interval={0}
