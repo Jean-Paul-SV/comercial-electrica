@@ -139,7 +139,11 @@ export class QuotesService {
         { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
       )
       .then(async (quote) => {
-        // Invalidar caché de listados
+        await this.audit.logCreate('quote', quote.id, createdByUserId ?? null, {
+          status: quote.status,
+          grandTotal: Number(quote.grandTotal),
+          itemsCount: quote.items.length,
+        });
         await this.cache.deletePattern('cache:quotes:*');
         return quote;
       });
@@ -353,7 +357,13 @@ export class QuotesService {
         { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
       )
       .then(async (updated) => {
-        // Invalidar caché de listados
+        await this.audit.logUpdate(
+          'quote',
+          updated.id,
+          updatedByUserId ?? null,
+          undefined,
+          { status: updated.status, grandTotal: Number(updated.grandTotal) },
+        );
         await this.cache.deletePattern('cache:quotes:*');
         return updated;
       });

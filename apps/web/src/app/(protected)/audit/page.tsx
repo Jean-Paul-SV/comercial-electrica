@@ -334,9 +334,9 @@ export default function AuditPage() {
                           <TableCell className="text-sm min-w-[200px] max-w-[360px] align-top">
                             <span
                               className="line-clamp-2 text-muted-foreground break-words"
-                              title={String(renderDetailsSummary(log))}
+                              title={log.summary ?? String(renderDetailsSummary(log))}
                             >
-                              {renderDetailsSummary(log)}
+                              {log.summary ?? renderDetailsSummary(log)}
                             </span>
                           </TableCell>
                           <TableCell className="text-right align-top">
@@ -379,6 +379,12 @@ export default function AuditPage() {
                       <dl className="grid grid-cols-[100px_1fr] gap-x-4 gap-y-2.5">
                         <dt className="text-muted-foreground font-medium">Fecha</dt>
                         <dd className="text-foreground">{formatDateTime(selectedLog.createdAt)}</dd>
+                        {selectedLog.summary && (
+                          <>
+                            <dt className="text-muted-foreground font-medium">Resumen</dt>
+                            <dd className="text-foreground">{selectedLog.summary}</dd>
+                          </>
+                        )}
                         <dt className="text-muted-foreground font-medium">Entidad</dt>
                         <dd className="text-foreground">{ENTITY_LABELS[selectedLog.entity] ?? selectedLog.entity}</dd>
                         <dt className="text-muted-foreground font-medium">ID entidad</dt>

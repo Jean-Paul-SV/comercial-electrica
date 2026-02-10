@@ -4,15 +4,10 @@
   "testEnvironment": "node",
   "testRegex": ".e2e-spec.ts$",
   "transform": {
-    "^.+\\.(t|j)s$": ["ts-jest", {
-      "isolatedModules": true
-    }]
+    "^.+\\.(t|j)s$": ["ts-jest", { "isolatedModules": true }]
   },
+  "moduleNameMapper": { "^ml-kmeans$": "<rootDir>/mocks/ml-kmeans.js" },
   "setupFilesAfterEnv": ["./jest-env-setup.js"],
-  "globals": {
-    "NODE_ENV": "test"
-  },
-  "testEnvironmentOptions": {
-    "NODE_ENV": "test"
-  }
+  "globals": { "NODE_ENV": "test" },
+  "testEnvironmentOptions": { "NODE_ENV": "test" }
 }

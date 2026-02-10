@@ -18,9 +18,8 @@ describe('AppController (e2e)', () => {
   });
 
   afterEach(async () => {
-    // Cerrar colas BullMQ/Redis para que Jest no quede con handles abiertos
-    await closeTestQueues(app);
     await app.close();
+    await closeTestQueues(app).catch(() => {});
   });
 
   it('/ (GET)', () => {

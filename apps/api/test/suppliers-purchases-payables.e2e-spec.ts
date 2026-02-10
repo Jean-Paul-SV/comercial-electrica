@@ -10,6 +10,7 @@ describe('Suppliers + Purchases + Payables (e2e)', () => {
   let app: INestApplication<App>;
   let prisma: PrismaService;
   let authToken: string;
+  let tenantId: string;
 
   let supplierId: string;
   let productId: string;
@@ -28,7 +29,7 @@ describe('Suppliers + Purchases + Payables (e2e)', () => {
       moduleFixture,
       'suppliers-purchases-payables-test@example.com',
     );
-    ({ app, prisma, authToken } = setup);
+    ({ app, prisma, authToken, tenantId } = setup);
   });
 
   afterAll(async () => {
@@ -54,10 +55,11 @@ describe('Suppliers + Purchases + Payables (e2e)', () => {
 
     // 2) Crear producto base (category + product)
     const category = await prisma.category.create({
-      data: { name: `CAT-${Date.now()}` },
+      data: { tenantId, name: `CAT-${Date.now()}` },
     });
     const product = await prisma.product.create({
       data: {
+        tenantId,
         internalCode: `P-${Date.now()}`,
         name: 'Producto Compra',
         categoryId: category.id,
@@ -137,8 +139,7 @@ describe('Suppliers + Purchases + Payables (e2e)', () => {
         invoiceDate: invoiceDate.toISOString(),
         dueDate: dueDate.toISOString(),
         subtotal: 15000, // 10 * 1500
-        taxTotal: 2850, // 19%
-        discountTotal: 0,
+        taxRate: 19,
         notes: 'Factura de prueba',
       })
       .expect(201);

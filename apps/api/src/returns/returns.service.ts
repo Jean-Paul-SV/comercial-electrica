@@ -20,11 +20,19 @@ export class ReturnsService {
     private readonly audit: AuditService,
   ) {}
 
-  async createReturn(dto: CreateReturnDto, createdByUserId?: string) {
+  async createReturn(
+    dto: CreateReturnDto,
+    createdByUserId?: string,
+    tenantId?: string | null,
+  ) {
+    if (tenantId == null) {
+      throw new BadRequestException('Tenant requerido para registrar devolución.');
+    }
     const sale = await this.prisma.sale.findUnique({
       where: { id: dto.saleId },
       select: {
         id: true,
+        tenantId: true,
         status: true,
         items: { include: { product: true } },
         customer: true,
@@ -32,6 +40,9 @@ export class ReturnsService {
     });
 
     if (!sale) {
+      throw new NotFoundException(`Venta con id ${dto.saleId} no encontrada.`);
+    }
+    if (sale.tenantId !== tenantId) {
       throw new NotFoundException(`Venta con id ${dto.saleId} no encontrada.`);
     }
 
@@ -142,13 +153,20 @@ export class ReturnsService {
     return saleReturn;
   }
 
-  async listReturns(pagination?: { page?: number; limit?: number }) {
+  async listReturns(
+    tenantId: string | null,
+    pagination?: { page?: number; limit?: number },
+  ) {
+    if (tenantId == null) {
+      throw new BadRequestException('Tenant requerido para listar devoluciones.');
+    }
     const page = pagination?.page ?? 1;
     const limit = pagination?.limit ?? 20;
     const skip = (page - 1) * limit;
 
     const [data, total] = await Promise.all([
       this.prisma.saleReturn.findMany({
+        where: { sale: { tenantId } },
         orderBy: { returnedAt: 'desc' },
         include: {
           items: { include: { product: true } },
@@ -157,13 +175,13 @@ export class ReturnsService {
         skip,
         take: limit,
       }),
-      this.prisma.saleReturn.count(),
+      this.prisma.saleReturn.count({ where: { sale: { tenantId } } }),
     ]);
 
     return createPaginatedResponse(data, total, page, limit);
   }
 
-  async getReturnById(id: string) {
+  async getReturnById(id: string, tenantId?: string | null) {
     const saleReturn = await this.prisma.saleReturn.findUnique({
       where: { id },
       include: {
@@ -173,6 +191,9 @@ export class ReturnsService {
     });
 
     if (!saleReturn) {
+      throw new NotFoundException(`Devolución con id ${id} no encontrada.`);
+    }
+    if (tenantId != null && saleReturn.sale.tenantId !== tenantId) {
       throw new NotFoundException(`Devolución con id ${id} no encontrada.`);
     }
 

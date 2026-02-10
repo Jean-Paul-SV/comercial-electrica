@@ -34,6 +34,8 @@ import {
 import { Skeleton } from '@shared/components/ui/skeleton';
 import { Pagination } from '@shared/components/Pagination';
 import { formatMoney, formatDate, formatDateTime } from '@shared/utils/format';
+import { getErrorMessage } from '@shared/utils/errors';
+import { useHasPermission } from '@shared/hooks/useHasPermission';
 import { Receipt, Plus, Wallet, Trash2, FileCheck, ExternalLink } from 'lucide-react';
 import { useExpensesList, useCreateExpense, useDeleteExpense } from '@features/expenses/hooks';
 import { useCashSessionsList } from '@features/cash/hooks';
@@ -71,8 +73,10 @@ const PAYMENT_METHODS: { value: CreateExpenseFormValues['paymentMethod']; label:
   { value: 'OTHER', label: 'Otro' },
 ];
 
-const selectClassName =
-  'flex h-10 w-full items-center rounded-lg border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:opacity-50';
+const formInputClass =
+  'h-9 min-w-0 rounded-xl border border-input bg-background/80 px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 transition-colors';
+const formSelectClass =
+  'flex h-10 w-full items-center rounded-xl border border-input bg-background/80 px-3 py-2 text-sm ring-offset-background focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-50 transition-colors';
 
 const CATEGORY_FACTURA_PROVEEDOR = 'Factura proveedor';
 
@@ -92,6 +96,8 @@ function getExpenseTypeFromUrl(searchParams: URLSearchParams): ExpenseTypeFilter
 }
 
 export default function ExpensesPage() {
+  const hasExpensesCreate = useHasPermission('expenses:create');
+  const hasExpensesDelete = useHasPermission('expenses:delete');
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
@@ -199,8 +205,8 @@ export default function ExpensesPage() {
             reference: '',
           });
         },
-        onError: (e: { message?: string }) => {
-          toast.error(e?.message ?? 'No se pudo registrar el gasto');
+        onError: (e: unknown) => {
+          toast.error(getErrorMessage(e, 'No se pudo registrar el gasto'));
         },
       },
     );
@@ -215,15 +221,27 @@ export default function ExpensesPage() {
 
   return (
     <div className="space-y-6 sm:space-y-8">
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-1">
         <h1 className="text-xl font-semibold tracking-tight sm:text-2xl flex items-center gap-2">
           <Receipt className="h-6 w-6 shrink-0 text-primary" />
           Gastos
         </h1>
-        <div className="rounded-xl border border-border/60 bg-muted/30 px-5 py-5 sm:px-6 sm:py-6">
-          <p className="text-base font-medium text-foreground/90 mb-5">
-            Un solo lugar para todos los gastos: compras, oficina, viáticos, etc.
-          </p>
+        <p className="text-sm text-muted-foreground">
+          Un solo lugar para todos los gastos: compras, oficina, viáticos, etc.
+        </p>
+      </div>
+
+      <Card className="rounded-2xl border-border/80 shadow-sm overflow-hidden">
+        <CardHeader className="pb-4 bg-muted/30 border-b border-border/50">
+          <CardTitle className="text-lg font-medium flex items-center gap-2">
+            <Receipt className="h-5 w-5 shrink-0 text-primary" />
+            Resumen
+          </CardTitle>
+          <CardDescription>
+            Cómo se registran los gastos en efectivo, por compras y cómo filtrar el listado.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="px-5 py-5 sm:px-6 sm:py-6">
           <ul className="space-y-4 text-muted-foreground text-sm">
             <li className="flex items-start gap-3">
               <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
@@ -263,32 +281,34 @@ export default function ExpensesPage() {
               </span>
             </li>
           </ul>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
-      <Card className="border-0 shadow-sm overflow-hidden">
+      <Card className="rounded-2xl border-border/80 shadow-sm overflow-hidden">
         <CardHeader className="pb-4 bg-muted/30 border-b border-border/50">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <CardTitle className="text-lg font-medium flex items-center gap-2">
                 <Receipt className="h-5 w-5 shrink-0 text-primary" />
-                Gastos
+                Listado
               </CardTitle>
               <CardDescription>
-                Listado unificado de gastos. Filtra por tipo (compras / otros), fecha y categoría.
+                Gastos paginados. Filtra por tipo (compras / otros), fecha, naturaleza y categoría.
               </CardDescription>
             </div>
-            <Button
-              size="sm"
-              onClick={() => setOpenNew(true)}
-              className="gap-2 w-full sm:w-fit shadow-sm"
-            >
-              <Plus className="h-4 w-4" />
-              Nuevo gasto
-            </Button>
+            {hasExpensesCreate && (
+              <Button
+                size="sm"
+                onClick={() => setOpenNew(true)}
+                className="gap-2 w-full sm:w-auto rounded-xl font-medium shadow-sm"
+              >
+                <Plus className="h-4 w-4" />
+                Nuevo gasto
+              </Button>
+            )}
           </div>
 
-          <div className="flex flex-wrap items-end gap-4 pt-4 rounded-lg bg-muted/20 border border-border/50 p-4 mt-2">
+          <div className="flex flex-wrap items-end gap-4 pt-4 rounded-xl bg-muted/20 border border-border/50 p-4 mt-2">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="filter-type" className="text-muted-foreground text-xs font-medium">
                 Tipo
@@ -297,7 +317,7 @@ export default function ExpensesPage() {
                 id="filter-type"
                 value={expenseTypeFilter}
                 onChange={(e) => setTypeAndUrl(e.target.value as ExpenseTypeFilter)}
-                className="h-9 min-w-[140px] rounded-lg border border-input bg-background px-3 py-1.5 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                className={formSelectClass + ' h-9 min-w-[140px]'}
               >
                 {EXPENSE_TYPE_OPTIONS.map((o) => (
                   <option key={o.value} value={o.value}>{o.label}</option>
@@ -313,7 +333,7 @@ export default function ExpensesPage() {
                 type="date"
                 value={startDate}
                 onChange={(e) => { setStartDate(e.target.value); setPage(1); }}
-                className="h-9 min-w-[140px] rounded-lg"
+                className={formInputClass + ' min-w-[140px]'}
               />
             </div>
             <div className="flex flex-col gap-1.5">
@@ -325,7 +345,7 @@ export default function ExpensesPage() {
                 type="date"
                 value={endDate}
                 onChange={(e) => { setEndDate(e.target.value); setPage(1); }}
-                className="h-9 min-w-[140px] rounded-lg"
+                className={formInputClass + ' min-w-[140px]'}
               />
             </div>
             <div className="flex flex-col gap-1.5">
@@ -336,7 +356,7 @@ export default function ExpensesPage() {
                 id="filter-kind"
                 value={kindFilter}
                 onChange={(e) => { setKindFilter((e.target.value || '') as '' | 'FIXED' | 'VARIABLE' | 'OTHER'); setPage(1); }}
-                className="h-9 min-w-[140px] rounded-lg border border-input bg-background px-3 py-1.5 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                className={formSelectClass + ' h-9 min-w-[140px]'}
               >
                 <option value="">Todos</option>
                 <option value="FIXED">Fijos</option>
@@ -355,7 +375,7 @@ export default function ExpensesPage() {
                   placeholder="Ej. Oficina, inventario..."
                   value={category}
                   onChange={(e) => { setCategory(e.target.value); setPage(1); }}
-                  className="h-9 min-w-[160px] rounded-lg"
+                  className={formInputClass + ' min-w-[160px]'}
                 />
               </div>
             )}
@@ -365,7 +385,7 @@ export default function ExpensesPage() {
           <Pagination meta={meta} onPageChange={setPage} label="Página" />
 
           {query.isLoading && (
-            <div className="rounded-lg border border-border overflow-hidden">
+            <div className="rounded-xl border border-border/80 overflow-hidden">
               <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/40">
@@ -399,12 +419,12 @@ export default function ExpensesPage() {
 
           {query.isError && (
             <p className="text-sm text-destructive py-4">
-              {(query.error as { message?: string })?.message ?? 'Error al cargar gastos'}
+              {getErrorMessage(query.error, 'Error al cargar gastos')}
             </p>
           )}
 
           {!query.isLoading && (
-            <div className="rounded-lg border border-border overflow-hidden">
+            <div className="rounded-xl border border-border/80 overflow-hidden">
               <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/40 hover:bg-muted/40">
@@ -455,16 +475,20 @@ export default function ExpensesPage() {
                         )}
                       </TableCell>
                       <TableCell className="text-center">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                          onClick={() => setExpenseToDelete({ id: e.id, description: e.description, amount: e.amount })}
-                          aria-label="Eliminar gasto"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        {hasExpensesDelete ? (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                            onClick={() => setExpenseToDelete({ id: e.id, description: e.description, amount: e.amount })}
+                            aria-label="Eliminar gasto"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">Sin permiso</span>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -486,20 +510,22 @@ export default function ExpensesPage() {
       </Card>
 
       <Dialog open={openNew} onOpenChange={setOpenNew}>
-        <DialogContent showClose className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-foreground">
-              <Receipt className="h-4 w-4 shrink-0 text-primary" aria-hidden />
+        <DialogContent showClose className="sm:max-w-2xl overflow-x-hidden rounded-2xl border-border/80 shadow-xl">
+          <DialogHeader className="pb-2">
+            <DialogTitle className="flex items-center gap-2 text-lg font-semibold">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                <Receipt className="h-4 w-4" aria-hidden />
+              </span>
               Nuevo gasto
             </DialogTitle>
-            <p className="text-sm text-muted-foreground pt-1">
-              Indica monto, descripción y método de pago. Si pagaste desde caja en efectivo, elige la sesión para que se registre la salida en movimientos.
+            <p className="text-sm text-muted-foreground pt-0.5 leading-snug">
+              Indica monto, descripción y método de pago. Si pagaste desde caja en efectivo, se descontará de la sesión abierta.
             </p>
           </DialogHeader>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-0">
             <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="amount" className="text-sm font-medium">Monto (COP) *</Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="amount" className="text-sm font-medium text-foreground">Monto (COP) *</Label>
                 <Input
                   id="amount"
                   type="number"
@@ -507,37 +533,37 @@ export default function ExpensesPage() {
                   step="0.01"
                   {...form.register('amount')}
                   placeholder="Ej.: 50000"
-                  className="rounded-lg"
+                  className={formInputClass + ' h-10'}
                 />
-                <p className="text-sm text-muted-foreground">
+                <p className="text-xs text-muted-foreground">
                   Monto en pesos colombianos.
                 </p>
                 {form.formState.errors.amount && (
                   <p className="text-sm text-destructive">{form.formState.errors.amount.message}</p>
                 )}
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="expenseDate" className="text-sm font-medium">Fecha *</Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="expenseDate" className="text-sm font-medium text-foreground">Fecha *</Label>
                 <Input
                   id="expenseDate"
                   type="date"
                   {...form.register('expenseDate')}
-                  className="rounded-lg"
+                  className={formInputClass + ' h-10'}
                 />
-                <p className="text-sm text-muted-foreground">
+                <p className="text-xs text-muted-foreground">
                   Fecha del gasto. Por defecto hoy.
                 </p>
               </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="description" className="text-sm font-medium">Descripción *</Label>
+            <div className="space-y-1.5">
+              <Label htmlFor="description" className="text-sm font-medium text-foreground">Descripción *</Label>
               <Input
                 id="description"
                 {...form.register('description')}
                 placeholder="Ej. Compra material de oficina, pago a proveedor"
-                className="rounded-lg"
+                className={formInputClass + ' h-10'}
               />
-              <p className="text-sm text-muted-foreground">
+              <p className="text-xs text-muted-foreground">
                 Breve descripción para identificar el gasto en el listado.
               </p>
               {form.formState.errors.description && (
@@ -545,14 +571,14 @@ export default function ExpensesPage() {
               )}
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="category" className="text-sm font-medium">Categoría (opcional)</Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="category" className="text-sm font-medium text-foreground">Categoría (opcional)</Label>
                 <Input
                   id="category"
                   {...form.register('category')}
                   list="category-suggestions"
                   placeholder="Ej. Almuerzo, Oficina, Viáticos"
-                  className="rounded-lg"
+                  className={formInputClass + ' h-10'}
                 />
                 <datalist id="category-suggestions">
                   <option value="Almuerzo" />
@@ -561,16 +587,16 @@ export default function ExpensesPage() {
                   <option value="Servicios" />
                   <option value="Otros" />
                 </datalist>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-xs text-muted-foreground">
                   Para filtrar después en el listado.
                 </p>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="kind" className="text-sm font-medium">Naturaleza (opcional)</Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="kind" className="text-sm font-medium text-foreground">Naturaleza (opcional)</Label>
                 <select
                   id="kind"
                   {...form.register('kind')}
-                  className={selectClassName}
+                  className={formSelectClass}
                 >
                   {EXPENSE_KIND_OPTIONS.map((o) => (
                     <option key={o.value || 'none'} value={o.value}>
@@ -578,17 +604,17 @@ export default function ExpensesPage() {
                     </option>
                   ))}
                 </select>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-xs text-muted-foreground">
                   Fijo (recurrente), variable u otros.
                 </p>
               </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="paymentMethod" className="text-sm font-medium">Método de pago *</Label>
+            <div className="space-y-1.5">
+              <Label htmlFor="paymentMethod" className="text-sm font-medium text-foreground">Método de pago *</Label>
               <select
                 id="paymentMethod"
                 {...form.register('paymentMethod')}
-                className={selectClassName}
+                className={formSelectClass}
               >
                 {PAYMENT_METHODS.map((m) => (
                   <option key={m.value} value={m.value}>
@@ -596,42 +622,42 @@ export default function ExpensesPage() {
                   </option>
                 ))}
               </select>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-xs text-muted-foreground">
                 Cómo se pagó: efectivo, tarjeta, transferencia u otro.
               </p>
             </div>
-            <div className="space-y-2 rounded-xl border border-border/80 bg-muted/20 p-4">
-              <div className="flex items-center gap-2">
+            <div className="rounded-xl border border-border/80 bg-muted/30 p-3 border-l-4 border-l-primary/50">
+              <div className="flex items-center gap-2 mb-1.5">
                 <Wallet className="h-4 w-4 shrink-0 text-primary" aria-hidden />
                 <span className="text-sm font-medium text-foreground">Sesión de caja</span>
               </div>
               {openSessions.length > 0 ? (
-                <p className="text-sm text-muted-foreground">
+                <p className="text-xs text-muted-foreground leading-snug">
                   Se descontará de la sesión abierta por defecto ({formatDate(openSessions[0].openedAt)}). Se creará una salida en &quot;Movimientos de la sesión&quot; y quedará en el cierre.
                 </p>
               ) : (
-                <p className="text-sm text-muted-foreground">
+                <p className="text-xs text-muted-foreground leading-snug">
                   No hay sesión de caja abierta. El gasto no se descontará de caja.
                 </p>
               )}
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="reference" className="text-sm font-medium">Referencia (opcional)</Label>
+            <div className="space-y-1.5">
+              <Label htmlFor="reference" className="text-sm font-medium text-foreground">Referencia (opcional)</Label>
               <Input
                 id="reference"
                 {...form.register('reference')}
                 placeholder="Ej. Factura 123, recibo, NIT"
-                className="rounded-lg"
+                className={formInputClass + ' h-10'}
               />
-              <p className="text-sm text-muted-foreground">
+              <p className="text-xs text-muted-foreground">
                 Nº de factura, recibo o referencia externa para trazabilidad.
               </p>
             </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setOpenNew(false)}>
+            <DialogFooter className="gap-2 pt-1 sm:gap-0">
+              <Button type="button" variant="outline" onClick={() => setOpenNew(false)} className="rounded-xl">
                 Cancelar
               </Button>
-              <Button type="submit" disabled={createMutation.isPending}>
+              <Button type="submit" disabled={createMutation.isPending} className="rounded-xl font-medium">
                 {createMutation.isPending ? 'Guardando…' : 'Registrar gasto'}
               </Button>
             </DialogFooter>
@@ -648,29 +674,29 @@ export default function ExpensesPage() {
           }
         }}
       >
-        <DialogContent showClose className="sm:max-w-sm">
+        <DialogContent showClose className="sm:max-w-sm rounded-2xl border-border/80 shadow-xl">
           <DialogHeader>
-            <DialogTitle>Eliminar gasto</DialogTitle>
+            <DialogTitle className="text-base">Eliminar gasto</DialogTitle>
           </DialogHeader>
           {expenseToDelete && (
             <>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-muted-foreground leading-relaxed">
                 ¿Eliminar el gasto &quot;{expenseToDelete.description}&quot; por {formatMoney(expenseToDelete.amount)}?
                 Si estaba descontado de caja, también se revertirá ese movimiento.
               </p>
               <div className="space-y-2">
-                <Label htmlFor="delete-reason">Justificación (obligatorio)</Label>
+                <Label htmlFor="delete-reason" className="text-foreground font-medium">Justificación (obligatorio)</Label>
                 <Input
                   id="delete-reason"
                   value={deleteReason}
                   onChange={(e) => setDeleteReason(e.target.value)}
                   placeholder="Ej. Registrado por error, duplicado..."
-                  className="w-full"
+                  className="rounded-xl border-input bg-background/80 focus-visible:ring-primary focus-visible:ring-offset-2"
                 />
               </div>
             </>
           )}
-          <DialogFooter>
+          <DialogFooter className="gap-2 pt-2 sm:gap-0">
             <Button
               type="button"
               variant="outline"
@@ -678,6 +704,7 @@ export default function ExpensesPage() {
                 setExpenseToDelete(null);
                 setDeleteReason('');
               }}
+              className="rounded-xl"
             >
               Cancelar
             </Button>
@@ -685,6 +712,7 @@ export default function ExpensesPage() {
               type="button"
               variant="destructive"
               disabled={deleteMutation.isPending || !deleteReason.trim()}
+              className="rounded-xl font-medium"
               onClick={() => {
                 if (!expenseToDelete || !deleteReason.trim()) return;
                 deleteMutation.mutate(
@@ -695,8 +723,8 @@ export default function ExpensesPage() {
                       setExpenseToDelete(null);
                       setDeleteReason('');
                     },
-                    onError: (err: { message?: string }) => {
-                      toast.error(err?.message ?? 'No se pudo eliminar el gasto');
+                    onError: (err: unknown) => {
+                      toast.error(getErrorMessage(err, 'No se pudo eliminar el gasto'));
                     },
                   },
                 );

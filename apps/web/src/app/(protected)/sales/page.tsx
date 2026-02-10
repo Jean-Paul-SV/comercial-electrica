@@ -34,11 +34,13 @@ const selectClassName =
   'flex h-10 w-full items-center rounded-lg border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:opacity-50';
 import { Pagination } from '@shared/components/Pagination';
 import { formatMoney, formatDateTime } from '@shared/utils/format';
+import { getErrorMessage } from '@shared/utils/errors';
+import { useHasPermission } from '@shared/hooks/useHasPermission';
 import Link from 'next/link';
 import { ShoppingCart, Plus, Trash2, Search, FileText, Printer, Layers, Eye } from 'lucide-react';
 import { useSalesList, useCreateSale } from '@features/sales/hooks';
 import { useCashSessionsList } from '@features/cash/hooks';
-import { useCustomersList } from '@features/customers/hooks';
+import { useCustomersList, useCustomerSalesStats } from '@features/customers/hooks';
 import { useProductsList } from '@features/products/hooks';
 import type { CreateSaleItemPayload, CreateSaleResponse } from '@features/sales/types';
 
@@ -52,6 +54,8 @@ const PAYMENT_METHODS = [
 type SaleLine = { productId: string; qty: number; unitPrice?: number };
 
 export default function SalesPage() {
+  const hasSalesCreate = useHasPermission('sales:create');
+  const hasSalesUpdate = useHasPermission('sales:update');
   const [page, setPage] = useState(1);
   const [openNewSale, setOpenNewSale] = useState(false);
   const [customerId, setCustomerId] = useState<string>('');
@@ -77,6 +81,7 @@ export default function SalesPage() {
   const createSaleMutation = useCreateSale();
   const cashSessionsQuery = useCashSessionsList({});
   const customersQuery = useCustomersList({ page: 1, limit: 100 });
+  const customerSalesStats = useCustomerSalesStats(customerId || null);
   const productsQuery = useProductsList({
     page: 1,
     limit: 100,
@@ -385,7 +390,7 @@ export default function SalesPage() {
               `Productos no encontrados o inactivos${lineStr}. Elimine esas líneas o elija otro producto.`
             );
           } else {
-            toast.error(e?.message ?? 'No se pudo registrar la venta');
+            toast.error(getErrorMessage(e, 'No se pudo registrar la venta'));
           }
         },
       }
@@ -415,14 +420,16 @@ export default function SalesPage() {
                 Ventas paginadas. Busca por cliente, número de factura o vendedor.
               </CardDescription>
             </div>
-            <Button
-              size="sm"
-              onClick={() => setOpenNewSale(true)}
-              className="gap-2 w-full sm:w-fit shadow-sm"
-            >
-              <Plus className="h-4 w-4" />
-              Nueva venta
-            </Button>
+            {hasSalesCreate && (
+              <Button
+                size="sm"
+                onClick={() => setOpenNewSale(true)}
+                className="gap-2 w-full sm:w-fit shadow-sm"
+              >
+                <Plus className="h-4 w-4" />
+                Nueva venta
+              </Button>
+            )}
           </div>
         </CardHeader>
         <CardContent className="space-y-4 pt-4">
@@ -489,8 +496,7 @@ export default function SalesPage() {
 
           {salesQuery.isError && (
             <p className="text-sm text-destructive py-4">
-              {(salesQuery.error as { message?: string })?.message ??
-                'Error al cargar ventas'}
+              {getErrorMessage(salesQuery.error, 'Error al cargar ventas')}
             </p>
           )}
 
@@ -558,7 +564,7 @@ export default function SalesPage() {
       </Card>
 
       <Dialog open={openNewSale} onOpenChange={setOpenNewSale}>
-        <DialogContent showClose className="sm:max-w-2xl max-h-[90vh] flex flex-col overflow-hidden p-4 sm:p-6">
+        <DialogContent showClose className="sm:max-w-4xl max-h-[90vh] flex flex-col overflow-hidden overflow-x-hidden p-4 sm:p-6">
           <DialogHeader className="flex-shrink-0 border-b border-border/50 pb-4">
             <DialogTitle className="flex items-center gap-2 text-lg">
               <ShoppingCart className="h-5 w-5 text-primary" />
@@ -613,6 +619,24 @@ export default function SalesPage() {
                   <p className="text-xs text-muted-foreground leading-snug">
                     Asocia la venta a un cliente para facturación y reportes.
                   </p>
+                  {customerId && (
+                    <div className="flex h-10 items-center rounded-lg border border-border bg-background/50 px-3 py-2 text-sm text-foreground">
+                      {customerSalesStats.isLoading && (
+                        <span className="text-muted-foreground">Cargando historial…</span>
+                      )}
+                      {customerSalesStats.isError && (
+                        <span className="text-muted-foreground">No se pudo cargar el historial.</span>
+                      )}
+                      {customerSalesStats.data && (
+                        <>
+                          <span className="font-medium">
+                            {customerSalesStats.data.totalPurchases} compra{customerSalesStats.data.totalPurchases !== 1 ? 's' : ''} · Total {formatMoney(customerSalesStats.data.totalAmount)}
+                          </span>
+                          <span className="text-muted-foreground text-xs ml-1.5">(para decidir descuentos)</span>
+                        </>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <div className="grid gap-2 min-w-0 sm:col-span-2">
                   <Label htmlFor="new-sale-payment" className="text-muted-foreground text-sm">Método de pago</Label>

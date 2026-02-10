@@ -27,6 +27,8 @@ import { CommonModule } from './common/common.module';
 import { BackupsModule } from './backups/backups.module';
 import { AuditModule } from './audit/audit.module';
 import { OnboardingModule } from './onboarding/onboarding.module';
+import { ProviderModule } from './provider/provider.module';
+import { BillingModule } from './billing/billing.module';
 import { validateEnv } from './config/env.validation';
 import { MetricsModule } from './metrics/metrics.module';
 import { RequestMetricsInterceptor } from './metrics/request-metrics.interceptor';
@@ -65,9 +67,24 @@ import { MailerModule } from './mailer/mailer.module';
         limit: 20000, // 20000 requests por hora
       },
       {
+        name: 'login',
+        ttl: 60000, // 1 minuto
+        limit: 10, // 10 intentos de login por minuto por IP (protección contra fuerza bruta)
+      },
+      {
         name: 'forgot',
         ttl: 900000, // 15 minutos
-        limit: 3, // 3 solicitudes de olvidé contraseña por 15 min por IP
+        limit: 3, // 3 solicitudes de olvidé contraseña por 15 min por email
+      },
+      {
+        name: 'reports',
+        ttl: 60000, // 1 minuto
+        limit: 30, // 30 requests de reportes por minuto por usuario
+      },
+      {
+        name: 'export',
+        ttl: 60000, // 1 minuto
+        limit: 10, // 10 exports por minuto por usuario (protección contra abuso)
       },
     ]),
     ScheduleModule.forRoot(),
@@ -93,6 +110,8 @@ import { MailerModule } from './mailer/mailer.module';
     BackupsModule,
     AuditModule,
     OnboardingModule,
+    ProviderModule,
+    BillingModule,
   ],
   controllers: [AppController],
   providers: [
@@ -105,11 +124,11 @@ import { MailerModule } from './mailer/mailer.module';
     },
     {
       provide: APP_INTERCEPTOR,
-      useClass: AuditContextInterceptor,
+      useClass: TenantContextInterceptor,
     },
     {
       provide: APP_INTERCEPTOR,
-      useClass: TenantContextInterceptor,
+      useClass: AuditContextInterceptor,
     },
     {
       provide: APP_INTERCEPTOR,

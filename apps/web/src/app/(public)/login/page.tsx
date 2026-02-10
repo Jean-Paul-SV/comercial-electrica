@@ -32,8 +32,8 @@ export default function LoginPage() {
   } = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      email: process.env.NODE_ENV === 'development' ? 'admin@example.com' : '',
-      password: process.env.NODE_ENV === 'development' ? 'Admin123!' : '',
+      email: '',
+      password: '',
     },
   });
 
@@ -54,7 +54,7 @@ export default function LoginPage() {
         <div className="absolute -bottom-40 -left-40 h-80 w-80 rounded-full bg-primary/[0.07] blur-3xl" />
       </div>
 
-      <Card className="relative w-full max-w-md border-0 shadow-xl shadow-slate-200/50 rounded-2xl overflow-hidden">
+      <Card className="relative z-10 w-full max-w-md border-0 shadow-xl shadow-slate-200/50 rounded-2xl overflow-hidden">
         {/* Línea de acento superior */}
         <div className="h-1 bg-gradient-to-r from-primary to-primary/80" />
 
@@ -84,6 +84,7 @@ export default function LoginPage() {
                 autoComplete="username"
                 placeholder="tu@empresa.com"
                 className="h-11 rounded-lg border-input/80 bg-background focus-visible:ring-2"
+                disabled={loginMutation.isPending}
                 {...register('email')}
               />
               {errors.email && (
@@ -109,6 +110,7 @@ export default function LoginPage() {
                 autoComplete="current-password"
                 placeholder="••••••••"
                 className="h-11 rounded-lg border-input/80 bg-background focus-visible:ring-2"
+                disabled={loginMutation.isPending}
                 {...register('password')}
               />
               {errors.password && (

@@ -39,9 +39,13 @@ function sectionVisible(
   section: NavSectionConfig,
   role: AppRole | undefined,
   permissions: string[] | undefined,
-  enabledModules: string[] | undefined
+  enabledModules: string[] | undefined,
+  isPlatformAdmin?: boolean
 ): boolean {
   if (!role) return false;
+  // Admin de plataforma (sin tenant) solo ve Panel proveedor; el resto no aplica.
+  if (isPlatformAdmin === true) return section.platformAdminOnly === true;
+  if (section.platformAdminOnly) return false;
   if (!moduleVisible(section.moduleCode, enabledModules)) return false;
   // Administrador ve todas las secciones sin depender de la lista de permisos.
   if (role === 'ADMIN') return true;
@@ -58,20 +62,21 @@ function sectionVisible(
 }
 
 /**
- * Devuelve el árbol de navegación filtrado por rol, permisos y módulos habilitados.
+ * Devuelve el árbol de navegación filtrado por rol, permisos, módulos habilitados y si es admin de plataforma.
  * Secciones sin ítems visibles se excluyen.
  */
 export function getNavForRole(
   sections: NavSectionConfig[],
   role: AppRole | undefined,
   permissions?: string[],
-  enabledModules?: string[]
+  enabledModules?: string[],
+  isPlatformAdmin?: boolean
 ): NavSectionConfig[] {
   if (!role) return [];
 
   return sections
     .filter((section) =>
-      sectionVisible(section, role, permissions, enabledModules)
+      sectionVisible(section, role, permissions, enabledModules, isPlatformAdmin)
     )
     .map((section) => ({
       ...section,

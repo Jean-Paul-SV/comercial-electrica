@@ -31,6 +31,15 @@ export function getCustomer(id: string, authToken: string): Promise<Customer> {
   return apiClient.get(`/customers/${id}`, { authToken });
 }
 
+export type CustomerSalesStats = { totalPurchases: number; totalAmount: number };
+
+export function getCustomerSalesStats(
+  id: string,
+  authToken: string,
+): Promise<CustomerSalesStats> {
+  return apiClient.get(`/customers/${id}/sales-stats`, { authToken });
+}
+
 export function createCustomer(
   payload: CreateCustomerPayload,
   authToken: string,

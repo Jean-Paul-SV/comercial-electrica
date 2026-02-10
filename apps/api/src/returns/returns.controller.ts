@@ -20,6 +20,7 @@ import { ReturnsService } from './returns.service';
 import { CreateReturnDto } from './dto/create-return.dto';
 import { PaginationDto } from '../common/dto/pagination.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { ForbiddenException } from '@nestjs/common';
 
 @ApiTags('returns')
 @UseGuards(JwtAuthGuard)
@@ -41,23 +42,36 @@ export class ReturnsController {
       'Venta no encontrada, producto no pertenece a la venta, cantidad excede lo vendido.',
   })
   @ApiResponse({ status: 401, description: 'No autenticado' })
+  @ApiResponse({ status: 403, description: 'Sin tenant (solo usuarios de empresa)' })
   create(
     @Body() dto: CreateReturnDto,
-    @Req() req: { user?: { sub?: string } },
+    @Req() req: { user?: { sub?: string; tenantId?: string | null } },
   ) {
-    return this.returns.createReturn(dto, req.user?.sub);
+    const tenantId = req.user?.tenantId ?? null;
+    if (tenantId == null) {
+      throw new ForbiddenException('Solo usuarios de una empresa pueden registrar devoluciones.');
+    }
+    return this.returns.createReturn(dto, req.user?.sub, tenantId);
   }
 
   @Get()
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Listar devoluciones',
-    description: 'Lista todas las devoluciones paginadas.',
+    description: 'Lista las devoluciones del tenant del usuario, paginadas.',
   })
   @ApiResponse({ status: 200, description: 'Lista paginada de devoluciones' })
   @ApiResponse({ status: 401, description: 'No autenticado' })
-  list(@Query() pagination?: PaginationDto) {
-    return this.returns.listReturns({
+  @ApiResponse({ status: 403, description: 'Sin tenant' })
+  list(
+    @Query() pagination: PaginationDto | undefined,
+    @Req() req: { user?: { tenantId?: string | null } },
+  ) {
+    const tenantId = req.user?.tenantId ?? null;
+    if (tenantId == null) {
+      throw new ForbiddenException('Solo usuarios de una empresa pueden listar devoluciones.');
+    }
+    return this.returns.listReturns(tenantId, {
       page: pagination?.page,
       limit: pagination?.limit,
     });
@@ -67,13 +81,20 @@ export class ReturnsController {
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Obtener devolución por ID',
-    description: 'Devuelve el detalle de una devolución.',
+    description: 'Devuelve el detalle de una devolución del tenant del usuario.',
   })
   @ApiParam({ name: 'id', description: 'ID de la devolución' })
   @ApiResponse({ status: 200, description: 'Devolución encontrada' })
   @ApiResponse({ status: 404, description: 'Devolución no encontrada' })
   @ApiResponse({ status: 401, description: 'No autenticado' })
-  getById(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string) {
-    return this.returns.getReturnById(id);
+  getById(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @Req() req: { user?: { tenantId?: string | null } },
+  ) {
+    const tenantId = req.user?.tenantId ?? null;
+    if (tenantId == null) {
+      throw new ForbiddenException('Solo usuarios de una empresa pueden consultar devoluciones.');
+    }
+    return this.returns.getReturnById(id, tenantId);
   }
 }

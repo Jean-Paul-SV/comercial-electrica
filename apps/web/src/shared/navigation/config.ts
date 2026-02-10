@@ -31,7 +31,7 @@ export const navConfig: NavTreeConfig = {
       moduleCode: 'core',
       items: [
         { id: 'products', href: '/products', label: 'Productos', icon: 'Package', order: 0, moduleCode: 'core' },
-        { id: 'product-dictionary', href: '/products/dictionary', label: 'Diccionario de búsqueda', icon: 'BookOpen', order: 1, moduleCode: 'core' },
+        { id: 'product-dictionary', href: '/products/dictionary', label: 'Diccionario', icon: 'BookOpen', order: 1, moduleCode: 'core' },
         { id: 'customers', href: '/customers', label: 'Clientes', icon: 'Users', order: 2, moduleCode: 'core' },
       ],
     },
@@ -68,14 +68,34 @@ export const navConfig: NavTreeConfig = {
       ],
     },
     {
+      id: 'cuenta',
+      label: 'Cuenta',
+      order: 5,
+      moduleCode: 'core',
+      items: [
+        { id: 'billing', href: '/settings/billing', label: 'Facturación', icon: 'CreditCard', order: 0, moduleCode: 'core' },
+      ],
+    },
+    {
       id: 'administracion',
       label: 'Administración',
-      order: 5,
+      order: 6,
       requiredPermission: 'users:read',
       moduleCode: 'core',
       items: [
         { id: 'users', href: '/users', label: 'Usuarios', icon: 'UserPlus', order: 0, requiredPermission: 'users:read', moduleCode: 'core' },
         { id: 'backups', href: '/backups', label: 'Backups', icon: 'Database', order: 1, requiredPermission: 'backups:manage', moduleCode: 'backups' },
+      ],
+    },
+    {
+      id: 'provider',
+      label: 'Panel proveedor',
+      order: 7,
+      platformAdminOnly: true,
+      items: [
+        { id: 'provider-tenants', href: '/provider', label: 'Empresas', icon: 'Building2', order: 0 },
+        { id: 'provider-new', href: '/provider/new', label: 'Nueva empresa', icon: 'PlusCircle', order: 1 },
+        { id: 'provider-plans', href: '/provider/plans', label: 'Planes', icon: 'CreditCard', order: 2 },
       ],
     },
   ],

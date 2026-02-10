@@ -5,8 +5,13 @@
  */
 
 import { PrismaClient, RoleName } from '@prisma/client';
+import * as argon2 from 'argon2';
 
 const prisma = new PrismaClient();
+
+/** Credenciales del administrador de plataforma (solo desarrollo; cambiar en producción). */
+const PLATFORM_ADMIN_EMAIL = 'platform@admin.local';
+const PLATFORM_ADMIN_PASSWORD = 'PlatformAdmin1!';
 
 /** Módulos del producto (alineado con ARQUITECTURA_MODULAR_SAAS). Plan "Todo incluido" los tiene todos. */
 const MODULE_CODES = [
@@ -72,6 +77,27 @@ async function main() {
       data: { planId: plan.id },
     });
     console.log('Tenant por defecto actualizado con planId:', plan.id);
+  }
+
+  // 2.1 Suscripción para tenants que no tengan (backfill para BD existentes)
+  const tenantsWithoutSub = await prisma.tenant.findMany({
+    where: { subscription: null },
+    select: { id: true, planId: true },
+  });
+  const now = new Date();
+  const periodEnd = new Date(now);
+  periodEnd.setDate(periodEnd.getDate() + 30);
+  for (const t of tenantsWithoutSub) {
+    await prisma.subscription.create({
+      data: {
+        tenantId: t.id,
+        planId: t.planId,
+        status: 'ACTIVE',
+        currentPeriodStart: now,
+        currentPeriodEnd: periodEnd,
+      },
+    });
+    console.log('Subscription creada para tenant:', t.id);
   }
 
   // 3. Permisos (upsert por resource+action)
@@ -172,6 +198,32 @@ async function main() {
       });
       console.log('UserRole asignado:', u.email, '->', u.role === RoleName.ADMIN ? 'admin' : 'user');
     }
+  }
+
+  // 6. Usuario administrador de plataforma (sin tenant) para Panel proveedor
+  let platformAdmin = await prisma.user.findFirst({
+    where: { email: PLATFORM_ADMIN_EMAIL },
+    select: { id: true },
+  });
+  if (!platformAdmin) {
+    const passwordHash = await argon2.hash(PLATFORM_ADMIN_PASSWORD);
+    platformAdmin = await prisma.user.create({
+      data: {
+        email: PLATFORM_ADMIN_EMAIL,
+        passwordHash,
+        role: RoleName.ADMIN,
+        tenantId: null,
+      },
+      select: { id: true },
+    });
+    await prisma.userRole.create({
+      data: {
+        userId: platformAdmin.id,
+        roleId: adminRole!.id,
+        tenantId: null,
+      },
+    });
+    console.log('Admin de plataforma creado:', PLATFORM_ADMIN_EMAIL);
   }
 }
 

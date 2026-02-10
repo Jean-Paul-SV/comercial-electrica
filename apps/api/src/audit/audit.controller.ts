@@ -4,6 +4,7 @@ import {
   Param,
   ParseUUIDPipe,
   Query,
+  Req,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -66,12 +67,18 @@ export class AuditController {
   })
   @ApiResponse({ status: 401, description: 'No autenticado' })
   @ApiResponse({ status: 403, description: 'No autorizado (requiere ADMIN)' })
-  async list(@Query() query: ListAuditLogsQueryDto) {
+  async list(
+    @Query() query: ListAuditLogsQueryDto,
+    @Req() req: { user?: { tenantId?: string | null } },
+  ) {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
     const skip = (page - 1) * limit;
 
     const where: Prisma.AuditLogWhereInput = {};
+    // Multi-tenant: usuario con tenant solo ve su tenant; plataforma puede filtrar por query.tenantId
+    const effectiveTenantId = req.user?.tenantId ?? query.tenantId;
+    if (effectiveTenantId) where.tenantId = effectiveTenantId;
     if (query.entity?.trim()) where.entity = query.entity.trim();
     if (query.action?.trim()) where.action = query.action.trim();
     if (query.startDate || query.endDate) {
@@ -161,12 +168,12 @@ export class AuditController {
   async getEntityLogs(
     @Param('entity') entity: string,
     @Param('entityId', new ParseUUIDPipe({ version: '4' })) entityId: string,
+    @Req() req: { user?: { tenantId?: string | null } },
   ) {
+    const where: Prisma.AuditLogWhereInput = { entity, entityId };
+    if (req.user?.tenantId) where.tenantId = req.user.tenantId;
     const logs = await this.prisma.auditLog.findMany({
-      where: {
-        entity,
-        entityId,
-      },
+      where,
       orderBy: { createdAt: 'desc' },
       include: { actor: { select: { id: true, email: true, role: true } } },
     });

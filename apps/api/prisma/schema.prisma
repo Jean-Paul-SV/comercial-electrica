@@ -96,20 +96,28 @@ enum SupplierInvoiceStatus {
   CANCELLED
 }
 
+enum SubscriptionStatus {
+  ACTIVE
+  SUSPENDED
+  CANCELLED
+}
+
 // ---------- Multi-tenant (RBAC + Plan/módulos, ver docs/ROLES_Y_PERMISOS_DISEÑO.md y ARQUITECTURA_MODULAR_SAAS.md) ----------
 model Plan {
-  id            String    @id @default(uuid()) @db.Uuid
-  name          String
-  slug          String    @unique
-  description   String?
-  priceMonthly  Decimal?  @db.Decimal(10, 2)
-  priceYearly   Decimal?  @db.Decimal(10, 2)
-  isActive      Boolean   @default(true)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id              String    @id @default(uuid()) @db.Uuid
+  name            String
+  slug            String    @unique
+  description     String?
+  priceMonthly    Decimal?  @db.Decimal(10, 2)
+  priceYearly     Decimal?  @db.Decimal(10, 2)
+  stripePriceId   String?   @db.VarChar(255)
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
-  features PlanFeature[]
-  tenants  Tenant[]
+  features       PlanFeature[]
+  tenants        Tenant[]
+  subscriptions  Subscription[]
 }
 
 model PlanFeature {
@@ -125,18 +133,20 @@ model PlanFeature {
 }
 
 model Tenant {
-  id        String   @id @default(uuid()) @db.Uuid
-  name      String
-  slug      String   @unique
-  planId    String?  @db.Uuid
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String    @id @default(uuid()) @db.Uuid
+  name            String
+  slug            String    @unique
+  planId          String?   @db.Uuid
+  isActive        Boolean   @default(true)
+  lastActivityAt  DateTime? @db.Timestamptz
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
-  plan       Plan?          @relation(fields: [planId], references: [id], onDelete: SetNull)
-  modules    TenantModule[]
-  addOns     TenantAddOn[]
-  users      User[]
+  plan          Plan?          @relation(fields: [planId], references: [id], onDelete: SetNull)
+  subscription  Subscription?
+  modules       TenantModule[]
+  addOns        TenantAddOn[]
+  users         User[]
   roles      Role[]
   userRoles  UserRole[]
   categories               Category[]
@@ -200,6 +210,39 @@ model TenantAddOn {
   @@unique([tenantId, addOnId])
   @@index([tenantId])
   @@index([validUntil])
+}
+
+/// Suscripción actual del tenant (estado de pago, periodo). Una por tenant.
+model Subscription {
+  id                    String             @id @default(uuid()) @db.Uuid
+  tenantId              String             @unique @db.Uuid
+  planId                String?            @db.Uuid
+  status                SubscriptionStatus @default(ACTIVE)
+  currentPeriodStart    DateTime?          @db.Timestamptz
+  currentPeriodEnd      DateTime?          @db.Timestamptz
+  stripeSubscriptionId  String?            @unique @db.VarChar(255)
+  lastPaymentFailedAt   DateTime?          @db.Timestamptz
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+
+  tenant Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  plan   Plan?    @relation(fields: [planId], references: [id], onDelete: SetNull)
+
+  @@index([status])
+  @@index([currentPeriodEnd])
+  @@index([stripeSubscriptionId])
+}
+
+model StripeEvent {
+  id         String   @id @default(uuid()) @db.Uuid
+  eventId    String   @unique @db.VarChar(255) // Stripe event.id
+  type       String   @db.VarChar(100)
+  processedAt DateTime @default(now())
+  payload    Json     // Evento completo de Stripe para auditoría
+
+  @@index([eventId])
+  @@index([processedAt])
+  @@index([type])
 }
 
 model Permission {
@@ -270,8 +313,9 @@ model User {
   tenantId               String?   @db.Uuid
   isActive               Boolean   @default(true)
   mustChangePassword     Boolean   @default(false)
-  onboardingStatus      String?   @db.VarChar(32)
-  onboardingCompletedAt DateTime? @db.Timestamptz
+  lastLoginAt            DateTime? @db.Timestamptz
+  onboardingStatus       String?   @db.VarChar(32)
+  onboardingCompletedAt  DateTime? @db.Timestamptz
   profilePictureUrl      String?
   createdAt              DateTime  @default(now())
   updatedAt              DateTime  @updatedAt
@@ -701,6 +745,8 @@ model Quote {
   items    QuoteItem[]
 
   @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, validUntil])
   @@index([createdAt])
   @@index([customerId])
   @@index([status])
@@ -810,6 +856,7 @@ model AuditLog {
   entity       String
   entityId     String
   action       String
+  summary      String?  @db.VarChar(255)
   diff         Json?
   requestId    String?  @db.VarChar(64)
   ip           String?  @db.VarChar(45)

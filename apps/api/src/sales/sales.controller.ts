@@ -21,9 +21,11 @@ import { CreateSaleDto } from './dto/create-sale.dto';
 import { ListSalesQueryDto } from './dto/list-sales-query.dto';
 import { ListInvoicesQueryDto } from './dto/list-invoices-query.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { PermissionsGuard } from '../auth/permissions.guard';
+import { RequirePermission } from '../auth/require-permission.decorator';
 
 @ApiTags('sales')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller('sales')
 export class SalesController {
   constructor(private readonly sales: SalesService) {}
@@ -130,6 +132,7 @@ export class SalesController {
   }
 
   @Patch('invoices/:id/void')
+  @RequirePermission('sales:update')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Anular factura',
@@ -140,6 +143,7 @@ export class SalesController {
   @ApiResponse({ status: 400, description: 'Factura ya anulada o no es emitida' })
   @ApiResponse({ status: 404, description: 'Factura no encontrada' })
   @ApiResponse({ status: 401, description: 'No autenticado' })
+  @ApiResponse({ status: 403, description: 'No autorizado (requiere permiso sales:update)' })
   voidInvoice(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Req() req: { user?: { sub?: string; tenantId?: string } },
@@ -168,6 +172,7 @@ export class SalesController {
   }
 
   @Post()
+  @RequirePermission('sales:create')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Crear venta',
@@ -181,6 +186,7 @@ export class SalesController {
       'Error de validación (stock insuficiente, productos inexistentes, etc.)',
   })
   @ApiResponse({ status: 401, description: 'No autenticado' })
+  @ApiResponse({ status: 403, description: 'No autorizado (requiere permiso sales:create)' })
   create(
     @Body() dto: CreateSaleDto,
     @Req() req: { user?: { sub?: string; tenantId?: string } },

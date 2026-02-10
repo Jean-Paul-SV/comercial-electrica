@@ -244,7 +244,20 @@ export class SupplierInvoicesService {
       typeof pagination.status === 'string' &&
       validStatuses.includes(pagination.status)
     ) {
-      where.status = pagination.status;
+      // Coincidir con la definición de "vencidas" de reportes/alertas: PENDING con dueDate pasada O ya marcadas OVERDUE
+      if (pagination.status === SupplierInvoiceStatus.OVERDUE) {
+        const now = new Date();
+        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        where.OR = [
+          { status: SupplierInvoiceStatus.OVERDUE },
+          {
+            status: SupplierInvoiceStatus.PENDING,
+            dueDate: { lt: todayStart },
+          },
+        ];
+      } else {
+        where.status = pagination.status;
+      }
     }
     if (pagination?.supplierId && typeof pagination.supplierId === 'string') {
       where.supplierId = pagination.supplierId;

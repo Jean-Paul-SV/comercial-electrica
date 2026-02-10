@@ -21,16 +21,19 @@ import {
 } from '@nestjs/swagger';
 import { ExpensesService } from './expenses.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { PermissionsGuard } from '../auth/permissions.guard';
+import { RequirePermission } from '../auth/require-permission.decorator';
 import { CreateExpenseDto } from './dto/create-expense.dto';
 import { ListExpensesDto } from './dto/list-expenses.dto';
 
 @ApiTags('expenses')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller('expenses')
 export class ExpensesController {
   constructor(private readonly expenses: ExpensesService) {}
 
   @Post()
+  @RequirePermission('expenses:create')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Registrar gasto',
@@ -40,6 +43,7 @@ export class ExpensesController {
   @ApiResponse({ status: 201, description: 'Gasto creado' })
   @ApiResponse({ status: 400, description: 'Datos inválidos o sesión cerrada' })
   @ApiResponse({ status: 404, description: 'Sesión de caja no encontrada' })
+  @ApiResponse({ status: 403, description: 'No autorizado (requiere permiso expenses:create)' })
   create(
     @Body() dto: CreateExpenseDto,
     @Req() req: { user?: { sub?: string; tenantId?: string } },
@@ -79,6 +83,7 @@ export class ExpensesController {
   }
 
   @Delete(':id')
+  @RequirePermission('expenses:delete')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Eliminar gasto',
@@ -94,6 +99,7 @@ export class ExpensesController {
   @ApiResponse({ status: 200, description: 'Gasto eliminado' })
   @ApiResponse({ status: 400, description: 'Justificación requerida' })
   @ApiResponse({ status: 404, description: 'Gasto no encontrado' })
+  @ApiResponse({ status: 403, description: 'No autorizado (requiere permiso expenses:delete)' })
   remove(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Query('reason') reason: string | undefined,

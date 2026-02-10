@@ -10,6 +10,7 @@ describe('Inventory (e2e)', () => {
   let app: INestApplication<App>;
   let prisma: PrismaService;
   let authToken: string;
+  let tenantId: string;
   let productId: string;
 
   beforeAll(async () => {
@@ -19,27 +20,24 @@ describe('Inventory (e2e)', () => {
       }),
     ).compile();
 
-    // Setup simplificado usando helper común
     const setup = await setupTestApp(
       moduleFixture,
       'inventory-test@example.com',
     );
-    ({ app, prisma, authToken } = setup);
+    ({ app, prisma, authToken, tenantId } = setup);
   });
 
   beforeEach(async () => {
-    // Crear categoría y producto para cada test
-    // Usar nombre único para evitar conflictos
     const categoryName = `Test Category ${Date.now()}`;
     const category = await prisma.category.upsert({
-      where: { name: categoryName },
+      where: { tenantId_name: { tenantId, name: categoryName } },
       update: {},
-      create: { name: categoryName },
+      create: { tenantId, name: categoryName },
     });
-    // Categoría creada para el producto
 
     const product = await prisma.product.create({
       data: {
+        tenantId,
         internalCode: `TEST-${Date.now()}`,
         name: 'Producto Test',
         categoryId: category.id,

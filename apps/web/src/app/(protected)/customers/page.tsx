@@ -33,8 +33,9 @@ import {
 import { Skeleton } from '@shared/components/ui/skeleton';
 import { Pagination } from '@shared/components/Pagination';
 import Link from 'next/link';
-import { Users, Plus, Search, ChevronUp, ChevronDown, Eye } from 'lucide-react';
-import { useCustomersList, useCreateCustomer } from '@features/customers/hooks';
+import { getErrorMessage } from '@shared/utils/errors';
+import { Users, Plus, Search, ChevronUp, ChevronDown, Eye, Pencil, ClipboardCheck } from 'lucide-react';
+import { useCustomersList, useCreateCustomer, useUpdateCustomer } from '@features/customers/hooks';
 import type { CustomerDocType } from '@features/customers/types';
 
 const DOC_LABELS: Record<string, string> = {
@@ -67,6 +68,16 @@ const SEARCH_DEBOUNCE_MS = 300;
 export default function CustomersPage() {
   const [page, setPage] = useState(1);
   const [openNewCustomer, setOpenNewCustomer] = useState(false);
+  const [showCreateConfirm, setShowCreateConfirm] = useState(false);
+  const [pendingCreateValues, setPendingCreateValues] = useState<CustomerFormValues | null>(null);
+  const [customerToEdit, setCustomerToEdit] = useState<{
+    id: string;
+    docType: CustomerDocType;
+    docNumber: string;
+    name: string;
+    email: string | null;
+    phone: string | null;
+  } | null>(null);
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc' | null>(null);
@@ -87,6 +98,7 @@ export default function CustomersPage() {
     sortOrder: sortOrder ?? undefined,
   });
   const createCustomer = useCreateCustomer();
+  const updateCustomer = useUpdateCustomer();
 
   const rows = useMemo(() => query.data?.data ?? [], [query.data]);
   const meta = query.data?.meta;
@@ -102,23 +114,77 @@ export default function CustomersPage() {
     },
   });
 
+  const editForm = useForm<CustomerFormValues>({
+    resolver: zodResolver(customerSchema),
+    defaultValues: {
+      docType: 'CC',
+      docNumber: '',
+      name: '',
+      email: '',
+      phone: '',
+    },
+  });
+
+  useEffect(() => {
+    if (customerToEdit) {
+      editForm.reset({
+        docType: customerToEdit.docType,
+        docNumber: customerToEdit.docNumber,
+        name: customerToEdit.name,
+        email: customerToEdit.email ?? '',
+        phone: customerToEdit.phone ?? '',
+      });
+    }
+  }, [customerToEdit, editForm]);
+
   const onNewCustomer = (values: CustomerFormValues) => {
+    setPendingCreateValues(values);
+    setShowCreateConfirm(true);
+  };
+
+  const onConfirmCreateCustomer = () => {
+    if (!pendingCreateValues) return;
     createCustomer.mutate(
       {
-        docType: values.docType,
-        docNumber: values.docNumber.trim(),
-        name: values.name.trim(),
-        email: values.email?.trim() || undefined,
-        phone: values.phone?.trim() || undefined,
+        docType: pendingCreateValues.docType,
+        docNumber: pendingCreateValues.docNumber.trim(),
+        name: pendingCreateValues.name.trim(),
+        email: pendingCreateValues.email?.trim() || undefined,
+        phone: pendingCreateValues.phone?.trim() || undefined,
       },
       {
         onSuccess: () => {
           toast.success('Cliente creado');
+          setShowCreateConfirm(false);
+          setPendingCreateValues(null);
           setOpenNewCustomer(false);
           form.reset();
         },
-        onError: (e: { message?: string }) => {
-          toast.error(e?.message ?? 'No se pudo crear el cliente');
+        onError: (e: unknown) => {
+          toast.error(getErrorMessage(e, 'No se pudo crear el cliente'));
+        },
+      }
+    );
+  };
+
+  const onEditCustomer = (values: CustomerFormValues) => {
+    if (!customerToEdit) return;
+    updateCustomer.mutate(
+      {
+        id: customerToEdit.id,
+        payload: {
+          name: values.name.trim(),
+          email: values.email?.trim() || undefined,
+          phone: values.phone?.trim() || undefined,
+        },
+      },
+      {
+        onSuccess: () => {
+          toast.success('Cliente actualizado');
+          setCustomerToEdit(null);
+        },
+        onError: (e: unknown) => {
+          toast.error(getErrorMessage(e, 'No se pudo actualizar el cliente'));
         },
       }
     );
@@ -306,17 +372,38 @@ export default function CustomersPage() {
                         {c.phone ?? '—'}
                       </TableCell>
                       <TableCell className="text-center">
-                        <Link href={`/customers/${c.id}`}>
+                        <div className="flex items-center justify-center gap-1">
+                          <Link href={`/customers/${c.id}`}>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+                              title="Ver detalle"
+                              aria-label="Ver detalle"
+                            >
+                              <Eye className="h-3.5 w-3.5" />
+                            </Button>
+                          </Link>
                           <Button
                             size="sm"
                             variant="ghost"
                             className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
-                            title="Ver detalle"
-                            aria-label="Ver detalle"
+                            title="Editar"
+                            aria-label="Editar"
+                            onClick={() =>
+                              setCustomerToEdit({
+                                id: c.id,
+                                docType: c.docType,
+                                docNumber: c.docNumber,
+                                name: c.name,
+                                email: c.email,
+                                phone: c.phone,
+                              })
+                            }
                           >
-                            <Eye className="h-3.5 w-3.5" />
+                            <Pencil className="h-3.5 w-3.5" />
                           </Button>
-                        </Link>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -439,6 +526,131 @@ export default function CustomersPage() {
               </Button>
               <Button type="submit" disabled={createCustomer.isPending}>
                 {createCustomer.isPending ? 'Guardando…' : 'Crear cliente'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showCreateConfirm} onOpenChange={setShowCreateConfirm}>
+        <DialogContent showClose className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base font-semibold">
+              <ClipboardCheck className="h-5 w-5 text-primary shrink-0" />
+              Confirmar datos del cliente
+            </DialogTitle>
+            <p className="text-sm text-muted-foreground pt-1 leading-relaxed">
+              Verifique que la información ingresada sea correcta antes de confirmar. Al aceptar, se registrará el nuevo cliente en el sistema.
+            </p>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setShowCreateConfirm(false);
+                setPendingCreateValues(null);
+              }}
+              className="rounded-xl"
+            >
+              Volver
+            </Button>
+            <Button
+              type="button"
+              onClick={onConfirmCreateCustomer}
+              disabled={createCustomer.isPending}
+              className="rounded-xl font-medium"
+            >
+              {createCustomer.isPending ? 'Registrando…' : 'Confirmar y crear cliente'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={!!customerToEdit}
+        onOpenChange={(open) => { if (!open) setCustomerToEdit(null); }}
+      >
+        <DialogContent showClose className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="h-4 w-4" />
+              Editar cliente
+            </DialogTitle>
+            <p className="text-sm text-muted-foreground pt-1">
+              Modifique nombre, email o teléfono. El tipo y número de documento no se pueden cambiar.
+            </p>
+          </DialogHeader>
+          <form
+            onSubmit={editForm.handleSubmit(onEditCustomer)}
+            className="space-y-4"
+          >
+            {customerToEdit && (
+              <>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label className="text-muted-foreground">Tipo documento</Label>
+                    <p className="flex h-10 items-center rounded-lg border border-input bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
+                      {DOC_LABELS[customerToEdit.docType] ?? customerToEdit.docType}
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-muted-foreground">Nº documento</Label>
+                    <p className="flex h-10 items-center rounded-lg border border-input bg-muted/50 px-3 py-2 text-sm font-mono text-muted-foreground">
+                      {customerToEdit.docNumber}
+                    </p>
+                  </div>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2 sm:col-span-2">
+                    <Label htmlFor="edit-name">Nombre / Razón social</Label>
+                    <Input
+                      id="edit-name"
+                      {...editForm.register('name')}
+                      placeholder="Ej: Juan Pérez o Empresa S.A.S."
+                      className="rounded-lg"
+                    />
+                    {editForm.formState.errors.name && (
+                      <p className="text-sm text-destructive">
+                        {editForm.formState.errors.name.message}
+                      </p>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-email">Email</Label>
+                    <Input
+                      id="edit-email"
+                      type="email"
+                      {...editForm.register('email')}
+                      placeholder="Ej: cliente@correo.com"
+                      className="rounded-lg"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-phone">Teléfono</Label>
+                    <Input
+                      id="edit-phone"
+                      {...editForm.register('phone')}
+                      placeholder="Ej: 300 123 4567"
+                      className="rounded-lg"
+                    />
+                  </div>
+                </div>
+              </>
+            )}
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setCustomerToEdit(null)}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                disabled={updateCustomer.isPending}
+              >
+                {updateCustomer.isPending ? 'Guardando…' : 'Guardar cambios'}
               </Button>
             </DialogFooter>
           </form>

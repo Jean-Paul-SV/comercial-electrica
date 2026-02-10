@@ -43,10 +43,16 @@ const supplierSchema = z.object({
   email: z.string().email('Email inválido').optional().or(z.literal('')),
   phone: z.string().optional(),
   contactPerson: z.string().optional(),
+  address: z.string().optional(),
 });
 type SupplierFormValues = z.infer<typeof supplierSchema>;
 
 const SEARCH_DEBOUNCE_MS = 300;
+
+const formInputClass =
+  'rounded-xl border border-input bg-background/80 h-10 px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:border-primary/50 transition-colors';
+const formTextareaClass =
+  'flex w-full rounded-xl border border-input bg-background/80 px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none transition-colors';
 
 export default function SuppliersPage() {
   const [page, setPage] = useState(1);
@@ -61,6 +67,7 @@ export default function SuppliersPage() {
     email: string | null;
     phone: string | null;
     contactPerson: string | null;
+    address: string | null;
   } | null>(null);
   const limit = 20;
 
@@ -91,6 +98,7 @@ export default function SuppliersPage() {
       email: '',
       phone: '',
       contactPerson: '',
+      address: '',
     },
   });
 
@@ -102,6 +110,7 @@ export default function SuppliersPage() {
       email: '',
       phone: '',
       contactPerson: '',
+      address: '',
     },
   });
 
@@ -113,6 +122,7 @@ export default function SuppliersPage() {
         email: supplierToEdit.email ?? '',
         phone: supplierToEdit.phone ?? '',
         contactPerson: supplierToEdit.contactPerson ?? '',
+        address: supplierToEdit.address ?? '',
         description: '',
       });
     }
@@ -127,6 +137,7 @@ export default function SuppliersPage() {
         email: values.email?.trim() || undefined,
         phone: values.phone?.trim() || undefined,
         contactPerson: values.contactPerson?.trim() || undefined,
+        address: values.address?.trim() || undefined,
       },
       {
         onSuccess: () => {
@@ -152,6 +163,7 @@ export default function SuppliersPage() {
           email: values.email?.trim() || undefined,
           phone: values.phone?.trim() || undefined,
           contactPerson: values.contactPerson?.trim() || undefined,
+          address: values.address?.trim() || undefined,
         },
       },
       {
@@ -323,6 +335,7 @@ export default function SuppliersPage() {
                                 email: s.email,
                                 phone: s.phone,
                                 contactPerson: s.contactPerson,
+                                address: s.address,
                               })
                             }
                           >
@@ -439,28 +452,28 @@ export default function SuppliersPage() {
         open={!!supplierToEdit}
         onOpenChange={(open) => { if (!open) setSupplierToEdit(null); }}
       >
-        <DialogContent showClose className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Pencil className="h-4 w-4" />
+        <DialogContent showClose className="sm:max-w-xl rounded-2xl border-border/80 shadow-xl">
+          <DialogHeader className="pb-2">
+            <DialogTitle className="flex items-center gap-2 text-lg">
+              <Pencil className="h-4 w-4 text-primary" />
               Editar proveedor
             </DialogTitle>
-            <p className="text-sm text-muted-foreground pt-1">
+            <p className="text-sm text-muted-foreground">
               Modifique el nombre, NIT o datos de contacto del proveedor.
             </p>
           </DialogHeader>
           <form
             onSubmit={editForm.handleSubmit(onEditSupplier)}
-            className="space-y-4"
+            className="space-y-5 pt-1"
           >
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-5 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="edit-nit">NIT</Label>
+                <Label htmlFor="edit-nit" className="text-foreground font-medium">NIT</Label>
                 <Input
                   id="edit-nit"
                   {...editForm.register('nit')}
                   placeholder="Ej: 900123456-7"
-                  className="rounded-lg"
+                  className={formInputClass}
                 />
                 {editForm.formState.errors.nit && (
                   <p className="text-sm text-destructive">
@@ -469,12 +482,12 @@ export default function SuppliersPage() {
                 )}
               </div>
               <div className="space-y-2">
-                <Label htmlFor="edit-name">Razón social</Label>
+                <Label htmlFor="edit-name" className="text-foreground font-medium">Razón social</Label>
                 <Input
                   id="edit-name"
                   {...editForm.register('name')}
                   placeholder="Ej: Distribuidora Eléctrica S.A.S."
-                  className="rounded-lg"
+                  className={formInputClass}
                 />
                 {editForm.formState.errors.name && (
                   <p className="text-sm text-destructive">
@@ -483,45 +496,56 @@ export default function SuppliersPage() {
                 )}
               </div>
               <div className="space-y-2">
-                <Label htmlFor="edit-email">Email</Label>
+                <Label htmlFor="edit-email" className="text-foreground font-medium">Email</Label>
                 <Input
                   id="edit-email"
                   type="email"
                   {...editForm.register('email')}
                   placeholder="Ej: contacto@proveedor.com"
-                  className="rounded-lg"
+                  className={formInputClass}
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="edit-phone">Teléfono</Label>
+                <Label htmlFor="edit-phone" className="text-foreground font-medium">Teléfono</Label>
                 <Input
                   id="edit-phone"
                   {...editForm.register('phone')}
                   placeholder="Ej: 300 123 4567"
-                  className="rounded-lg"
+                  className={formInputClass}
                 />
               </div>
               <div className="space-y-2 sm:col-span-2">
-                <Label htmlFor="edit-contactPerson">Persona de contacto</Label>
+                <Label htmlFor="edit-contactPerson" className="text-foreground font-medium">Persona de contacto</Label>
                 <Input
                   id="edit-contactPerson"
                   {...editForm.register('contactPerson')}
                   placeholder="Ej: Juan Pérez — Ventas"
-                  className="rounded-lg"
+                  className={formInputClass}
+                />
+              </div>
+              <div className="space-y-2 sm:col-span-2">
+                <Label htmlFor="edit-address" className="text-foreground font-medium">Dirección</Label>
+                <Input
+                  id="edit-address"
+                  {...editForm.register('address')}
+                  placeholder="Ej: Carrera 54 #15"
+                  className={formInputClass}
                 />
               </div>
             </div>
-            <DialogFooter>
+            <DialogFooter className="gap-2 pt-2 sm:gap-0">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => setSupplierToEdit(null)}
+                className="rounded-xl"
               >
                 Cancelar
               </Button>
               <Button
                 type="submit"
                 disabled={updateSupplier.isPending}
+                className="rounded-xl font-medium"
               >
                 {updateSupplier.isPending ? 'Guardando…' : 'Guardar cambios'}
               </Button>
@@ -531,25 +555,28 @@ export default function SuppliersPage() {
       </Dialog>
 
       <Dialog open={openNewSupplier} onOpenChange={setOpenNewSupplier}>
-        <DialogContent showClose className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Plus className="h-4 w-4" />
+        <DialogContent showClose className="sm:max-w-xl rounded-2xl border-border/80 shadow-xl">
+          <DialogHeader className="pb-2">
+            <DialogTitle className="flex items-center gap-2 text-lg">
+              <Plus className="h-4 w-4 text-primary" />
               Nuevo proveedor
             </DialogTitle>
+            <p className="text-sm text-muted-foreground">
+              Complete los datos del proveedor. Los campos opcionales pueden dejarse en blanco.
+            </p>
           </DialogHeader>
           <form
             onSubmit={form.handleSubmit(onNewSupplier)}
-            className="space-y-4"
+            className="space-y-5 pt-1"
           >
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-5 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="nit">NIT</Label>
+                <Label htmlFor="nit" className="text-foreground font-medium">NIT</Label>
                 <Input
                   id="nit"
                   {...form.register('nit')}
                   placeholder="Ej: 900123456-7"
-                  className="rounded-lg"
+                  className={formInputClass}
                 />
                 <p className="text-xs text-muted-foreground">
                   Número de identificación tributaria del proveedor. Se usa en facturas y reportes.
@@ -561,12 +588,12 @@ export default function SuppliersPage() {
                 )}
               </div>
               <div className="space-y-2">
-                <Label htmlFor="name">Razón social</Label>
+                <Label htmlFor="name" className="text-foreground font-medium">Razón social</Label>
                 <Input
                   id="name"
                   {...form.register('name')}
                   placeholder="Ej: Distribuidora Eléctrica S.A.S."
-                  className="rounded-lg"
+                  className={formInputClass}
                 />
                 <p className="text-xs text-muted-foreground">
                   Nombre legal de la empresa. Aparecerá en pedidos de compra y facturas.
@@ -578,65 +605,78 @@ export default function SuppliersPage() {
                 )}
               </div>
               <div className="space-y-2 sm:col-span-2">
-                <Label htmlFor="description">Descripción del proveedor</Label>
+                <Label htmlFor="description" className="text-foreground font-medium">Descripción del proveedor</Label>
                 <textarea
                   id="description"
                   {...form.register('description')}
                   placeholder="Ej: Proveedor de cables y materiales eléctricos. Horario de atención: 8am-5pm."
                   rows={3}
-                  className="flex w-full rounded-lg border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
+                  className={formTextareaClass}
                 />
                 <p className="text-xs text-muted-foreground">
                   Opcional. Notas internas sobre el proveedor: productos que vende, condiciones, etc.
                 </p>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email" className="text-foreground font-medium">Email</Label>
                 <Input
                   id="email"
                   type="email"
                   {...form.register('email')}
                   placeholder="Ej: contacto@proveedor.com"
-                  className="rounded-lg"
+                  className={formInputClass}
                 />
                 <p className="text-xs text-muted-foreground">
                   Opcional. Correo para pedidos o consultas.
                 </p>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="phone">Teléfono</Label>
+                <Label htmlFor="phone" className="text-foreground font-medium">Teléfono</Label>
                 <Input
                   id="phone"
                   {...form.register('phone')}
                   placeholder="Ej: 300 123 4567"
-                  className="rounded-lg"
+                  className={formInputClass}
                 />
                 <p className="text-xs text-muted-foreground">
                   Opcional. Número de contacto del proveedor.
                 </p>
               </div>
               <div className="space-y-2 sm:col-span-2">
-                <Label htmlFor="contactPerson">Persona de contacto</Label>
+                <Label htmlFor="contactPerson" className="text-foreground font-medium">Persona de contacto</Label>
                 <Input
                   id="contactPerson"
                   {...form.register('contactPerson')}
                   placeholder="Ej: Juan Pérez — Ventas"
-                  className="rounded-lg"
+                  className={formInputClass}
                 />
                 <p className="text-xs text-muted-foreground">
                   Opcional. Nombre de quien atiende pedidos o facturación.
                 </p>
               </div>
+              <div className="space-y-2 sm:col-span-2">
+                <Label htmlFor="address" className="text-foreground font-medium">Dirección</Label>
+                <Input
+                  id="address"
+                  {...form.register('address')}
+                  placeholder="Ej: Carrera 54 #15"
+                  className={formInputClass}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Opcional. Dirección del proveedor.
+                </p>
+              </div>
             </div>
-            <DialogFooter>
+            <DialogFooter className="gap-2 pt-2 sm:gap-0">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => setOpenNewSupplier(false)}
+                className="rounded-xl"
               >
                 Cancelar
               </Button>
-              <Button type="submit" disabled={createSupplier.isPending}>
+              <Button type="submit" disabled={createSupplier.isPending} className="rounded-xl font-medium">
                 {createSupplier.isPending ? 'Guardando…' : 'Crear proveedor'}
               </Button>
             </DialogFooter>

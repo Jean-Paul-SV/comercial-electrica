@@ -36,6 +36,7 @@ describe('CashService', () => {
       cashSession: {
         findMany: jest.fn(),
         findUnique: jest.fn(),
+        findFirst: jest.fn(),
         create: jest.fn(),
         update: jest.fn(),
         count: jest.fn(),
@@ -125,13 +126,13 @@ describe('CashService', () => {
         closingAmount: 61900,
       };
 
-      prisma.cashSession.findUnique = jest
+      prisma.cashSession.findFirst = jest
         .fn()
         .mockResolvedValue(mockCashSession);
       prisma.sale.count = jest.fn().mockResolvedValue(0);
       prisma.cashSession.update = jest.fn().mockResolvedValue(sessionCerrada);
 
-      const result = await service.closeSession('session-1', 61900);
+      const result = await service.closeSession('session-1', 61900, undefined, 'tenant-1');
 
       expect(result.closedAt).toBeDefined();
       expect(result.closingAmount).toBe(61900);
@@ -145,13 +146,13 @@ describe('CashService', () => {
     });
 
     it('debe lanzar error si la sesión no existe', async () => {
-      prisma.cashSession.findUnique = jest.fn().mockResolvedValue(null);
+      prisma.cashSession.findFirst = jest.fn().mockResolvedValue(null);
 
       await expect(
-        service.closeSession('session-inexistente', 50000),
+        service.closeSession('session-inexistente', 50000, undefined, 'tenant-1'),
       ).rejects.toThrow(NotFoundException);
       await expect(
-        service.closeSession('session-inexistente', 50000),
+        service.closeSession('session-inexistente', 50000, undefined, 'tenant-1'),
       ).rejects.toThrow('Caja no encontrada.');
     });
 
@@ -162,30 +163,44 @@ describe('CashService', () => {
         closingAmount: 61900,
       };
 
-      prisma.cashSession.findUnique = jest
+      prisma.cashSession.findFirst = jest
         .fn()
         .mockResolvedValue(sessionCerrada);
 
-      await expect(service.closeSession('session-1', 61900)).rejects.toThrow(
+      await expect(service.closeSession('session-1', 61900, undefined, 'tenant-1')).rejects.toThrow(
         BadRequestException,
       );
-      await expect(service.closeSession('session-1', 61900)).rejects.toThrow(
+      await expect(service.closeSession('session-1', 61900, undefined, 'tenant-1')).rejects.toThrow(
         'ya está cerrada',
+      );
+    });
+
+    it('debe lanzar error si hay ventas pendientes de facturar en la sesión', async () => {
+      prisma.cashSession.findFirst = jest
+        .fn()
+        .mockResolvedValue(mockCashSession);
+      prisma.sale.count = jest.fn().mockResolvedValue(2);
+
+      await expect(service.closeSession('session-1', 61900, undefined, 'tenant-1')).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(service.closeSession('session-1', 61900, undefined, 'tenant-1')).rejects.toThrow(
+        'pendiente',
       );
     });
   });
 
   describe('getSession', () => {
     it('debe obtener una sesión existente', async () => {
-      prisma.cashSession.findUnique = jest
+      prisma.cashSession.findFirst = jest
         .fn()
         .mockResolvedValue(mockCashSession);
 
-      const result = await service.getSession('session-1');
+      const result = await service.getSession('session-1', 'tenant-1');
 
       expect(result).toEqual(mockCashSession);
-      expect(prisma.cashSession.findUnique).toHaveBeenCalledWith({
-        where: { id: 'session-1' },
+      expect(prisma.cashSession.findFirst).toHaveBeenCalledWith({
+        where: { id: 'session-1', tenantId: 'tenant-1' },
       });
     });
 

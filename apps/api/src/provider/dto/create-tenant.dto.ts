@@ -1,0 +1,44 @@
+import {
+  IsEmail,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MinLength,
+  MaxLength,
+  Matches,
+} from 'class-validator';
+
+export class CreateTenantDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(200)
+  name: string;
+
+  @IsString()
+  @MinLength(1)
+  @MaxLength(80)
+  @Matches(/^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/, {
+    message: 'slug debe ser minúsculas, números o guiones (ej: mi-empresa)',
+  })
+  slug: string;
+
+  @IsOptional()
+  @IsUUID()
+  planId?: string;
+
+  /** Email del primer usuario administrador (único en la plataforma). */
+  @IsEmail()
+  adminEmail: string;
+
+  /** Nombre del admin (opcional). */
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  adminName?: string;
+
+  /** Contraseña inicial. Si no se envía, se genera temporal y mustChangePassword=true. */
+  @IsOptional()
+  @IsString()
+  @MinLength(8, { message: 'La contraseña debe tener al menos 8 caracteres.' })
+  adminPassword?: string;
+}

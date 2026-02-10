@@ -165,12 +165,6 @@ export default function SupplierDetailPage() {
                 <dd className="text-base font-medium text-foreground">{supplier.address}</dd>
               </div>
             )}
-            {supplier.cityCode && (
-              <div className="flex flex-col gap-1">
-                <dt className="text-sm font-medium text-muted-foreground">Código ciudad</dt>
-                <dd className="text-base font-medium text-foreground font-mono">{supplier.cityCode}</dd>
-              </div>
-            )}
             <div className="flex flex-col gap-1">
               <dt className="text-sm font-medium text-muted-foreground">Creado</dt>
               <dd className="text-base font-medium text-foreground tabular-nums">{formatDate(supplier.createdAt)}</dd>

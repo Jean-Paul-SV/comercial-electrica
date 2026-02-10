@@ -165,6 +165,21 @@ async function main() {
     });
     console.log(`  USER: ${userEmail} / ${userPass}`);
   }
+  // Asignar UserRole (RBAC) para que /auth/me y permisos funcionen correctamente
+  const adminRole = await prisma.role.findFirst({ where: { slug: 'admin', tenantId: null } });
+  const userRole = await prisma.role.findFirst({ where: { slug: 'user', tenantId: null } });
+  if (adminRole && userRole) {
+    await prisma.userRole.upsert({
+      where: { userId_roleId_tenantId: { userId: admin.id, roleId: adminRole.id, tenantId } },
+      create: { userId: admin.id, roleId: adminRole.id, tenantId },
+      update: {},
+    });
+    await prisma.userRole.upsert({
+      where: { userId_roleId_tenantId: { userId: user.id, roleId: userRole.id, tenantId } },
+      create: { userId: user.id, roleId: userRole.id, tenantId },
+      update: {},
+    });
+  }
   const adminId = admin.id;
 
   // --- Categorías (10k en lotes) ---

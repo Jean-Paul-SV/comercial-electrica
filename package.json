@@ -28,6 +28,7 @@
     "prisma:migrate": "npm run prisma:migrate -w api",
     "prisma:seed": "npm run prisma:seed -w api",
     "prisma:studio": "npm run prisma:studio -w api",
+    "prisma:migrate:status": "npm run prisma:migrate:status -w api",
     "test": "echo \"No tests yet\"",
     "test:api": "node scripts/test-api.js",
     "test:e2e": "npm run test:e2e -w api"

@@ -271,7 +271,7 @@ export default function ProductsPage() {
               <Button asChild size="sm" variant="outline" className="gap-2 w-full sm:w-auto">
                 <Link href="/products/dictionary" className="flex items-center gap-2">
                   <BookOpen className="h-4 w-4 shrink-0" />
-                  Diccionario de búsqueda
+                  Diccionario
                 </Link>
               </Button>
               <Button size="sm" variant="outline" onClick={() => setOpenAddTerm(true)} className="gap-2 w-full sm:w-auto">
@@ -527,7 +527,7 @@ export default function ProductsPage() {
               Agregar término al diccionario
             </DialogTitle>
             <p className="text-sm text-muted-foreground pt-1">
-              El término se agregará al diccionario de búsqueda. Opcionalmente puedes vincularlo a un producto.
+              El término se agregará al diccionario. Opcionalmente puedes vincularlo a un producto.
             </p>
           </DialogHeader>
           <div className="space-y-4 py-2">

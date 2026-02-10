@@ -1,8 +1,16 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString, IsDateString, MaxLength } from 'class-validator';
+import { IsOptional, IsString, IsDateString, IsUUID, MaxLength } from 'class-validator';
 import { PaginationDto } from '../../common/dto/pagination.dto';
 
 export class ListAuditLogsQueryDto extends PaginationDto {
+  @ApiPropertyOptional({
+    description:
+      'Filtrar por tenant (solo plataforma). Si el usuario tiene tenantId, siempre se filtra por el suyo.',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
+  @IsOptional()
+  @IsUUID('4')
+  tenantId?: string;
   @ApiPropertyOptional({
     description:
       'Filtrar por tipo de entidad (sale, quote, customer, product, expense, etc.)',

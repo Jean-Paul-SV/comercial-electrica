@@ -11,7 +11,7 @@
 | **Seguridad y acceso** | Roles y permisos por cliente; validación backend + frontend | ROLES_Y_PERMISOS_DISEÑO, schema-roles-permisos.prisma | Parcial: Tenant, Permission, Role, UserRole, PermissionsService, PermissionsGuard, GET /auth/me; nav por permisos; RoleName se mantiene por compatibilidad |
 | **Estado operativo** | Interpretar estado del negocio; alertas y acciones | ESTADOS_OPERATIVOS_Y_ALERTAS | Implementado: GET /reports/operational-state; dashboard con bloque "Alertas operativas" |
 | **Onboarding** | Guiar usuarios no técnicos; reducir estrés | ONBOARDING_UX_DISEÑO | Implementado: flujo 3 pasos, GET/PATCH /onboarding/status, panel Tu progreso |
-| **Auditoría** | Trazabilidad completa; defendible ante DIAN | AUDITORIA_Y_TRAZABILIDAD | Parcial: AuditLog + requestId, ip, userAgent, severity, category; AuditContextInterceptor; hash chain pendiente |
+| **Auditoría** | Trazabilidad completa; defendible ante DIAN | AUDITORIA_Y_TRAZABILIDAD | Parcial: AuditLog + requestId, ip, userAgent, severity, category, **tenantId**; AuditContextInterceptor; **hash chain implementada** (previousHash/entryHash, verifyChain); **listado y entidad filtrados por tenant** |
 | **Resiliencia** | Negocio no se detenga; backups y offline | RESILIENCIA_Y_SINCRONIZACION | Implementado: backups + download + export CSV + copia S3; cliente: reintentos/backoff, timeout, detección offline, banner; cola offline + Idempotency-Key (nivel B) |
 | **Modularidad SaaS** | Módulos por cliente; planes y franquicias | ARQUITECTURA_MODULAR_SAAS | Implementado: Plan, PlanFeature, TenantModule, AddOn, TenantAddOn; TenantModulesService; ModulesGuard + @RequireModule; GET /auth/me con tenant + enabledModules; nav por moduleCode; página "Módulo no disponible" |
 | **Indicadores** | Datos que digan “qué hacer”; no solo gráficas | INDICADORES_Y_ACCIONES | Implementado: productos pérdida/margen bajo, sin rotación, facturas vencidas, proveedores menos competitivos, ventas por empleado; dashboard "Acciones recomendadas" |
@@ -85,12 +85,19 @@ Qué parte del código o del esquema materializa cada diseño.
 |------------------------|-------------------|--------|
 | AuditLog con actorId, entity, entityId, action, diff, createdAt | AuditLog en Prisma; AuditService.log, logCreate, logUpdate, logDelete, logAuth | Implementado |
 | Campos ip, userAgent, requestId, severity, category | Schema + migración 20260131000000; AuditService acepta contexto; AuditContextInterceptor inyecta por request | Implementado |
-| Cadena de integridad (hash) | No | Opcional |
-| Guard de permisos para consulta (solo ADMIN) | AuditController @Roles(ADMIN) | Implementado |
-| Cadena de integridad (hash chain) | No | Opcional |
+| tenantId en AuditLog (multi-tenant) | Schema tenantId; AuditContextData.tenantId; TenantContextInterceptor antes de AuditContextInterceptor; persistencia y hash compatibles con registros antiguos | Implementado (feb 2026) |
+| Listado y consulta por entidad filtrados por tenant | GET /audit-logs: where.tenantId = req.user.tenantId o query.tenantId (plataforma); GET entity/:entity/:entityId idem | Implementado (feb 2026) |
+| Cadena de integridad (hash chain) | previousHash, entryHash en create; verifyChain() y GET /audit-logs/verify-chain | Implementado |
+| Guard de permisos para consulta (audit:read, módulo audit) | AuditController @RequirePermission('audit:read'), @RequireModule('audit') | Implementado |
 | Retención y archivado | No documentado en código | Por definir en operación |
 
-**Archivos relacionados:** `apps/api/prisma/schema.prisma` (AuditLog), `apps/api/src/common/services/audit.service.ts`, `apps/api/src/audit/audit.controller.ts`.
+**Qué falta en trazabilidad (opcional o futuro):**
+
+- **Campo summary:** ✅ Implementado (feb 2026): columna `summary` en AuditLog; si no se pasa en contexto se genera `entity · action`; listado y modal de auditoría lo muestran cuando existe.
+- **Cobertura de eventos:** según AUDITORIA_Y_TRAZABILIDAD no todos los módulos llaman aún a audit (ej. algunos CRUD de categorías, facturas, proveedores); ir ampliando según prioridad.
+- **Retención/archivado:** política de retención y exportación para cumplimiento (por definir en operación).
+
+**Archivos relacionados:** `apps/api/prisma/schema.prisma` (AuditLog), `apps/api/src/common/services/audit.service.ts`, `apps/api/src/common/audit/audit-context.ts`, `apps/api/src/common/interceptors/audit-context.interceptor.ts`, `apps/api/src/audit/audit.controller.ts`, `apps/api/src/audit/dto/list-audit-logs-query.dto.ts`.
 
 ### 3.5 Resiliencia (RESILIENCIA_Y_SINCRONIZACION)
 
@@ -142,7 +149,7 @@ Qué parte del código o del esquema materializa cada diseño.
 | O1–O3 Roles, permisos, multi-tenant | ROLES_Y_PERMISOS, schema-roles-permisos, ARQUITECTURA_MODULAR_SAAS | Tenant, Permission, Role, UserRole, PermissionsService, PermissionsGuard, GET /auth/me | Nav por permisos (requiredPermission), AuthProvider.permissions | Parcial (RBAC implementado; Plan/módulos pendiente) |
 | O4–O5 Estados y alertas | ESTADOS_OPERATIVOS_Y_ALERTAS | ReportsService.getOperationalState, reglas por estado | Dashboard con bloque "Alertas operativas" (alerts[]) | Implementado |
 | O6–O7 Onboarding | ONBOARDING_UX_DISEÑO | User.onboardingStatus, GET/PATCH /onboarding/status | Flujo 3 pasos, redirección primera vez, panel Tu progreso | Implementado |
-| O8–O9 Auditoría completa | AUDITORIA_Y_TRAZABILIDAD | AuditLog + ip, userAgent, severity; hash opcional | Consulta auditoría (existente) | Parcial (log básico) |
+| O8–O9 Auditoría completa | AUDITORIA_Y_TRAZABILIDAD | AuditLog + ip, userAgent, severity, category, tenantId; hash chain; listado por tenant | Consulta auditoría (existente) | Parcial (log completo; retención/archivado por definir) |
 | O10–O11 Backup y resiliencia | RESILIENCIA_Y_SINCRONIZACION | BackupsService, GET download, export CSV, copia S3; apiClient reintentos/backoff/timeout/idempotencyKey; useOnlineStatus; IdempotencyInterceptor | Banner sin conexión; cola offline + UI Pendientes de enviar | Implementado |
 | O12 Módulos por cliente | ARQUITECTURA_MODULAR_SAAS | Plan, TenantModule, TenantModulesService, ModulesGuard, GET /me con tenant + enabledModules | Nav por moduleCode; página plan-required | Implementado |
 | O13–O14 Indicadores e IA | INDICADORES_Y_ACCIONES | Reports: productos pérdida/margen bajo, sin rotación, facturas vencidas, proveedores menos competitivos, ventas por empleado; GET actionable-indicators | Acciones recomendadas en dashboard; reportes por categoría | Implementado |

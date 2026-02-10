@@ -10,13 +10,14 @@ import { randomUUID } from 'crypto';
 import { runWithAuditContext } from '../audit/audit-context';
 
 /**
- * Establece el contexto de auditoría (requestId, ip, userAgent) por request
+ * Establece el contexto de auditoría (requestId, ip, userAgent, tenantId) por request
  * para que AuditService pueda registrarlo sin recibir el request explícitamente.
+ * Debe ejecutarse después de TenantContextInterceptor para tener req.user.tenantId.
  */
 @Injectable()
 export class AuditContextInterceptor implements NestInterceptor {
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
-    const req = context.switchToHttp().getRequest<Request>();
+    const req = context.switchToHttp().getRequest<Request & { user?: { tenantId?: string | null } }>();
     const requestId = (req.headers['x-request-id'] as string) || randomUUID();
     const ip =
       (req.ip as string) ||
@@ -24,8 +25,9 @@ export class AuditContextInterceptor implements NestInterceptor {
       (req.socket?.remoteAddress as string) ||
       undefined;
     const userAgent = (req.headers['user-agent'] as string)?.slice(0, 500);
+    const tenantId = req.user?.tenantId ?? undefined;
 
-    const auditContext = { requestId, ip, userAgent };
+    const auditContext = { requestId, ip, userAgent, tenantId };
 
     return new Observable((subscriber) => {
       runWithAuditContext(auditContext, () => {

@@ -52,3 +52,7 @@ coverage
 *.tmp
 *.temp
 .cache
+
+# Backups (no subir dumps SQL al repo)
+apps/api/backups/*.sql
+.en

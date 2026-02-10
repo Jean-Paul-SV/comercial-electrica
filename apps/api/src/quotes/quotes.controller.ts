@@ -188,9 +188,14 @@ export class QuotesController {
   convert(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Body() dto: ConvertQuoteDto,
-    @Req() req: { user?: { sub?: string } },
+    @Req() req: { user?: { sub?: string; tenantId?: string | null } },
   ) {
-    return this.quotesService.convertQuoteToSale(id, dto, req.user?.sub);
+    return this.quotesService.convertQuoteToSale(
+      id,
+      dto,
+      req.user?.sub,
+      req.user?.tenantId,
+    );
   }
 
   @Patch(':id/status')

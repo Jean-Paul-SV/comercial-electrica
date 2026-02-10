@@ -4,13 +4,16 @@ import { createHash } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { getAuditContext } from '../audit/audit-context';
 
-/** Contexto opcional para enriquecer el log (ip, userAgent, severity, category). */
+/** Contexto opcional para enriquecer el log (tenantId, ip, userAgent, severity, category, summary). */
 export interface AuditLogContext {
+  tenantId?: string | null;
   requestId?: string | null;
   ip?: string | null;
   userAgent?: string | null;
   severity?: string | null;
   category?: string | null;
+  /** Descripción corta para listados (máx. 255 caracteres). Si no se pasa, se genera desde entity + action. */
+  summary?: string | null;
 }
 
 const GENESIS_HASH = '';
@@ -56,11 +59,17 @@ export class AuditService {
     }
 
     const requestContext = getAuditContext();
+    const tenantId = context?.tenantId ?? requestContext?.tenantId ?? null;
     const requestId = context?.requestId ?? requestContext?.requestId ?? null;
     const ip = context?.ip ?? requestContext?.ip ?? null;
     const userAgent = context?.userAgent ?? requestContext?.userAgent ?? null;
     const severity = context?.severity ?? null;
     const category = context?.category ?? null;
+    const summaryRaw = context?.summary ?? null;
+    const summary =
+      summaryRaw != null && summaryRaw.length > 0
+        ? String(summaryRaw).slice(0, 255)
+        : `${entity} · ${action}`.slice(0, 255);
 
     const id = randomUUID();
     const createdAt = new Date();
@@ -72,7 +81,7 @@ export class AuditService {
       });
       const previousHash = lastLog?.entryHash ?? GENESIS_HASH;
 
-      const payload = canonicalPayload({
+      const payloadObj: Record<string, unknown> = {
         id,
         actorId: actorId ?? null,
         entity,
@@ -85,16 +94,20 @@ export class AuditService {
         severity: severity ?? null,
         category: category ?? null,
         createdAt: createdAt.toISOString(),
-      });
+      };
+      if (tenantId != null) payloadObj.tenantId = tenantId;
+      const payload = canonicalPayload(payloadObj);
       const entryHash = sha256Hex(previousHash + '|' + payload);
 
       await this.prisma.auditLog.create({
         data: {
           id,
+          tenantId: tenantId ?? undefined,
           actorId: actorId ?? null,
           entity,
           entityId,
           action,
+          summary: summary || undefined,
           diff: diff ? (diff as object) : undefined,
           requestId: requestId ?? undefined,
           ip: ip ?? undefined,
@@ -119,8 +132,9 @@ export class AuditService {
     entityId: string,
     actorId?: string | null,
     data?: Record<string, unknown>,
+    context?: AuditLogContext,
   ) {
-    return this.log(entity, entityId, 'create', actorId, data);
+    return this.log(entity, entityId, 'create', actorId, data, context);
   }
 
   /**
@@ -132,12 +146,13 @@ export class AuditService {
     actorId: string | null | undefined,
     oldData?: Record<string, unknown>,
     newData?: Record<string, unknown>,
+    context?: AuditLogContext,
   ) {
     const diff = {
       old: oldData,
       new: newData,
     };
-    return this.log(entity, entityId, 'update', actorId, diff);
+    return this.log(entity, entityId, 'update', actorId, diff, context);
   }
 
   /**
@@ -148,8 +163,9 @@ export class AuditService {
     entityId: string,
     actorId?: string | null,
     data?: Record<string, unknown>,
+    context?: AuditLogContext,
   ) {
-    return this.log(entity, entityId, 'delete', actorId, data);
+    return this.log(entity, entityId, 'delete', actorId, data, context);
   }
 
   /**
@@ -193,6 +209,7 @@ export class AuditService {
       orderBy: { createdAt: 'asc' },
       select: {
         id: true,
+        tenantId: true,
         actorId: true,
         entity: true,
         entityId: true,
@@ -214,7 +231,7 @@ export class AuditService {
 
     for (const log of logs) {
       if (log.entryHash == null) continue;
-      const payload = canonicalPayload({
+      const payloadObj: Record<string, unknown> = {
         id: log.id,
         actorId: log.actorId,
         entity: log.entity,
@@ -230,7 +247,9 @@ export class AuditService {
           log.createdAt instanceof Date
             ? log.createdAt.toISOString()
             : String(log.createdAt),
-      });
+      };
+      if (log.tenantId != null) payloadObj.tenantId = log.tenantId;
+      const payload = canonicalPayload(payloadObj);
       const expectedHash = sha256Hex((previousEntryHash ?? '') + '|' + payload);
       if (expectedHash !== log.entryHash) {
         errors.push(

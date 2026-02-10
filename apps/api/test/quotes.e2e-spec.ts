@@ -11,6 +11,7 @@ describe('Quotes (e2e) - Flujo Completo', () => {
   let prisma: PrismaService;
   let authToken: string;
   let userId: string;
+  let tenantId: string;
   let productId: string;
   let customerId: string;
   let quoteId: string;
@@ -22,21 +23,18 @@ describe('Quotes (e2e) - Flujo Completo', () => {
       }),
     ).compile();
 
-    // Setup simplificado usando helper común
     const setup = await setupTestApp(moduleFixture, 'quotes-test@example.com');
-    ({ app, prisma, authToken, userId } = setup);
+    ({ app, prisma, authToken, userId, tenantId } = setup);
 
-    // Crear categoría (usar upsert para evitar unique constraint)
     const category = await prisma.category.upsert({
-      where: { name: 'Test Category' },
+      where: { tenantId_name: { tenantId, name: 'Test Category' } },
       update: {},
-      create: { name: 'Test Category' },
+      create: { tenantId, name: 'Test Category' },
     });
 
-    // Crear producto (usar código único para evitar conflictos)
     const productCode = `QUOTES-TEST-${Date.now()}`;
     const product = await prisma.product.upsert({
-      where: { internalCode: productCode },
+      where: { tenantId_internalCode: { tenantId, internalCode: productCode } },
       update: {
         name: 'Test Product',
         categoryId: category.id,
@@ -46,6 +44,7 @@ describe('Quotes (e2e) - Flujo Completo', () => {
         isActive: true,
       },
       create: {
+        tenantId,
         internalCode: productCode,
         name: 'Test Product',
         categoryId: category.id,
@@ -57,11 +56,10 @@ describe('Quotes (e2e) - Flujo Completo', () => {
     });
     productId = product.id;
 
-    // Crear cliente con docNumber único para evitar conflictos
     const customer = await prisma.customer.create({
       data: {
+        tenantId,
         docType: 'CC',
-        // Usar docNumber único para evitar violar el unique constraint (docType, docNumber)
         docNumber: `123456${Date.now()}`,
         name: 'Test Customer',
       },
@@ -171,9 +169,9 @@ describe('Quotes (e2e) - Flujo Completo', () => {
         );
       }
 
-      // Crear sesión de caja primero
       const cashSession = await prisma.cashSession.create({
         data: {
+          tenantId,
           openingAmount: 100000,
           openedBy: userId,
         },

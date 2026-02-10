@@ -68,7 +68,7 @@ export class ReportsService {
     }
   }
 
-  async getSalesReport(dto: SalesReportDto) {
+  async getSalesReport(dto: SalesReportDto, tenantId: string) {
     // Validar rango de fechas (máximo 1 año)
     if (dto.startDate && dto.endDate) {
       const start = new Date(dto.startDate);
@@ -89,6 +89,7 @@ export class ReportsService {
     }
 
     const where: Prisma.SaleWhereInput = {
+      tenantId,
       status: 'PAID', // Solo ventas pagadas
     };
 
@@ -166,8 +167,9 @@ export class ReportsService {
     };
   }
 
-  async getInventoryReport(dto: InventoryReportDto) {
+  async getInventoryReport(dto: InventoryReportDto, tenantId: string) {
     const where: Prisma.ProductWhereInput = {
+      tenantId,
       isActive: true,
     };
 
@@ -238,7 +240,7 @@ export class ReportsService {
     };
   }
 
-  async getCashReport(dto: CashReportDto) {
+  async getCashReport(dto: CashReportDto, tenantId: string) {
     // Validar rango de fechas (máximo 1 año)
     if (dto.startDate && dto.endDate) {
       const start = new Date(dto.startDate);
@@ -258,7 +260,7 @@ export class ReportsService {
       }
     }
 
-    const where: Prisma.CashSessionWhereInput = {};
+    const where: Prisma.CashSessionWhereInput = { tenantId };
 
     if (dto.sessionId) {
       where.id = dto.sessionId;
@@ -375,7 +377,7 @@ export class ReportsService {
     };
   }
 
-  async getCustomersReport(dto: CustomersReportDto) {
+  async getCustomersReport(dto: CustomersReportDto, tenantId: string) {
     // Validar rango de fechas (máximo 1 año)
     if (dto.startDate && dto.endDate) {
       const start = new Date(dto.startDate);
@@ -396,6 +398,7 @@ export class ReportsService {
     }
 
     const where: Prisma.SaleWhereInput = {
+      tenantId,
       status: 'PAID',
     };
 
@@ -501,7 +504,7 @@ export class ReportsService {
    * Artículos en tendencias: productos ordenados por ingreso total o por unidades vendidas
    * en el período indicado (últimos N días o mes actual).
    */
-  async getTrendingProducts(dto: TrendingProductsDto) {
+  async getTrendingProducts(dto: TrendingProductsDto, tenantId: string) {
     const top = Math.min(Math.max(dto.top ?? 20, 1), 100);
     const sortBy = dto.sortBy ?? 'revenue';
     const period = dto.period ?? 'last_days';
@@ -531,6 +534,7 @@ export class ReportsService {
     const saleItems = await this.prisma.saleItem.findMany({
       where: {
         sale: {
+          tenantId,
           status: 'PAID',
           soldAt: { gte: since, ...(end ? { lte: end } : {}) },
         },
@@ -606,9 +610,9 @@ export class ReportsService {
     };
   }
 
-  async getDashboard() {
+  async getDashboard(tenantId: string) {
     return this.wrapReport(async () => {
-      const cacheKey = this.cache.buildKey('dashboard', 'main');
+      const cacheKey = this.cache.buildKey('dashboard', tenantId);
       let cached: unknown = null;
       try {
         cached = await this.cache.get(cacheKey);
@@ -633,6 +637,7 @@ export class ReportsService {
       // Ventas del día (select explícito para no depender de columnas opcionales como createdByUserId)
       const todaySales = await this.prisma.sale.findMany({
         where: {
+          tenantId,
           status: 'PAID',
           soldAt: {
             gte: todayStart,
@@ -650,6 +655,7 @@ export class ReportsService {
       // Productos con stock bajo
       const lowStockProducts = await this.prisma.product.findMany({
         where: {
+          tenantId,
           isActive: true,
           stock: {
             qtyOnHand: { lte: 10 },
@@ -665,6 +671,7 @@ export class ReportsService {
       // Sesiones de caja abiertas
       const openCashSessions = await this.prisma.cashSession.findMany({
         where: {
+          tenantId,
           closedAt: null,
         },
         include: {
@@ -675,6 +682,7 @@ export class ReportsService {
       // Cotizaciones pendientes (no convertidas ni canceladas)
       const pendingQuotes = await this.prisma.quote.count({
         where: {
+          tenantId,
           status: {
             in: ['DRAFT', 'SENT'],
           },
@@ -689,6 +697,7 @@ export class ReportsService {
       weekFromNow.setDate(weekFromNow.getDate() + 7);
       const expiringQuotes = await this.prisma.quote.count({
         where: {
+          tenantId,
           status: {
             in: ['DRAFT', 'SENT'],
           },
@@ -701,14 +710,17 @@ export class ReportsService {
 
       // Total de productos activos
       const totalProducts = await this.prisma.product.count({
-        where: { isActive: true },
+        where: { tenantId, isActive: true },
       });
 
       // Total de clientes
-      const totalCustomers = await this.prisma.customer.count();
+      const totalCustomers = await this.prisma.customer.count({
+        where: { tenantId },
+      });
 
       const dashboard = {
         date: now.toISOString(),
+        tenantId,
         sales: {
           today: {
             count: todaySales.length,
@@ -759,7 +771,7 @@ export class ReportsService {
    * Estado operativo del negocio: indicadores por área y alertas con acción sugerida.
    * Ver docs/ESTADOS_OPERATIVOS_Y_ALERTAS.md
    */
-  async getOperationalState(): Promise<OperationalStateResponse> {
+  async getOperationalState(tenantId: string): Promise<OperationalStateResponse> {
     return this.wrapReport(async () => {
       const now = new Date();
       const todayStart = new Date(
@@ -791,11 +803,12 @@ export class ReportsService {
         dueSoonInvoices,
       ] = await Promise.all([
         this.prisma.cashSession.findMany({
-          where: { closedAt: null },
+          where: { tenantId, closedAt: null },
           orderBy: { openedAt: 'asc' },
         }),
         this.prisma.product.findMany({
           where: {
+            tenantId,
             isActive: true,
             stock: { qtyOnHand: { lte: LOW_STOCK_THRESHOLD } },
           },
@@ -803,6 +816,7 @@ export class ReportsService {
         }),
         this.prisma.product.findMany({
           where: {
+            tenantId,
             isActive: true,
             OR: [{ stock: null }, { stock: { qtyOnHand: 0 } }],
           },
@@ -810,24 +824,28 @@ export class ReportsService {
         }),
         this.prisma.quote.count({
           where: {
+            tenantId,
             status: { in: ['DRAFT', 'SENT'] },
             validUntil: { gte: now },
           },
         }),
         this.prisma.quote.count({
           where: {
+            tenantId,
             status: { in: ['DRAFT', 'SENT'] },
             validUntil: { gte: now, lte: weekFromNow },
           },
         }),
         this.prisma.quote.count({
           where: {
+            tenantId,
             status: { in: ['DRAFT', 'SENT'] },
             validUntil: { lt: now },
           },
         }),
         this.prisma.sale.findMany({
           where: {
+            tenantId,
             status: 'PAID',
             soldAt: { gte: todayStart, lt: todayEnd },
           },
@@ -835,17 +853,19 @@ export class ReportsService {
         }),
         this.prisma.sale.findMany({
           where: {
+            tenantId,
             status: 'PAID',
             soldAt: { gte: lookbackStart, lt: todayStart },
           },
           select: { grandTotal: true },
         }),
         this.prisma.supplierInvoice.findMany({
-          where: { status: 'PENDING', dueDate: { lt: todayStart } },
+          where: { tenantId, status: 'PENDING', dueDate: { lt: todayStart } },
           select: { id: true },
         }),
         this.prisma.supplierInvoice.findMany({
           where: {
+            tenantId,
             status: 'PENDING',
             dueDate: { gte: todayStart, lte: invoicesDueSoonEnd },
           },
@@ -1051,6 +1071,7 @@ export class ReportsService {
    */
   async getActionableIndicators(
     dto: ActionableIndicatorsDto = {},
+    tenantId: string,
   ): Promise<ActionableIndicatorsResponse> {
     return this.wrapReport(async () => {
       const days = Math.min(dto.days ?? 30, 365);
@@ -1091,6 +1112,7 @@ export class ReportsService {
       const saleItemsWithProduct = await this.prisma.saleItem.findMany({
         where: {
           sale: {
+            tenantId,
             status: 'PAID',
             soldAt: soldAtRange,
           },
@@ -1158,6 +1180,7 @@ export class ReportsService {
       const productIdsSold = await this.prisma.saleItem.findMany({
         where: {
           sale: {
+            tenantId,
             status: 'PAID',
             soldAt: soldAtRange,
           },
@@ -1168,6 +1191,7 @@ export class ReportsService {
       const soldIds = new Set(productIdsSold.map((p) => p.productId));
       const noRotationProducts = await this.prisma.product.findMany({
         where: {
+          tenantId,
           isActive: true,
           id: { notIn: Array.from(soldIds) },
         },
@@ -1182,6 +1206,7 @@ export class ReportsService {
       if (noRotationProducts.length > 0) {
         const totalNoRotation = await this.prisma.product.count({
           where: {
+            tenantId,
             isActive: true,
             id: { notIn: Array.from(soldIds) },
           },
@@ -1207,7 +1232,7 @@ export class ReportsService {
 
       // 3) Facturas proveedor vencidas
       const overdueInvoices = await this.prisma.supplierInvoice.findMany({
-        where: { status: 'PENDING', dueDate: { lt: todayStart } },
+        where: { tenantId, status: 'PENDING', dueDate: { lt: todayStart } },
         include: { supplier: { select: { name: true } } },
         take: top,
         orderBy: { dueDate: 'asc' },
@@ -1215,7 +1240,7 @@ export class ReportsService {
 
       if (overdueInvoices.length > 0) {
         const totalOverdue = await this.prisma.supplierInvoice.count({
-          where: { status: 'PENDING', dueDate: { lt: todayStart } },
+          where: { tenantId, status: 'PENDING', dueDate: { lt: todayStart } },
         });
         const pendingTotal = overdueInvoices.reduce(
           (acc, inv) => acc + Number(inv.grandTotal) - Number(inv.paidAmount),
@@ -1241,7 +1266,7 @@ export class ReportsService {
 
       // 4) Productos con margen muy bajo (< 10 %)
       const allProducts = await this.prisma.product.findMany({
-        where: { isActive: true },
+        where: { tenantId, isActive: true },
         select: { id: true, name: true, cost: true, price: true },
       });
       const lowMarginProducts = allProducts.filter((p) => {
@@ -1341,6 +1366,7 @@ export class ReportsService {
       const salesForReorder = await this.prisma.saleItem.findMany({
         where: {
           sale: {
+            tenantId,
             status: 'PAID',
             soldAt: { gte: reorderPeriodStart },
           },
@@ -1892,11 +1918,11 @@ export class ReportsService {
    * Resumen del dashboard en lenguaje natural (IA Fase 3).
    * Si OPENAI_API_KEY está configurado, usa LLM para una o dos frases; si no, devuelve fallback (primeros insights).
    */
-  async getDashboardSummary(dto: ActionableIndicatorsDto = {}): Promise<{
+  async getDashboardSummary(dto: ActionableIndicatorsDto = {}, tenantId: string): Promise<{
     summary: string;
     source: 'llm' | 'fallback';
   }> {
-    const { indicators } = await this.getActionableIndicators(dto);
+    const { indicators } = await this.getActionableIndicators(dto, tenantId);
     const insights = indicators.map((i) => i.insight);
     const fallback =
       insights.length > 0
@@ -1905,6 +1931,9 @@ export class ReportsService {
 
     const apiKey = this.config.get<string>('OPENAI_API_KEY', '')?.trim();
     if (!apiKey) {
+      this.logger.log(
+        'Resumen del día: OPENAI_API_KEY no configurada, usando resumen automático.',
+      );
       return { summary: fallback, source: 'fallback' };
     }
 
@@ -1959,7 +1988,7 @@ export class ReportsService {
    * Segmenta por: monto total en periodo, días desde última compra, cantidad de compras.
    * Devuelve k clusters con lista de clientes por segmento.
    */
-  async getCustomerClusters(dto: CustomerClustersDto = {}): Promise<{
+  async getCustomerClusters(dto: CustomerClustersDto = {}, tenantId: string): Promise<{
     periodDays: number;
     k: number;
     clusters: Array<{
@@ -1981,6 +2010,7 @@ export class ReportsService {
 
     const sales = await this.prisma.sale.findMany({
       where: {
+        tenantId,
         status: 'PAID',
         soldAt: { gte: periodStart },
         customerId: { not: null },
@@ -2132,15 +2162,17 @@ export class ReportsService {
 
   /**
    * Exporta datos por entidad a CSV (para descarga manual; resiliencia).
+   * Filtrado por tenantId para aislamiento multi-tenant.
    */
   async exportAsCsv(
     dto: ExportReportDto,
+    tenantId: string,
   ): Promise<{ csv: string; fileName: string }> {
     const limit = Math.min(dto.limit ?? 1000, 5000);
     const entity = dto.entity;
 
     if (entity === 'sales') {
-      const where: Prisma.SaleWhereInput = { status: 'PAID' };
+      const where: Prisma.SaleWhereInput = { tenantId, status: 'PAID' };
       if (dto.startDate || dto.endDate) {
         where.soldAt = {};
         if (dto.startDate) where.soldAt.gte = new Date(dto.startDate);
@@ -2174,6 +2206,7 @@ export class ReportsService {
 
     if (entity === 'customers') {
       const customers = await this.prisma.customer.findMany({
+        where: { tenantId },
         orderBy: { name: 'asc' },
         take: limit,
       });

@@ -2,6 +2,8 @@ import {
   Injectable,
   UnauthorizedException,
   BadRequestException,
+  InternalServerErrorException,
+  HttpException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
@@ -30,11 +32,15 @@ export type JwtPayload = {
   role: RoleName;
   /** Tenant del usuario; si no tiene, se usa el default para aislamiento de datos. */
   tenantId?: string | null;
+  /** true cuando el usuario no pertenece a ningún tenant (admin de plataforma). Usado p. ej. en GET /stats?tenantId= */
+  isPlatformAdmin?: boolean;
 };
 
 export type MeResponse = {
   user: { id: string; email: string; role: RoleName; profilePictureUrl?: string | null };
   permissions: string[];
+  /** true cuando el usuario no pertenece a ningún tenant (admin de plataforma). */
+  isPlatformAdmin?: boolean;
   tenant?: {
     id: string;
     name: string;
@@ -383,6 +389,21 @@ export class AuthService {
   }
 
   async login(dto: LoginDto) {
+    try {
+      return await this.loginInternal(dto);
+    } catch (err) {
+      if (err instanceof HttpException) throw err;
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('[AuthService.login] Error no controlado:', err);
+      throw new InternalServerErrorException(
+        process.env.NODE_ENV === 'production'
+          ? 'Error al iniciar sesión. Intenta más tarde.'
+          : message,
+      );
+    }
+  }
+
+  private async loginInternal(dto: LoginDto) {
     const email = dto.email.toLowerCase();
     const user = await this.prisma.user.findUnique({
       where: { email },
@@ -416,18 +437,45 @@ export class AuthService {
 
     const effectiveTenantId =
       user.tenantId ?? (await this.tenantModules.getDefaultTenantId());
+    if (effectiveTenantId) {
+      const tenant = await this.prisma.tenant.findUnique({
+        where: { id: effectiveTenantId },
+        select: { isActive: true },
+      });
+      if (tenant && !tenant.isActive) {
+        throw new UnauthorizedException(
+          'Cuenta suspendida. Contacte a soporte o facturación.',
+        );
+      }
+    }
     const payload: JwtPayload = {
       sub: user.id,
       email: user.email,
       role: user.role,
       tenantId: effectiveTenantId ?? undefined,
+      isPlatformAdmin: user.tenantId === null,
     };
-    const accessToken = await this.jwt.signAsync(payload);
+    const now = new Date();
+    await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id: user.id },
+        data: { lastLoginAt: now },
+      }),
+      ...(effectiveTenantId
+        ? [
+            this.prisma.tenant.update({
+              where: { id: effectiveTenantId },
+              data: { lastActivityAt: now },
+            }),
+          ]
+        : []),
+    ]);
     try {
       await this.audit.logAuth('login', user.id, { email, role: user.role });
     } catch (auditErr) {
       console.error('Error al registrar auditoría de login:', auditErr);
     }
+    const accessToken = await this.jwt.signAsync(payload);
     return {
       accessToken,
       mustChangePassword: user.mustChangePassword ?? false,
@@ -456,11 +504,17 @@ export class AuthService {
     const permissions =
       await this.permissions.getEnabledPermissionsForUser(userId);
     const tenantId = user.tenantId ?? null;
-    const enabledModules = await this.tenantModules.getEnabledModules(tenantId);
+    let enabledModules: string[] = [];
+    try {
+      enabledModules = await this.tenantModules.getEnabledModules(tenantId);
+    } catch (err) {
+      console.error('[AuthService.getMe] getEnabledModules error:', err);
+    }
 
     const response: MeResponse = {
       user: { id: user.id, email: user.email, role: user.role, profilePictureUrl: user.profilePictureUrl },
       permissions,
+      isPlatformAdmin: user.tenantId === null,
     };
     if (user.tenant) {
       response.tenant = {

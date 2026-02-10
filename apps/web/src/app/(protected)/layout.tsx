@@ -38,7 +38,7 @@ export default function ProtectedLayout({
 function ProtectedLayoutContent({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { isAuthenticated, user, enabledModules, hasCheckedStorage, isRestoringSession } = useAuth();
+  const { isAuthenticated, user, enabledModules, isPlatformAdmin, hasCheckedStorage, isRestoringSession } = useAuth();
   const isOnline = useOnlineStatus();
 
   useEffect(() => {
@@ -53,13 +53,22 @@ function ProtectedLayoutContent({ children }: { children: React.ReactNode }) {
       router.replace('/app');
       return;
     }
+    if ((pathname ?? '').startsWith('/provider') && !isPlatformAdmin) {
+      router.replace('/app');
+      return;
+    }
+    // Admin de plataforma solo usa Panel proveedor; redirigir /app a /provider
+    if (isPlatformAdmin && (pathname === '/app' || pathname === '/')) {
+      router.replace('/provider');
+      return;
+    }
     if (!isPlanRequiredPath(pathname) && enabledModules.length > 0) {
       const requiredModule = getModuleForPath(pathname);
       if (requiredModule && !enabledModules.includes(requiredModule)) {
         router.replace(`/plan-required?module=${encodeURIComponent(requiredModule)}`);
       }
     }
-  }, [isAuthenticated, isRestoringSession, user?.role, pathname, router, enabledModules, hasCheckedStorage]);
+  }, [isAuthenticated, isRestoringSession, user?.role, pathname, router, enabledModules, isPlatformAdmin, hasCheckedStorage]);
 
   if (!hasCheckedStorage || isRestoringSession) {
     return (
@@ -70,6 +79,9 @@ function ProtectedLayoutContent({ children }: { children: React.ReactNode }) {
   }
   if (!isAuthenticated) return null;
   if (user?.role && pathname && !canAccessPath(pathname, user.role)) {
+    return null;
+  }
+  if (pathname?.startsWith('/provider') && !isPlatformAdmin) {
     return null;
   }
   if (

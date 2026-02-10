@@ -10,11 +10,14 @@ type SidebarNavItemProps = {
   item: NavItemConfig;
   /** Modo colapsado: solo icono, sin label. */
   collapsed?: boolean;
+  /** Si se pasa, se usa en lugar de calcular por pathname (para que solo un ítem por sección quede activo). */
+  isActive?: boolean;
 };
 
-export function SidebarNavItem({ item, collapsed = false }: SidebarNavItemProps) {
+export function SidebarNavItem({ item, collapsed = false, isActive: isActiveProp }: SidebarNavItemProps) {
   const pathname = usePathname();
-  const active = pathname === item.href || (item.href !== '/app' && pathname?.startsWith(item.href + '/'));
+  const activeByPath = pathname === item.href || (item.href !== '/app' && pathname?.startsWith(item.href + '/'));
+  const active = isActiveProp !== undefined ? isActiveProp : activeByPath;
   const Icon = getNavIcon(item.icon);
 
   if (item.disabled) {

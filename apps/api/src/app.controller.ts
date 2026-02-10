@@ -1,9 +1,10 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import { Controller, Get, UseGuards, Req, Query, ForbiddenException } from '@nestjs/common';
 import {
   ApiOperation,
   ApiResponse,
   ApiTags,
   ApiBearerAuth,
+  ApiQuery,
 } from '@nestjs/swagger';
 import { AppService } from './app.service';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
@@ -60,7 +61,12 @@ export class AppController {
   @ApiOperation({
     summary: 'Estadísticas generales del sistema',
     description:
-      'Obtiene estadísticas generales del sistema (requiere permiso reports:read)',
+      'Obtiene estadísticas generales del sistema filtradas por tenant. Usuarios regulares ven solo su tenant. Platform admins pueden especificar tenantId opcional.',
+  })
+  @ApiQuery({
+    name: 'tenantId',
+    required: false,
+    description: 'ID del tenant (solo para platform admins). Si no se especifica, usa el tenant del usuario autenticado.',
   })
   @ApiResponse({
     status: 200,
@@ -71,7 +77,20 @@ export class AppController {
     status: 403,
     description: 'No autorizado (requiere permiso reports:read)',
   })
-  getStats() {
-    return this.appService.getStats();
+  getStats(
+    @Req() req: { user?: { tenantId?: string | null; isPlatformAdmin?: boolean } },
+    @Query('tenantId') tenantId?: string,
+  ) {
+    // Si es platform admin y especifica tenantId, usar ese
+    // Si no, usar el tenantId del usuario autenticado
+    const targetTenantId = req.user?.isPlatformAdmin && tenantId
+      ? tenantId
+      : req.user?.tenantId ?? null;
+
+    if (!targetTenantId && !req.user?.isPlatformAdmin) {
+      throw new ForbiddenException('Tenant requerido para obtener estadísticas');
+    }
+
+    return this.appService.getStats(targetTenantId);
   }
 }

@@ -97,9 +97,17 @@ export class CashService {
       },
     );
 
-    await this.audit.logCreate('cashSession', session.id, openedBy, {
-      openingAmount: Number(openingAmount),
-    });
+    await this.audit.logCreate(
+      'cashSession',
+      session.id,
+      openedBy,
+      {
+        openingAmount: Number(openingAmount),
+      },
+      {
+        summary: `Sesión de caja abierta con ${Number(openingAmount).toLocaleString('es-CO')}`,
+      },
+    );
 
     return session;
   }
@@ -145,14 +153,14 @@ export class CashService {
 
     if (pendingSales > 0) {
       this.logger.warn(
-        `Intento de cerrar sesión ${id} con ${pendingSales} ventas pendientes`,
+        `Intento de cerrar sesión ${id} con ${pendingSales} ventas pendientes de facturar`,
         {
           sessionId: id,
           pendingSales,
         },
       );
       throw new BadRequestException(
-        `No se puede cerrar la sesión. Hay ${pendingSales} venta(s) pendiente(s).`,
+        `No se puede cerrar la sesión. Hay ${pendingSales} venta(s) pendiente(s) de facturar. Factúrelas o anúlelas antes de cerrar la caja.`,
       );
     }
 
@@ -189,6 +197,9 @@ export class CashService {
       {
         closedAt: updated.closedAt,
         closingAmount: Number(closingAmount),
+      },
+      {
+        summary: `Sesión de caja cerrada con ${Number(closingAmount).toLocaleString('es-CO')}`,
       },
     );
 

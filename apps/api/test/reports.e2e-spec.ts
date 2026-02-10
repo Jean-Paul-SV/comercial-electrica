@@ -11,6 +11,7 @@ describe('Reports (e2e)', () => {
   let prisma: PrismaService;
   let authToken: string;
   let userId: string;
+  let tenantId: string;
   let productId: string;
   let customerId: string;
   let saleId: string;
@@ -23,22 +24,18 @@ describe('Reports (e2e)', () => {
       }),
     ).compile();
 
-    // Setup simplificado usando helper común
     const setup = await setupTestApp(moduleFixture, 'reports-test@example.com');
-    ({ app, prisma, authToken, userId } = setup);
+    ({ app, prisma, authToken, userId, tenantId } = setup);
 
-    // Crear datos de prueba
-    // Usar upsert para evitar unique constraint
     const category = await prisma.category.upsert({
-      where: { name: 'Test Category' },
+      where: { tenantId_name: { tenantId, name: 'Test Category' } },
       update: {},
-      create: { name: 'Test Category' },
+      create: { tenantId, name: 'Test Category' },
     });
 
-    // Usar código único para evitar conflictos entre tests
     const productCode = `REPORTS-TEST-${Date.now()}`;
     const product = await prisma.product.upsert({
-      where: { internalCode: productCode },
+      where: { tenantId_internalCode: { tenantId, internalCode: productCode } },
       update: {
         name: 'Test Product',
         categoryId: category.id,
@@ -48,6 +45,7 @@ describe('Reports (e2e)', () => {
         isActive: true,
       },
       create: {
+        tenantId,
         internalCode: productCode,
         name: 'Test Product',
         categoryId: category.id,
@@ -61,17 +59,17 @@ describe('Reports (e2e)', () => {
 
     const customer = await prisma.customer.create({
       data: {
+        tenantId,
         docType: 'CC',
-        // Usar docNumber único para evitar violar el unique constraint (docType, docNumber)
         docNumber: `123456${Date.now()}`,
         name: 'Test Customer',
       },
     });
     customerId = customer.id;
 
-    // Crear sesión de caja con openedBy (requerido para algunas operaciones)
     const cashSession = await prisma.cashSession.create({
       data: {
+        tenantId,
         openingAmount: 100000,
         openedBy: userId,
       },
@@ -80,6 +78,7 @@ describe('Reports (e2e)', () => {
 
     const sale = await prisma.sale.create({
       data: {
+        tenantId,
         customerId,
         status: 'PAID',
         subtotal: 2000,
@@ -110,8 +109,8 @@ describe('Reports (e2e)', () => {
   });
 
   afterAll(async () => {
-    // Limpiar solo datos relacionados a reports, no productos/categorías/clientes
-    // para evitar conflictos con otras suites
+    await prisma.saleReturnItem.deleteMany();
+    await prisma.saleReturn.deleteMany();
     await prisma.saleItem.deleteMany();
     await prisma.sale.deleteMany();
     await prisma.cashMovement.deleteMany();

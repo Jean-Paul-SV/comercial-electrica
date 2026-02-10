@@ -16,6 +16,8 @@ export type AuthState = {
   permissions: string[];
   /** Módulos habilitados para el tenant (SaaS). Si vacío/undefined, no se filtra nav por módulo. */
   enabledModules: string[];
+  /** true cuando el usuario no pertenece a ningún tenant (acceso al panel del proveedor). */
+  isPlatformAdmin: boolean;
   /** Si true, el usuario debe cambiar la contraseña (ej. temporal). */
   mustChangePassword: boolean;
   isAuthenticated: boolean;
@@ -43,6 +45,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<{ id: string; email: string; role: 'ADMIN' | 'USER'; profilePictureUrl?: string | null } | null>(null);
   const [permissions, setPermissions] = useState<string[]>([]);
   const [enabledModules, setEnabledModules] = useState<string[]>([]);
+  const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
   const [mustChangePassword, setMustChangePassword] = useState(false);
 
   useEffect(() => {
@@ -58,10 +61,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(res.user);
       setPermissions(res.permissions ?? []);
       setEnabledModules(res.tenant?.enabledModules ?? []);
+      setIsPlatformAdmin(res.isPlatformAdmin ?? false);
     } catch {
       setUser(null);
       setPermissions([]);
       setEnabledModules([]);
+      setIsPlatformAdmin(false);
     }
   }, [token]);
 
@@ -70,6 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(null);
       setPermissions([]);
       setEnabledModules([]);
+      setIsPlatformAdmin(false);
       return;
     }
     const claims = decodeJwtClaims(token);
@@ -88,6 +94,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(res.user);
         setPermissions(res.permissions ?? []);
         setEnabledModules(res.tenant?.enabledModules ?? []);
+        setIsPlatformAdmin(res.isPlatformAdmin ?? false);
       })
       .catch((err: { status?: number }) => {
         // Solo cerrar sesión si el servidor responde 401 (token inválido/expirado).
@@ -98,6 +105,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setUser(null);
           setPermissions([]);
           setEnabledModules([]);
+          setIsPlatformAdmin(false);
         } else {
           setPermissions([]);
           setEnabledModules([]);
@@ -114,6 +122,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       permissions,
       enabledModules,
+      isPlatformAdmin,
       mustChangePassword,
       isAuthenticated: Boolean(token && user),
       login: (newToken: string, mustChange = false) => {
@@ -127,12 +136,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(null);
         setPermissions([]);
         setEnabledModules([]);
+        setIsPlatformAdmin(false);
         setMustChangePassword(false);
       },
       clearMustChangePassword: () => setMustChangePassword(false),
       refreshMe,
     };
-  }, [token, hasCheckedStorage, user, permissions, enabledModules, mustChangePassword, refreshMe]);
+  }, [token, hasCheckedStorage, user, permissions, enabledModules, isPlatformAdmin, mustChangePassword, refreshMe]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

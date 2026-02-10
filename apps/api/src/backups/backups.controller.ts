@@ -25,9 +25,10 @@ import { PermissionsGuard } from '../auth/permissions.guard';
 import { RequirePermission } from '../auth/require-permission.decorator';
 import { ModulesGuard } from '../auth/modules.guard';
 import { RequireModule } from '../auth/require-module.decorator';
+import { PlatformAdminGuard } from '../provider/platform-admin.guard';
 
 @ApiTags('backups')
-@UseGuards(JwtAuthGuard, PermissionsGuard, ModulesGuard)
+@UseGuards(JwtAuthGuard, PlatformAdminGuard, PermissionsGuard, ModulesGuard)
 @RequirePermission('backups:manage')
 @RequireModule('backups')
 @Controller('backups')

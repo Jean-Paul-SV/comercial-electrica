@@ -4,6 +4,8 @@ import {
   Query,
   UseGuards,
   StreamableFile,
+  Req,
+  ForbiddenException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -12,6 +14,7 @@ import {
   ApiBearerAuth,
   ApiQuery,
 } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { ReportsService } from './reports.service';
 import { SalesReportDto } from './dto/sales-report.dto';
 import { InventoryReportDto } from './dto/inventory-report.dto';
@@ -28,6 +31,7 @@ import { RequireModule } from '../auth/require-module.decorator';
 @ApiTags('reports')
 @UseGuards(JwtAuthGuard, ModulesGuard)
 @RequireModule('advanced_reports')
+@Throttle({ reports: { limit: 30, ttl: 60000 } }) // 30 requests por minuto por usuario para todos los reportes
 @Controller('reports')
 export class ReportsController {
   constructor(private readonly reportsService: ReportsService) {}
@@ -37,15 +41,23 @@ export class ReportsController {
   @ApiOperation({
     summary: 'Reporte de ventas',
     description:
-      'Obtiene un reporte detallado de ventas con filtros opcionales por fecha y cliente. Incluye totales y estadísticas.',
+      'Obtiene un reporte detallado de ventas filtrado por tenant con filtros opcionales por fecha y cliente. Incluye totales y estadísticas.',
   })
   @ApiResponse({
     status: 200,
     description: 'Reporte de ventas generado exitosamente',
   })
   @ApiResponse({ status: 401, description: 'No autenticado' })
-  getSalesReport(@Query() dto: SalesReportDto) {
-    return this.reportsService.getSalesReport(dto);
+  @ApiResponse({ status: 403, description: 'Tenant requerido' })
+  getSalesReport(
+    @Query() dto: SalesReportDto,
+    @Req() req: { user?: { tenantId?: string | null } },
+  ) {
+    const tenantId = req.user?.tenantId;
+    if (!tenantId) {
+      throw new ForbiddenException('Tenant requerido para obtener el reporte de ventas');
+    }
+    return this.reportsService.getSalesReport(dto, tenantId);
   }
 
   @Get('inventory')
@@ -53,15 +65,23 @@ export class ReportsController {
   @ApiOperation({
     summary: 'Reporte de inventario',
     description:
-      'Obtiene un reporte del estado del inventario. Puede filtrar por stock bajo y categoría. Incluye estadísticas de inventario.',
+      'Obtiene un reporte del estado del inventario filtrado por tenant. Puede filtrar por stock bajo y categoría.',
   })
   @ApiResponse({
     status: 200,
     description: 'Reporte de inventario generado exitosamente',
   })
   @ApiResponse({ status: 401, description: 'No autenticado' })
-  getInventoryReport(@Query() dto: InventoryReportDto) {
-    return this.reportsService.getInventoryReport(dto);
+  @ApiResponse({ status: 403, description: 'Tenant requerido' })
+  getInventoryReport(
+    @Query() dto: InventoryReportDto,
+    @Req() req: { user?: { tenantId?: string | null } },
+  ) {
+    const tenantId = req.user?.tenantId;
+    if (!tenantId) {
+      throw new ForbiddenException('Tenant requerido para obtener el reporte de inventario');
+    }
+    return this.reportsService.getInventoryReport(dto, tenantId);
   }
 
   @Get('cash')
@@ -69,15 +89,23 @@ export class ReportsController {
   @ApiOperation({
     summary: 'Reporte de caja',
     description:
-      'Obtiene un reporte de sesiones de caja con movimientos y diferencias. Puede filtrar por sesión específica o rango de fechas.',
+      'Obtiene un reporte de sesiones de caja filtrado por tenant, con movimientos y diferencias. Puede filtrar por sesión o rango de fechas.',
   })
   @ApiResponse({
     status: 200,
     description: 'Reporte de caja generado exitosamente',
   })
   @ApiResponse({ status: 401, description: 'No autenticado' })
-  getCashReport(@Query() dto: CashReportDto) {
-    return this.reportsService.getCashReport(dto);
+  @ApiResponse({ status: 403, description: 'Tenant requerido' })
+  getCashReport(
+    @Query() dto: CashReportDto,
+    @Req() req: { user?: { tenantId?: string | null } },
+  ) {
+    const tenantId = req.user?.tenantId;
+    if (!tenantId) {
+      throw new ForbiddenException('Tenant requerido para obtener el reporte de caja');
+    }
+    return this.reportsService.getCashReport(dto, tenantId);
   }
 
   @Get('customers')
@@ -85,23 +113,32 @@ export class ReportsController {
   @ApiOperation({
     summary: 'Reporte de clientes',
     description:
-      'Obtiene un reporte de los mejores clientes basado en ventas. Puede filtrar por período y limitar el número de resultados.',
+      'Obtiene un reporte de los mejores clientes filtrado por tenant, basado en ventas. Puede filtrar por período y limitar resultados.',
   })
   @ApiResponse({
     status: 200,
     description: 'Reporte de clientes generado exitosamente',
   })
   @ApiResponse({ status: 401, description: 'No autenticado' })
-  getCustomersReport(@Query() dto: CustomersReportDto) {
-    return this.reportsService.getCustomersReport(dto);
+  @ApiResponse({ status: 403, description: 'Tenant requerido' })
+  getCustomersReport(
+    @Query() dto: CustomersReportDto,
+    @Req() req: { user?: { tenantId?: string | null } },
+  ) {
+    const tenantId = req.user?.tenantId;
+    if (!tenantId) {
+      throw new ForbiddenException('Tenant requerido para obtener el reporte de clientes');
+    }
+    return this.reportsService.getCustomersReport(dto, tenantId);
   }
 
+  @Throttle({ export: { limit: 10, ttl: 60000 } }) // 10 exports por minuto por usuario (más restrictivo)
   @Get('export')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Exportar datos a CSV',
     description:
-      'Exporta ventas o clientes a CSV para descarga. Útil para respaldo o trabajar sin conexión estable.',
+      'Exporta ventas o clientes a CSV para descarga. Útil para respaldo o trabajar sin conexión estable. Límite: 10 exports por minuto por usuario.',
   })
   @ApiQuery({
     name: 'entity',
@@ -117,8 +154,16 @@ export class ReportsController {
     content: { 'text/csv': {} },
   })
   @ApiResponse({ status: 401, description: 'No autenticado' })
-  async export(@Query() dto: ExportReportDto): Promise<StreamableFile> {
-    const { csv, fileName } = await this.reportsService.exportAsCsv(dto);
+  @ApiResponse({ status: 403, description: 'Tenant requerido' })
+  async export(
+    @Query() dto: ExportReportDto,
+    @Req() req: { user?: { tenantId?: string | null } },
+  ): Promise<StreamableFile> {
+    const tenantId = req.user?.tenantId;
+    if (!tenantId) {
+      throw new ForbiddenException('Tenant requerido para exportar datos');
+    }
+    const { csv, fileName } = await this.reportsService.exportAsCsv(dto, tenantId);
     return new StreamableFile(Buffer.from(csv, 'utf-8'), {
       type: 'text/csv; charset=utf-8',
       disposition: `attachment; filename="${fileName}"`,
@@ -171,8 +216,16 @@ export class ReportsController {
     },
   })
   @ApiResponse({ status: 401, description: 'No autenticado' })
-  getActionableIndicators(@Query() dto: ActionableIndicatorsDto) {
-    return this.reportsService.getActionableIndicators(dto);
+  @ApiResponse({ status: 403, description: 'Tenant requerido' })
+  getActionableIndicators(
+    @Query() dto: ActionableIndicatorsDto,
+    @Req() req: { user?: { tenantId?: string | null } },
+  ) {
+    const tenantId = req.user?.tenantId;
+    if (!tenantId) {
+      throw new ForbiddenException('Tenant requerido para indicadores accionables');
+    }
+    return this.reportsService.getActionableIndicators(dto, tenantId);
   }
 
   @Get('dashboard-summary')
@@ -204,8 +257,16 @@ export class ReportsController {
     },
   })
   @ApiResponse({ status: 401, description: 'No autenticado' })
-  getDashboardSummary(@Query() dto: ActionableIndicatorsDto) {
-    return this.reportsService.getDashboardSummary(dto);
+  @ApiResponse({ status: 403, description: 'Tenant requerido' })
+  getDashboardSummary(
+    @Query() dto: ActionableIndicatorsDto,
+    @Req() req: { user?: { tenantId?: string | null } },
+  ) {
+    const tenantId = req.user?.tenantId;
+    if (!tenantId) {
+      throw new ForbiddenException('Tenant requerido para el resumen del dashboard');
+    }
+    return this.reportsService.getDashboardSummary(dto, tenantId);
   }
 
   @Get('customer-clusters')
@@ -259,8 +320,16 @@ export class ReportsController {
     },
   })
   @ApiResponse({ status: 401, description: 'No autenticado' })
-  getCustomerClusters(@Query() dto: CustomerClustersDto) {
-    return this.reportsService.getCustomerClusters(dto);
+  @ApiResponse({ status: 403, description: 'Tenant requerido' })
+  getCustomerClusters(
+    @Query() dto: CustomerClustersDto,
+    @Req() req: { user?: { tenantId?: string | null } },
+  ) {
+    const tenantId = req.user?.tenantId;
+    if (!tenantId) {
+      throw new ForbiddenException('Tenant requerido para clustering de clientes');
+    }
+    return this.reportsService.getCustomerClusters(dto, tenantId);
   }
 
   @Get('trending-products')
@@ -314,8 +383,16 @@ export class ReportsController {
     },
   })
   @ApiResponse({ status: 401, description: 'No autenticado' })
-  getTrendingProducts(@Query() dto: TrendingProductsDto) {
-    return this.reportsService.getTrendingProducts(dto);
+  @ApiResponse({ status: 403, description: 'Tenant requerido' })
+  getTrendingProducts(
+    @Query() dto: TrendingProductsDto,
+    @Req() req: { user?: { tenantId?: string | null } },
+  ) {
+    const tenantId = req.user?.tenantId;
+    if (!tenantId) {
+      throw new ForbiddenException('Tenant requerido para productos en tendencia');
+    }
+    return this.reportsService.getTrendingProducts(dto, tenantId);
   }
 
   @Get('operational-state')
@@ -323,7 +400,7 @@ export class ReportsController {
   @ApiOperation({
     summary: 'Estado operativo del negocio',
     description:
-      'Indicadores por área (caja, inventario, cotizaciones, ventas, facturas proveedor) y alertas con acción sugerida. Para construir dashboard "Acciones recomendadas".',
+      'Indicadores por área (caja, inventario, cotizaciones, ventas, facturas proveedor) filtrados por tenant y alertas con acción sugerida. Para construir dashboard "Acciones recomendadas".',
   })
   @ApiResponse({
     status: 200,
@@ -358,8 +435,13 @@ export class ReportsController {
     },
   })
   @ApiResponse({ status: 401, description: 'No autenticado' })
-  getOperationalState() {
-    return this.reportsService.getOperationalState();
+  @ApiResponse({ status: 403, description: 'Tenant requerido' })
+  getOperationalState(@Req() req: { user?: { tenantId?: string | null } }) {
+    const tenantId = req.user?.tenantId;
+    if (!tenantId) {
+      throw new ForbiddenException('Tenant requerido para obtener el estado operativo');
+    }
+    return this.reportsService.getOperationalState(tenantId);
   }
 
   @Get('dashboard')
@@ -367,14 +449,19 @@ export class ReportsController {
   @ApiOperation({
     summary: 'Dashboard ejecutivo',
     description:
-      'Obtiene KPIs principales del sistema: ventas del día, productos con stock bajo, sesiones de caja abiertas, cotizaciones pendientes, etc.',
+      'Obtiene KPIs principales del sistema filtrados por tenant: ventas del día, productos con stock bajo, sesiones de caja abiertas, cotizaciones pendientes, etc.',
   })
   @ApiResponse({
     status: 200,
     description: 'Dashboard generado exitosamente',
   })
   @ApiResponse({ status: 401, description: 'No autenticado' })
-  getDashboard() {
-    return this.reportsService.getDashboard();
+  @ApiResponse({ status: 403, description: 'Tenant requerido' })
+  getDashboard(@Req() req: { user?: { tenantId?: string | null } }) {
+    const tenantId = req.user?.tenantId;
+    if (!tenantId) {
+      throw new ForbiddenException('Tenant requerido para obtener el dashboard');
+    }
+    return this.reportsService.getDashboard(tenantId);
   }
 }

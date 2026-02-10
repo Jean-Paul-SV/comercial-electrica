@@ -35,6 +35,8 @@ import { Skeleton } from '@shared/components/ui/skeleton';
 import { Pagination } from '@shared/components/Pagination';
 import { EmptyState } from '@shared/components/EmptyState';
 import { formatMoney, formatDateTime } from '@shared/utils/format';
+import { getErrorMessage } from '@shared/utils/errors';
+import { useHasPermission } from '@shared/hooks/useHasPermission';
 import { Wallet, Plus, ArrowDownToLine, ArrowUpFromLine, SlidersHorizontal, Lock, TrendingUp, Calculator, Receipt } from 'lucide-react';
 import { useCashSessionsList, useOpenCashSession, useCloseCashSession, useSessionMovements } from '@features/cash/hooks';
 import { useDashboard, useCashReport } from '@features/reports/hooks';
@@ -56,6 +58,8 @@ const MOVEMENT_TYPES: { value: 'IN' | 'OUT' | 'ADJUST'; label: string; icon: Rea
 ];
 
 export default function CashPage() {
+  const hasCashCreate = useHasPermission('cash:create');
+  const hasCashUpdate = useHasPermission('cash:update');
   const [page, setPage] = useState(1);
   const [openNewSession, setOpenNewSession] = useState(false);
   const [sessionToClose, setSessionToClose] = useState<{ id: string; openedAt: string; openingAmount: number | string } | null>(null);
@@ -121,8 +125,8 @@ export default function CashPage() {
           setSessionToClose(null);
           closeForm.reset({ closingAmount: 0 });
         },
-        onError: (e: { message?: string }) => {
-          toast.error(e?.message ?? 'No se pudo cerrar la sesión');
+        onError: (e: unknown) => {
+          toast.error(getErrorMessage(e, 'No se pudo cerrar la sesión'));
         },
       }
     );
@@ -137,8 +141,8 @@ export default function CashPage() {
           setOpenNewSession(false);
           form.reset({ openingAmount: 0 });
         },
-        onError: (e: { message?: string }) => {
-          toast.error(e?.message ?? 'No se pudo abrir la sesión');
+        onError: (e: unknown) => {
+          toast.error(getErrorMessage(e, 'No se pudo abrir la sesión'));
         },
       }
     );
@@ -201,14 +205,16 @@ export default function CashPage() {
                   Movimientos de caja
                 </Link>
               </Button>
-              <Button
-                size="sm"
-                onClick={() => setOpenNewSession(true)}
-                className="gap-2 w-full sm:w-auto"
-              >
-                <Plus className="h-4 w-4 shrink-0" />
-                Abrir sesión
-              </Button>
+              {hasCashCreate && (
+                <Button
+                  size="sm"
+                  onClick={() => setOpenNewSession(true)}
+                  className="gap-2 w-full sm:w-auto"
+                >
+                  <Plus className="h-4 w-4 shrink-0" />
+                  Abrir sesión
+                </Button>
+              )}
             </div>
           </div>
         </CardHeader>
@@ -245,8 +251,7 @@ export default function CashPage() {
           {query.isError && (
             <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3">
               <p className="text-sm text-destructive">
-                {(query.error as { message?: string })?.message ??
-                  'Error al cargar sesiones'}
+                {getErrorMessage(query.error, 'Error al cargar sesiones')}
               </p>
             </div>
           )}
@@ -295,7 +300,7 @@ export default function CashPage() {
                           </span>
                         </TableCell>
                         <TableCell className="text-right">
-                          {s.closedAt == null ? (
+                          {s.closedAt == null && hasCashUpdate ? (
                             <Button
                               size="sm"
                               variant="outline"
@@ -312,6 +317,8 @@ export default function CashPage() {
                               <Lock className="h-3.5 w-3" />
                               Cerrar sesión
                             </Button>
+                          ) : s.closedAt == null ? (
+                            <span className="text-xs text-muted-foreground">Sin permiso</span>
                           ) : (
                             '—'
                           )}
@@ -326,14 +333,16 @@ export default function CashPage() {
                             description="Abre una sesión para registrar ventas y movimientos de efectivo."
                             icon={Wallet}
                             action={
-                              <Button
-                                size="sm"
-                                onClick={() => setOpenNewSession(true)}
-                                className="gap-2"
-                              >
-                                <Plus className="h-4 w-4" />
-                                Abrir sesión
-                              </Button>
+                              hasCashCreate ? (
+                                <Button
+                                  size="sm"
+                                  onClick={() => setOpenNewSession(true)}
+                                  className="gap-2"
+                                >
+                                  <Plus className="h-4 w-4" />
+                                  Abrir sesión
+                                </Button>
+                              ) : undefined
                             }
                             className="py-16"
                           />
@@ -407,25 +416,27 @@ export default function CashPage() {
       </Dialog>
 
       <Dialog open={!!sessionToClose} onOpenChange={(open) => !open && setSessionToClose(null)}>
-        <DialogContent showClose className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Lock className="h-4 w-4" />
+        <DialogContent showClose className="sm:max-w-xl rounded-2xl border-border/80 shadow-xl max-h-[90vh] overflow-y-auto overflow-x-hidden">
+          <DialogHeader className="pb-3">
+            <DialogTitle className="flex items-center gap-2 text-lg font-semibold">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                <Lock className="h-4 w-4" />
+              </span>
               Cerrar sesión de caja
             </DialogTitle>
             {sessionToClose && (
-              <div className="space-y-1.5 text-sm text-muted-foreground">
+              <div className="space-y-1.5 text-sm text-muted-foreground min-w-0">
                 <p>
                   Sesión abierta el {formatDateTime(sessionToClose.openedAt)} — Apertura: {formatMoney(Number(sessionToClose.openingAmount))}
                 </p>
                 <p className="font-medium text-foreground flex items-center gap-1.5">
-                  <TrendingUp className="h-3.5 w-3.5" />
+                  <TrendingUp className="h-3.5 w-3.5 shrink-0" />
                   Ventas del día: {formatMoney(todaySalesTotal)}
                   {todaySalesCount > 0 && ` (${todaySalesCount} venta${todaySalesCount !== 1 ? 's' : ''})`}
                 </p>
                 {sessionExpectedAmount != null && (
                   <p className="text-muted-foreground">
-                    Monto esperado en caja (apertura + movimientos): <strong className="text-foreground">{formatMoney(sessionExpectedAmount)}</strong>
+                    Monto esperado en caja (apertura + movimientos): <strong className={sessionExpectedAmount < 0 ? 'text-destructive' : 'text-foreground'}>{formatMoney(sessionExpectedAmount)}</strong>
                   </p>
                 )}
                 {sessionTotalsByMethod && Object.keys(sessionTotalsByMethod).some((k) => (sessionTotalsByMethod[k] ?? 0) > 0) && (
@@ -444,9 +455,9 @@ export default function CashPage() {
                     </ul>
                   </div>
                 )}
-                <div className="pt-1.5 border-t border-border mt-1.5">
+                <div className="pt-1.5 border-t border-border mt-1.5 min-w-0">
                   <p className="text-xs font-medium text-muted-foreground mb-1 flex items-center gap-1.5">
-                    <SlidersHorizontal className="h-3.5 w-3.5" />
+                    <SlidersHorizontal className="h-3.5 w-3.5 shrink-0" />
                     Movimientos de la sesión
                   </p>
                   <p className="text-xs text-muted-foreground/90 mb-1.5">
@@ -457,7 +468,7 @@ export default function CashPage() {
                   ) : sessionMovements.length === 0 ? (
                     <p className="text-xs text-muted-foreground">Sin movimientos (ventas, gastos ni ajustes en esta sesión).</p>
                   ) : (
-                    <ul className="text-xs text-muted-foreground space-y-0.5 max-h-40 overflow-y-auto">
+                    <ul className="text-xs text-muted-foreground space-y-0.5 max-h-40 overflow-y-auto overflow-x-hidden">
                       {sessionMovements.slice(0, 25).map((m) => {
                         const label =
                           m.relatedExpense?.description ??
@@ -466,8 +477,8 @@ export default function CashPage() {
                           m.reference ??
                           '—';
                         return (
-                          <li key={m.id} className="flex justify-between gap-2">
-                            <span className="truncate">
+                          <li key={m.id} className="flex justify-between gap-2 min-w-0">
+                            <span className="min-w-0 break-words pr-2">
                               {MOVEMENT_TYPES.find((t) => t.value === m.type)?.label ?? m.type}: {label}
                             </span>
                             <span className={`tabular-nums shrink-0 ${m.type === 'IN' ? 'text-emerald-600 dark:text-emerald-400' : m.type === 'OUT' ? 'text-red-600 dark:text-red-400' : 'text-foreground'}`}>
@@ -485,25 +496,25 @@ export default function CashPage() {
               </div>
             )}
           </DialogHeader>
-          <form onSubmit={closeForm.handleSubmit(onCloseSession)} className="space-y-4">
-            <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-3">
-              <p className="text-sm font-medium flex items-center gap-2">
-                <Calculator className="h-4 w-4" />
+          <form onSubmit={closeForm.handleSubmit(onCloseSession)} className="space-y-4 pt-1 min-w-0">
+            <div className="rounded-xl border border-border/80 bg-muted/30 p-4 border-l-4 border-l-primary/50 min-w-0">
+              <p className="text-sm font-medium flex items-center gap-2 mb-2">
+                <Calculator className="h-4 w-4 shrink-0 text-primary" />
                 Arqueo de caja
               </p>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-muted-foreground leading-relaxed">
                 Cuente el efectivo en caja e ingrese el monto contado. Compare con el monto esperado.
               </p>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="closingAmount">Monto contado en caja (COP)</Label>
+              <Label htmlFor="closingAmount" className="text-foreground font-medium">Monto contado en caja (COP)</Label>
               <Input
                 id="closingAmount"
                 type="number"
                 step="1"
                 {...closeForm.register('closingAmount')}
                 placeholder="Ej. 174034"
-                className="rounded-lg"
+                className="rounded-xl h-10 border-input bg-background/80 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
               />
               {closeForm.formState.errors.closingAmount && (
                 <p className="text-sm text-destructive">
@@ -530,15 +541,16 @@ export default function CashPage() {
                 );
               })()}
             </div>
-            <DialogFooter>
+            <DialogFooter className="gap-2 pt-2 sm:gap-0">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => setSessionToClose(null)}
+                className="rounded-xl"
               >
                 Cancelar
               </Button>
-              <Button type="submit" disabled={closeSession.isPending}>
+              <Button type="submit" disabled={closeSession.isPending} className="rounded-xl font-medium">
                 {closeSession.isPending ? 'Cerrando…' : 'Cerrar sesión'}
               </Button>
             </DialogFooter>

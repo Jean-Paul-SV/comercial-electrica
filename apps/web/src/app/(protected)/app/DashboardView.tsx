@@ -263,28 +263,28 @@ export default function DashboardView() {
       )}
 
       {trendingProducts.data?.items && trendingProducts.data.items.length > 0 && (
-        <Card className="border-0 shadow-md overflow-hidden border-l-4 border-l-primary bg-gradient-to-br from-primary/5 to-transparent dark:from-primary/10 flex h-[280px] min-h-[280px] w-full flex-col">
+        <Card className="w-full flex flex-col overflow-hidden rounded-2xl border border-border/80 border-l-4 border-l-primary shadow-sm bg-gradient-to-br from-primary/5 to-transparent dark:from-primary/10 min-h-[280px] h-[320px]">
           <CardHeader className="shrink-0 pb-2 pt-4 px-4">
             <div className="flex items-center justify-between gap-2">
               <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
-                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/15 text-primary">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary">
                   <TrendingUp className="h-4 w-4" />
                 </span>
                 Artículos en tendencias
               </CardTitle>
             </div>
-            <CardDescription className="text-xs">
+            <CardDescription className="text-xs text-muted-foreground mt-0.5">
               Por ingreso (últimos {trendingProducts.data.periodDays} días)
             </CardDescription>
           </CardHeader>
           <CardContent className="flex min-h-0 flex-1 flex-col gap-3 px-4 pb-4 pt-0">
-            <ul className="min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-0.5">
+            <ul className="min-h-0 flex-1 space-y-1.5 overflow-y-auto overflow-x-hidden pr-1">
               {trendingProducts.data.items.slice(0, 8).map((item, idx) => (
                 <li
                   key={item.product.id}
-                  className="flex items-center justify-between gap-3 rounded-lg bg-muted/50 px-3 py-2 transition-colors hover:bg-muted/70 dark:bg-muted/30 dark:hover:bg-muted/50"
+                  className="flex items-center justify-between gap-3 rounded-xl bg-muted/40 px-3 py-2 transition-colors hover:bg-muted/60 dark:bg-muted/25 dark:hover:bg-muted/45"
                 >
-                  <span className="truncate text-sm font-medium text-foreground">
+                  <span className="min-w-0 truncate text-sm font-medium text-foreground">
                     {idx + 1}. {item.product.name}
                   </span>
                   <span className="shrink-0 text-sm font-semibold text-primary tabular-nums">
@@ -295,10 +295,10 @@ export default function DashboardView() {
             </ul>
             <Link
               href="/reports?tab=trending"
-              className="shrink-0 flex w-full items-center justify-center gap-1.5 rounded-lg border border-primary/30 bg-primary/10 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/20 dark:hover:bg-primary/15"
+              className="shrink-0 flex w-full items-center justify-center gap-1.5 rounded-xl bg-primary py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 shadow-sm"
             >
               Ver todos los artículos en tendencias
-              <ChevronRight className="h-4 w-4" />
+              <ChevronRight className="h-4 w-4 shrink-0" />
             </Link>
           </CardContent>
         </Card>
@@ -450,10 +450,15 @@ export default function DashboardView() {
               )}
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-2">
             <p className="text-sm text-muted-foreground leading-relaxed">
               {dashboardSummary.data.summary}
             </p>
+            {dashboardSummary.data.source === 'fallback' && (
+              <p className="text-xs text-muted-foreground/80">
+                Configura <code className="rounded bg-muted px-1">OPENAI_API_KEY</code> en la API para un resumen generado con IA.
+              </p>
+            )}
           </CardContent>
         </Card>
       )}

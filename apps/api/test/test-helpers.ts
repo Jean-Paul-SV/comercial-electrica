@@ -51,6 +51,8 @@ export async function cleanDatabase(prisma: PrismaService): Promise<void> {
     () => prisma.purchaseOrder.deleteMany(),
     () => prisma.quoteItem.deleteMany(),
     () => prisma.quote.deleteMany(),
+    () => prisma.saleReturnItem.deleteMany(),
+    () => prisma.saleReturn.deleteMany(),
     () => prisma.saleItem.deleteMany(),
     () => prisma.sale.deleteMany(),
     () => prisma.invoice.deleteMany(),
@@ -65,7 +67,12 @@ export async function cleanDatabase(prisma: PrismaService): Promise<void> {
     () => prisma.category.deleteMany(),
     () => prisma.customer.deleteMany(),
     () => prisma.supplier.deleteMany(),
+    () => prisma.userRole.deleteMany(),
     () => prisma.user.deleteMany(),
+    () => prisma.subscription.deleteMany(),
+    () => prisma.tenantAddOn.deleteMany(),
+    () => prisma.tenantModule.deleteMany(),
+    () => prisma.tenant.deleteMany(),
   ];
 
   // Ejecutar todas las operaciones, ignorando errores individuales
@@ -90,13 +97,14 @@ export async function cleanDatabase(prisma: PrismaService): Promise<void> {
 }
 
 /**
- * Helper para crear un usuario de test y obtener token de autenticación
- * SOLUCIÓN SIMPLIFICADA: Eliminada lógica redundante de verificación
+ * Helper para crear un usuario de test y obtener token de autenticación.
+ * Si se pasa tenantId, el usuario se asocia a ese tenant (necesario para multi-tenant).
  */
 export async function setupTestUser(
   prisma: PrismaService,
   app: INestApplication,
   testEmail: string,
+  tenantId?: string | null,
 ): Promise<{ token: string; userId: string }> {
   const normalizedEmail = testEmail.toLowerCase();
   const passwordHash = await argon2.hash('Test123!');
@@ -107,12 +115,14 @@ export async function setupTestUser(
       passwordHash,
       role: RoleName.ADMIN,
       isActive: true,
+      ...(tenantId != null && { tenantId }),
     },
     create: {
       email: normalizedEmail,
       passwordHash,
       role: RoleName.ADMIN,
       isActive: true,
+      ...(tenantId != null && { tenantId }),
     },
   });
 
@@ -149,6 +159,7 @@ export interface TestAppSetup {
   prisma: PrismaService;
   authToken: string;
   userId: string;
+  tenantId: string;
 }
 
 export async function setupTestApp(
@@ -168,13 +179,131 @@ export async function setupTestApp(
   const prisma = moduleFixture.get<PrismaService>(PrismaService);
   await cleanDatabase(prisma);
 
-  const { token, userId } = await setupTestUser(prisma, app, testEmail);
+  const tenant = await prisma.tenant.create({
+    data: {
+      name: 'Default Test Tenant',
+      slug: `default-test-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+      isActive: true,
+    },
+  });
+
+  const moduleCodes = [
+    'core',
+    'inventory',
+    'suppliers',
+    'electronic_invoicing',
+    'advanced_reports',
+    'audit',
+    'backups',
+  ];
+  await prisma.tenantModule.createMany({
+    data: moduleCodes.map((moduleCode) => ({
+      tenantId: tenant.id,
+      moduleCode,
+      enabled: true,
+    })),
+  });
+
+  const { token, userId } = await setupTestUser(
+    prisma,
+    app,
+    testEmail,
+    tenant.id,
+  );
 
   return {
     app,
     prisma,
     authToken: token,
     userId,
+    tenantId: tenant.id,
+  };
+}
+
+/**
+ * Setup de app para tests que requieren usuario administrador de plataforma (sin tenant).
+ * Usar para E2E de backups, provider, etc.
+ */
+export interface TestAppSetupPlatformAdmin {
+  app: INestApplication;
+  prisma: PrismaService;
+  authToken: string;
+  userId: string;
+}
+
+export async function setupTestAppForPlatformAdmin(
+  moduleFixture: TestingModule,
+  testEmail: string,
+): Promise<TestAppSetupPlatformAdmin> {
+  const app = moduleFixture.createNestApplication();
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      transform: true,
+      forbidNonWhitelisted: true,
+    }),
+  );
+  await app.init();
+
+  const prisma = moduleFixture.get<PrismaService>(PrismaService);
+  await cleanDatabase(prisma);
+
+  // Un tenant mínimo para que createBackup tenga tenantId (backup de BD completa)
+  await prisma.tenant.create({
+    data: {
+      name: 'Platform Backup Tenant',
+      slug: `platform-backup-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+      isActive: true,
+    },
+  });
+
+  const adminRole = await prisma.role.findFirst({
+    where: { slug: 'admin', tenantId: null },
+  });
+  if (!adminRole) {
+    throw new Error(
+      'Rol admin (tenantId null) no encontrado. Ejecuta el seed o las migraciones.',
+    );
+  }
+
+  const normalizedEmail = testEmail.toLowerCase();
+  const passwordHash = await argon2.hash('Test123!');
+  const user = await prisma.user.create({
+    data: {
+      email: normalizedEmail,
+      passwordHash,
+      role: RoleName.ADMIN,
+      tenantId: null,
+      isActive: true,
+    },
+  });
+
+  await prisma.userRole.create({
+    data: {
+      userId: user.id,
+      roleId: adminRole.id,
+      tenantId: null,
+    },
+  });
+
+  const loginResponse = await request(app.getHttpServer())
+    .post('/auth/login')
+    .send({ email: normalizedEmail, password: 'Test123!' });
+
+  if (
+    (loginResponse.status !== 200 && loginResponse.status !== 201) ||
+    !loginResponse.body?.accessToken
+  ) {
+    throw new Error(
+      `Login platform admin failed. Status: ${loginResponse.status}, Body: ${JSON.stringify(loginResponse.body)}`,
+    );
+  }
+
+  return {
+    app,
+    prisma,
+    authToken: loginResponse.body.accessToken,
+    userId: user.id,
   };
 }
 

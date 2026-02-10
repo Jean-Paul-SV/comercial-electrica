@@ -78,6 +78,26 @@ export class CustomersController {
     );
   }
 
+  @Get(':id/sales-stats')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Estadísticas de compras del cliente',
+    description: 'Cantidad de ventas pagadas y monto total. Útil al seleccionar cliente en una venta para decidir descuentos.',
+  })
+  @ApiParam({ name: 'id', description: 'ID del cliente' })
+  @ApiResponse({
+    status: 200,
+    description: 'totalPurchases (número de compras), totalAmount (monto total)',
+  })
+  @ApiResponse({ status: 404, description: 'Cliente no encontrado' })
+  @ApiResponse({ status: 401, description: 'No autenticado' })
+  getSalesStats(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @Req() req?: { user?: { tenantId?: string } },
+  ) {
+    return this.customers.getSalesStats(id, req?.user?.tenantId);
+  }
+
   @Get(':id')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({

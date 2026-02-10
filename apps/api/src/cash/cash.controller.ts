@@ -19,13 +19,15 @@ import {
 } from '@nestjs/swagger';
 import { CashService } from './cash.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { PermissionsGuard } from '../auth/permissions.guard';
+import { RequirePermission } from '../auth/require-permission.decorator';
 import { OpenSessionDto } from './dto/open-session.dto';
 import { CloseSessionDto } from './dto/close-session.dto';
 import { PaginationDto } from '../common/dto/pagination.dto';
 import { ListMovementsQueryDto } from './dto/list-movements-query.dto';
 
 @ApiTags('cash')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller('cash')
 export class CashController {
   constructor(private readonly cash: CashService) {}
@@ -73,6 +75,7 @@ export class CashController {
   }
 
   @Post('sessions')
+  @RequirePermission('cash:create')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Abrir sesión de caja',
@@ -80,6 +83,7 @@ export class CashController {
   })
   @ApiResponse({ status: 201, description: 'Sesión abierta exitosamente' })
   @ApiResponse({ status: 401, description: 'No autenticado' })
+  @ApiResponse({ status: 403, description: 'No autorizado (requiere permiso cash:create)' })
   async open(
     @Body() dto: OpenSessionDto,
     @Req() req: { user?: { sub?: string; tenantId?: string } },
@@ -92,6 +96,7 @@ export class CashController {
   }
 
   @Post('sessions/:id/close')
+  @RequirePermission('cash:update')
   @HttpCode(200)
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
@@ -102,6 +107,7 @@ export class CashController {
   @ApiResponse({ status: 200, description: 'Sesión cerrada exitosamente' })
   @ApiResponse({ status: 404, description: 'Sesión no encontrada' })
   @ApiResponse({ status: 401, description: 'No autenticado' })
+  @ApiResponse({ status: 403, description: 'No autorizado (requiere permiso cash:update)' })
   close(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Body() dto: CloseSessionDto,

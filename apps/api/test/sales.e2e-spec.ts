@@ -11,6 +11,7 @@ describe('Sales (e2e)', () => {
   let prisma: PrismaService;
   let authToken: string;
   let userId: string;
+  let tenantId: string;
   let customerId: string;
   let productId: string;
   let cashSessionId: string;
@@ -22,24 +23,21 @@ describe('Sales (e2e)', () => {
       }),
     ).compile();
 
-    // Setup simplificado: una línea reemplaza 100+ líneas
     const setup = await setupTestApp(moduleFixture, 'sales-test@example.com');
-    ({ app, prisma, authToken, userId } = setup);
+    ({ app, prisma, authToken, userId, tenantId } = setup);
   });
 
   beforeEach(async () => {
-    // Crear datos de prueba para cada test
-    // Usar nombre único con timestamp para evitar conflictos
     const categoryName = `Test Category ${Date.now()}`;
     const category = await prisma.category.upsert({
-      where: { name: categoryName },
+      where: { tenantId_name: { tenantId, name: categoryName } },
       update: {},
-      create: { name: categoryName },
+      create: { tenantId, name: categoryName },
     });
-    // Categoría creada para el producto
 
     const product = await prisma.product.create({
       data: {
+        tenantId,
         internalCode: `TEST-${Date.now()}`,
         name: 'Producto Test',
         categoryId: category.id,
@@ -50,7 +48,6 @@ describe('Sales (e2e)', () => {
     });
     productId = product.id;
 
-    // Crear stock inicial
     await prisma.stockBalance.create({
       data: {
         productId: product.id,
@@ -61,6 +58,7 @@ describe('Sales (e2e)', () => {
 
     const customer = await prisma.customer.create({
       data: {
+        tenantId,
         docType: 'CC',
         docNumber: `123456${Date.now()}`,
         name: 'Cliente Test',
@@ -71,19 +69,17 @@ describe('Sales (e2e)', () => {
 
     const cashSession = await prisma.cashSession.create({
       data: {
+        tenantId,
         openingAmount: 50000,
         openedBy: userId,
       },
     });
     cashSessionId = cashSession.id;
-
-    // El token ya se obtuvo en beforeAll
   });
 
   afterEach(async () => {
-    // Limpiar datos relacionados a ventas creados en cada test.
-    // No eliminamos productos/categorías/clientes aquí para evitar conflictos
-    // con otras suites (p.ej. quotes) que también crean datos relacionados.
+    await prisma.saleReturnItem.deleteMany();
+    await prisma.saleReturn.deleteMany();
     await prisma.saleItem.deleteMany();
     await prisma.sale.deleteMany();
     await prisma.invoice.deleteMany();

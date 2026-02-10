@@ -150,7 +150,7 @@ export default function ProductDictionaryPage() {
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-xl font-semibold tracking-tight sm:text-2xl text-foreground">
-            Diccionario de búsqueda
+            Diccionario
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Términos o frases que los clientes escriben al preguntar por productos. Opcionalmente puedes vincular cada término a un producto.

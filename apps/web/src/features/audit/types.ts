@@ -14,6 +14,7 @@ export type AuditLog = {
   entity: string;
   entityId: string;
   action: string;
+  summary: string | null;
   diff: Record<string, unknown> | null;
   createdAt: string;
   actor: AuditLogActor | null;

@@ -18,7 +18,7 @@ import type { AppRole } from '@shared/navigation/types';
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { user, permissions, enabledModules, logout, mustChangePassword, clearMustChangePassword } = useAuth();
+  const { user, permissions, enabledModules, isPlatformAdmin, logout, mustChangePassword, clearMustChangePassword } = useAuth();
   const isOnline = useOnlineStatus();
   const sidebarContext = useSidebarOptional();
 
@@ -32,7 +32,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     navConfig.sections,
     user?.role as AppRole | undefined,
     permissions,
-    enabledModules?.length ? enabledModules : undefined
+    enabledModules?.length ? enabledModules : undefined,
+    isPlatformAdmin
   );
   const routeLabel = getRouteLabel(pathname ?? '');
 

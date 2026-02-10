@@ -55,10 +55,12 @@ export class AuthController {
     return this.auth.bootstrapAdmin(dto);
   }
 
+  @Throttle({ login: { limit: 10, ttl: 60000 } })
   @Post('login')
   @ApiOperation({
     summary: 'Iniciar sesión',
-    description: 'Obtener token JWT para autenticación',
+    description:
+      'Obtener token JWT para autenticación. Límite: 10 intentos por minuto por IP (protección contra fuerza bruta).',
   })
   @ApiResponse({
     status: 200,
@@ -66,6 +68,7 @@ export class AuthController {
     schema: { type: 'object', properties: { accessToken: { type: 'string' } } },
   })
   @ApiResponse({ status: 401, description: 'Credenciales inválidas' })
+  @ApiResponse({ status: 429, description: 'Demasiados intentos. Intenta más tarde.' })
   login(@Body() dto: LoginDto) {
     return this.auth.login(dto);
   }

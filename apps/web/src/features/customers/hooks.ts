@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   listCustomers,
   getCustomer,
+  getCustomerSalesStats,
   createCustomer,
   updateCustomer,
   type CustomersListParams,
@@ -28,6 +29,16 @@ export function useCustomer(id: string | null) {
     queryKey: ['customers', id],
     enabled: Boolean(token && id),
     queryFn: () => getCustomer(id!, token!),
+  });
+}
+
+export function useCustomerSalesStats(customerId: string | null) {
+  const { token } = useAuth();
+
+  return useQuery({
+    queryKey: ['customers', customerId, 'sales-stats'],
+    enabled: Boolean(token && customerId),
+    queryFn: () => getCustomerSalesStats(customerId!, token!),
   });
 }
 

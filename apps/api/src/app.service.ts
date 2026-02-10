@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { PrismaService } from './prisma/prisma.service';
 import { CacheService } from './common/services/cache.service';
 import { InjectQueue } from '@nestjs/bullmq';
@@ -100,7 +100,11 @@ export class AppService {
     };
   }
 
-  async getStats() {
+  async getStats(tenantId: string | null) {
+    if (!tenantId) {
+      throw new BadRequestException('Tenant requerido para obtener estadísticas');
+    }
+
     const [
       totalUsers,
       totalProducts,
@@ -110,14 +114,15 @@ export class AppService {
       openCashSessions,
       lowStockProducts,
     ] = await Promise.all([
-      this.prisma.user.count(),
-      this.prisma.product.count({ where: { isActive: true } }),
-      this.prisma.customer.count(),
-      this.prisma.sale.count({ where: { status: 'PAID' } }),
-      this.prisma.quote.count(),
-      this.prisma.cashSession.count({ where: { closedAt: null } }),
+      this.prisma.user.count({ where: { tenantId } }),
+      this.prisma.product.count({ where: { tenantId, isActive: true } }),
+      this.prisma.customer.count({ where: { tenantId } }),
+      this.prisma.sale.count({ where: { tenantId, status: 'PAID' } }),
+      this.prisma.quote.count({ where: { tenantId } }),
+      this.prisma.cashSession.count({ where: { tenantId, closedAt: null } }),
       this.prisma.product.count({
         where: {
+          tenantId,
           isActive: true,
           stock: {
             qtyOnHand: { lte: 10 },
@@ -131,6 +136,7 @@ export class AppService {
     todayStart.setHours(0, 0, 0, 0);
     const todaySales = await this.prisma.sale.aggregate({
       where: {
+        tenantId,
         status: 'PAID',
         soldAt: { gte: todayStart },
       },
@@ -144,6 +150,7 @@ export class AppService {
 
     return {
       timestamp: new Date().toISOString(),
+      tenantId,
       users: {
         total: totalUsers,
       },

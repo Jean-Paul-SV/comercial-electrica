@@ -18,6 +18,8 @@ export type UserListItem = {
 export type MeResponse = {
   user: AuthUser;
   permissions: string[];
+  /** true cuando el usuario no pertenece a ningún tenant (admin de plataforma). */
+  isPlatformAdmin?: boolean;
   tenant?: {
     id: string;
     name: string;

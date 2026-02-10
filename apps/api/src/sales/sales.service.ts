@@ -231,13 +231,21 @@ export class SalesService {
         { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
       )
       .then(async (result) => {
-        await this.audit.logCreate('sale', result.sale.id, createdByUserId, {
-          invoiceId: result.invoice.id,
-          dianDocumentId: result.dianDocument.id,
-          customerId: result.sale.customerId,
-          grandTotal: Number(result.sale.grandTotal),
-          itemsCount: result.sale.items.length,
-        });
+        await this.audit.logCreate(
+          'sale',
+          result.sale.id,
+          createdByUserId,
+          {
+            invoiceId: result.invoice.id,
+            dianDocumentId: result.dianDocument.id,
+            customerId: result.sale.customerId,
+            grandTotal: Number(result.sale.grandTotal),
+            itemsCount: result.sale.items.length,
+          },
+          {
+            summary: `Venta #${result.invoice.number} por ${Number(result.sale.grandTotal).toLocaleString('es-CO')} (${result.sale.items.length} producto${result.sale.items.length !== 1 ? 's' : ''})`,
+          },
+        );
         this.logger.log(
           `Encolando procesamiento DIAN para documento ${result.dianDocument.id}`,
         );
@@ -272,6 +280,13 @@ export class SalesService {
         },
         { createdBy: { email: { contains: search, mode: 'insensitive' } } },
       ];
+    }
+
+    const useListCache = !search && page === 1 && limit === 20 && tenantId;
+    if (useListCache) {
+      const listCacheKey = this.cache.buildKey('sales', 'list', tenantId, 1, 20);
+      const cached = await this.cache.get<{ data: unknown[]; meta: unknown }>(listCacheKey);
+      if (cached) return cached;
     }
 
     const [data, total] = await Promise.all([
@@ -315,6 +330,10 @@ export class SalesService {
       },
     };
 
+    if (useListCache) {
+      const listCacheKey = this.cache.buildKey('sales', 'list', tenantId, 1, 20);
+      await this.cache.set(listCacheKey, result, 60);
+    }
     return result;
   }
 

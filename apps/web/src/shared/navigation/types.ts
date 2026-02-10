@@ -43,6 +43,8 @@ export type NavSectionConfig = {
   requiredPermission?: string;
   /** Código de módulo SaaS para la sección (ej. inventory, suppliers). Si no se define o es "core", visible según plan. */
   moduleCode?: string;
+  /** Si true, la sección solo se muestra para administradores de plataforma (usuarios sin tenant). */
+  platformAdminOnly?: boolean;
 };
 
 /** Árbol de navegación completo (configuración cruda). */

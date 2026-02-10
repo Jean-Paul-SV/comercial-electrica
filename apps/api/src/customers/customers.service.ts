@@ -47,6 +47,13 @@ export class CustomersService {
       ];
     }
 
+    const useListCache = !search && page === 1 && limit === 20 && tenantId;
+    if (useListCache) {
+      const listCacheKey = this.cache.buildKey('customers', 'list', tenantId, 1, 20);
+      const cached = await this.cache.get<{ data: unknown[]; meta: unknown }>(listCacheKey);
+      if (cached) return cached;
+    }
+
     const [data, total] = await Promise.all([
       this.prisma.customer.findMany({
         where,
@@ -59,7 +66,7 @@ export class CustomersService {
 
     const totalPages = Math.ceil(total / limit);
 
-    return {
+    const result = {
       data,
       meta: {
         total,
@@ -70,6 +77,12 @@ export class CustomersService {
         hasPreviousPage: page > 1,
       },
     };
+
+    if (useListCache) {
+      const listCacheKey = this.cache.buildKey('customers', 'list', tenantId, 1, 20);
+      await this.cache.set(listCacheKey, result, 90);
+    }
+    return result;
   }
 
   async get(id: string, tenantId?: string | null) {
@@ -89,6 +102,26 @@ export class CustomersService {
     // Cachear por 5 minutos
     await this.cache.set(cacheKey, c, 300);
     return c;
+  }
+
+  /** Cantidad de compras (ventas pagadas) y monto total del cliente. Para mostrar en ventas al seleccionar cliente. */
+  async getSalesStats(id: string, tenantId?: string | null) {
+    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
+
+    const customer = await this.prisma.customer.findFirst({
+      where: { id, tenantId },
+    });
+    if (!customer) throw new NotFoundException('Cliente no encontrado.');
+
+    const sales = await this.prisma.sale.findMany({
+      where: { customerId: id, tenantId, status: 'PAID' },
+      select: { grandTotal: true },
+    });
+
+    const totalPurchases = sales.length;
+    const totalAmount = sales.reduce((sum, s) => sum + Number(s.grandTotal), 0);
+
+    return { totalPurchases, totalAmount };
   }
 
   async create(

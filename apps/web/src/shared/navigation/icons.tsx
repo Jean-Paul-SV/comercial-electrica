@@ -22,6 +22,9 @@ import {
   Receipt,
   ClipboardList,
   Database,
+  Building2,
+  PlusCircle,
+  CreditCard,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -43,6 +46,9 @@ export const navIconMap: Record<string, LucideIcon> = {
   Receipt,
   ClipboardList,
   Database,
+  Building2,
+  PlusCircle,
+  CreditCard,
 };
 
 export function getNavIcon(name: string): LucideIcon | undefined {

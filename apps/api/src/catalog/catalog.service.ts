@@ -47,6 +47,22 @@ export class CatalogService {
 
     const where: Prisma.ProductWhereInput = { tenantId };
 
+    // Caché para listado por tenant + página (solo primera página sin búsqueda ni filtros)
+    const useListCache =
+      !pagination?.search?.trim() &&
+      page === 1 &&
+      limit === 20 &&
+      pagination?.zeroStock !== true &&
+      pagination?.lowStock !== true &&
+      pagination?.minStock == null &&
+      pagination?.maxStock == null &&
+      !pagination?.sortByStock;
+    if (useListCache && tenantId) {
+      const listCacheKey = this.cache.buildKey('products', 'list', tenantId, 1, 20);
+      const cached = await this.cache.get<{ data: unknown[]; meta: unknown }>(listCacheKey);
+      if (cached) return cached;
+    }
+
     // Filtro por stock
     if (pagination?.zeroStock === true) {
       where.stock = { qtyOnHand: 0 };
@@ -99,7 +115,7 @@ export class CatalogService {
 
     const totalPages = Math.ceil(total / limit);
 
-    return {
+    const result = {
       data,
       meta: {
         total,
@@ -110,6 +126,12 @@ export class CatalogService {
         hasPreviousPage: page > 1,
       },
     };
+
+    if (useListCache && tenantId) {
+      const listCacheKey = this.cache.buildKey('products', 'list', tenantId, 1, 20);
+      await this.cache.set(listCacheKey, result, 90); // 90 segundos
+    }
+    return result;
   }
 
   async getProduct(id: string, tenantId?: string | null) {
@@ -448,6 +470,9 @@ export class CatalogService {
     if (!existing) throw new NotFoundException('Entrada del diccionario no encontrada.');
 
     await this.prisma.productDictionaryEntry.delete({ where: { id } });
+    await this.audit.logDelete('productDictionaryEntry', id, null, {
+      term: existing.term,
+    });
     return { deleted: true };
   }
 }

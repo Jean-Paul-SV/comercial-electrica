@@ -9,6 +9,7 @@ import { JsonLogger } from './common/logger/json-logger';
 import { randomUUID } from 'crypto';
 import type { Request, Response, NextFunction } from 'express';
 import { NestExpressApplication } from '@nestjs/platform-express';
+import { json } from 'express';
 
 // Cargar .env manualmente antes de que NestJS inicie
 // Intenta diferentes ubicaciones
@@ -42,7 +43,17 @@ async function bootstrap() {
   const useJsonLog = process.env.LOG_FORMAT === 'json';
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     logger: useJsonLog ? new JsonLogger() : undefined,
+    bodyParser: false, // We add json() and raw for webhook manually
   });
+
+  // Body parser: guardar raw body en req.rawBody para webhooks (p. ej. Stripe)
+  app.use(
+    json({
+      verify: (req: Request & { rawBody?: Buffer }, _res, buf) => {
+        (req as Request & { rawBody?: Buffer }).rawBody = buf;
+      },
+    }),
+  );
 
   // Configurar servidor de archivos estáticos para storage
   const storageBasePath = process.env.OBJECT_STORAGE_BASE_PATH || './storage';
@@ -55,7 +66,16 @@ async function bootstrap() {
     .split(',')
     .map((s) => s.trim().replace(/\/$/, ''))
     .filter(Boolean);
-  // En prod sin ALLOWED_ORIGINS configurado, permitir cualquier origen. Con valores, comparación normalizada (sin barra final).
+
+  // En producción, ALLOWED_ORIGINS es obligatorio
+  if (isProd && allowedOrigins.length === 0) {
+    throw new Error(
+      'ALLOWED_ORIGINS debe estar configurado en producción. Ejemplo: ALLOWED_ORIGINS=https://app.tudominio.com,https://admin.tudominio.com',
+    );
+  }
+
+  // En prod con ALLOWED_ORIGINS configurado, validación estricta
+  // En desarrollo, permitir cualquier origen
   const corsOrigin =
     isProd && allowedOrigins.length > 0
       ? (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
