@@ -3,7 +3,7 @@ ALTER TABLE "ProductDictionaryEntry" ADD COLUMN IF NOT EXISTS "categoryId" UUID;
 
 CREATE INDEX IF NOT EXISTS "ProductDictionaryEntry_categoryId_idx" ON "ProductDictionaryEntry"("categoryId");
 
-DO $$en l
+DO $$
 BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM pg_constraint WHERE conname = 'ProductDictionaryEntry_categoryId_fkey'
