@@ -1,6 +1,6 @@
 # 📌 Estado Actual del Proyecto (Actualización)
 
-> **Proyecto:** Sistema de Gestión Comercial Eléctrica  
+> **Proyecto:** Sistema de Gestión Orion  
 > **Fecha:** 2026-01-28  
 > **Objetivo de este documento:** ser la **fuente de verdad** del estado actual (fase, qué está listo, qué falta, y qué sigue).
 

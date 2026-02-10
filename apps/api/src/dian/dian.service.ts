@@ -3,6 +3,7 @@ import {
   Logger,
   NotFoundException,
   BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { DianDocumentStatus, DianEnvironment, Prisma } from '@prisma/client';
@@ -651,16 +652,35 @@ export class DianService {
   }
 
   /**
-   * Consulta el estado de un documento en DIAN
+   * Consulta el estado de un documento DIAN para un tenant específico.
+   *
+   * Garantiza aislamiento multi-tenant usando el tenantId de la factura
+   * asociada al documento DIAN.
    */
   async queryDocumentStatus(
     dianDocumentId: string,
+    tenantId?: string | null,
   ): Promise<DianDocumentStatus> {
-    const doc = await this.prisma.dianDocument.findUnique({
-      where: { id: dianDocumentId },
+    if (!tenantId) {
+      throw new ForbiddenException(
+        'Tenant requerido para consultar estado de documentos DIAN.',
+      );
+    }
+
+    const doc = await this.prisma.dianDocument.findFirst({
+      where: {
+        id: dianDocumentId,
+        invoice: {
+          tenantId,
+        },
+      },
+      select: {
+        status: true,
+      },
     });
 
     if (!doc) {
+      // No revelamos si el ID existe para otro tenant: mantenemos aislamiento
       throw new NotFoundException(
         `Documento DIAN ${dianDocumentId} no encontrado.`,
       );
@@ -669,6 +689,54 @@ export class DianService {
     // TODO: Implementar consulta real a DIAN
     // Por ahora retorna el estado almacenado
     return doc.status;
+  }
+
+  /**
+   * Obtiene el detalle de estado de un documento DIAN (status + metadatos)
+   * asegurando aislamiento multi-tenant por tenantId de la factura.
+   */
+  async getDocumentStatusForTenant(
+    dianDocumentId: string,
+    tenantId?: string | null,
+  ): Promise<{
+    status: DianDocumentStatus;
+    cufe: string | null;
+    sentAt: Date | null;
+    lastError: string | null;
+  }> {
+    if (!tenantId) {
+      throw new ForbiddenException(
+        'Tenant requerido para consultar estado de documentos DIAN.',
+      );
+    }
+
+    const doc = await this.prisma.dianDocument.findFirst({
+      where: {
+        id: dianDocumentId,
+        invoice: {
+          tenantId,
+        },
+      },
+      select: {
+        status: true,
+        cufe: true,
+        sentAt: true,
+        lastError: true,
+      },
+    });
+
+    if (!doc) {
+      throw new NotFoundException(
+        `Documento DIAN ${dianDocumentId} no encontrado.`,
+      );
+    }
+
+    return {
+      status: doc.status,
+      cufe: doc.cufe ?? null,
+      sentAt: doc.sentAt ?? null,
+      lastError: doc.lastError ?? null,
+    };
   }
 }
 

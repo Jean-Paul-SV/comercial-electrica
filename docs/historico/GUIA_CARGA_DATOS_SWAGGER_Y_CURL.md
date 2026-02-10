@@ -1,4 +1,4 @@
-# Guía para cargar datos (Swagger o cURL) — Comercial Eléctrica API
+# Guía para cargar datos (Swagger o cURL) — Orion API
 
 Esta guía te permite **probar todo el sistema** creando datos reales desde:
 

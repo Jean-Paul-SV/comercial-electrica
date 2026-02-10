@@ -1,6 +1,6 @@
 # 📚 Documentación del Proyecto
 
-Esta carpeta contiene toda la documentación técnica y de análisis del proyecto **Sistema Comercial Eléctrica**.
+Esta carpeta contiene toda la documentación técnica y de análisis del proyecto **Orion**.
 
 ---
 

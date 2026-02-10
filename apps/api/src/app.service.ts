@@ -18,7 +18,7 @@ export class AppService {
   ) {}
 
   getHello(): string {
-    return 'Sistema Comercial Eléctrica API v1.0';
+    return 'Orion API v1.0';
   }
 
   async getHealth() {

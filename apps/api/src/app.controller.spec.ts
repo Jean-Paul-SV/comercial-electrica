@@ -69,7 +69,7 @@ describe('AppController', () => {
   describe('root', () => {
     it('should return welcome message', () => {
       expect(appController.getHello()).toBe(
-        'Sistema Comercial Eléctrica API v1.0',
+        'Orion API v1.0',
       );
     });
   });

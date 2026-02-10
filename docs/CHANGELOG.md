@@ -1,4 +1,4 @@
-# 📝 Changelog - Sistema Comercial Eléctrica
+# 📝 Changelog - Orion
 
 Todos los cambios notables del proyecto serán documentados en este archivo.
 

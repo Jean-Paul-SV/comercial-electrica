@@ -5,7 +5,7 @@ import { Zap } from 'lucide-react';
 import { cn } from '@lib/utils';
 
 type SidebarBrandProps = {
-  /** Nombre del producto (ej. "Comercial Eléctrica"). */
+  /** Nombre del producto (ej. "Orion"). */
   productName?: string;
   /** Si true, oculta el texto (modo colapsado). */
   collapsed?: boolean;
@@ -13,7 +13,7 @@ type SidebarBrandProps = {
 };
 
 export function SidebarBrand({
-  productName = 'Comercial Eléctrica',
+  productName = 'Orion',
   collapsed = false,
   className,
 }: SidebarBrandProps) {

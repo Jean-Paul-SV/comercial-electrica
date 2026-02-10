@@ -2,7 +2,7 @@
 
 > **Autor:** Recomendaciones de Senior Frontend Developer  
 > **Fecha:** Enero 2026  
-> **Contexto:** Sistema ERP Comercial Eléctrica - Backend NestJS completo con Swagger
+> **Contexto:** Sistema ERP Orion - Backend NestJS completo con Swagger
 
 ---
 

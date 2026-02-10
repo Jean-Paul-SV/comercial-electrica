@@ -170,7 +170,7 @@ async function bootstrap() {
 
   // Configurar Swagger/OpenAPI
   const swaggerConfig = new DocumentBuilder()
-    .setTitle('Sistema Comercial Eléctrica API')
+    .setTitle('Orion API')
     .setDescription(
       'API para gestión de inventario, ventas, caja, clientes y facturación electrónica DIAN',
     )

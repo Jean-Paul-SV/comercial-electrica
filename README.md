@@ -1,4 +1,4 @@
-# Comercial Eléctrica
+# Orion
 
 Sistema de gestión integral para ferretería eléctrica: inventario, ventas, caja, clientes, gastos, cotizaciones, proveedores, facturación y reportes. Preparado para facturación electrónica DIAN (Colombia).
 

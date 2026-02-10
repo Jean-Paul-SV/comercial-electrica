@@ -1,4 +1,4 @@
-# Blueprint: Comercial Eléctrica – API (NestJS) + PostgreSQL
+# Blueprint: Orion – API (NestJS) + PostgreSQL
 # Despliegue gratuito en Render. Frontend se despliega en Vercel (ver docs/DEPLOY_VERCEL_RENDER.md).
 
 databases:

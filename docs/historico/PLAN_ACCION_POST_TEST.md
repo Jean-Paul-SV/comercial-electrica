@@ -1,4 +1,4 @@
-# 🎯 Plan de Acción Post-Test - Sistema Comercial Eléctrica
+# 🎯 Plan de Acción Post-Test - Orion
 
 > **Análisis y recomendaciones desde la perspectiva de un Programador Senior**
 
@@ -145,7 +145,7 @@ jobs:
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 
 const config = new DocumentBuilder()
-  .setTitle('Sistema Comercial Eléctrica API')
+  .setTitle('Orion API')
   .setDescription('API para gestión de inventario, ventas y facturación DIAN')
   .setVersion('1.0')
   .addBearerAuth()

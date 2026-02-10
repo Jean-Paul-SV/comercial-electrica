@@ -1,4 +1,4 @@
-# Análisis exhaustivo del proyecto Comercial Eléctrica
+# Análisis exhaustivo del proyecto Orion
 
 > **Fecha:** Enero 2026  
 > **Objetivo:** Documento único que resume cuánto hay implementado en todo el programa hasta la fecha.
@@ -9,7 +9,7 @@
 
 | Aspecto | Descripción |
 |--------|-------------|
-| **Nombre** | Sistema de Gestión Comercial Eléctrica |
+| **Nombre** | Sistema de Gestión Orion |
 | **Tipo** | Monorepo (npm workspaces): `apps/api` + `apps/web` |
 | **API** | NestJS 11, Prisma 5, PostgreSQL 16, Redis 7, BullMQ |
 | **Web** | Next.js 15, React 18, TanStack Query, Tailwind, Recharts |

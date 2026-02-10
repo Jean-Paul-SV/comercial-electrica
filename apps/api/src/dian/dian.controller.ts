@@ -3,6 +3,7 @@ import {
   Get,
   Param,
   ParseUUIDPipe,
+  Req,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -72,25 +73,13 @@ export class DianController {
   })
   async getDocumentStatus(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @Req() req: { user?: { tenantId?: string } },
   ) {
-    const status = await this.dianService.queryDocumentStatus(id);
+    const result = await this.dianService.getDocumentStatusForTenant(
+      id,
+      req?.user?.tenantId,
+    );
 
-    // Obtener información adicional del documento
-    const doc = await this.dianService['prisma'].dianDocument.findUnique({
-      where: { id },
-      select: {
-        status: true,
-        cufe: true,
-        sentAt: true,
-        lastError: true,
-      },
-    });
-
-    return {
-      status,
-      cufe: doc?.cufe || null,
-      sentAt: doc?.sentAt || null,
-      lastError: doc?.lastError || null,
-    };
+    return result;
   }
 }

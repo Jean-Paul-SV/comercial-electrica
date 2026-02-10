@@ -1,6 +1,6 @@
 # Pasos para inicializar todo el programa
 
-Guía para dejar el proyecto **Comercial Eléctrica** listo desde cero: base de datos, backend y frontend.
+Guía para dejar el proyecto **Orion** listo desde cero: base de datos, backend y frontend.
 
 ---
 

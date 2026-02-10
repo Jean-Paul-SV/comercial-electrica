@@ -1,6 +1,6 @@
 /* eslint-disable no-console */
 /**
- * Seed de datos REALES para Comercial Eléctrica (≥500 registros).
+ * Seed de datos REALES para Orion (≥500 registros).
  *
  * Genera datos coherentes con el esquema actual (multi-tenant):
  * - Plan + Tenant por defecto (si no existen)
@@ -143,7 +143,7 @@ async function main() {
   const PrismaClient = prismaPkg.PrismaClient;
   const prisma = new PrismaClient({ datasources: { db: { url: databaseUrl } } });
 
-  console.log('=== Seed 500 datos reales (Comercial Eléctrica) ===');
+  console.log('=== Seed 500 datos reales (Orion) ===');
   const start = Date.now();
 
   // --- Plan + Tenant ---

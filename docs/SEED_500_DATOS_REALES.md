@@ -1,4 +1,4 @@
-# Seed 500 datos reales (Comercial Eléctrica)
+# Seed 500 datos reales (Orion)
 
 Seed con **datos realistas** de ferretería eléctrica en Colombia, compatible con el esquema actual (multi-tenant). Genera **más de 500 registros** entre categorías, productos, clientes, proveedores, ventas, cotizaciones, etc.
 

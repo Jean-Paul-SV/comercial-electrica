@@ -42,13 +42,15 @@ import { MailerModule } from './mailer/mailer.module';
     ConfigModule.forRoot({
       isGlobal: true,
       // Cargar .env desde la raíz del proyecto
-      // Intenta diferentes ubicaciones posibles
       envFilePath: [
         resolve(process.cwd(), '../../.env'), // Desde apps/api/
         resolve(process.cwd(), '../.env'), // Desde apps/
         resolve(process.cwd(), '.env'), // Desde raíz
       ],
-      validate: (config) => validateEnv(config as Record<string, unknown>),
+      // En Vercel/serverless no hay .env; las variables vienen de process.env.
+      // Fusionar process.env para que validateEnv las vea.
+      validate: (config) =>
+        validateEnv({ ...process.env, ...config } as Record<string, unknown>),
     }),
     ThrottlerModule.forRoot([
       {

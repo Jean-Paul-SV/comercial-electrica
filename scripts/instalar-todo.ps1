@@ -8,7 +8,7 @@ $here = (Get-Location).Path
 $ProjectRoot = if (Test-Path (Join-Path $here "package.json")) { $here } else { (Resolve-Path (Join-Path $here "..")).Path }
 Set-Location $ProjectRoot
 
-Write-Host "=== Proyecto: Comercial Electrica - Instalacion ===" -ForegroundColor Cyan
+Write-Host "=== Proyecto: Orion - Instalacion ===" -ForegroundColor Cyan
 Write-Host "Raiz del proyecto: $ProjectRoot`n" -ForegroundColor Gray
 
 # 1) Comprobar Node/npm

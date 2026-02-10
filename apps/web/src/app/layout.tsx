@@ -7,7 +7,7 @@ import { Toaster } from '@shared/components/Toaster';
 import './globals.css';
 
 export const metadata = {
-  title: 'Comercial Eléctrica',
+  title: 'Orion',
 };
 
 /** Script que aplica tema guardado antes del primer pintado para evitar parpadeo. */

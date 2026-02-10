@@ -56,3 +56,64 @@ La API en Render solo acepta peticiones desde orígenes que estén en `ALLOWED_O
 | Render | `ALLOWED_ORIGINS`           | `https://comercial-electrica-web.vercel.app`   |
 
 Ambas deben coincidir con tus URLs reales de Vercel y Render.
+
+---
+
+## Si despliegas la API en Vercel (comercial-electrica-api)
+
+Si tienes un proyecto en Vercel que despliega la API (p. ej. `comercial-electrica-api.vercel.app`), la app **no arranca** si faltan variables de entorno. Verás:
+
+`Error: Falta variable de entorno requerida: DATABASE_URL`
+
+**Variables obligatorias** en ese proyecto (Settings → Environment Variables):
+
+| Variable              | Uso |
+|-----------------------|-----|
+| `DATABASE_URL`        | URL de PostgreSQL |
+| `REDIS_URL`            | URL de Redis |
+| `JWT_ACCESS_SECRET`    | Debe coincidir con Render si compartes sesiones |
+| `JWT_REFRESH_SECRET`   | Obligatorio en producción; mismo valor que en Render |
+
+Opcional: `ALLOWED_ORIGINS` (orígenes CORS permitidos).
+
+**Recomendación:** La API en producción está en **Render**. El front en Vercel ya apunta ahí. No es necesario desplegar la API también en Vercel; puedes usar solo Render para la API y evitar configurar DB/Redis/JWT dos veces.
+
+---
+
+## Cómo levantar comercial-electrica-api.vercel.app (cuando está caído)
+
+Si la API en Render está bien pero **https://comercial-electrica-api.vercel.app/** sigue caída (500, "Falta DATABASE_URL"), haz esto **en el proyecto comercial-electrica-api** de Vercel:
+
+### 1. Variables de entorno
+
+- **Settings** → **Environment Variables**.
+- Asegúrate de tener (y que **no** tengan espacios o el comando de redis-cli en REDIS_URL):
+
+  | Variable | Ejemplo / formato |
+  |----------|-------------------|
+  | `DATABASE_URL` | `postgresql://user:pass@host/db` |
+  | `REDIS_URL` | **Solo la URL**, ej. `rediss://default:TOKEN@allowed-goblin-45457.upstash.io:6379` (sin `redis-cli --tls -u`) |
+  | `JWT_ACCESS_SECRET` | Mismo valor que en Render |
+  | `JWT_REFRESH_SECRET` | Mismo valor que en Render |
+  | `ALLOWED_ORIGINS` | `https://comercial-electrica-web.vercel.app` |
+  | `NODE_ENV` | `production` |
+
+### 2. Asignar a Production (y Preview)
+
+- En **cada** variable, marca el entorno donde se usa:
+  - **Production** ✅ (obligatorio para comercial-electrica-api.vercel.app).
+  - **Preview** ✅ (si quieres que los previews también tengan env).
+- Si solo está en "Preview" o "Development", en Production la variable **no existe** y seguirás viendo "Falta DATABASE_URL".
+
+### 3. Guardar y redeploy
+
+- Pulsa **Save** (o "Save, rebuild, and deploy" si lo ofrece la pantalla).
+- Ve a **Deployments** → último deployment → menú (⋮) → **Redeploy**.
+- Espera a que el nuevo deploy termine (estado "Ready").
+
+Las variables se inyectan **en el deploy**. Si añadiste o corregiste variables pero no redeployaste, el código en ejecución sigue sin verlas.
+
+### 4. Si sigue caído
+
+- Revisa **Logs** del proyecto comercial-electrica-api (filtrar por el horario del último deploy).
+- Si el error pasa de "DATABASE_URL" a otro (p. ej. Redis o conexión DB), corrige ese punto (REDIS_URL, firewall, etc.).

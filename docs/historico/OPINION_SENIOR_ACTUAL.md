@@ -5,7 +5,7 @@
 
 > **Fecha:** Enero 2026  
 > **Evaluador:** Senior Developer  
-> **Proyecto:** Sistema Comercial Eléctrica
+> **Proyecto:** Orion
 
 ---
 

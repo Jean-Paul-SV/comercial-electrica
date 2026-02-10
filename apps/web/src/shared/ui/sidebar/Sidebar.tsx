@@ -36,7 +36,7 @@ export function Sidebar({
   userRole,
   onLogout,
   collapsed = false,
-  productName = 'Comercial Eléctrica',
+  productName = 'Orion',
   className,
   showFooter = true,
   showCollapseToggle = false,

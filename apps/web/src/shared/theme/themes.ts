@@ -1,7 +1,7 @@
 /**
  * Presets de color para la interfaz.
  * Valores en HSL (H S% L%) para --primary y --ring.
- * Colores armónicos y profesionales para Comercial Eléctrica.
+ * Colores armónicos y profesionales para Orion.
  */
 
 export type ThemeId =

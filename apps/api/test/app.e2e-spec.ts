@@ -26,6 +26,6 @@ describe('AppController (e2e)', () => {
     return request(app.getHttpServer())
       .get('/')
       .expect(200)
-      .expect('Sistema Comercial Eléctrica API v1.0');
+      .expect('Orion API v1.0');
   });
 });
