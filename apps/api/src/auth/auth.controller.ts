@@ -13,6 +13,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import type { MulterFile } from '../common/types/multer';
 import {
   ApiTags,
   ApiOperation,
@@ -323,7 +324,7 @@ export class AuthController {
   @ApiResponse({ status: 400, description: 'Archivo inválido o muy grande' })
   @ApiResponse({ status: 401, description: 'No autenticado' })
   uploadProfilePicture(
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFile() file: MulterFile,
     @Req() req: { user?: { sub?: string } },
   ) {
     if (!file) {
@@ -357,7 +358,7 @@ export class AuthController {
   @ApiResponse({ status: 403, description: 'No autorizado (requiere permiso users:update)' })
   uploadEmployeePicture(
     @Param('id') id: string,
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFile() file: MulterFile,
     @Req() req: { user?: { sub?: string } },
   ) {
     if (!file) {

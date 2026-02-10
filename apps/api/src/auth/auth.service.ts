@@ -25,6 +25,7 @@ import { MailerService } from '../mailer/mailer.service';
 import { PermissionsService } from './permissions.service';
 import { TenantModulesService } from './tenant-modules.service';
 import { StorageService } from '../common/services/storage.service';
+import type { MulterFile } from '../common/types/multer';
 
 export type JwtPayload = {
   sub: string;
@@ -540,7 +541,7 @@ export class AuthService {
    */
   async updateProfilePicture(
     userId: string,
-    file: Express.Multer.File,
+    file: MulterFile,
   ): Promise<{ profilePictureUrl: string }> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
@@ -581,7 +582,7 @@ export class AuthService {
    */
   async updateEmployeePicture(
     employeeId: string,
-    file: Express.Multer.File,
+    file: MulterFile,
     requestUserId: string,
   ): Promise<{ profilePictureUrl: string }> {
     const requestTenantId =

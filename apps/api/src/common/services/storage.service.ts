@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { writeFile, mkdir, unlink } from 'fs/promises';
 import { existsSync } from 'fs';
 import { join, extname } from 'path';
+import type { MulterFile } from '../types/multer';
 
 @Injectable()
 export class StorageService {
@@ -22,7 +23,7 @@ export class StorageService {
    * Retorna la URL relativa para acceder al archivo.
    */
   async saveFile(
-    file: Express.Multer.File,
+    file: MulterFile,
     subfolder: string = 'uploads',
   ): Promise<string> {
     if (this.provider !== 'local') {
@@ -56,7 +57,10 @@ export class StorageService {
     const filename = `${Date.now()}-${Math.random().toString(36).substring(7)}${ext}`;
     const filePath = join(uploadDir, filename);
 
-    // Guardar archivo
+    // Guardar archivo (con memoryStorage el archivo viene en buffer)
+    if (!file.buffer) {
+      throw new BadRequestException('El archivo no está disponible en memoria');
+    }
     await writeFile(filePath, file.buffer);
 
     // Retornar ruta relativa para servir el archivo
