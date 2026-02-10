@@ -15,8 +15,12 @@ export function listInvoices(
   const qs = new URLSearchParams();
   if (params.page != null) qs.set('page', String(params.page));
   if (params.limit != null) qs.set('limit', String(params.limit));
-  if (params.search != null && params.search !== '') qs.set('search', params.search);
-  if (params.status != null && params.status !== '') qs.set('status', params.status);
+  if (params.search != null && params.search.trim() !== '') {
+    qs.set('search', params.search);
+  }
+  if (params.status != null) {
+    qs.set('status', params.status);
+  }
   const query = qs.toString() ? `?${qs.toString()}` : '';
   return apiClient.get(`/sales/invoices${query}`, { authToken });
 }
