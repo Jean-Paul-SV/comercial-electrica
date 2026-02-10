@@ -32,5 +32,7 @@ export type LoginResponse = {
   accessToken: string;
   /** Si true, el usuario debe cambiar la contraseña (ej. temporal). */
   mustChangePassword?: boolean;
+  /** Si true, redirigir al panel del proveedor (gestión empresas/suscripciones). */
+  isPlatformAdmin?: boolean;
 };
 

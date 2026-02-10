@@ -41,7 +41,7 @@ export default function LoginPage() {
     loginMutation.mutate(values, {
       onSuccess: (data) => {
         auth.login(data.accessToken, data.mustChangePassword);
-        router.replace('/app');
+        router.replace(data.isPlatformAdmin ? '/provider' : '/app');
       },
     });
   };

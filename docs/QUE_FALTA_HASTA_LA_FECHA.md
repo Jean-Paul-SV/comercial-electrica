@@ -18,6 +18,14 @@
 
 ---
 
+## Pendiente para mañana (junto con DIAN)
+
+| Tarea | Descripción |
+|-------|-------------|
+| **Límite de login configurable** | Hacer que el límite de intentos de login (actualmente 20/min fijo) sea configurable por variable de entorno (p. ej. `LOGIN_THROTTLE_LIMIT`). Así en producción final se puede ajustar (10, 20, 30) sin tocar código. Implementar en `ThrottlerModule` y en el decorador `@Throttle` del endpoint `POST /auth/login`. |
+
+---
+
 ## 1. Crítico: DIAN (facturación electrónica en Colombia) — por último
 
 Si el producto se vende en **Colombia** y se ofrece facturación electrónica, es **obligatorio** completar la integración real con la DIAN. **Pasos ordenados:** ver **`DIAN_PASOS_IMPLEMENTACION.md`**.

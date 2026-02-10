@@ -480,6 +480,7 @@ export class AuthService {
     return {
       accessToken,
       mustChangePassword: user.mustChangePassword ?? false,
+      isPlatformAdmin: user.tenantId === null,
     };
   }
 
