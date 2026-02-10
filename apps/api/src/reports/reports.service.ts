@@ -20,7 +20,6 @@ import { CustomerClustersDto } from './dto/customer-clusters.dto';
 import { TrendingProductsDto } from './dto/trending-products.dto';
 import { Prisma } from '@prisma/client';
 import { CacheService } from '../common/services/cache.service';
-import { kmeans } from 'ml-kmeans';
 
 const LOW_STOCK_THRESHOLD = 10;
 const QUOTES_EXPIRING_DAYS = 7;
@@ -2083,6 +2082,7 @@ export class ReportsService {
       countNorm[i],
     ]);
 
+    const { kmeans } = await import('ml-kmeans');
     const result = kmeans(data, k, {});
     const clusterIndices = result.clusters;
 
