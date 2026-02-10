@@ -59,6 +59,8 @@ type TrendingPeriodKey = 'last_days' | 'current_month' | 'prev_month' | 'prev_mo
 
 const MONTH_NAMES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 
+type KpiFormat = 'number' | 'money';
+
 function getMonthRange(monthsAgo: number): { startDate: string; endDate: string; label: string } {
   const d = new Date();
   d.setMonth(d.getMonth() - monthsAgo);
@@ -486,11 +488,13 @@ export default function ReportsPage() {
                       const name = item.product.name?.trim() || item.product.internalCode || '—';
                       const shortName = name.length > maxLabelLen ? `${name.slice(0, maxLabelLen - 1)}…` : name;
                       const fullName = item.product.internalCode ? `${name} (${item.product.internalCode})` : name;
+                      const format: KpiFormat =
+                        chartValueKey === 'totalQty' ? 'number' : 'money';
                       return {
                         name: shortName,
                         fullName,
                         value: chartValueKey === 'totalQty' ? item.totalQty : item.totalRevenue,
-                        format: (chartValueKey === 'totalQty' ? 'number' : 'money') as const,
+                        format,
                       };
                     });
                     return (
