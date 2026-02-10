@@ -73,7 +73,8 @@ export default function SaleDetailPage() {
 
   const soldAt = sale.soldAt ? new Date(sale.soldAt).toLocaleString() : '—';
   const items = sale.items ?? [];
-  const invoices = sale.invoices ?? [];
+  type InvoiceLike = { id?: string; number?: string } | string;
+  const invoices: InvoiceLike[] = (sale.invoices ?? []) as InvoiceLike[];
 
   return (
     <div className="space-y-6">
@@ -180,13 +181,22 @@ export default function SaleDetailPage() {
             <>
               <h3 className="text-sm font-medium text-foreground">Factura(s)</h3>
               <ul className="text-sm space-y-1">
-                {invoices.map((inv) => (
-                  <li key={inv.id}>
-                    {typeof inv === 'object' && inv !== null && 'number' in inv
-                      ? `Factura ${(inv as { number: string }).number}`
-                      : inv.id}
-                  </li>
-                ))}
+                {invoices.map((inv, index) => {
+                  if (typeof inv === 'object' && inv !== null) {
+                    if ('number' in inv && typeof inv.number === 'string') {
+                      return (
+                        <li key={inv.id ?? `invoice-${index}`}>
+                          {`Factura ${inv.number}`}
+                        </li>
+                      );
+                    }
+                    if ('id' in inv && typeof inv.id === 'string') {
+                      return <li key={inv.id}>{inv.id}</li>;
+                    }
+                  }
+                  // Fallback genérico para strings u otros formatos
+                  return <li key={`invoice-${index}`}>{String(inv)}</li>;
+                })}
               </ul>
             </>
           )}
