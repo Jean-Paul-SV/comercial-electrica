@@ -68,14 +68,32 @@ export class AuthService {
     if (count > 0) {
       throw new BadRequestException('Bootstrap ya fue realizado.');
     }
+    const defaultTenantId = await this.tenantModules.getDefaultTenantId();
+    const adminRole = await this.prisma.role.findFirst({
+      where: { slug: 'admin', tenantId: null },
+      select: { id: true },
+    });
+    if (!defaultTenantId || !adminRole) {
+      throw new BadRequestException(
+        'Ejecuta primero el seed para crear tenant y roles: npm run prisma:seed -w api',
+      );
+    }
     const passwordHash = await argon2.hash(dto.password);
     const user = await this.prisma.user.create({
       data: {
         email: dto.email.toLowerCase(),
         passwordHash,
         role: RoleName.ADMIN,
+        tenantId: defaultTenantId,
       },
       select: { id: true, email: true, role: true, createdAt: true },
+    });
+    await this.prisma.userRole.create({
+      data: {
+        userId: user.id,
+        roleId: adminRole.id,
+        tenantId: defaultTenantId,
+      },
     });
     await this.audit.logCreate('user', user.id, null, {
       email: user.email,

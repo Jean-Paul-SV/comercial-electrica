@@ -12,6 +12,7 @@ import { AuditService } from '../common/services/audit.service';
 import { MailerService } from '../mailer/mailer.service';
 import { PermissionsService } from './permissions.service';
 import { TenantModulesService } from './tenant-modules.service';
+import { StorageService } from '../common/services/storage.service';
 import * as argon2 from 'argon2';
 
 // Mock argon2
@@ -44,6 +45,8 @@ describe('AuthService', () => {
         findUnique: jest.fn(),
         create: jest.fn(),
       },
+      role: { findFirst: jest.fn() },
+      userRole: { create: jest.fn().mockResolvedValue({}) },
     };
 
     const mockJwt = {
@@ -92,6 +95,13 @@ describe('AuthService', () => {
             getEffectiveTenantId: jest.fn().mockResolvedValue('tenant-default'),
           },
         },
+        {
+          provide: StorageService,
+          useValue: {
+            getSignedUrl: jest.fn().mockResolvedValue(''),
+            upload: jest.fn().mockResolvedValue({ key: '', url: '' }),
+          },
+        },
       ],
     }).compile();
 
@@ -119,6 +129,7 @@ describe('AuthService', () => {
       };
 
       prisma.user.count = jest.fn().mockResolvedValue(0);
+      prisma.role.findFirst = jest.fn().mockResolvedValue({ id: 'role-admin' });
       (argon2.hash as jest.Mock).mockResolvedValue('hashed-password');
       prisma.user.create = jest.fn().mockResolvedValue(createdUser);
 
@@ -132,8 +143,16 @@ describe('AuthService', () => {
           email: 'admin@test.com',
           passwordHash: 'hashed-password',
           role: RoleName.ADMIN,
+          tenantId: 'tenant-default',
         },
         select: { id: true, email: true, role: true, createdAt: true },
+      });
+      expect(prisma.userRole.create).toHaveBeenCalledWith({
+        data: {
+          userId: 'user-1',
+          roleId: 'role-admin',
+          tenantId: 'tenant-default',
+        },
       });
     });
 
@@ -152,6 +171,7 @@ describe('AuthService', () => {
         'Bootstrap ya fue realizado.',
       );
       expect(prisma.user.create).not.toHaveBeenCalled();
+      expect(prisma.userRole.create).not.toHaveBeenCalled();
     });
 
     it('debe normalizar el email a minúsculas', async () => {
@@ -168,6 +188,7 @@ describe('AuthService', () => {
       };
 
       prisma.user.count = jest.fn().mockResolvedValue(0);
+      prisma.role.findFirst = jest.fn().mockResolvedValue({ id: 'role-admin' });
       (argon2.hash as jest.Mock).mockResolvedValue('hashed-password');
       prisma.user.create = jest.fn().mockResolvedValue(createdUser);
 
@@ -180,6 +201,24 @@ describe('AuthService', () => {
           }),
         }),
       );
+    });
+
+    it('debe lanzar error si no hay tenant o rol admin (seed no ejecutado)', async () => {
+      const dto: BootstrapAdminDto = {
+        email: 'admin@test.com',
+        password: 'Admin123!',
+      };
+      prisma.user.count = jest.fn().mockResolvedValue(0);
+      const tenantModules = (service as any).tenantModules;
+      tenantModules.getDefaultTenantId = jest.fn().mockResolvedValue(null);
+
+      await expect(service.bootstrapAdmin(dto)).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(service.bootstrapAdmin(dto)).rejects.toThrow(
+        'Ejecuta primero el seed',
+      );
+      expect(prisma.user.create).not.toHaveBeenCalled();
     });
   });
 
