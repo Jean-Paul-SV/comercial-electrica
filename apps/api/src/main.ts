@@ -117,7 +117,18 @@ async function bootstrap() {
       'Idempotency-Key',
       'idempotency-key', // algunos clientes envían el header en minúsculas en el preflight
     ],
+    preflightContinue: false, // responder OPTIONS con 204 aquí y no pasar al router
   });
+
+  // Asegurar que OPTIONS (preflight CORS) responda 204 si no lo hizo enableCors
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    if (req.method === 'OPTIONS') {
+      res.status(204).end();
+      return;
+    }
+    next();
+  });
+
   // Filtro global de excepciones para respuestas consistentes
   app.useGlobalFilters(new AllExceptionsFilter());
 

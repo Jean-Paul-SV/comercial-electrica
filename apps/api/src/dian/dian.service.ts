@@ -646,7 +646,7 @@ export class DianService {
 
     const headers: Record<string, string> = useSoap
       ? {
-          'Content-Type': 'text/xml; charset=utf-8',
+          'Content-Type': 'application/soap+xml; charset=utf-8',
           SOAPAction: `"${DIAN_SOAP_ACTION_RECEIVE}"`,
           Accept: 'text/xml, application/xml, */*',
         }
