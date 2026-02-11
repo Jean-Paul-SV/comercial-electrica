@@ -120,13 +120,35 @@ async function bootstrap() {
     preflightContinue: false, // responder OPTIONS con 204 aquí y no pasar al router
   });
 
-  // Asegurar que OPTIONS (preflight CORS) responda 204 si no lo hizo enableCors
+  // Fallback OPTIONS: si llegamos aquí, responder 204 con cabeceras CORS para que el preflight pase
   app.use((req: Request, res: Response, next: NextFunction) => {
-    if (req.method === 'OPTIONS') {
-      res.status(204).end();
+    if (req.method !== 'OPTIONS') {
+      next();
       return;
     }
-    next();
+    const origin = req.get('Origin');
+    const isProd = process.env.NODE_ENV === 'production';
+    const allowed = (process.env.ALLOWED_ORIGINS ?? '')
+      .split(',')
+      .map((s) => s.trim().replace(/\/$/, ''))
+      .filter(Boolean);
+    const allowOrigin =
+      !isProd || allowed.length === 0
+        ? origin || '*'
+        : origin && allowed.some((o) => o === origin.trim().replace(/\/$/, ''))
+          ? origin
+          : null;
+    if (allowOrigin) {
+      res.setHeader('Access-Control-Allow-Origin', allowOrigin);
+      res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, PUT, PATCH, POST, DELETE, OPTIONS');
+      res.setHeader(
+        'Access-Control-Allow-Headers',
+        'Content-Type, Authorization, Accept, Origin, X-Requested-With, X-Request-Id, Idempotency-Key',
+      );
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+      res.setHeader('Access-Control-Max-Age', '86400');
+    }
+    res.status(204).end();
   });
 
   // Filtro global de excepciones para respuestas consistentes
