@@ -21,7 +21,7 @@
 
 | Paso | Acción | Dónde |
 |------|--------|--------|
-| 2.1 | Iniciar sesión en la app con el **usuario de plataforma** (el creado con `POST /auth/bootstrap-admin` la primera vez). | Misma URL de la app que usan los clientes. |
+| 2.1 | Iniciar sesión en la app con el **usuario de plataforma** (en pruebas: `platform@admin.local` / `PlatformAdmin1!`; en producción el definido con `PLATFORM_ADMIN_EMAIL` al ejecutar `prisma:seed`). | Misma URL de la app que usan los clientes. |
 | 2.2 | Ir a **Panel proveedor → Nueva empresa**. | Solo visible para el admin de plataforma. |
 | 2.3 | Completar el formulario: **Nombre de la empresa**, **Slug**, **Plan** (selector), **Email del admin**, **Nombre del admin** (opcional), **Contraseña** (dejar vacío para generar temporal). | Si se deja contraseña vacía, el sistema genera una temporal y el admin deberá cambiarla en el primer login. |
 | 2.4 | Pulsar **Crear empresa y admin**. | En desarrollo, si se generó contraseña temporal, se muestra en pantalla; guardarla de forma segura para el paso 3. |

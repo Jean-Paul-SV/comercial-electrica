@@ -59,6 +59,8 @@ Requisitos previos: **PostgreSQL y Redis** levantados (`npm run db:up`), **migra
 | Usuario (tenant) | vendedor@example.com  | User123!       | seed-500 o seed-dev |
 | **Platform admin** | platform@admin.local | PlatformAdmin1! | **prisma:seed** solo |
 
+**Panel proveedor (pruebas):** En entornos de prueba, el correo **platform@admin.local** es el que debe tener acceso al **Panel proveedor** (gestión de empresas/tenants, planes, filtros Activas/Suspendidas). Tras el login, la app redirige a este usuario a `/provider`. Para producción, usa `PLATFORM_ADMIN_EMAIL` y `PLATFORM_ADMIN_PASSWORD` en el seed para crear tu cuenta como dueño.
+
 ---
 
 ## Orden recomendado (inicializar todo)

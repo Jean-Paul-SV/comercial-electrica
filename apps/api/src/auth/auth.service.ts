@@ -2,6 +2,7 @@ import {
   Injectable,
   UnauthorizedException,
   BadRequestException,
+  ForbiddenException,
   InternalServerErrorException,
   HttpException,
 } from '@nestjs/common';
@@ -213,12 +214,19 @@ export class AuthService {
     return { success: true };
   }
 
-  /** Lista usuarios del mismo tenant. Requiere users:read. */
+  /** Lista usuarios del mismo tenant. Requiere users:read. Nunca incluye admins de plataforma (tenantId null). */
   async listUsers(tenantId: string | null) {
     const effectiveTenantId =
       tenantId ?? (await this.tenantModules.getDefaultTenantId());
+    if (!effectiveTenantId) return [];
     return this.prisma.user.findMany({
-      where: { tenantId: effectiveTenantId, isActive: true },
+      where: {
+        AND: [
+          { tenantId: effectiveTenantId },
+          { tenantId: { not: null } },
+          { isActive: true },
+        ],
+      },
       select: { id: true, email: true, name: true, role: true, profilePictureUrl: true, createdAt: true },
       orderBy: { createdAt: 'desc' },
     });
@@ -236,6 +244,9 @@ export class AuthService {
       select: { id: true, tenantId: true },
     });
     if (!target) throw new BadRequestException('Usuario no encontrado.');
+    if (target.tenantId === null) {
+      throw new ForbiddenException('No se puede editar el administrador de plataforma.');
+    }
     const targetTenantId =
       target.tenantId ?? (await this.tenantModules.getDefaultTenantId());
     if (targetTenantId !== requestTenantId) {
@@ -270,6 +281,9 @@ export class AuthService {
       select: { id: true, tenantId: true, email: true },
     });
     if (!target) throw new BadRequestException('Usuario no encontrado.');
+    if (target.tenantId === null) {
+      throw new ForbiddenException('No se puede eliminar el administrador de plataforma.');
+    }
     const targetTenantId =
       target.tenantId ?? (await this.tenantModules.getDefaultTenantId());
     if (targetTenantId !== requestTenantId) {
