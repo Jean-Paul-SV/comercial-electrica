@@ -40,9 +40,11 @@ npm run db:up
 npm run prisma:generate -w api
 npm run prisma:migrate -w api
 
-# Opcional: datos de prueba (admin + seed)
-npm run db:seed
+# Seed: roles/permisos y tenant por defecto
 npm run prisma:seed -w api
+
+# Opcional: solo 2 usuarios (admin + vendedor), sin productos ni ventas
+# npm run db:seed
 
 # Levantar API + Web
 npm run dev
@@ -55,6 +57,36 @@ npm run dev
 Login por defecto (tras seed): `admin@example.com` / `Admin123!`
 
 Guía detallada y solución de problemas: [docs/LEVANTAR_PROYECTO.md](./docs/LEVANTAR_PROYECTO.md).
+
+---
+
+## Cargar datos para ver todas las funcionalidades
+
+Para probar la app con **productos, clientes, ventas, cotizaciones, caja, reportes**, etc., carga el seed de datos reales (500+ registros). Desde la **raíz del proyecto**:
+
+```bash
+# 1. Infra y esquema (si aún no lo hiciste)
+npm run db:up
+npm run prisma:generate -w api
+npm run prisma:migrate -w api
+npm run prisma:seed -w api
+
+# 2. Cargar 500+ datos (categorías, productos, clientes, ventas, cotizaciones, caja, gastos…)
+npm run db:seed:500
+
+# 3. Levantar app
+npm run dev
+```
+
+Luego abre **http://localhost:3001** e inicia sesión con:
+
+| Rol   | Email                | Contraseña |
+|-------|----------------------|------------|
+| Admin | admin@example.com    | Admin123!  |
+| User  | vendedor@example.com | User123!  |
+
+Con eso podrás ver y usar: Dashboard, Ventas, Productos, Clientes, Caja, Gastos, Cotizaciones, Proveedores, Compras, Reportes, Auditoría, etc.  
+Más detalle: [docs/SEED_500_DATOS_REALES.md](./docs/SEED_500_DATOS_REALES.md).
 
 ---
 
@@ -140,10 +172,27 @@ Detalle completo en `env.example`.
 
 ---
 
+## Redis: ¿qué es y qué tengo que hacer?
+
+**Redis no es la base de datos.** La base de datos es **PostgreSQL** (productos, ventas, usuarios, etc. van ahí).
+
+Redis se usa para:
+
+- **Colas de trabajos (BullMQ):** por ejemplo, procesar documentos DIAN en segundo plano.
+- **Caché:** guardar respuestas temporales para que algunas consultas vayan más rápido.
+
+**Qué tienes que hacer:**
+
+- **En local:** Nada especial. Al ejecutar `npm run db:up` se levantan **Postgres y Redis** en Docker. En `.env` deja `REDIS_URL="redis://localhost:6379"`. La API se conecta sola; no tienes que cargar ni crear datos en Redis.
+- **En producción:** Contratar o desplegar un Redis (Upstash, Redis Cloud, Redis en tu VPS, etc.) y poner su URL en `REDIS_URL`. Tampoco se “sube” la base de datos a Redis: los datos de negocio siguen en PostgreSQL.
+
+---
+
 ## Documentación
 
 - [Levantar el proyecto](./docs/LEVANTAR_PROYECTO.md) — Primera vez, errores frecuentes
 - [**Primer usuario en producción**](./docs/PRIMER_USUARIO_PRODUCCION.md) — Cómo crear el primer admin cuando subes a producción (sin BD en el repo)
+- [**Datos reales en Vercel (producción)**](./docs/DATOS_REALES_VERCEL_PRODUCCION.md) — Cargar productos, ventas, clientes en la BD de Render para que la web en Vercel muestre datos
 - [Qué falta hasta la fecha](./docs/QUE_FALTA_HASTA_LA_FECHA.md) — Pendientes y prioridades
 - [Índice de documentación](./docs/README.md) — Toda la documentación en `docs/`
 - [Solución error EPERM (Prisma)](./docs/SOLUCION_ERROR_EPERM_PRISMA.md) — Común en Windows
