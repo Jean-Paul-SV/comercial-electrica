@@ -51,6 +51,7 @@ export const navConfig: NavTreeConfig = {
       roles: ['ADMIN'],
       requiredPermission: 'suppliers:read',
       moduleCode: 'suppliers',
+      platformAdminCanSee: true,
       items: [
         { id: 'suppliers', href: '/suppliers', label: 'Proveedores', icon: 'Truck', order: 0, requiredPermission: 'suppliers:read', moduleCode: 'suppliers' },
         { id: 'supplier-invoices', href: '/supplier-invoices', label: 'Facturas proveedor', icon: 'FileCheck', order: 1, requiredPermission: 'supplier-invoices:read', moduleCode: 'suppliers' },

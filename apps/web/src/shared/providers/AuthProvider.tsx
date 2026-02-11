@@ -89,6 +89,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
     setUser({ id, email, role });
+    setIsPlatformAdmin(claims?.isPlatformAdmin ?? false);
     getMe(token)
       .then((res) => {
         setUser(res.user);

@@ -45,6 +45,8 @@ export type NavSectionConfig = {
   moduleCode?: string;
   /** Si true, la sección solo se muestra para administradores de plataforma (usuarios sin tenant). */
   platformAdminOnly?: boolean;
+  /** Si true, la sección también es visible para administradores de plataforma (ej. Compras / Proveedores). */
+  platformAdminCanSee?: boolean;
 };
 
 /** Árbol de navegación completo (configuración cruda). */

@@ -43,8 +43,9 @@ function sectionVisible(
   isPlatformAdmin?: boolean
 ): boolean {
   if (!role) return false;
-  // Admin de plataforma (sin tenant) solo ve Panel proveedor; el resto no aplica.
-  if (isPlatformAdmin === true) return section.platformAdminOnly === true;
+  // Admin de plataforma ve Panel proveedor y, si está marcada, secciones extra (ej. Compras / Proveedores).
+  if (isPlatformAdmin === true)
+    return section.platformAdminOnly === true || section.platformAdminCanSee === true;
   if (section.platformAdminOnly) return false;
   if (!moduleVisible(section.moduleCode, enabledModules)) return false;
   // Administrador ve todas las secciones sin depender de la lista de permisos.

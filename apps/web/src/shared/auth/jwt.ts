@@ -3,6 +3,8 @@ export type JwtClaims = {
   email?: string;
   role?: 'ADMIN' | 'USER';
   exp?: number;
+  /** true = admin de plataforma (solo Panel proveedor). Viene del backend en el token. */
+  isPlatformAdmin?: boolean;
 };
 
 function base64UrlDecode(input: string): string {
