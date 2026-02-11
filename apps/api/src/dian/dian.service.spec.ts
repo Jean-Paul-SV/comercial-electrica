@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { DianService } from './dian.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
@@ -69,10 +69,13 @@ describe('DianService', () => {
     },
   };
 
+  const tenantId = 'tenant-123';
+
   beforeEach(async () => {
     const mockPrisma = {
       dianDocument: {
         findUnique: jest.fn(),
+        findFirst: jest.fn(),
         update: jest.fn(),
       },
       dianEvent: {
@@ -188,6 +191,30 @@ describe('DianService', () => {
       expect(prisma.dianDocument.update).not.toHaveBeenCalled();
     });
 
+    it('debe lanzar BadRequestException si FE no tiene cliente con documento', async () => {
+      const docSinCliente = {
+        ...mockDianDocument,
+        invoice: {
+          ...mockDianDocument.invoice,
+          customer: null,
+          sale: {
+            ...mockDianDocument.invoice.sale,
+            customer: null,
+          },
+        },
+      };
+      prisma.dianDocument.findUnique = jest.fn().mockResolvedValue(docSinCliente);
+
+      await expect(service.processDocument('dian-doc-1')).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(service.processDocument('dian-doc-1')).rejects.toThrow(
+        'Factura electrónica requiere cliente',
+      );
+      // No debe haber actualizado a SENT
+      expect(prisma.dianDocument.update).not.toHaveBeenCalled();
+    });
+
     it('debe manejar errores y actualizar estado a REJECTED', async () => {
       prisma.dianDocument.findUnique = jest
         .fn()
@@ -221,23 +248,27 @@ describe('DianService', () => {
 
   describe('queryDocumentStatus', () => {
     it('debe retornar el estado del documento', async () => {
-      prisma.dianDocument.findUnique = jest
+      prisma.dianDocument.findFirst = jest
         .fn()
-        .mockResolvedValue(mockDianDocument);
+        .mockResolvedValue({ status: DianDocumentStatus.DRAFT });
 
-      const status = await service.queryDocumentStatus('dian-doc-1');
+      const status = await service.queryDocumentStatus('dian-doc-1', tenantId);
 
       expect(status).toBe(DianDocumentStatus.DRAFT);
-      expect(prisma.dianDocument.findUnique).toHaveBeenCalledWith({
-        where: { id: 'dian-doc-1' },
+      expect(prisma.dianDocument.findFirst).toHaveBeenCalledWith({
+        where: {
+          id: 'dian-doc-1',
+          invoice: { tenantId },
+        },
+        select: { status: true },
       });
     });
 
     it('debe lanzar error si el documento no existe', async () => {
-      prisma.dianDocument.findUnique = jest.fn().mockResolvedValue(null);
+      prisma.dianDocument.findFirst = jest.fn().mockResolvedValue(null);
 
       await expect(
-        service.queryDocumentStatus('dian-doc-inexistente'),
+        service.queryDocumentStatus('dian-doc-inexistente', tenantId),
       ).rejects.toThrow(NotFoundException);
     });
   });

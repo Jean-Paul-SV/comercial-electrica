@@ -1,8 +1,10 @@
 import {
   Body,
   Controller,
+  DefaultValuePipe,
   Get,
   Param,
+  ParseIntPipe,
   ParseUUIDPipe,
   Post,
   Query,
@@ -18,7 +20,6 @@ import {
 } from '@nestjs/swagger';
 import { ReturnsService } from './returns.service';
 import { CreateReturnDto } from './dto/create-return.dto';
-import { PaginationDto } from '../common/dto/pagination.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ForbiddenException } from '@nestjs/common';
 
@@ -64,17 +65,15 @@ export class ReturnsController {
   @ApiResponse({ status: 401, description: 'No autenticado' })
   @ApiResponse({ status: 403, description: 'Sin tenant' })
   list(
-    @Query() pagination: PaginationDto | undefined,
+    @Query('page', new DefaultValuePipe(1), new ParseIntPipe()) page: number,
+    @Query('limit', new DefaultValuePipe(20), new ParseIntPipe()) limit: number,
     @Req() req: { user?: { tenantId?: string | null } },
   ) {
     const tenantId = req.user?.tenantId ?? null;
     if (tenantId == null) {
       throw new ForbiddenException('Solo usuarios de una empresa pueden listar devoluciones.');
     }
-    return this.returns.listReturns(tenantId, {
-      page: pagination?.page,
-      limit: pagination?.limit,
-    });
+    return this.returns.listReturns(tenantId, { page, limit });
   }
 
   @Get(':id')

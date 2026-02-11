@@ -252,7 +252,11 @@ export class SalesService {
         await this.dianQueue.add(
           'send',
           { dianDocumentId: result.dianDocument.id },
-          { attempts: 10, backoff: { type: 'exponential', delay: 5000 } },
+          {
+            jobId: `dian-${result.dianDocument.id}`,
+            attempts: 10,
+            backoff: { type: 'exponential', delay: 5000 },
+          },
         );
         await this.cache.deletePattern('cache:sales:*');
         return result;

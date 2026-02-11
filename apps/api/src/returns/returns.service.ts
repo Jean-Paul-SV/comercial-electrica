@@ -160,8 +160,8 @@ export class ReturnsService {
     if (tenantId == null) {
       throw new BadRequestException('Tenant requerido para listar devoluciones.');
     }
-    const page = pagination?.page ?? 1;
-    const limit = pagination?.limit ?? 20;
+    const page = Math.max(1, Number(pagination?.page) || 1);
+    const limit = Math.min(100, Math.max(1, Number(pagination?.limit) || 20));
     const skip = (page - 1) * limit;
 
     const [data, total] = await Promise.all([

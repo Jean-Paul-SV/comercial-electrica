@@ -35,8 +35,21 @@ services:
       - key: ALLOWED_ORIGINS
         value: "*"
       # Añadir en el Dashboard: REDIS_URL (Upstash), FRONTEND_URL (URL de Vercel).
-      # - key: REDIS_URL / FRONTEND_URL → sync: false o valor
       - key: REDIS_URL
         sync: false
       - key: FRONTEND_URL
+        sync: false
+      # DIAN: en el Dashboard asigna DIAN_SOFTWARE_ID y DIAN_SOFTWARE_PIN (secretos). Ver docs/DIAN_PRODUCCION_RENDER.md
+      - key: DIAN_SOFTWARE_ID
+        sync: false
+      - key: DIAN_SOFTWARE_PIN
+        sync: false
+      - key: DIAN_USE_DEFAULT_URL
+        value: "true"
+      - key: DIAN_ENV
+        value: "HABILITACION"
+      # Opcional certificado .p12: DIAN_CERT_PATH y DIAN_CERT_PASSWORD en el Dashboard
+      - key: DIAN_CERT_PATH
+        sync: false
+      - key: DIAN_CERT_PASSWORD
         sync: false

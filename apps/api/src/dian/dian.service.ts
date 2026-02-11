@@ -6,8 +6,22 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { DianDocumentStatus, DianEnvironment, Prisma } from '@prisma/client';
+import {
+  DianDocumentStatus,
+  DianEnvironment,
+  InvoiceStatus,
+  Prisma,
+} from '@prisma/client';
 import { ConfigService } from '@nestjs/config';
+
+/** URLs por defecto DIAN. Ref: documentación técnica DIAN. */
+const DIAN_DEFAULT_BASE_URL_HAB = 'https://vpfe-hab.dian.gov.co';
+const DIAN_DEFAULT_BASE_URL_PROD = 'https://vpfe.dian.gov.co';
+const DIAN_SEND_PATH = '/WcfDianCustomerServices.svc';
+const DIAN_SOAP_ACTION_RECEIVE = 'http://wcf.dian.colombia/IWcfDianCustomerServices/ReceiveInvoice';
+const DIAN_HTTP_TIMEOUT_MS = 30_000;
+const DIAN_HTTP_MAX_RETRIES = 3;
+const DIAN_HTTP_RETRY_DELAY_MS = 5_000;
 import { AuditService } from '../common/services/audit.service';
 import { readFile } from 'fs/promises';
 import { resolve } from 'path';
@@ -110,6 +124,9 @@ export class DianService {
       this.logger.warn(`Documento ${dianDocumentId} ya fue aceptado por DIAN.`);
       return;
     }
+
+    // Validaciones pre-envío: evitan rechazos por datos incompletos o incoherentes
+    this.validateBeforeSend(dianDoc);
 
     try {
       // Actualizar estado a SENT (procesando)
@@ -223,6 +240,91 @@ export class DianService {
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&apos;');
+  }
+
+  /**
+   * Valida el documento y la factura antes de generar XML y enviar a DIAN.
+   * Lanza BadRequestException si falta algo obligatorio o los datos son incoherentes.
+   */
+  private validateBeforeSend(
+    dianDoc: Prisma.DianDocumentGetPayload<{
+      include: {
+        invoice: {
+          include: {
+            sale: {
+              include: {
+                items: { include: { product: true } };
+                customer: true;
+              };
+            };
+            customer: true;
+          };
+        };
+      };
+    }>,
+  ): void {
+    const invoice = dianDoc.invoice;
+    if (!invoice) {
+      throw new BadRequestException(
+        'El documento DIAN no tiene factura asociada. No se puede enviar.',
+      );
+    }
+
+    if (invoice.status === InvoiceStatus.VOIDED) {
+      throw new BadRequestException(
+        'La factura está anulada. No se puede enviar a DIAN.',
+      );
+    }
+
+    if (!invoice.number || String(invoice.number).trim() === '') {
+      throw new BadRequestException(
+        'La factura debe tener número. No se puede enviar a DIAN.',
+      );
+    }
+
+    const subtotal = Number(invoice.subtotal);
+    const taxTotal = Number(invoice.taxTotal);
+    const discountTotal = Number(invoice.discountTotal ?? 0);
+    const grandTotal = Number(invoice.grandTotal);
+    if (
+      !Number.isFinite(subtotal) ||
+      !Number.isFinite(taxTotal) ||
+      !Number.isFinite(grandTotal) ||
+      subtotal < 0 ||
+      taxTotal < 0 ||
+      grandTotal < 0
+    ) {
+      throw new BadRequestException(
+        'La factura debe tener subtotal, impuestos y total válidos (números >= 0).',
+      );
+    }
+
+    const expectedGrandTotal = Math.round((subtotal + taxTotal - discountTotal) * 100) / 100;
+    if (Math.abs(grandTotal - expectedGrandTotal) > 0.02) {
+      throw new BadRequestException(
+        `Total de la factura incoherente: subtotal + impuestos - descuento debe coincidir con el total (esperado ${expectedGrandTotal}, actual ${grandTotal}).`,
+      );
+    }
+
+    const sale = invoice.sale;
+    const customer = invoice.customer ?? sale?.customer;
+    if (dianDoc.type === 'FE') {
+      if (!sale?.items?.length) {
+        throw new BadRequestException(
+          'Factura electrónica de venta debe tener al menos un ítem en la venta.',
+        );
+      }
+      if (!customer) {
+        throw new BadRequestException(
+          'Factura electrónica requiere cliente con documento (NIT/CC). Asocia la venta a un cliente con tipo y número de documento.',
+        );
+      }
+      if (!customer.docType || !customer.docNumber || String(customer.docNumber).trim() === '') {
+        throw new BadRequestException(
+          'El cliente debe tener tipo de documento (docType) y número de documento (docNumber) para factura electrónica DIAN.',
+        );
+      }
+    }
   }
 
   /**
@@ -463,8 +565,212 @@ export class DianService {
   }
 
   /**
-   * Envía el documento firmado a DIAN
-   * Por ahora simula el envío - debe implementarse con API real de DIAN
+   * Base URL del API DIAN. Si DIAN_API_BASE_URL está definida se usa.
+   * Si DIAN_USE_DEFAULT_URL=true se usan las URLs por defecto (hab/prod). Si no, null = modo simulado.
+   */
+  private getDianBaseUrl(): string | null {
+    const override = this.config.get<string>('DIAN_API_BASE_URL', '')?.trim();
+    if (override) return override.replace(/\/$/, '');
+    if (this.config.get<string>('DIAN_USE_DEFAULT_URL', '') === 'true') {
+      return this.dianEnv === DianEnvironment.PRODUCCION
+        ? DIAN_DEFAULT_BASE_URL_PROD
+        : DIAN_DEFAULT_BASE_URL_HAB;
+    }
+    return null;
+  }
+
+  /**
+   * URL completa para envío.
+   */
+  private getDianSendUrl(): string {
+    const base = this.getDianBaseUrl();
+    if (!base) {
+      throw new BadRequestException(
+        'DIAN_API_BASE_URL no configurada. Configure la URL base del API DIAN para envío real.',
+      );
+    }
+    const path =
+      this.config.get<string>('DIAN_SEND_PATH', '')?.trim() || DIAN_SEND_PATH;
+    return `${base}${path.startsWith('/') ? path : `/${path}`}`;
+  }
+
+  /**
+   * Construye el sobre SOAP para ReceiveInvoice (DIAN WCF).
+   * Ref: namespace http://wcf.dian.colombia, operación ReceiveInvoice con fileName y contentFile (base64).
+   */
+  private buildSoapEnvelopeReceiveInvoice(
+    signedXml: string,
+    fileName: string,
+  ): string {
+    const contentFile = Buffer.from(signedXml, 'utf-8').toString('base64');
+    return `<?xml version="1.0" encoding="UTF-8"?>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:wcf="http://wcf.dian.colombia">
+  <soap:Header>
+    <wcf:SoftwareID>${this.escapeXml(this.softwareId)}</wcf:SoftwareID>
+    <wcf:SoftwarePIN>${this.escapeXml(this.softwarePin)}</wcf:SoftwarePIN>
+  </soap:Header>
+  <soap:Body>
+    <wcf:ReceiveInvoice>
+      <wcf:fileName>${this.escapeXml(fileName)}</wcf:fileName>
+      <wcf:contentFile>${contentFile}</wcf:contentFile>
+    </wcf:ReceiveInvoice>
+  </soap:Body>
+</soap:Envelope>`;
+  }
+
+  /**
+   * POST al API DIAN con timeout y reintentos. Devuelve el cuerpo de la respuesta.
+   */
+  private async sendToDianHttp(
+    body: string,
+    dianDocumentId: string,
+    useSoap: boolean,
+  ): Promise<string> {
+    const url = this.getDianSendUrl();
+    const controller = new AbortController();
+    const timeoutMs = this.config.get<number>(
+      'DIAN_HTTP_TIMEOUT_MS',
+      DIAN_HTTP_TIMEOUT_MS,
+    );
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+    let lastError: Error | null = null;
+    const maxRetries = this.config.get<number>(
+      'DIAN_HTTP_MAX_RETRIES',
+      DIAN_HTTP_MAX_RETRIES,
+    );
+    const retryDelayMs = this.config.get<number>(
+      'DIAN_HTTP_RETRY_DELAY_MS',
+      DIAN_HTTP_RETRY_DELAY_MS,
+    );
+
+    const headers: Record<string, string> = useSoap
+      ? {
+          'Content-Type': 'text/xml; charset=utf-8',
+          SOAPAction: `"${DIAN_SOAP_ACTION_RECEIVE}"`,
+          Accept: 'text/xml, application/xml, */*',
+        }
+      : {
+          'Content-Type': 'application/xml',
+          Accept: 'application/xml, application/json, text/xml, */*',
+        };
+    if (this.softwareId && !useSoap) {
+      headers.SoftwareID = this.softwareId;
+      headers.SoftwarePIN = this.softwarePin;
+    }
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        this.logger.log(
+          `Envío DIAN intento ${attempt}/${maxRetries} a ${url}`,
+        );
+        const res = await fetch(url, {
+          method: 'POST',
+          headers,
+          body,
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+
+        const responseBody = await res.text();
+        if (!res.ok) {
+          throw new Error(
+            `DIAN respondió ${res.status} ${res.statusText}: ${responseBody.slice(0, 500)}`,
+          );
+        }
+        return responseBody;
+      } catch (err) {
+        lastError = err instanceof Error ? err : new Error(String(err));
+        if (this.isTestEnv) throw lastError;
+        this.logger.warn(
+          `Intento ${attempt}/${maxRetries} fallido: ${lastError.message}`,
+        );
+        if (attempt < maxRetries) {
+          await new Promise((r) => setTimeout(r, retryDelayMs));
+        }
+      }
+    }
+    clearTimeout(timeoutId);
+    throw lastError ?? new Error('Envío DIAN falló sin detalle');
+  }
+
+  /**
+   * Parsea la respuesta del API DIAN (XML o JSON) a DianResponse.
+   */
+  private parseDianResponse(
+    responseBody: string,
+    _dianDocumentId: string,
+  ): DianResponse {
+    const timestamp = new Date().toISOString();
+    const body = responseBody.trim();
+
+    if (!body) {
+      return {
+        success: false,
+        message: 'Respuesta vacía del API DIAN',
+        timestamp,
+      };
+    }
+
+    if (body.startsWith('{')) {
+      try {
+        const json = JSON.parse(body) as Record<string, unknown>;
+        const isValid =
+          json.IsValid === true ||
+          json.isValid === true ||
+          json.Success === true ||
+          json.success === true;
+        const cufe =
+          (json.CUFE as string) ??
+          (json.Cufe as string) ??
+          (json.cufe as string);
+        const msg =
+          (json.Description as string) ??
+          (json.Message as string) ??
+          (json.message as string) ??
+          (json.ResponseMessage as string);
+        return {
+          success: !!isValid,
+          cufe: typeof cufe === 'string' ? cufe : undefined,
+          message: typeof msg === 'string' ? msg : undefined,
+          errors: Array.isArray(json.errors) ? (json.errors as string[]) : undefined,
+          timestamp,
+        };
+      } catch {
+        // seguir con XML
+      }
+    }
+
+    const upper = body.toUpperCase();
+    const isValid =
+      upper.includes('<ISVALID>TRUE</ISVALID>') ||
+      upper.includes('<ISVALID>1</ISVALID>') ||
+      /ResponseCode[\s"=>]*0\s*</i.test(body);
+    const cufeMatch = body.match(
+      /<CUFE[^>]*>([^<]+)<\/CUFE>|<Cufe[^>]*>([^<]+)<\/Cufe>/i,
+    );
+    const cufe = cufeMatch ? (cufeMatch[1] || cufeMatch[2] || '').trim() : undefined;
+    const descMatch = body.match(
+      /<Description[^>]*>([^<]*)<\/Description>|<ResponseMessage[^>]*>([^<]*)<\/ResponseMessage>|<Message[^>]*>([^<]*)<\/Message>/i,
+    );
+    const message = descMatch
+      ? (descMatch[1] || descMatch[2] || descMatch[3] || '').trim()
+      : undefined;
+
+    return {
+      success: !!isValid,
+      cufe,
+      message:
+        message ||
+        (isValid ? 'Documento aceptado' : 'Documento rechazado por DIAN'),
+      timestamp,
+    };
+  }
+
+  /**
+   * Envía el documento firmado a DIAN.
+   * Si DIAN_API_BASE_URL está configurada (o se usan URLs por defecto), hace POST con sobre SOAP ReceiveInvoice.
+   * Si no hay URL configurada, simula respuesta (desarrollo).
    */
   async sendToDian(
     signedXml: string,
@@ -474,53 +780,70 @@ export class DianService {
       `Enviando documento ${dianDocumentId} a DIAN (ambiente: ${this.dianEnv})`,
     );
 
-    // Validar configuración
     if (!this.softwareId || !this.softwarePin) {
       throw new BadRequestException(
         'DIAN_SOFTWARE_ID y DIAN_SOFTWARE_PIN deben estar configurados para enviar documentos a DIAN.',
       );
     }
 
-    // TODO: Implementar envío real a DIAN
-    // Requiere:
-    // - Autenticación con softwareId y softwarePin
-    // - Endpoint de DIAN según ambiente (habilitación o producción)
-    // - Manejo de errores de red
-    // - Reintentos automáticos
+    const baseUrl = this.getDianBaseUrl();
+    let response: DianResponse;
 
-    // Por ahora simulamos una respuesta exitosa
-    this.logger.warn(
-      `⚠️ Envío a DIAN no implementado. Simulando respuesta exitosa.`,
-    );
+    if (baseUrl) {
+      try {
+        const useSoap = this.config.get<string>('DIAN_USE_SOAP', 'true') !== 'false';
+        const fileName = `factura-${dianDocumentId}.xml`;
+        const body = useSoap
+          ? this.buildSoapEnvelopeReceiveInvoice(signedXml, fileName)
+          : signedXml;
+        const responseBody = await this.sendToDianHttp(
+          body,
+          dianDocumentId,
+          useSoap,
+        );
+        response = this.parseDianResponse(responseBody, dianDocumentId);
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        this.logger.error(
+          `Envío DIAN fallido para ${dianDocumentId}: ${errorMessage}`,
+        );
+        response = {
+          success: false,
+          message: errorMessage,
+          timestamp: new Date().toISOString(),
+        };
+      }
+    } else {
+      this.logger.warn(
+        `⚠️ DIAN_API_BASE_URL no configurada. Simulando respuesta exitosa.`,
+      );
+      response = {
+        success: true,
+        cufe: `CUFE-${dianDocumentId.substring(0, 8).toUpperCase()}-${Date.now()}`,
+        qrCode: `QR-CODE-MOCK-${dianDocumentId}`,
+        message: 'Documento aceptado (simulado)',
+        timestamp: new Date().toISOString(),
+      };
+    }
 
-    // Simular respuesta de DIAN
-    const mockResponse: DianResponse = {
-      success: true,
-      cufe: `CUFE-${dianDocumentId.substring(0, 8).toUpperCase()}-${Date.now()}`,
-      qrCode: `QR-CODE-MOCK-${dianDocumentId}`,
-      message: 'Documento aceptado (simulado)',
-      timestamp: new Date().toISOString(),
-    };
-
-    // Registrar evento de envío
     await this.prisma.dianEvent.create({
       data: {
         dianDocumentId,
         eventType: 'SENT',
         payload: {
           response: {
-            success: mockResponse.success,
-            cufe: mockResponse.cufe || null,
-            qrCode: mockResponse.qrCode || null,
-            message: mockResponse.message || null,
-            timestamp: mockResponse.timestamp,
+            success: response.success,
+            cufe: response.cufe ?? null,
+            qrCode: response.qrCode ?? null,
+            message: response.message ?? null,
+            timestamp: response.timestamp,
           },
           environment: this.dianEnv,
         } as Prisma.InputJsonValue,
       },
     });
 
-    return mockResponse;
+    return response;
   }
 
   /**

@@ -121,6 +121,22 @@ Para que el frontend en Vercel pueda llamar a la API en Render:
 
 ---
 
+## Parte 4: (Opcional) DIAN en producción
+
+Si quieres que la API en Render envíe facturas electrónicas a la DIAN:
+
+1. En **Render** → servicio de la API → **Environment**, añade:
+   - `DIAN_SOFTWARE_ID` = tu Software ID (UUID)
+   - `DIAN_SOFTWARE_PIN` = tu PIN
+   - `DIAN_USE_DEFAULT_URL` = `true`
+   - `DIAN_ENV` = `HABILITACION` (pruebas) o `PRODUCCION` (facturación real)
+2. Si tienes certificado .p12: configura `DIAN_CERT_PATH` y `DIAN_CERT_PASSWORD` (ver guía abajo).
+3. Guarda y **redepliega** el servicio.
+
+Guía detallada: **[DIAN_PRODUCCION_RENDER.md](./DIAN_PRODUCCION_RENDER.md)** (variables, certificado .p12 en Render, comprobaciones).
+
+---
+
 ## Resumen de variables
 
 | Dónde   | Variable                     | Valor / Origen |
@@ -130,6 +146,7 @@ Para que el frontend en Vercel pueda llamar a la API en Render:
 | Render  | `REDIS_URL`                   | Upstash → Redis URL |
 | Render  | `ALLOWED_ORIGINS`             | URL(s) del frontend en Vercel |
 | Render  | `FRONTEND_URL`                | URL del frontend en Vercel |
+| Render  | `DIAN_SOFTWARE_ID` / `DIAN_SOFTWARE_PIN` / `DIAN_USE_DEFAULT_URL` | Opcional: ver [DIAN_PRODUCCION_RENDER.md](./DIAN_PRODUCCION_RENDER.md) |
 | Vercel  | `NEXT_PUBLIC_API_BASE_URL`    | URL del servicio API en Render |
 
 ---

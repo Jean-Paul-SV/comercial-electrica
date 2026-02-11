@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsDateString, IsOptional, IsInt, Min, IsUUID } from 'class-validator';
+import { IsDateString, IsOptional, IsInt, Min, Max, IsUUID } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class SalesReportDto {
@@ -29,12 +29,14 @@ export class SalesReportDto {
 
   @ApiPropertyOptional({
     example: 100,
-    description: 'Límite de resultados',
+    description: 'Límite de resultados (máximo 500)',
     minimum: 1,
+    maximum: 500,
   })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
+  @Max(500)
   limit?: number;
 }

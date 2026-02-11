@@ -194,6 +194,7 @@ Redis se usa para:
 - [**Primer usuario en producción**](./docs/PRIMER_USUARIO_PRODUCCION.md) — Cómo crear el primer admin cuando subes a producción (sin BD en el repo)
 - [**Datos reales en Vercel (producción)**](./docs/DATOS_REALES_VERCEL_PRODUCCION.md) — Cargar productos, ventas, clientes en la BD de Render para que la web en Vercel muestre datos
 - [Qué falta hasta la fecha](./docs/QUE_FALTA_HASTA_LA_FECHA.md) — Pendientes y prioridades
+- [**Cómo empezar con DIAN**](./docs/COMO_EMPEZAR_CON_DIAN.md) — Orden práctico para integrar facturación electrónica (envío real, CUFE, PDF, consulta)
 - [Índice de documentación](./docs/README.md) — Toda la documentación en `docs/`
 - [Solución error EPERM (Prisma)](./docs/SOLUCION_ERROR_EPERM_PRISMA.md) — Común en Windows
 
