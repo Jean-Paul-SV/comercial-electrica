@@ -9,9 +9,22 @@ import * as argon2 from 'argon2';
 
 const prisma = new PrismaClient();
 
-/** Credenciales del administrador de plataforma (solo desarrollo; cambiar en producción). */
-const PLATFORM_ADMIN_EMAIL = 'platform@admin.local';
-const PLATFORM_ADMIN_PASSWORD = 'PlatformAdmin1!';
+/**
+ * Administrador de plataforma (dueño del sistema): Panel proveedor, gestión de tenants.
+ * En producción define PLATFORM_ADMIN_EMAIL y PLATFORM_ADMIN_PASSWORD en el entorno
+ * antes de ejecutar prisma:seed; así se crea tu usuario como dueño. Si no están definidas
+ * o la contraseña tiene menos de 8 caracteres, se usa el usuario por defecto (solo desarrollo).
+ */
+const envPlatformEmail = process.env.PLATFORM_ADMIN_EMAIL?.trim();
+const envPlatformPassword = process.env.PLATFORM_ADMIN_PASSWORD?.trim();
+const PLATFORM_ADMIN_EMAIL =
+  envPlatformEmail && envPlatformPassword && envPlatformPassword.length >= 8
+    ? envPlatformEmail
+    : 'platform@admin.local';
+const PLATFORM_ADMIN_PASSWORD =
+  envPlatformEmail && envPlatformPassword && envPlatformPassword.length >= 8
+    ? envPlatformPassword
+    : 'PlatformAdmin1!';
 
 /** Módulos del producto (alineado con ARQUITECTURA_MODULAR_SAAS). Plan "Todo incluido" los tiene todos. */
 const MODULE_CODES = [

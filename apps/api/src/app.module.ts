@@ -71,7 +71,7 @@ import { MailerModule } from './mailer/mailer.module';
       {
         name: 'login',
         ttl: 60000, // 1 minuto
-        limit: 10, // 10 intentos de login por minuto por IP (protección contra fuerza bruta)
+        limit: 50, // 50 intentos por minuto por IP (protección contra fuerza bruta; si no se resetea, usar THROTTLE_LOGIN_DISABLED=true)
       },
       {
         name: 'forgot',

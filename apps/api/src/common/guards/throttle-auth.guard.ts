@@ -5,10 +5,10 @@ import { ThrottlerGuard } from '@nestjs/throttler';
  * Guard personalizado para rate limiting.
  * - En desarrollo: no aplica límites.
  * - En producción:
- *   - POST /auth/login: 10 req/min por IP (protección contra fuerza bruta)
+ *   - POST /auth/login: 50 req/min por IP (o desactivar con THROTTLE_LOGIN_DISABLED=true)
  *   - POST /auth/forgot-password: 3 por 15 min por email
- *   - GET /reports/*: 30 req/min por usuario autenticado (protección contra scraping)
- *   - GET /reports/export: 10 req/min por usuario autenticado (protección contra abuso)
+ *   - GET /reports/*: 30 req/min por usuario autenticado
+ *   - GET /reports/export: 10 req/min por usuario autenticado
  *   - Resto: sin límite (navegación normal)
  */
 @Injectable()
@@ -26,11 +26,14 @@ export class ThrottleAuthGuard extends ThrottlerGuard {
     const path = (req.originalUrl ?? req.url ?? '').split('?')[0];
     const normalizedPath = path.replace(/^\/+/, '') || '/';
 
-    // Login: límite por IP
+    // Login: límite por IP (puede desactivarse con THROTTLE_LOGIN_DISABLED=true si el contador no se resetea)
     const isLogin =
       req.method === 'POST' &&
       (normalizedPath === 'auth/login' || normalizedPath === '/auth/login');
     if (isLogin) {
+      if (process.env.THROTTLE_LOGIN_DISABLED === 'true') {
+        return true;
+      }
       return super.canActivate(context);
     }
 

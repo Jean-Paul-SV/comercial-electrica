@@ -53,10 +53,11 @@ Requisitos previos: **PostgreSQL y Redis** levantados (`npm run db:up`), **migra
 
 ## Credenciales después del seed
 
-| Rol    | Email               | Contraseña  |
-|--------|---------------------|-------------|
-| Admin  | admin@example.com   | Admin123!   |
-| Usuario| vendedor@example.com| User123!    |
+| Rol              | Email                 | Contraseña     | Creado por        |
+|------------------|-----------------------|----------------|-------------------|
+| Admin (tenant)    | admin@example.com     | Admin123!      | seed-500 o seed-dev |
+| Usuario (tenant) | vendedor@example.com  | User123!       | seed-500 o seed-dev |
+| **Platform admin** | platform@admin.local | PlatformAdmin1! | **prisma:seed** solo |
 
 ---
 
