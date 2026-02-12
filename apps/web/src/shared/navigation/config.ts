@@ -74,6 +74,7 @@ export const navConfig: NavTreeConfig = {
       moduleCode: 'core',
       items: [
         { id: 'billing', href: '/settings/billing', label: 'Facturación', icon: 'CreditCard', order: 0, moduleCode: 'core' },
+        { id: 'electronic-invoicing', href: '/settings/electronic-invoicing', label: 'Facturación electrónica', icon: 'FileCheck', order: 1, requiredPermission: 'dian:manage', moduleCode: 'electronic_invoicing' },
       ],
     },
     {

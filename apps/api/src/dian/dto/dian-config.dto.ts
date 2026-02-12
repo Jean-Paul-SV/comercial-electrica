@@ -11,19 +11,37 @@ export class CreateDianConfigDto {
   @IsEnum(DianEnvironment)
   env: DianEnvironment;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
+    description: 'NIT del emisor (empresa). Obligatorio para envío real a DIAN.',
+    example: '900123456-7',
+  })
+  @IsOptional()
+  @IsString()
+  issuerNit?: string;
+
+  @ApiPropertyOptional({
+    description: 'Razón social del emisor.',
+    example: 'Mi Empresa S.A.S.',
+  })
+  @IsOptional()
+  @IsString()
+  issuerName?: string;
+
+  @ApiPropertyOptional({
     description: 'ID del software registrado en DIAN',
     example: '123456789',
   })
+  @IsOptional()
   @IsString()
-  softwareId: string;
+  softwareId?: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     description: 'PIN del software registrado en DIAN',
     example: 'abcdef123456',
   })
+  @IsOptional()
   @IsString()
-  softwarePin: string;
+  softwarePin?: string;
 
   @ApiPropertyOptional({
     description: 'Número de resolución DIAN',
@@ -69,16 +87,22 @@ export class UpdateDianConfigDto {
   @IsEnum(DianEnvironment)
   env?: DianEnvironment;
 
-  @ApiPropertyOptional({
-    description: 'ID del software',
-  })
+  @ApiPropertyOptional({ description: 'NIT del emisor (empresa)' })
+  @IsOptional()
+  @IsString()
+  issuerNit?: string;
+
+  @ApiPropertyOptional({ description: 'Razón social del emisor' })
+  @IsOptional()
+  @IsString()
+  issuerName?: string;
+
+  @ApiPropertyOptional({ description: 'ID del software' })
   @IsOptional()
   @IsString()
   softwareId?: string;
 
-  @ApiPropertyOptional({
-    description: 'PIN del software',
-  })
+  @ApiPropertyOptional({ description: 'PIN del software' })
   @IsOptional()
   @IsString()
   softwarePin?: string;
@@ -112,4 +136,19 @@ export class UpdateDianConfigDto {
   @IsInt()
   @Min(1)
   rangeTo?: number;
+}
+
+/** DTO para subida de certificado .p12 (contenido en base64 + contraseña). */
+export class UploadCertificateDto {
+  @ApiProperty({
+    description: 'Contenido del archivo .p12 codificado en base64',
+  })
+  @IsString()
+  certBase64: string;
+
+  @ApiProperty({
+    description: 'Contraseña del archivo .p12',
+  })
+  @IsString()
+  password: string;
 }

@@ -29,6 +29,8 @@ import { resolve, join } from 'path';
 import { tmpdir } from 'os';
 import * as forge from 'node-forge';
 import { SignedXml } from 'xml-crypto';
+import { decryptCertPayload, encryptCertPayload } from './cert-encryption.util';
+import type { UpdateDianConfigDto } from './dto/dian-config.dto';
 
 /** Algoritmos DIAN: RSA-SHA256, SHA256, C14N exclusivo. Ref: Anexo Técnico FE 1.9 */
 const DIAN_SIGNATURE_ALG = 'http://www.w3.org/2001/04/xmldsig-more#rsa-sha256';
@@ -139,6 +141,38 @@ export class DianService {
     // Validaciones pre-envío: evitan rechazos por datos incompletos o incoherentes
     this.validateBeforeSend(dianDoc);
 
+    const tenantId = dianDoc.invoice?.tenantId ?? null;
+    const tenantConfig =
+      tenantId != null
+        ? await this.getDianConfigAndCertForTenant(tenantId)
+        : null;
+    const useTenant =
+      tenantConfig &&
+      !!tenantConfig.issuerNit &&
+      !!tenantConfig.issuerName &&
+      !!tenantConfig.softwareId &&
+      !!tenantConfig.softwarePin &&
+      !!tenantConfig.certBuffer &&
+      !!tenantConfig.certPassword &&
+      (tenantConfig.certValidUntil == null ||
+        tenantConfig.certValidUntil >= new Date());
+
+    if (tenantId && !useTenant && tenantConfig) {
+      throw new BadRequestException(
+        'Configuración DIAN del tenant incompleta o certificado vencido. Complete la configuración en Facturación electrónica.',
+      );
+    }
+    if (tenantId && !tenantConfig) {
+      throw new BadRequestException(
+        'No hay configuración DIAN para esta empresa. Configure facturación electrónica antes de enviar.',
+      );
+    }
+    if (!tenantId && !this.hasCertConfigured()) {
+      throw new BadRequestException(
+        'No se puede enviar a la DIAN sin firma digital. Configure el certificado (variables de entorno o configuración por empresa).',
+      );
+    }
+
     try {
       // Actualizar estado a SENT (procesando)
       try {
@@ -157,17 +191,47 @@ export class DianService {
         throw e;
       }
 
+      const configOverride = useTenant
+        ? {
+            issuerNit: tenantConfig.issuerNit!,
+            issuerName: tenantConfig.issuerName!,
+          }
+        : undefined;
+      const certOverride =
+        useTenant && tenantConfig.certBuffer && tenantConfig.certPassword
+          ? {
+              certBuffer: tenantConfig.certBuffer,
+              password: tenantConfig.certPassword,
+            }
+          : undefined;
+      const sendOverride =
+        useTenant && tenantConfig.softwareId && tenantConfig.softwarePin
+          ? {
+              softwareId: tenantConfig.softwareId,
+              softwarePin: tenantConfig.softwarePin,
+              hasCert: true,
+            }
+          : undefined;
+
       // 1. Generar XML
       this.logger.log(`Generando XML para documento ${dianDocumentId}`);
-      const xml = await this.generateXML(dianDocumentId);
+      const xml = await this.generateXML(dianDocumentId, configOverride);
 
       // 2. Firmar documento
       this.logger.log(`Firmando documento ${dianDocumentId}`);
-      const signedXml = await this.signDocument(xml, dianDocumentId);
+      const signedXml = await this.signDocument(
+        xml,
+        dianDocumentId,
+        certOverride,
+      );
 
       // 3. Enviar a DIAN
       this.logger.log(`Enviando documento ${dianDocumentId} a DIAN`);
-      const dianResponse = await this.sendToDian(signedXml, dianDocumentId);
+      const dianResponse = await this.sendToDian(
+        signedXml,
+        dianDocumentId,
+        sendOverride,
+      );
 
       // 4. Procesar respuesta
       await this.handleDianResponse(dianDocumentId, dianResponse);
@@ -343,7 +407,10 @@ export class DianService {
    * Ref: Resolución 000165/2023, Anexo Técnico Factura Electrónica de Venta v1.9.
    * Documentación: https://micrositios.dian.gov.co/sistema-de-facturacion-electronica/documentacion-tecnica/
    */
-  async generateXML(dianDocumentId: string): Promise<string> {
+  async generateXML(
+    dianDocumentId: string,
+    configOverride?: { issuerNit: string; issuerName: string },
+  ): Promise<string> {
     const dianDoc = await this.prisma.dianDocument.findUnique({
       where: { id: dianDocumentId },
       include: {
@@ -373,8 +440,20 @@ export class DianService {
     const sale = invoice.sale;
     const customer = invoice.customer || sale?.customer;
 
-    // Obtener configuración DIAN
-    const config = this.getDianConfig();
+    // Obtener configuración DIAN (override por tenant o variables de entorno)
+    const config = configOverride
+      ? {
+          issuerNit: configOverride.issuerNit,
+          issuerName: configOverride.issuerName,
+          env: this.dianEnv,
+          softwareId: this.softwareId,
+          softwarePin: this.softwarePin,
+          resolutionNumber: this.config.get<string>('DIAN_RESOLUTION_NUMBER'),
+          prefix: this.config.get<string>('DIAN_PREFIX', 'FAC'),
+          rangeFrom: this.config.get<number>('DIAN_RANGE_FROM', 1),
+          rangeTo: this.config.get<number>('DIAN_RANGE_TO', 999999),
+        }
+      : this.getDianConfig();
 
     // UBL 2.1 Invoice: cada línea es un cac:InvoiceLine directo (sin wrapper). Ref: Anexo Técnico DIAN FE 1.9.
     const invoiceLinesXml =
@@ -471,6 +550,54 @@ export class DianService {
   }
 
   /**
+   * Carga clave privada y certificado desde un buffer .p12 (PKCS#12).
+   * Usado cuando el certificado viene de la config por tenant (descifrado).
+   */
+  private loadCertFromP12Buffer(
+    p12Buffer: Buffer,
+    password: string,
+  ): { privateKeyPem: string; certPem: string } {
+    const binary = p12Buffer.toString('binary');
+    const p12Asn1 = forge.asn1.fromDer(binary);
+    const p12 = forge.pkcs12.pkcs12FromAsn1(p12Asn1, password);
+    let keyBag = p12.getBags({
+      bagType: forge.pki.oids.pkcs8ShroudedKeyBag,
+    })[forge.pki.oids.pkcs8ShroudedKeyBag];
+    if (!keyBag || keyBag.length === 0) {
+      keyBag = p12.getBags({ bagType: forge.pki.oids.keyBag })[
+        forge.pki.oids.keyBag
+      ];
+    }
+    if (!keyBag || keyBag.length === 0) {
+      throw new BadRequestException(
+        'No se encontró clave privada en el certificado .p12.',
+      );
+    }
+    const privateKey = keyBag[0].key;
+    if (!privateKey) {
+      throw new BadRequestException(
+        'Clave privada no encontrada en el certificado .p12.',
+      );
+    }
+    const privateKeyPem = forge.pki.privateKeyToPem(privateKey);
+    const certBags = p12.getBags({ bagType: forge.pki.oids.certBag });
+    const certBag = certBags[forge.pki.oids.certBag];
+    if (!certBag || certBag.length === 0) {
+      throw new BadRequestException(
+        'No se encontró certificado en el archivo .p12.',
+      );
+    }
+    const cert = certBag[0].cert;
+    if (!cert) {
+      throw new BadRequestException(
+        'Certificado no encontrado en el archivo .p12.',
+      );
+    }
+    const certPem = forge.pki.certificateToPem(cert);
+    return { privateKeyPem, certPem };
+  }
+
+  /**
    * Carga clave privada y certificado desde archivo .p12/.pfx (PKCS#12).
    * Soporta DIAN_CERT_PATH (ruta a archivo) o DIAN_CERT_BASE64 (contenido en base64, útil en Render/servidores sin disco persistente).
    */
@@ -549,20 +676,35 @@ export class DianService {
 
   /**
    * Firma digitalmente el XML con certificado .p12 (XMLDSig, RSA-SHA256).
-   * Si DIAN_CERT_PATH/DIAN_CERT_PASSWORD no están configurados, retorna el XML sin firmar.
+   * Si se pasa certOverride (config por tenant), se usa ese certificado; si no, variables de entorno.
    * Ref: DIAN Anexo Técnico FE 1.9, XML Signature.
    */
-  async signDocument(xml: string, dianDocumentId: string): Promise<string> {
+  async signDocument(
+    xml: string,
+    dianDocumentId: string,
+    certOverride?: { certBuffer: Buffer; password: string },
+  ): Promise<string> {
     this.logger.log(`Firmando documento ${dianDocumentId}`);
 
-    if (!this.hasCertConfigured()) {
+    let privateKeyPem: string;
+    let certPem: string;
+    if (certOverride) {
+      const loaded = this.loadCertFromP12Buffer(
+        certOverride.certBuffer,
+        certOverride.password,
+      );
+      privateKeyPem = loaded.privateKeyPem;
+      certPem = loaded.certPem;
+    } else if (this.hasCertConfigured()) {
+      const loaded = await this.loadCertFromP12();
+      privateKeyPem = loaded.privateKeyPem;
+      certPem = loaded.certPem;
+    } else {
       this.logger.warn(
         `⚠️ Firma digital omitida (certificado no configurado). Retornando XML sin firmar.`,
       );
       return xml;
     }
-
-    const { privateKeyPem, certPem } = await this.loadCertFromP12();
 
     const sig = new SignedXml({
       privateKey: privateKeyPem,
@@ -636,13 +778,15 @@ export class DianService {
   private buildSoapEnvelopeReceiveInvoice(
     signedXml: string,
     fileName: string,
+    softwareId: string,
+    softwarePin: string,
   ): string {
     const contentFile = Buffer.from(signedXml, 'utf-8').toString('base64');
     return `<?xml version="1.0" encoding="UTF-8"?>
 <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:wcf="http://wcf.dian.colombia">
   <soap:Header>
-    <wcf:SoftwareID>${this.escapeXml(this.softwareId)}</wcf:SoftwareID>
-    <wcf:SoftwarePIN>${this.escapeXml(this.softwarePin)}</wcf:SoftwarePIN>
+    <wcf:SoftwareID>${this.escapeXml(softwareId)}</wcf:SoftwareID>
+    <wcf:SoftwarePIN>${this.escapeXml(softwarePin)}</wcf:SoftwarePIN>
   </soap:Header>
   <soap:Body>
     <wcf:ReceiveInvoice>
@@ -812,20 +956,29 @@ export class DianService {
 
   /**
    * Envía el documento firmado a DIAN.
-   * Si DIAN_API_BASE_URL está configurada (o se usan URLs por defecto), hace POST con sobre SOAP ReceiveInvoice.
-   * Si no hay URL configurada, simula respuesta (desarrollo).
+   * sendOverride: cuando se usa config por tenant (softwareId, softwarePin, hasCert).
    */
   async sendToDian(
     signedXml: string,
     dianDocumentId: string,
+    sendOverride?: {
+      softwareId: string;
+      softwarePin: string;
+      hasCert: boolean;
+    },
   ): Promise<DianResponse> {
+    const softwareId = sendOverride?.softwareId ?? this.softwareId;
+    const softwarePin = sendOverride?.softwarePin ?? this.softwarePin;
+    const hasCert = sendOverride?.hasCert ?? this.hasCertConfigured();
+    const env = sendOverride ? this.dianEnv : this.dianEnv;
+
     this.logger.log(
-      `Enviando documento ${dianDocumentId} a DIAN (ambiente: ${this.dianEnv})`,
+      `Enviando documento ${dianDocumentId} a DIAN (ambiente: ${env})`,
     );
 
-    if (!this.softwareId || !this.softwarePin) {
+    if (!softwareId || !softwarePin) {
       throw new BadRequestException(
-        'DIAN_SOFTWARE_ID y DIAN_SOFTWARE_PIN deben estar configurados para enviar documentos a DIAN.',
+        'DIAN_SOFTWARE_ID y DIAN_SOFTWARE_PIN deben estar configurados para enviar documentos a DIAN (o complete la configuración por empresa).',
       );
     }
 
@@ -833,21 +986,9 @@ export class DianService {
     let response: DianResponse;
 
     if (baseUrl) {
-      const config = this.getDianConfig();
-      if (!config.issuerNit || config.issuerNit === this.softwareId) {
-        this.logger.warn(
-          'DIAN_ISSUER_NIT no configurado o igual a Software ID. Configure DIAN_ISSUER_NIT con el NIT del emisor (empresa) para evitar 400.',
-        );
-      }
-      if (!config.issuerName || config.issuerName === 'EMPRESA COMERCIAL ELECTRICA') {
-        this.logger.warn(
-          'DIAN_ISSUER_NAME no configurado. Configure DIAN_ISSUER_NAME con la razón social del emisor para evitar 400.',
-        );
-      }
-
-      if (!this.hasCertConfigured()) {
+      if (!hasCert) {
         throw new BadRequestException(
-          'No se puede enviar a la DIAN sin firma digital. La DIAN rechaza documentos no firmados (400). Configure DIAN_CERT_PATH y DIAN_CERT_PASSWORD, o DIAN_CERT_BASE64 y DIAN_CERT_PASSWORD (certificado .p12 en base64 para entornos sin disco).',
+          'No se puede enviar a la DIAN sin firma digital. La DIAN rechaza documentos no firmados (400). Configure el certificado (variables de entorno o configuración por empresa).',
         );
       }
 
@@ -855,7 +996,12 @@ export class DianService {
         const useSoap = this.config.get<string>('DIAN_USE_SOAP', 'true') !== 'false';
         const fileName = `factura-${dianDocumentId}.xml`;
         const body = useSoap
-          ? this.buildSoapEnvelopeReceiveInvoice(signedXml, fileName)
+          ? this.buildSoapEnvelopeReceiveInvoice(
+              signedXml,
+              fileName,
+              softwareId,
+              softwarePin,
+            )
           : signedXml;
         const responseBody = await this.sendToDianHttp(
           body,
@@ -1073,6 +1219,302 @@ export class DianService {
     };
   }
 
+  /** Configuración DIAN pública por tenant (sin secretos). */
+  async getDianConfigForTenant(tenantId: string): Promise<DianConfigPublic | null> {
+    const row = await this.prisma.dianConfig.findUnique({
+      where: { tenantId },
+    });
+    if (!row) return null;
+    return {
+      id: row.id,
+      tenantId: row.tenantId,
+      env: row.env,
+      issuerNit: row.issuerNit ?? undefined,
+      issuerName: row.issuerName ?? undefined,
+      softwareId: row.softwareId ?? undefined,
+      resolutionNumber: row.resolutionNumber ?? undefined,
+      prefix: row.prefix ?? undefined,
+      rangeFrom: row.rangeFrom ?? undefined,
+      rangeTo: row.rangeTo ?? undefined,
+      certValidUntil: row.certValidUntil ?? undefined,
+      hasCert: !!(row.certEncrypted && row.certPasswordEncrypted),
+      hasSoftwarePin: !!row.softwarePin,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+    };
+  }
+
+  /** Estado de la configuración DIAN para un tenant (para UX y validación de envío). */
+  async getConfigStatusForTenant(tenantId: string): Promise<DianConfigStatus> {
+    const config = await this.prisma.dianConfig.findUnique({
+      where: { tenantId },
+    });
+    const missing: string[] = [];
+    if (!config) {
+      return {
+        status: 'not_configured',
+        readyForSend: false,
+        missing: [
+          'issuer_nit',
+          'issuer_name',
+          'software_id',
+          'software_pin',
+          'certificate',
+        ],
+        hasCert: false,
+        hasIssuerData: false,
+      };
+    }
+    if (!config.issuerNit?.trim()) missing.push('issuer_nit');
+    if (!config.issuerName?.trim()) missing.push('issuer_name');
+    if (!config.softwareId?.trim()) missing.push('software_id');
+    if (!config.softwarePin?.trim()) missing.push('software_pin');
+    const hasCert = !!(config.certEncrypted && config.certPasswordEncrypted);
+    if (!hasCert) missing.push('certificate');
+
+    const baseUrl = this.getDianBaseUrl();
+    if (!baseUrl) missing.push('dian_url');
+
+    if (config.certValidUntil && config.certValidUntil < new Date()) {
+      return {
+        status: 'cert_expired',
+        readyForSend: false,
+        missing,
+        hasCert,
+        hasIssuerData: !!(config.issuerNit && config.issuerName),
+        certValidUntil: config.certValidUntil,
+        env: config.env,
+      };
+    }
+
+    const rangeTo = config.rangeTo ?? 999999;
+    const nextNumber = await this.getNextInvoiceNumberForTenant(tenantId, config);
+    if (nextNumber > rangeTo) {
+      return {
+        status: 'range_exhausted',
+        readyForSend: false,
+        missing,
+        hasCert,
+        hasIssuerData: !!(config.issuerNit && config.issuerName),
+        certValidUntil: config.certValidUntil ?? undefined,
+        nextNumber,
+        rangeTo,
+        env: config.env,
+      };
+    }
+
+    const ready = missing.length === 0;
+    return {
+      status: ready ? 'ready' : 'incomplete',
+      readyForSend: ready,
+      missing,
+      hasCert,
+      hasIssuerData: !!(config.issuerNit && config.issuerName),
+      certValidUntil: config.certValidUntil ?? undefined,
+      nextNumber,
+      rangeTo,
+      env: config.env,
+    };
+  }
+
+  /** Próximo número de factura para el tenant (máximo numérico + 1 o rangeFrom). */
+  private async getNextInvoiceNumberForTenant(
+    tenantId: string,
+    config: { rangeFrom?: number | null; prefix?: string | null },
+  ): Promise<number> {
+    const rangeFrom = config.rangeFrom ?? 1;
+    const invoices = await this.prisma.invoice.findMany({
+      where: { tenantId },
+      select: { number: true },
+    });
+    let maxNum = rangeFrom - 1;
+    for (const inv of invoices) {
+      const num = this.parseInvoiceNumberToInt(inv.number, config.prefix);
+      if (num !== null && num > maxNum) maxNum = num;
+    }
+    return maxNum + 1;
+  }
+
+  private parseInvoiceNumberToInt(
+    number: string,
+    prefix?: string | null,
+  ): number | null {
+    let s = String(number).trim();
+    if (prefix && s.startsWith(prefix)) {
+      s = s.slice(prefix.length).replace(/^[\s\-_]+/, '');
+    }
+    const n = parseInt(s, 10);
+    return Number.isFinite(n) && n >= 0 ? n : null;
+  }
+
+  /** Crea o actualiza la configuración DIAN del tenant (solo datos no secretos). */
+  async upsertDianConfig(
+    tenantId: string,
+    data: Partial<UpdateDianConfigDto>,
+  ): Promise<DianConfigPublic> {
+    const payload: Prisma.DianConfigUncheckedCreateInput = {
+      tenantId,
+      env: data.env ?? DianEnvironment.HABILITACION,
+      issuerNit: data.issuerNit ?? undefined,
+      issuerName: data.issuerName ?? undefined,
+      softwareId: data.softwareId ?? null,
+      softwarePin: data.softwarePin ?? null,
+      resolutionNumber: data.resolutionNumber ?? undefined,
+      prefix: data.prefix ?? undefined,
+      rangeFrom: data.rangeFrom ?? undefined,
+      rangeTo: data.rangeTo ?? undefined,
+    };
+    const row = await this.prisma.dianConfig.upsert({
+      where: { tenantId },
+      create: payload,
+      update: {
+        ...(data.env !== undefined && { env: data.env }),
+        ...(data.issuerNit !== undefined && { issuerNit: data.issuerNit }),
+        ...(data.issuerName !== undefined && { issuerName: data.issuerName }),
+        ...(data.softwareId !== undefined && { softwareId: data.softwareId }),
+        ...(data.softwarePin !== undefined && { softwarePin: data.softwarePin }),
+        ...(data.resolutionNumber !== undefined && {
+          resolutionNumber: data.resolutionNumber,
+        }),
+        ...(data.prefix !== undefined && { prefix: data.prefix }),
+        ...(data.rangeFrom !== undefined && { rangeFrom: data.rangeFrom }),
+        ...(data.rangeTo !== undefined && { rangeTo: data.rangeTo }),
+      },
+    });
+    return {
+      id: row.id,
+      tenantId: row.tenantId,
+      env: row.env,
+      issuerNit: row.issuerNit ?? undefined,
+      issuerName: row.issuerName ?? undefined,
+      softwareId: row.softwareId ?? undefined,
+      resolutionNumber: row.resolutionNumber ?? undefined,
+      prefix: row.prefix ?? undefined,
+      rangeFrom: row.rangeFrom ?? undefined,
+      rangeTo: row.rangeTo ?? undefined,
+      certValidUntil: row.certValidUntil ?? undefined,
+      hasCert: !!(row.certEncrypted && row.certPasswordEncrypted),
+      hasSoftwarePin: !!row.softwarePin,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+    };
+  }
+
+  /** Valida .p12 y extrae fecha de vencimiento del certificado. */
+  private getCertValidUntilFromP12(
+    p12Buffer: Buffer,
+    password: string,
+  ): Date | null {
+    try {
+      const binary = p12Buffer.toString('binary');
+      const p12Asn1 = forge.asn1.fromDer(binary);
+      const p12 = forge.pkcs12.pkcs12FromAsn1(p12Asn1, password);
+      const certBags = p12.getBags({ bagType: forge.pki.oids.certBag });
+      const certBag = certBags[forge.pki.oids.certBag];
+      if (!certBag?.[0]?.cert) return null;
+      const validTo = certBag[0].cert.validity.notAfter;
+      return new Date(validTo.getTime());
+    } catch {
+      return null;
+    }
+  }
+
+  /** Sube y guarda el certificado .p12 del tenant (cifrado). */
+  async saveCertificate(
+    tenantId: string,
+    certBase64: string,
+    password: string,
+  ): Promise<void> {
+    const encKey = this.config.get<string>('DIAN_CERT_ENCRYPTION_KEY', '')?.trim();
+    if (!encKey) {
+      throw new BadRequestException(
+        'DIAN_CERT_ENCRYPTION_KEY no configurada. No se puede almacenar el certificado de forma segura.',
+      );
+    }
+    const certBuffer = Buffer.from(certBase64.trim(), 'base64');
+    if (certBuffer.length === 0) {
+      throw new BadRequestException(
+        'certBase64 no es un base64 válido del archivo .p12.',
+      );
+    }
+    const validUntil = this.getCertValidUntilFromP12(certBuffer, password);
+    if (!validUntil) {
+      throw new BadRequestException(
+        'No se pudo leer el certificado .p12 (contraseña incorrecta o archivo inválido).',
+      );
+    }
+    const certEncrypted = encryptCertPayload(certBuffer, encKey);
+    const certPasswordEncrypted = encryptCertPayload(
+      Buffer.from(password, 'utf-8'),
+      encKey,
+    );
+    await this.prisma.dianConfig.upsert({
+      where: { tenantId },
+      create: {
+        tenantId,
+        env: DianEnvironment.HABILITACION,
+        softwareId: '',
+        certEncrypted,
+        certPasswordEncrypted,
+        certValidUntil: validUntil,
+      },
+      update: {
+        certEncrypted,
+        certPasswordEncrypted,
+        certValidUntil: validUntil,
+      },
+    });
+    this.logger.log(
+      `Certificado DIAN guardado para tenant ${tenantId}, válido hasta ${validUntil.toISOString()}.`,
+    );
+  }
+
+  /**
+   * Obtiene la configuración DIAN del tenant con certificado descifrado (solo para uso interno en processDocument).
+   */
+  async getDianConfigAndCertForTenant(
+    tenantId: string,
+  ): Promise<DianConfigFull | null> {
+    const row = await this.prisma.dianConfig.findUnique({
+      where: { tenantId },
+    });
+    if (!row) return null;
+    const encKey = this.config.get<string>('DIAN_CERT_ENCRYPTION_KEY', '')?.trim();
+    let certBuffer: Buffer | null = null;
+    let certPassword: string | null = null;
+    if (
+      row.certEncrypted &&
+      row.certPasswordEncrypted &&
+      encKey
+    ) {
+      try {
+        certBuffer = decryptCertPayload(row.certEncrypted, encKey);
+        certPassword = decryptCertPayload(
+          row.certPasswordEncrypted,
+          encKey,
+        ).toString('utf-8');
+      } catch (e) {
+        this.logger.warn(
+          `No se pudo descifrar certificado del tenant ${tenantId}: ${e instanceof Error ? e.message : String(e)}`,
+        );
+      }
+    }
+    return {
+      env: row.env,
+      issuerNit: row.issuerNit?.trim() || null,
+      issuerName: row.issuerName?.trim() || null,
+      softwareId: row.softwareId?.trim() || null,
+      softwarePin: row.softwarePin?.trim() || null,
+      resolutionNumber: row.resolutionNumber ?? null,
+      prefix: row.prefix ?? 'FAC',
+      rangeFrom: row.rangeFrom ?? 1,
+      rangeTo: row.rangeTo ?? 999999,
+      certValidUntil: row.certValidUntil ?? null,
+      certBuffer,
+      certPassword,
+    };
+  }
+
   /**
    * Consulta el estado de un documento DIAN para un tenant específico.
    *
@@ -1172,4 +1614,52 @@ export interface DianResponse {
   message?: string;
   errors?: string[];
   timestamp: string;
+}
+
+/** Configuración DIAN pública (sin PIN ni certificado). */
+export interface DianConfigPublic {
+  id: string;
+  tenantId: string;
+  env: DianEnvironment;
+  issuerNit?: string;
+  issuerName?: string;
+  softwareId?: string;
+  resolutionNumber?: string;
+  prefix?: string;
+  rangeFrom?: number;
+  rangeTo?: number;
+  certValidUntil?: Date;
+  hasCert: boolean;
+  hasSoftwarePin: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/** Estado de configuración DIAN por tenant. */
+export type DianConfigStatus = {
+  status: 'not_configured' | 'incomplete' | 'cert_expired' | 'range_exhausted' | 'ready';
+  readyForSend: boolean;
+  missing: string[];
+  hasCert: boolean;
+  hasIssuerData: boolean;
+  env?: DianEnvironment;
+  certValidUntil?: Date;
+  nextNumber?: number;
+  rangeTo?: number;
+};
+
+/** Configuración completa + certificado descifrado (uso interno). */
+export interface DianConfigFull {
+  env: DianEnvironment;
+  issuerNit: string | null;
+  issuerName: string | null;
+  softwareId: string | null;
+  softwarePin: string | null;
+  resolutionNumber: string | null;
+  prefix: string;
+  rangeFrom: number;
+  rangeTo: number;
+  certValidUntil: Date | null;
+  certBuffer: Buffer | null;
+  certPassword: string | null;
 }

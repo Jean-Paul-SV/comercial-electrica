@@ -796,18 +796,30 @@ model Invoice {
   @@index([saleId])
 }
 
+/// Configuración DIAN por tenant (una por empresa). Certificado y PIN se almacenan cifrados.
 model DianConfig {
-  id               String          @id @default(uuid()) @db.Uuid
-  tenantId         String          @db.Uuid
-  env              DianEnvironment @default(HABILITACION)
-  softwareId       String
-  softwarePin      String
-  resolutionNumber String?
-  prefix           String?
-  rangeFrom        Int?
-  rangeTo          Int?
-  createdAt        DateTime        @default(now())
-  updatedAt        DateTime        @updatedAt
+  id                   String           @id @default(uuid()) @db.Uuid
+  tenantId              String           @db.Uuid
+  env                   DianEnvironment  @default(HABILITACION)
+  /// NIT del emisor (empresa). Obligatorio para XML y validación DIAN.
+  issuerNit             String?
+  /// Razón social del emisor.
+  issuerName            String?
+  softwareId            String?
+  /// PIN DIAN; en producción debería almacenarse cifrado (certPasswordEncrypted o gestor de secretos).
+  softwarePin           String?
+  resolutionNumber      String?
+  prefix                String?
+  rangeFrom             Int?
+  rangeTo               Int?
+  /// Contenido del .p12 cifrado (AES-256), en base64. Clave: DIAN_CERT_ENCRYPTION_KEY.
+  certEncrypted         String?          @db.Text
+  /// Contraseña del .p12 cifrada (AES-256), en base64.
+  certPasswordEncrypted String?          @db.Text
+  /// Fecha de vencimiento del certificado (cacheada del .p12) para validaciones sin abrir el archivo.
+  certValidUntil        DateTime?        @db.Timestamptz
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
