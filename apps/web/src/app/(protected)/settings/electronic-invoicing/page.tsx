@@ -122,6 +122,9 @@ export default function ElectronicInvoicingPage() {
     (statusResponse?.readyForSend ? 'ready' : 'incomplete');
   const missing = statusResponse?.missing ?? [];
   const readyForSend = statusResponse?.readyForSend ?? false;
+  const statusExt = statusResponse as { certExpiresInDays?: number; rangeRemaining?: number } | undefined;
+  const certExpiresInDays = statusExt?.certExpiresInDays;
+  const rangeRemaining = statusExt?.rangeRemaining;
 
   useEffect(() => {
     if (!config) return;
@@ -288,26 +291,24 @@ export default function ElectronicInvoicingPage() {
           {/* Alertas cuando está listo */}
           {readyForSend && (
             <div className="mt-3 space-y-2 border-t pt-3">
-              {statusResponse?.certExpiresInDays != null &&
-                statusResponse.certExpiresInDays < 30 && (
-                  <p
-                    className={
-                      statusResponse.certExpiresInDays < 15
-                        ? 'text-sm text-destructive'
-                        : 'text-sm text-amber-600 dark:text-amber-500'
-                    }
-                  >
-                    Su certificado vence en {statusResponse.certExpiresInDays} día
-                    {statusResponse.certExpiresInDays !== 1 ? 's' : ''}. Renuévelo a tiempo.
-                  </p>
-                )}
-              {statusResponse?.rangeRemaining != null &&
-                statusResponse.rangeRemaining < 500 && (
-                  <p className="text-sm text-amber-600 dark:text-amber-500">
-                    Quedan {statusResponse.rangeRemaining} números en su rango. Solicite un nuevo
-                    rango a la DIAN si es necesario.
-                  </p>
-                )}
+              {certExpiresInDays != null && certExpiresInDays < 30 && (
+                <p
+                  className={
+                    certExpiresInDays < 15
+                      ? 'text-sm text-destructive'
+                      : 'text-sm text-amber-600 dark:text-amber-500'
+                  }
+                >
+                  Su certificado vence en {certExpiresInDays} día
+                  {certExpiresInDays !== 1 ? 's' : ''}. Renuévelo a tiempo.
+                </p>
+              )}
+              {rangeRemaining != null && rangeRemaining < 500 && (
+                <p className="text-sm text-amber-600 dark:text-amber-500">
+                  Quedan {rangeRemaining} números en su rango. Solicite un nuevo
+                  rango a la DIAN si es necesario.
+                </p>
+              )}
             </div>
           )}
         </CardContent>
