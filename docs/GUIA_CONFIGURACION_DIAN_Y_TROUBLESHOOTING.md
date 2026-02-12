@@ -31,10 +31,10 @@ Definir en `.env` (o en el entorno de despliegue). No subir valores reales a rep
 ## 2. Certificado de firma (.p12)
 
 1. **Obtener el certificado:** Según el procedimiento de la DIAN y/o el certificador (ej. Certicámara). Debe ser .p12 o .pfx para firma de factura electrónica.
-2. **Ubicación:** Colocar el archivo en una ruta a la que la API tenga acceso (ej. `./certs/firma-electronic.p12`). No subir el archivo al repositorio.
-3. **Permisos:** El proceso de la API debe poder leer el archivo.
-4. **Variables:** `DIAN_CERT_PATH` con la ruta; `DIAN_CERT_PASSWORD` con la contraseña del .p12.
-5. **Sin certificado:** Si no se configuran, el XML se genera pero se envía sin firmar (solo válido en desarrollo; la DIAN no aceptará facturas sin firma en producción).
+2. **Opción A – Archivo en disco:** Colocar el .p12 en una ruta a la que la API tenga acceso (ej. `./certs/firma-electronic.p12`). Variable `DIAN_CERT_PATH` con esa ruta; `DIAN_CERT_PASSWORD` con la contraseña. No subir el archivo al repositorio.
+3. **Opción B – Base64 (Render, serverless):** En entornos sin disco persistente, puede usarse **`DIAN_CERT_BASE64`**: contenido del archivo .p12 codificado en base64 (ej. `cat firma.p12 | base64 -w0` en Linux). La API escribe un archivo temporal al primer uso y lo reutiliza. Sigue siendo obligatorio `DIAN_CERT_PASSWORD`. En Render, añadir `DIAN_CERT_BASE64` como variable secreta (secret env var).
+4. **Permisos (opción A):** El proceso de la API debe poder leer el archivo.
+5. **Sin certificado:** Si no se configuran `DIAN_CERT_PATH` ni `DIAN_CERT_BASE64` (y contraseña), el XML se genera pero no se envía a la DIAN (la API lanza error claro); la DIAN rechaza facturas sin firma con 400.
 
 ---
 
@@ -49,6 +49,14 @@ Definir en `.env` (o en el entorno de despliegue). No subir valores reales a rep
 ---
 
 ## 4. Troubleshooting
+
+### 4.0 400 Bad Request con cuerpo vacío
+
+- **Causa habitual:** El documento se envió **sin firma digital**. La DIAN rechaza facturas no firmadas y suele devolver 400 con `content-length: 0` (cuerpo vacío).
+- **Qué hacer:**
+  1. Configure **DIAN_CERT_PATH** y **DIAN_CERT_PASSWORD** con su certificado .p12 de firma electrónica (ver §2).
+  2. Desde la versión actual, la API **no envía** a la DIAN si el certificado no está configurado: lanzará un error claro indicando que debe configurar el certificado, y no hará los 3 reintentos inútiles.
+- Si ya tiene certificado configurado y sigue recibiendo 400, revise NIT/razón social (DIAN_ISSUER_NIT, DIAN_ISSUER_NAME), numeración y esquema XML.
 
 ### 4.1 "Error al conectar con DIAN" / timeout
 

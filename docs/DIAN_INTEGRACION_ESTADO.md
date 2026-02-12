@@ -1,6 +1,6 @@
 # Estado de la integración DIAN (facturación electrónica)
 
-> **Última actualización:** 2026-02-02  
+> **Última actualización:** 2026-02-10  
 > Ref: Resolución 000165/2023, Anexo Técnico Factura Electrónica de Venta v1.9 (mod. Res. 000008, 000119, 000189 de 2024).
 
 ---
@@ -17,12 +17,13 @@
 
 | Componente | Estado | Ubicación | Notas |
 |------------|--------|-----------|--------|
-| **Estructura XML UBL 2.1** | ✅ Mejorado | `dian.service.ts` → `generateXML()` | Estructura corregida (líneas de factura como hermanas, sin wrapper); escape XML en textos dinámicos; referencias a normativa DIAN. |
-| **Firma digital** | ✅ Implementado | `signDocument()` | xml-crypto + node-forge (.p12). RSA-SHA256, SHA256, C14N. Si no hay DIAN_CERT_PATH/DIAN_CERT_PASSWORD retorna XML sin firmar. |
-| **Envío a API DIAN** | ❌ Pendiente | `sendToDian()` | Requiere autenticación con softwareId/softwarePin, endpoints habilitación/producción, manejo de respuestas y reintentos. Hoy simula respuesta exitosa. |
-| **Generación de PDF** | ❌ Pendiente | `generatePDF()` | Requiere librería (pdfkit, puppeteer), plantilla de factura, QR y CUFE. Hoy solo guarda ruta simulada. |
-| **Consulta estado real** | ❌ Pendiente | `queryDocumentStatus()` | Requiere consumo del Web Service de consulta DIAN. Hoy retorna solo el estado almacenado en BD. |
-| **CUFE** | ⚠️ Parcial | Respuesta simulada en `sendToDian()` | El CUFE real debe calcularse según Anexo Técnico (hash de campos del documento). En producción lo asigna DIAN o se calcula antes de enviar. |
+| **Estructura XML UBL 2.1** | ✅ Mejorado | `dian.service.ts` → `generateXML()` | Estructura corregida (líneas de factura como hermanas, sin wrapper); escape XML; emisor usa DIAN_ISSUER_NIT / DIAN_ISSUER_NAME. |
+| **Firma digital** | ✅ Implementado | `signDocument()` | xml-crypto + node-forge (.p12). RSA-SHA256, SHA256, C14N. Si no hay certificado retorna XML sin firmar. |
+| **Envío a API DIAN** | ✅ Implementado | `sendToDian()` | POST con sobre SOAP ReceiveInvoice cuando `DIAN_USE_DEFAULT_URL=true` o `DIAN_API_BASE_URL` está definida. Reintentos y log de 4xx/5xx. |
+| **Estado de configuración** | ✅ Nuevo | `GET /dian/config-status` | Indica si falta algo (Software ID, PIN, certificado, DIAN_ISSUER_NIT, DIAN_ISSUER_NAME, URL) sin revelar secretos. |
+| **Generación de PDF** | ❌ Pendiente | `generatePDF()` | Requiere librería (pdfkit, puppeteer), plantilla, QR y CUFE. Hoy solo guarda ruta simulada. |
+| **Consulta estado real** | ❌ Pendiente | `queryDocumentStatus()` | Requiere consumo del Web Service de consulta DIAN. Hoy retorna solo el estado en BD. |
+| **CUFE** | ⚠️ Parcial | Respuesta DIAN / simulado | El CUFE lo asigna la DIAN en la respuesta. Cálculo propio según Anexo (opcional) para incluir en XML/QR. |
 
 ---
 
@@ -30,30 +31,52 @@
 
 | Variable | Descripción | Uso actual |
 |----------|-------------|------------|
-| `DIAN_ENV` | `HABILITACION` o `PRODUCCION` | Ambiente para envío (cuando esté implementado). |
-| `DIAN_SOFTWARE_ID` | Identificador del software ante DIAN | Incluido en XML como NIT emisor; requerido para envío real. |
-| `DIAN_SOFTWARE_PIN` | PIN del software | Requerido para autenticación en API DIAN. |
-| `DIAN_RESOLUTION_NUMBER` | Número de resolución (opcional) | Disponible en `getDianConfig()`. |
-| `DIAN_PREFIX` | Prefijo de numeración (ej. FAC) | Disponible en config. |
-| `DIAN_RANGE_FROM` / `DIAN_RANGE_TO` | Rango de numeración | Disponible en config. |
-| `DIAN_CERT_PATH` | Ruta al certificado .p12 de firma electrónica | Usado en `signDocument()`; si no está, XML sin firmar. |
+| `DIAN_ENV` | `HABILITACION` o `PRODUCCION` | Ambiente; define URL por defecto si `DIAN_USE_DEFAULT_URL=true`. |
+| `DIAN_SOFTWARE_ID` | Identificador del software ante DIAN | Header SOAP y validación; requerido para envío real. |
+| `DIAN_SOFTWARE_PIN` | PIN del software | Header SOAP; requerido para envío real. |
+| `DIAN_ISSUER_NIT` | **NIT del emisor (empresa)** | Va en el XML UBL (AccountingSupplierParty). **Obligatorio para evitar 400.** |
+| `DIAN_ISSUER_NAME` | **Razón social del emisor** | Va en el XML UBL. **Obligatorio para evitar 400.** |
+| `DIAN_USE_DEFAULT_URL` | `true` para usar URL hab/prod según DIAN_ENV | Si no está, no se envía a DIAN (modo simulado). |
+| `DIAN_API_BASE_URL` | URL base del API (opcional) | Alternativa a DIAN_USE_DEFAULT_URL. |
+| `DIAN_CERT_PATH` | Ruta al certificado .p12 | Usado en `signDocument()`; sin esto el XML va sin firma (DIAN rechaza en real). |
 | `DIAN_CERT_PASSWORD` | Contraseña del .p12 | Usado en `signDocument()`. |
+| `DIAN_RESOLUTION_NUMBER`, `DIAN_PREFIX`, `DIAN_RANGE_*` | Numeración y resolución | Disponibles en `getDianConfig()`. |
+
+Ver **`env.example`** para el listado completo y comentarios.
+
+---
+
+## Checklist antes de enviar a DIAN (habilitación o producción)
+
+1. **Configurar variables** (ver `env.example`):
+   - `DIAN_SOFTWARE_ID`, `DIAN_SOFTWARE_PIN`
+   - **`DIAN_ISSUER_NIT`** (NIT del emisor, no el Software ID)
+   - **`DIAN_ISSUER_NAME`** (razón social)
+   - `DIAN_USE_DEFAULT_URL=true` o `DIAN_API_BASE_URL`
+   - `DIAN_CERT_PATH`, `DIAN_CERT_PASSWORD`
+2. **Verificar estado:** `GET /dian/config-status` (con JWT y permiso `dian:manage`). Debe devolver `readyForSend: true` y `missing: []`.
+3. **Certificado .p12** vigente y accesible por la API.
+4. **Cliente con documento:** La factura debe tener cliente con `docType` y `docNumber` (CC/NIT).
+
+Si la DIAN devuelve **400** con cuerpo vacío o rechazo, revisar logs (cuerpo y headers de la respuesta se registran). Ajustar NIT/razón social, numeración o esquema XML según documentación técnica DIAN.
 
 ---
 
 ## Próximos pasos recomendados
 
-1. ~~**Firma digital:**~~ ✅ Hecho: certificado .p12 + xml-crypto (RSA-SHA256, C14N).
-2. **Envío real:** Implementar cliente HTTP para el Web Service de recepción DIAN (habilitación y producción); manejar respuestas ACEPTADO/RECHAZADO y reintentos.
-3. **CUFE:** Implementar cálculo del CUFE según Anexo Técnico 1.9 e incluirlo en el XML/extensión antes de firmar (si aplica).
-4. **PDF:** Generar PDF de la factura con QR y CUFE; guardar en disco o storage (S3).
+1. ~~**Firma digital:**~~ ✅ Hecho.
+2. ~~**Envío real:**~~ ✅ Hecho (SOAP ReceiveInvoice, reintentos, log de errores).
+3. **CUFE:** Opcional: calcular CUFE según Anexo Técnico e incluirlo en XML/QR antes de firmar.
+4. **PDF:** Generar PDF de la factura con QR y CUFE; guardar en disco o S3.
 5. **Consulta estado:** Consumir Web Service de consulta de estado DIAN para sincronizar estados locales.
 
 ---
 
-## Cambios recientes (2026-01-29)
+## Cambios recientes (2026-02-10)
 
-- **signDocument:** Firma digital real con certificado .p12 (DIAN_CERT_PATH, DIAN_CERT_PASSWORD). Uso de xml-crypto (SignedXml) y node-forge para cargar PKCS#12. Algoritmos: RSA-SHA256, SHA256, C14N exclusivo, firma enveloped. Si no hay certificado configurado, se retorna XML sin firmar con advertencia en log.
+- **getConfigStatus()** y **GET /dian/config-status:** Indica si la configuración está lista para envío y qué variables faltan (sin revelar PIN ni certificado).
+- **sendToDian:** Advertencia en log si DIAN_ISSUER_NIT o DIAN_ISSUER_NAME no están configurados (evita 400 por emisor incorrecto).
+- **Documentación:** Tabla de estado actualizada (envío real implementado), checklist antes de enviar, variables DIAN_ISSUER_* destacadas.
 
 ## Cambios anteriores (2026-02-02)
 

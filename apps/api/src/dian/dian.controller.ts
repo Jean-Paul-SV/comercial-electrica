@@ -28,6 +28,31 @@ import { RequireModule } from '../auth/require-module.decorator';
 export class DianController {
   constructor(private readonly dianService: DianService) {}
 
+  @Get('config-status')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Estado de configuración DIAN',
+    description:
+      'Indica si la configuración está lista para envío real y qué variables faltan (sin revelar secretos).',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Estado de la configuración',
+    schema: {
+      type: 'object',
+      properties: {
+        env: { type: 'string', enum: ['HABILITACION', 'PRODUCCION'] },
+        readyForSend: { type: 'boolean' },
+        missing: { type: 'array', items: { type: 'string' } },
+        hasCert: { type: 'boolean' },
+        hasIssuerData: { type: 'boolean' },
+      },
+    },
+  })
+  getConfigStatus() {
+    return this.dianService.getConfigStatus();
+  }
+
   @Get('documents/:id/status')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({

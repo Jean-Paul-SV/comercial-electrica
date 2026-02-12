@@ -24,7 +24,9 @@ const DIAN_HTTP_MAX_RETRIES = 3;
 const DIAN_HTTP_RETRY_DELAY_MS = 5_000;
 import { AuditService } from '../common/services/audit.service';
 import { readFile } from 'fs/promises';
-import { resolve } from 'path';
+import { writeFileSync } from 'fs';
+import { resolve, join } from 'path';
+import { tmpdir } from 'os';
 import * as forge from 'node-forge';
 import { SignedXml } from 'xml-crypto';
 
@@ -52,9 +54,12 @@ export class DianService {
   private readonly softwareId: string;
   private readonly softwarePin: string;
   private readonly certPath: string;
+  private readonly certBase64: string;
   private readonly certPassword: string;
   private readonly isTestEnv =
     process.env.NODE_ENV === 'test' || !!process.env.JEST_WORKER_ID;
+  /** Ruta al .p12 temporal cuando se usa DIAN_CERT_BASE64 (se escribe una vez por proceso). */
+  private certTempPath: string | null = null;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -70,7 +75,7 @@ export class DianService {
     this.softwareId = this.config.get<string>('DIAN_SOFTWARE_ID', '') || '';
     this.softwarePin = this.config.get<string>('DIAN_SOFTWARE_PIN', '') || '';
     this.certPath = this.config.get<string>('DIAN_CERT_PATH', '') || '';
-    // En producción, inyectar DIAN_CERT_PASSWORD desde un gestor de secretos (AWS Secrets Manager, Vault, etc.)
+    this.certBase64 = this.config.get<string>('DIAN_CERT_BASE64', '')?.trim() || '';
     this.certPassword = this.config.get<string>('DIAN_CERT_PASSWORD', '') || '';
 
     if (!this.softwareId || !this.softwarePin) {
@@ -78,11 +83,17 @@ export class DianService {
         '⚠️ DIAN_SOFTWARE_ID o DIAN_SOFTWARE_PIN no configurados. El procesamiento DIAN no funcionará.',
       );
     }
-    if (!this.certPath || !this.certPassword) {
+    const hasCert = (this.certPath?.trim() || this.certBase64) && this.certPassword;
+    if (!hasCert) {
       this.logger.warn(
-        '⚠️ DIAN_CERT_PATH o DIAN_CERT_PASSWORD no configurados. Los documentos se enviarán sin firma digital.',
+        '⚠️ Certificado no configurado (DIAN_CERT_PATH o DIAN_CERT_BASE64, y DIAN_CERT_PASSWORD). Los documentos se enviarán sin firma digital.',
       );
     }
+  }
+
+  /** Devuelve true si hay certificado configurado (ruta o base64) y contraseña. */
+  private hasCertConfigured(): boolean {
+    return !!(this.certPath?.trim() || this.certBase64) && !!this.certPassword;
   }
 
   /**
@@ -461,13 +472,37 @@ export class DianService {
 
   /**
    * Carga clave privada y certificado desde archivo .p12/.pfx (PKCS#12).
-   * Requiere DIAN_CERT_PATH y DIAN_CERT_PASSWORD configurados.
+   * Soporta DIAN_CERT_PATH (ruta a archivo) o DIAN_CERT_BASE64 (contenido en base64, útil en Render/servidores sin disco persistente).
    */
   private async loadCertFromP12(): Promise<{
     privateKeyPem: string;
     certPem: string;
   }> {
-    const pathToUse = resolve(this.certPath);
+    let pathToUse: string;
+    if (this.certPath?.trim()) {
+      pathToUse = resolve(this.certPath);
+    } else if (this.certBase64) {
+      if (!this.certTempPath) {
+        const buf = Buffer.from(this.certBase64, 'base64');
+        if (buf.length === 0) {
+          throw new BadRequestException(
+            'DIAN_CERT_BASE64 no es un base64 válido del archivo .p12.',
+          );
+        }
+        this.certTempPath = join(
+          tmpdir(),
+          `dian-cert-${process.pid}-${Date.now()}.p12`,
+        );
+        writeFileSync(this.certTempPath, buf, { mode: 0o600 });
+        this.logger.log('Certificado DIAN cargado desde DIAN_CERT_BASE64 (archivo temporal).');
+      }
+      pathToUse = this.certTempPath;
+    } else {
+      throw new BadRequestException(
+        'Configure DIAN_CERT_PATH o DIAN_CERT_BASE64 con el certificado .p12 de firma electrónica.',
+      );
+    }
+
     const raw = await readFile(pathToUse);
     const binary = typeof raw === 'string' ? raw : raw.toString('binary');
     const p12Asn1 = forge.asn1.fromDer(binary);
@@ -520,7 +555,7 @@ export class DianService {
   async signDocument(xml: string, dianDocumentId: string): Promise<string> {
     this.logger.log(`Firmando documento ${dianDocumentId}`);
 
-    if (!this.certPath || !this.certPassword) {
+    if (!this.hasCertConfigured()) {
       this.logger.warn(
         `⚠️ Firma digital omitida (certificado no configurado). Retornando XML sin firmar.`,
       );
@@ -798,6 +833,24 @@ export class DianService {
     let response: DianResponse;
 
     if (baseUrl) {
+      const config = this.getDianConfig();
+      if (!config.issuerNit || config.issuerNit === this.softwareId) {
+        this.logger.warn(
+          'DIAN_ISSUER_NIT no configurado o igual a Software ID. Configure DIAN_ISSUER_NIT con el NIT del emisor (empresa) para evitar 400.',
+        );
+      }
+      if (!config.issuerName || config.issuerName === 'EMPRESA COMERCIAL ELECTRICA') {
+        this.logger.warn(
+          'DIAN_ISSUER_NAME no configurado. Configure DIAN_ISSUER_NAME con la razón social del emisor para evitar 400.',
+        );
+      }
+
+      if (!this.hasCertConfigured()) {
+        throw new BadRequestException(
+          'No se puede enviar a la DIAN sin firma digital. La DIAN rechaza documentos no firmados (400). Configure DIAN_CERT_PATH y DIAN_CERT_PASSWORD, o DIAN_CERT_BASE64 y DIAN_CERT_PASSWORD (certificado .p12 en base64 para entornos sin disco).',
+        );
+      }
+
       try {
         const useSoap = this.config.get<string>('DIAN_USE_SOAP', 'true') !== 'false';
         const fileName = `factura-${dianDocumentId}.xml`;
@@ -985,6 +1038,38 @@ export class DianService {
       prefix: this.config.get<string>('DIAN_PREFIX', 'FAC'),
       rangeFrom: this.config.get<number>('DIAN_RANGE_FROM', 1),
       rangeTo: this.config.get<number>('DIAN_RANGE_TO', 999999),
+    };
+  }
+
+  /**
+   * Estado de la configuración DIAN para envío real (sin revelar secretos).
+   * Útil para que el front o el operador sepa qué falta antes de enviar facturas.
+   */
+  getConfigStatus(): {
+    env: DianEnvironment;
+    readyForSend: boolean;
+    missing: string[];
+    hasCert: boolean;
+    hasIssuerData: boolean;
+  } {
+    const missing: string[] = [];
+    if (!this.softwareId?.trim()) missing.push('DIAN_SOFTWARE_ID');
+    if (!this.softwarePin?.trim()) missing.push('DIAN_SOFTWARE_PIN');
+    const baseUrl = this.getDianBaseUrl();
+    if (!baseUrl) missing.push('DIAN_USE_DEFAULT_URL o DIAN_API_BASE_URL');
+    const issuerNit = this.config.get<string>('DIAN_ISSUER_NIT', '')?.trim();
+    const issuerName = this.config.get<string>('DIAN_ISSUER_NAME', '')?.trim();
+    if (!issuerNit) missing.push('DIAN_ISSUER_NIT');
+    if (!issuerName) missing.push('DIAN_ISSUER_NAME');
+    const hasCert = !!((this.certPath?.trim() || this.certBase64) && this.certPassword);
+    if (!hasCert) missing.push('DIAN_CERT_PATH o DIAN_CERT_BASE64, y DIAN_CERT_PASSWORD (firma digital)');
+
+    return {
+      env: this.dianEnv,
+      readyForSend: missing.length === 0,
+      missing,
+      hasCert,
+      hasIssuerData: !!(issuerNit && issuerName),
     };
   }
 
