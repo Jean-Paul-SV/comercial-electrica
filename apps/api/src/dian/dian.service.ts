@@ -23,6 +23,7 @@ const DIAN_HTTP_TIMEOUT_MS = 30_000;
 const DIAN_HTTP_MAX_RETRIES = 3;
 const DIAN_HTTP_RETRY_DELAY_MS = 5_000;
 import { AuditService } from '../common/services/audit.service';
+import { MailerService } from '../mailer/mailer.service';
 import { readFile } from 'fs/promises';
 import { writeFileSync } from 'fs';
 import { resolve, join } from 'path';
@@ -67,6 +68,7 @@ export class DianService {
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
     private readonly audit: AuditService,
+    private readonly mailer: MailerService,
   ) {
     // Cargar configuración desde variables de entorno
     this.dianEnv =
@@ -171,6 +173,16 @@ export class DianService {
       throw new BadRequestException(
         'No se puede enviar a la DIAN sin firma digital. Configure el certificado (variables de entorno o configuración por empresa).',
       );
+    }
+
+    const contingencyMode =
+      this.config.get<string>('DIAN_CONTINGENCY_MODE', '')?.toLowerCase() === 'true' ||
+      this.config.get<string>('DIAN_CONTINGENCY_MODE') === '1';
+    if (contingencyMode) {
+      this.logger.warn(
+        `Modo contingencia DIAN activo: documento ${dianDocumentId} no se envía. Queda en DRAFT para reintento posterior.`,
+      );
+      return;
     }
 
     try {
@@ -1304,16 +1316,29 @@ export class DianService {
     }
 
     const ready = missing.length === 0;
+    const certValidUntil = config.certValidUntil ?? undefined;
+    const rangeToNum = config.rangeTo ?? 999999;
+    const certExpiresInDays =
+      certValidUntil != null
+        ? Math.ceil((certValidUntil.getTime() - Date.now()) / (24 * 60 * 60 * 1000))
+        : undefined;
+    const rangeRemaining =
+      nextNumber != null && rangeToNum != null
+        ? Math.max(0, rangeToNum - nextNumber + 1)
+        : undefined;
+
     return {
       status: ready ? 'ready' : 'incomplete',
       readyForSend: ready,
       missing,
       hasCert,
       hasIssuerData: !!(config.issuerNit && config.issuerName),
-      certValidUntil: config.certValidUntil ?? undefined,
+      certValidUntil,
       nextNumber,
-      rangeTo,
+      rangeTo: rangeToNum,
       env: config.env,
+      certExpiresInDays: ready ? certExpiresInDays : undefined,
+      rangeRemaining: ready ? rangeRemaining : undefined,
     };
   }
 
@@ -1351,7 +1376,22 @@ export class DianService {
   async upsertDianConfig(
     tenantId: string,
     data: Partial<UpdateDianConfigDto>,
+    userId?: string | null,
   ): Promise<DianConfigPublic> {
+    const existing = await this.prisma.dianConfig.findUnique({
+      where: { tenantId },
+      select: {
+        id: true,
+        env: true,
+        issuerNit: true,
+        issuerName: true,
+        softwareId: true,
+        resolutionNumber: true,
+        prefix: true,
+        rangeFrom: true,
+        rangeTo: true,
+      },
+    });
     const payload: Prisma.DianConfigUncheckedCreateInput = {
       tenantId,
       env: data.env ?? DianEnvironment.HABILITACION,
@@ -1381,6 +1421,41 @@ export class DianService {
         ...(data.rangeTo !== undefined && { rangeTo: data.rangeTo }),
       },
     });
+    const action = existing ? 'update' : 'create';
+    const diff =
+      existing && action === 'update'
+        ? {
+            old: {
+              env: existing.env,
+              issuerNit: existing.issuerNit ?? undefined,
+              issuerName: existing.issuerName ?? undefined,
+              resolutionNumber: existing.resolutionNumber ?? undefined,
+              prefix: existing.prefix ?? undefined,
+              rangeFrom: existing.rangeFrom ?? undefined,
+              rangeTo: existing.rangeTo ?? undefined,
+            },
+            new: {
+              env: row.env,
+              issuerNit: row.issuerNit ?? undefined,
+              issuerName: row.issuerName ?? undefined,
+              resolutionNumber: row.resolutionNumber ?? undefined,
+              prefix: row.prefix ?? undefined,
+              rangeFrom: row.rangeFrom ?? undefined,
+              rangeTo: row.rangeTo ?? undefined,
+            },
+          }
+        : { created: true };
+    await this.audit.log(
+      'dian_config',
+      row.id,
+      action,
+      userId ?? null,
+      diff,
+      {
+        tenantId,
+        summary: action === 'create' ? 'Configuración DIAN creada' : 'Configuración DIAN actualizada',
+      },
+    );
     return {
       id: row.id,
       tenantId: row.tenantId,
@@ -1424,6 +1499,7 @@ export class DianService {
     tenantId: string,
     certBase64: string,
     password: string,
+    userId?: string | null,
   ): Promise<void> {
     const encKey = this.config.get<string>('DIAN_CERT_ENCRYPTION_KEY', '')?.trim();
     if (!encKey) {
@@ -1448,7 +1524,7 @@ export class DianService {
       Buffer.from(password, 'utf-8'),
       encKey,
     );
-    await this.prisma.dianConfig.upsert({
+    const row = await this.prisma.dianConfig.upsert({
       where: { tenantId },
       create: {
         tenantId,
@@ -1464,6 +1540,17 @@ export class DianService {
         certValidUntil: validUntil,
       },
     });
+    await this.audit.log(
+      'dian_config',
+      row.id,
+      'upload_certificate',
+      userId ?? null,
+      { certValidUntil: validUntil.toISOString() },
+      {
+        tenantId,
+        summary: 'Certificado .p12 de firma electrónica actualizado',
+      },
+    );
     this.logger.log(
       `Certificado DIAN guardado para tenant ${tenantId}, válido hasta ${validUntil.toISOString()}.`,
     );
@@ -1602,6 +1689,74 @@ export class DianService {
       lastError: doc.lastError ?? null,
     };
   }
+
+  /**
+   * Envía alertas por email a administradores de tenants con certificado por vencer (< 30 días)
+   * o rango bajo (< 500 números). Se llama desde un cron diario. Si SMTP no está configurado, no envía.
+   */
+  async sendDianAlertsForTenants(): Promise<void> {
+    if (this.isTestEnv || !this.mailer.isConfigured()) {
+      if (this.isTestEnv) return;
+      this.logger.debug('Alertas DIAN por email: SMTP no configurado, omitiendo.');
+      return;
+    }
+    const configs = await this.prisma.dianConfig.findMany({
+      select: { tenantId: true },
+    });
+    const tenantIds = [...new Set(configs.map((c) => c.tenantId))];
+    const dianPermIds = await this.prisma.permission
+      .findMany({
+        where: { resource: 'dian', action: { in: ['manage', 'manage_certificate'] } },
+        select: { id: true },
+      })
+      .then((p) => p.map((x) => x.id));
+    if (dianPermIds.length === 0) return;
+    const roleIdsWithDian = await this.prisma.rolePermission
+      .findMany({
+        where: { permissionId: { in: dianPermIds } },
+        select: { roleId: true },
+      })
+      .then((r) => [...new Set(r.map((x) => x.roleId))]);
+    if (roleIdsWithDian.length === 0) return;
+
+    for (const tenantId of tenantIds) {
+      const status = await this.getConfigStatusForTenant(tenantId);
+      if (!status.readyForSend) continue;
+      const certWarn = status.certExpiresInDays != null && status.certExpiresInDays < 30;
+      const rangeWarn = status.rangeRemaining != null && status.rangeRemaining < 500;
+      if (!certWarn && !rangeWarn) continue;
+
+      const userRoles = await this.prisma.userRole.findMany({
+        where: { tenantId, roleId: { in: roleIdsWithDian } },
+        include: { user: { select: { email: true } } },
+      });
+      const emails = [...new Set(userRoles.map((ur) => ur.user?.email).filter(Boolean))] as string[];
+      if (emails.length === 0) continue;
+
+      const lines: string[] = [];
+      if (certWarn) {
+        lines.push(
+          `• Su certificado de firma electrónica vence en ${status.certExpiresInDays} día(s). Renuévelo a tiempo.`,
+        );
+      }
+      if (rangeWarn) {
+        lines.push(
+          `• Quedan ${status.rangeRemaining} números en su rango autorizado. Solicite un nuevo rango a la DIAN si es necesario.`,
+        );
+      }
+      const body = `Estimado usuario,\n\nLe informamos las siguientes alertas de facturación electrónica (DIAN):\n\n${lines.join('\n')}\n\nConfigure en la aplicación: Cuenta → Facturación electrónica.\n\n— Orion`;
+      const html = `<p>Estimado usuario,</p><p>Le informamos las siguientes alertas de facturación electrónica (DIAN):</p><ul>${lines.map((l) => `<li>${l.replace(/^•\s*/, '')}</li>`).join('')}</ul><p>Configure en la aplicación: <strong>Cuenta → Facturación electrónica</strong>.</p><p>— Orion</p>`;
+      for (const to of emails) {
+        await this.mailer.sendMail({
+          to,
+          subject: 'Orion – Alertas de facturación electrónica (DIAN)',
+          html,
+          text: body,
+        });
+      }
+      this.logger.log(`Alertas DIAN enviadas a ${emails.length} destinatario(s) del tenant ${tenantId}`);
+    }
+  }
 }
 
 /**
@@ -1646,6 +1801,10 @@ export type DianConfigStatus = {
   certValidUntil?: Date;
   nextNumber?: number;
   rangeTo?: number;
+  /** Días hasta vencimiento del certificado (solo cuando ready). */
+  certExpiresInDays?: number;
+  /** Números restantes en el rango autorizado (solo cuando ready). */
+  rangeRemaining?: number;
 };
 
 /** Configuración completa + certificado descifrado (uso interno). */

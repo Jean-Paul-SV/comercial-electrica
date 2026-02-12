@@ -48,8 +48,16 @@ services:
         value: "true"
       - key: DIAN_ENV
         value: "HABILITACION"
-      # Opcional certificado .p12: DIAN_CERT_PATH y DIAN_CERT_PASSWORD en el Dashboard
+      # Opcional certificado .p12: DIAN_CERT_PATH y DIAN_CERT_PASSWORD en el Dashboard (modo un solo tenant).
       - key: DIAN_CERT_PATH
         sync: false
       - key: DIAN_CERT_PASSWORD
+        sync: false
+      # Multi-tenant: obligatoria para que cada empresa suba su certificado desde Cuenta → Facturación electrónica (cifrado en BD).
+      - key: DIAN_CERT_ENCRYPTION_KEY
+        sync: false
+      # Admin de plataforma (Panel proveedor): solo se usan si ejecutas el seed contra esta BD. El deploy NO ejecuta seed; ver docs/PRIMER_USUARIO_PRODUCCION.md.
+      - key: PLATFORM_ADMIN_EMAIL
+        sync: false
+      - key: PLATFORM_ADMIN_PASSWORD
         sync: false

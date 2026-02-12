@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { DianService } from './dian.service';
 import { DianProcessor } from './dian.processor';
 import { DianController } from './dian.controller';
+import { DianAlertsScheduler } from './dian-alerts.scheduler';
 import { PrismaModule } from '../prisma/prisma.module';
 import { QueueModule } from '../queue/queue.module';
 import { ConfigModule } from '@nestjs/config';
@@ -14,7 +15,10 @@ const enableDianProcessor =
 @Module({
   imports: [PrismaModule, QueueModule, ConfigModule, CommonModule, AuthModule],
   controllers: [DianController],
-  providers: [DianService, ...(enableDianProcessor ? [DianProcessor] : [])],
+  providers: [
+    DianService,
+    ...(enableDianProcessor ? [DianProcessor, DianAlertsScheduler] : []),
+  ],
   exports: [DianService],
 })
 export class DianModule {}

@@ -43,6 +43,7 @@ export type SaleDetail = SaleListItem & {
     subtotal: number;
     taxTotal: number;
     grandTotal: number;
+    dianDocument?: { id: string } | null;
   }>;
 };
 

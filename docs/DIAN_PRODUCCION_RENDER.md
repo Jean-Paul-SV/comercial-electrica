@@ -2,6 +2,8 @@
 
 Guía para configurar la API en Render y que envíe facturas electrónicas a la DIAN (habilitación o producción).
 
+**Multi-tenant:** Si cada empresa configura DIAN desde la app (**Cuenta → Facturación electrónica**), en Render solo necesitas añadir **`DIAN_CERT_ENCRYPTION_KEY`** (clave para cifrar certificados en BD). El resto (NIT, software ID/PIN, certificado .p12) lo sube cada empresa en la pantalla. Ver `docs/CONFIGURAR_FACTURACION_ELECTRONICA_PASOS.md`.
+
 ---
 
 ## ¿Cuándo tengo el certificado .p12?

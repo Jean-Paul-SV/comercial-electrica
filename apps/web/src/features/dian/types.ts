@@ -56,6 +56,10 @@ export type DianConfigStatusResponse = {
   certValidUntil?: string | null;
   nextNumber?: number;
   rangeTo?: number;
+  /** Días hasta vencimiento del certificado (solo cuando ready). */
+  certExpiresInDays?: number;
+  /** Números restantes en el rango autorizado (solo cuando ready). */
+  rangeRemaining?: number;
 };
 
 export type UpdateDianConfigPayload = {

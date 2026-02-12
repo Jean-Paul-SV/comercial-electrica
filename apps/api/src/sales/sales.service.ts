@@ -23,6 +23,7 @@ import { Queue } from 'bullmq';
 import { ValidationLimitsService } from '../common/services/validation-limits.service';
 import { AuditService } from '../common/services/audit.service';
 import { CacheService } from '../common/services/cache.service';
+import { DianService } from '../dian/dian.service';
 
 function makeInvoiceNumber(now = new Date()) {
   const yyyy = String(now.getFullYear());
@@ -42,6 +43,7 @@ export class SalesService {
     private readonly limits: ValidationLimitsService,
     private readonly audit: AuditService,
     private readonly cache: CacheService,
+    private readonly dianService: DianService,
   ) {}
 
   async createSale(
@@ -50,6 +52,20 @@ export class SalesService {
     tenantId?: string | null,
   ) {
     if (!tenantId) throw new ForbiddenException('Tenant requerido.');
+
+    const dianStatus = await this.dianService.getConfigStatusForTenant(tenantId);
+    if (!dianStatus.readyForSend) {
+      const msg =
+        dianStatus.status === 'not_configured'
+          ? 'Configure la facturación electrónica en Cuenta → Facturación electrónica antes de registrar ventas.'
+          : dianStatus.status === 'cert_expired'
+            ? 'El certificado de firma electrónica está vencido. Renuévelo en Cuenta → Facturación electrónica.'
+            : dianStatus.status === 'range_exhausted'
+              ? 'El rango de numeración DIAN está agotado. Solicite un nuevo rango y actualice la configuración.'
+              : 'Complete la configuración de facturación electrónica en Cuenta → Facturación electrónica para poder registrar ventas.';
+      throw new BadRequestException(msg);
+    }
+
     this.logger.log(
       `Creando venta para usuario ${createdByUserId || 'anónimo'}`,
     );
@@ -362,7 +378,11 @@ export class SalesService {
         updatedAt: true,
         items: { include: { product: true } },
         customer: true,
-        invoices: true,
+        invoices: {
+          include: {
+            dianDocument: { select: { id: true } },
+          },
+        },
         createdBy: { select: { id: true, email: true } },
       },
     });

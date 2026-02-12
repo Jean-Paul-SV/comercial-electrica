@@ -24,6 +24,7 @@ import { PermissionsGuard } from '../auth/permissions.guard';
 import { RequirePermission } from '../auth/require-permission.decorator';
 import { ModulesGuard } from '../auth/modules.guard';
 import { RequireModule } from '../auth/require-module.decorator';
+import { PermissionsService } from '../auth/permissions.service';
 import {
   UpdateDianConfigDto,
   UploadCertificateDto,
@@ -35,7 +36,10 @@ import {
 @RequireModule('electronic_invoicing')
 @Controller('dian')
 export class DianController {
-  constructor(private readonly dianService: DianService) {}
+  constructor(
+    private readonly dianService: DianService,
+    private readonly permissions: PermissionsService,
+  ) {}
 
   private getTenantId(req: { user?: { tenantId?: string } }): string {
     const tenantId = req?.user?.tenantId;
@@ -72,25 +76,43 @@ export class DianController {
   @ApiBody({ type: UpdateDianConfigDto })
   @ApiResponse({ status: 200, description: 'Configuración actualizada' })
   async updateConfig(
-    @Req() req: { user?: { tenantId?: string } },
+    @Req() req: { user?: { tenantId?: string; sub?: string } },
     @Body() dto: UpdateDianConfigDto,
   ) {
     const tenantId = this.getTenantId(req);
-    return this.dianService.upsertDianConfig(tenantId, dto);
+    const sensitive =
+      dto.resolutionNumber !== undefined ||
+      dto.prefix !== undefined ||
+      dto.rangeFrom !== undefined ||
+      dto.rangeTo !== undefined ||
+      dto.softwarePin !== undefined;
+    if (sensitive && req.user?.sub) {
+      const canManageCert = await this.permissions.userHasAnyPermission(req.user.sub, [
+        'dian:manage_certificate',
+      ]);
+      if (!canManageCert) {
+        throw new ForbiddenException(
+          'Se requiere permiso de gestión de certificado (dian:manage_certificate) para modificar numeración o PIN.',
+        );
+      }
+    }
+    return this.dianService.upsertDianConfig(tenantId, dto, req.user?.sub ?? null);
   }
 
   @Post('config/certificate')
+  @RequirePermission('dian:manage_certificate')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Subir certificado .p12 del tenant',
     description:
-      'Sube el certificado de firma electrónica (.p12 en base64) y su contraseña. Se almacenan cifrados.',
+      'Sube el certificado de firma electrónica (.p12 en base64) y su contraseña. Se almacenan cifrados. Requiere permiso dian:manage_certificate.',
   })
   @ApiBody({ type: UploadCertificateDto })
   @ApiResponse({ status: 201, description: 'Certificado guardado' })
   @ApiResponse({ status: 400, description: 'certBase64 o contraseña inválidos' })
+  @ApiResponse({ status: 403, description: 'Sin permiso dian:manage_certificate' })
   async uploadCertificate(
-    @Req() req: { user?: { tenantId?: string } },
+    @Req() req: { user?: { tenantId?: string; sub?: string } },
     @Body() dto: UploadCertificateDto,
   ) {
     const tenantId = this.getTenantId(req);
@@ -98,6 +120,7 @@ export class DianController {
       tenantId,
       dto.certBase64,
       dto.password,
+      req.user?.sub ?? null,
     );
     return { ok: true, message: 'Certificado guardado correctamente.' };
   }
@@ -133,6 +156,8 @@ export class DianController {
         certValidUntil: { type: 'string', format: 'date-time', nullable: true },
         nextNumber: { type: 'number', nullable: true },
         rangeTo: { type: 'number', nullable: true },
+        certExpiresInDays: { type: 'number', nullable: true, description: 'Días hasta vencimiento del certificado (solo cuando ready)' },
+        rangeRemaining: { type: 'number', nullable: true, description: 'Números restantes en el rango autorizado (solo cuando ready)' },
       },
     },
   })

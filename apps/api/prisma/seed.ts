@@ -121,7 +121,12 @@ async function main() {
       update: {},
     });
   }
-  console.log('Permisos creados/actualizados:', slugList.length);
+  await prisma.permission.upsert({
+    where: { resource_action: { resource: 'dian', action: 'manage_certificate' } },
+    create: { resource: 'dian', action: 'manage_certificate', description: 'dian:manage_certificate (subir certificado y editar resolución/rangos)' },
+    update: {},
+  });
+  console.log('Permisos creados/actualizados:', slugList.length + 1);
 
   // 4. Roles de sistema (globales, tenantId null para que apliquen en cualquier tenant)
   const allPerms = await prisma.permission.findMany({ select: { id: true } });

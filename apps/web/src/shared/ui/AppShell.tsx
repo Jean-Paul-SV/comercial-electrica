@@ -9,6 +9,7 @@ import { cn } from '@lib/utils';
 import { Menu, X, LogOut, WifiOff } from 'lucide-react';
 import { AlertsBell } from '@shared/components/AlertsBell';
 import { OfflineQueueBell } from '@shared/components/OfflineQueueBell';
+import { DianAlertsBanner } from '@shared/components/DianAlertsBanner';
 import { Sidebar, useSidebarOptional } from '@shared/ui/sidebar';
 import { navConfig } from '@shared/navigation/config';
 import { getNavForRole } from '@shared/navigation/filterByRole';
@@ -187,6 +188,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </header>
         <main className="flex-1 overflow-auto p-4 sm:p-6 md:p-8">
           <div className="mx-auto max-w-6xl animate-in fade-in duration-200">
+            {enabledModules?.includes('electronic_invoicing') && <DianAlertsBanner />}
             {children}
           </div>
         </main>

@@ -19,8 +19,10 @@ import {
   TableHeader,
   TableRow,
 } from '@shared/components/ui/table';
-import { ArrowLeft, ShoppingCart } from 'lucide-react';
+import { Badge } from '@shared/components/ui/badge';
+import { ArrowLeft, FileCheck, ShoppingCart } from 'lucide-react';
 import { useSale } from '@features/sales/hooks';
+import { useDianDocumentStatus } from '@features/dian/hooks';
 import { formatMoney } from '@shared/utils/format';
 
 export default function SaleDetailPage() {
@@ -73,8 +75,14 @@ export default function SaleDetailPage() {
 
   const soldAt = sale.soldAt ? new Date(sale.soldAt).toLocaleString() : '—';
   const items = sale.items ?? [];
-  type InvoiceLike = { id?: string; number?: string } | string;
+  type InvoiceLike = { id?: string; number?: string; dianDocument?: { id: string } | null } | string;
   const invoices: InvoiceLike[] = (sale.invoices ?? []) as InvoiceLike[];
+  const firstInvoiceWithDian = invoices.find(
+    (inv): inv is { id: string; number: string; dianDocument?: { id: string } | null } =>
+      typeof inv === 'object' && inv !== null && 'dianDocument' in inv && inv.dianDocument?.id != null,
+  );
+  const dianDocumentId = firstInvoiceWithDian?.dianDocument?.id ?? null;
+  const { data: dianStatus } = useDianDocumentStatus(dianDocumentId);
 
   return (
     <div className="space-y-6">
@@ -194,10 +202,63 @@ export default function SaleDetailPage() {
                       return <li key={inv.id}>{inv.id}</li>;
                     }
                   }
-                  // Fallback genérico para strings u otros formatos
                   return <li key={`invoice-${index}`}>{String(inv)}</li>;
                 })}
               </ul>
+            </>
+          )}
+
+          {dianDocumentId && (
+            <>
+              <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
+                <FileCheck className="h-4 w-4 text-muted-foreground" aria-hidden />
+                Facturación electrónica (DIAN)
+              </h3>
+              <div className="rounded-lg border border-border/80 bg-muted/30 p-4 space-y-2">
+                <dl className="grid gap-2 sm:grid-cols-2 text-sm">
+                  <div>
+                    <dt className="text-muted-foreground">Estado</dt>
+                    <dd>
+                      {dianStatus ? (
+                        <Badge
+                          variant={
+                            dianStatus.status === 'ACCEPTED'
+                              ? 'default'
+                              : dianStatus.status === 'REJECTED'
+                                ? 'destructive'
+                                : 'secondary'
+                          }
+                        >
+                          {dianStatus.status === 'DRAFT'
+                            ? 'En cola'
+                            : dianStatus.status === 'SIGNED'
+                              ? 'Firmado'
+                              : dianStatus.status === 'SENT'
+                                ? 'Enviado'
+                                : dianStatus.status === 'ACCEPTED'
+                                  ? 'Aceptado por DIAN'
+                                  : dianStatus.status === 'REJECTED'
+                                    ? 'Rechazado por DIAN'
+                                    : dianStatus.status}
+                        </Badge>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </dd>
+                  </div>
+                  {dianStatus?.sentAt && (
+                    <div>
+                      <dt className="text-muted-foreground">Enviado</dt>
+                      <dd>{new Date(dianStatus.sentAt).toLocaleString('es-CO')}</dd>
+                    </div>
+                  )}
+                </dl>
+                {dianStatus?.status === 'REJECTED' && dianStatus?.lastError && (
+                  <p className="text-sm text-destructive mt-2">
+                    Error DIAN: {dianStatus.lastError}
+                  </p>
+                )}
+              </div>
             </>
           )}
         </CardContent>

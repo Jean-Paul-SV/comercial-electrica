@@ -22,6 +22,7 @@ import { ValidationLimitsService } from '../common/services/validation-limits.se
 import { AuditService } from '../common/services/audit.service';
 import { CacheService } from '../common/services/cache.service';
 import { createPaginatedResponse } from '../common/interfaces/pagination.interface';
+import { DianService } from '../dian/dian.service';
 
 @Injectable()
 export class QuotesService {
@@ -33,6 +34,7 @@ export class QuotesService {
     private readonly limits: ValidationLimitsService,
     private readonly audit: AuditService,
     private readonly cache: CacheService,
+    private readonly dianService: DianService,
   ) {}
 
   async createQuote(
@@ -423,6 +425,19 @@ export class QuotesService {
       throw new BadRequestException(
         `No se puede convertir cotización. La sesión de caja ${dto.cashSessionId} está cerrada.`,
       );
+    }
+
+    const dianStatus = await this.dianService.getConfigStatusForTenant(quote.tenantId);
+    if (!dianStatus.readyForSend) {
+      const msg =
+        dianStatus.status === 'not_configured'
+          ? 'Configure la facturación electrónica en Cuenta → Facturación electrónica antes de convertir a venta.'
+          : dianStatus.status === 'cert_expired'
+            ? 'El certificado de firma electrónica está vencido. Renuévelo en Cuenta → Facturación electrónica.'
+            : dianStatus.status === 'range_exhausted'
+              ? 'El rango de numeración DIAN está agotado. Solicite un nuevo rango y actualice la configuración.'
+              : 'Complete la configuración de facturación electrónica en Cuenta → Facturación electrónica para poder convertir a venta.';
+      throw new BadRequestException(msg);
     }
 
     return this.prisma

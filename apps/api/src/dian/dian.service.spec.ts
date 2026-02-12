@@ -4,6 +4,7 @@ import { DianService } from './dian.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
 import { AuditService } from '../common/services/audit.service';
+import { MailerService } from '../mailer/mailer.service';
 import {
   DianDocumentStatus,
   DianDocumentType,
@@ -99,6 +100,7 @@ describe('DianService', () => {
     };
 
     const mockAudit = { log: jest.fn() };
+    const mockMailer = { isConfigured: jest.fn().mockReturnValue(false), sendMail: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -114,6 +116,10 @@ describe('DianService', () => {
         {
           provide: AuditService,
           useValue: mockAudit,
+        },
+        {
+          provide: MailerService,
+          useValue: mockMailer,
         },
       ],
     }).compile();

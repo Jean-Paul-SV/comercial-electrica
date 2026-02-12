@@ -4,6 +4,29 @@ El proyecto **no incluye base de datos** en el repositorio. En producción debes
 
 ---
 
+## Si desplegaste en Render: las credenciales no “aparecen” solas
+
+En Render, el **deploy no ejecuta el seed**. El `startCommand` solo hace migraciones y arranca la API. Por tanto:
+
+- **El usuario de plataforma** (`platform@admin.local` o el que definas) **no se crea** hasta que ejecutes el seed **una vez** contra la BD de producción.
+- Las variables **`PLATFORM_ADMIN_EMAIL`** y **`PLATFORM_ADMIN_PASSWORD`** en el Dashboard de Render son opcionales y **solo se usan si en algún momento se ejecuta el seed** con ese entorno (por ejemplo desde un job o shell que apunte a esa BD). Para crear el usuario la primera vez, lo habitual es ejecutar el seed **desde tu PC** (ver más abajo).
+
+**Qué hacer:**
+
+1. En tu PC, apunta a la BD de Render y ejecuta el seed **una vez** (después del primer deploy):
+   ```powershell
+   cd apps/api
+   $env:DATABASE_URL = "postgresql://..."   # Copia la connection string de Render (Dashboard → BD → Connect)
+   # Opcional: usar tu email/contraseña como dueño del sistema
+   $env:PLATFORM_ADMIN_EMAIL = "tu@email.com"
+   $env:PLATFORM_ADMIN_PASSWORD = "TuPasswordSegura123!"
+   npx prisma db seed
+   ```
+2. Si **no** defines `PLATFORM_ADMIN_EMAIL` / `PLATFORM_ADMIN_PASSWORD`, el seed crea por defecto **`platform@admin.local`** / **`PlatformAdmin1!`**. Puedes usar esas credenciales para entrar en la app desplegada y acceder al Panel proveedor.
+3. (Opcional) Si quieres que en el Dashboard de Render figuren las variables para referencia o para un futuro job que ejecute el seed, añade `PLATFORM_ADMIN_EMAIL` y `PLATFORM_ADMIN_PASSWORD` en Environment; el usuario solo existirá después de ejecutar el seed como en el paso 1.
+
+---
+
 ## Dueño del sistema (administrador de plataforma)
 
 El **dueño del sistema** es el usuario que puede acceder al **Panel proveedor** (gestión de empresas/tenants, planes, altas de clientes). Ese usuario se crea al ejecutar **`prisma:seed`**.

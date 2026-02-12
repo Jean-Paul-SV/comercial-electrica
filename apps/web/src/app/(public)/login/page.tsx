@@ -58,7 +58,7 @@ export default function LoginPage() {
         {/* Línea de acento superior */}
         <div className="h-1 bg-gradient-to-r from-primary to-primary/80" />
 
-          <CardHeader className="space-y-1 pb-6 pt-8 px-8">
+        <CardHeader className="space-y-1 pb-6 pt-8 px-8">
           <div className="flex items-center justify-center gap-3 mb-2">
             <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
               <OrionLogo size={28} withCircle />
