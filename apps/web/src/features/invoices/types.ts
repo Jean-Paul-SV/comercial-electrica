@@ -13,6 +13,9 @@ export type Paginated<T> = {
 /** Estado de factura de venta (Invoice) */
 export type InvoiceStatus = 'DRAFT' | 'ISSUED' | 'VOIDED';
 
+/** Estado del documento en la DIAN */
+export type DianDocumentStatus = 'DRAFT' | 'ACCEPTED' | 'REJECTED';
+
 export type InvoiceListItem = {
   id: string;
   number: string;
@@ -26,4 +29,6 @@ export type InvoiceListItem = {
   customerId: string | null;
   customer: { id: string; name: string } | null;
   sale: { id: string; soldAt: string } | null;
+  /** Estado DIAN (en cola, aceptada, rechazada). Solo para facturas emitidas. */
+  dianDocument?: { status: DianDocumentStatus; lastError: string | null } | null;
 };

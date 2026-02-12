@@ -2,6 +2,7 @@ import {
   Injectable,
   Logger,
   BadRequestException,
+  ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
@@ -12,11 +13,33 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { createHash } from 'crypto';
 import { readFile, unlink } from 'fs/promises';
+import { createWriteStream } from 'fs';
 import { existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import archiver from 'archiver';
 
 const execAsync = promisify(exec);
+
+/** Escapa un valor para CSV (comillas si contiene coma, comilla o salto de línea). */
+function csvEscape(val: unknown): string {
+  const s = val === null || val === undefined ? '' : String(val);
+  if (/[",\r\n]/.test(s)) {
+    return `"${s.replace(/"/g, '""')}"`;
+  }
+  return s;
+}
+
+/** Convierte un array de objetos en texto CSV con cabecera. */
+function toCsv(rows: Record<string, unknown>[]): string {
+  if (rows.length === 0) return '';
+  const headers = Object.keys(rows[0]);
+  const lines = [headers.join(',')];
+  for (const row of rows) {
+    lines.push(headers.map((h) => csvEscape(row[h])).join(','));
+  }
+  return lines.join('\n');
+}
 
 @Injectable()
 export class BackupsService {
@@ -33,83 +56,71 @@ export class BackupsService {
   }
 
   /**
-   * Crea un backup de la base de datos
+   * Crea un backup: si hay tenantId, exporta CSV (ZIP) del tenant; si no (plataforma), pg_dump completo.
    */
-  async createBackup(tenantId?: string): Promise<{
+  async createBackup(tenantId?: string | null): Promise<{
     id: string;
     storagePath: string;
     checksum: string;
     status: string;
   }> {
-    const tid =
-      tenantId ??
-      (await this.prisma.tenant.findFirst({ select: { id: true } }))?.id;
-    if (!tid) throw new BadRequestException('No hay tenant para el backup.');
+    const isTenantBackup =
+      typeof tenantId === 'string' && tenantId.trim() !== '';
+    const tidForRun = isTenantBackup
+      ? tenantId!
+      : (await this.prisma.tenant.findFirst({ select: { id: true } }))?.id;
+    if (!tidForRun) throw new BadRequestException('No hay tenant para el backup.');
     const backupRun = await this.prisma.backupRun.create({
-      data: { tenantId: tid, status: 'IN_PROGRESS' },
+      data: { tenantId: tidForRun, status: 'IN_PROGRESS' },
     });
 
     try {
-      // Asegurar que el directorio existe
       if (!existsSync(this.backupDir)) {
         mkdirSync(this.backupDir, { recursive: true });
       }
 
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      const filename = `backup-${timestamp}.sql`;
-      const filepath = join(this.backupDir, filename);
+      let filepath: string;
 
-      // Obtener DATABASE_URL
-      const databaseUrl = this.config.get<string>('DATABASE_URL');
-      if (!databaseUrl) {
-        throw new BadRequestException('DATABASE_URL no configurada');
+      if (isTenantBackup) {
+        // Backup por tenant: ZIP con CSVs (cada admin descarga los datos de su empresa)
+        const filename = `backup-tenant-${timestamp}.zip`;
+        filepath = join(this.backupDir, filename);
+        await this.createTenantCsvZip(tidForRun, filepath);
+      } else {
+        // Plataforma: volcado completo con pg_dump
+        const filename = `backup-${timestamp}.sql`;
+        filepath = join(this.backupDir, filename);
+        const databaseUrl = this.config.get<string>('DATABASE_URL');
+        if (!databaseUrl) {
+          throw new BadRequestException('DATABASE_URL no configurada');
+        }
+        const url = new URL(databaseUrl);
+        const dbName = url.pathname.slice(1);
+        const dbHost = url.hostname;
+        const dbPort = url.port || '5432';
+        const dbUser = url.username;
+        const dbPassword = url.password;
+        const env = { ...process.env, PGPASSWORD: dbPassword };
+        let command: string;
+        try {
+          await execAsync('pg_dump --version', { timeout: 2000 });
+          command = `pg_dump -h ${dbHost} -p ${dbPort} -U ${dbUser} -d ${dbName} -F c -f "${filepath}"`;
+          this.logger.log(`Usando pg_dump directamente para backup: ${backupRun.id}`);
+        } catch {
+          const dockerHost =
+            process.platform === 'linux' ? dbHost : 'host.docker.internal';
+          const dockerBackupPath = `/backups/${filename}`;
+          const backupDirNormalized = this.backupDir.replace(/\\/g, '/');
+          command = `docker run --rm -v "${backupDirNormalized}:/backups" -e PGPASSWORD="${dbPassword}" postgres:16-alpine pg_dump -h ${dockerHost} -p ${dbPort} -U ${dbUser} -d ${dbName} -F c -f "${dockerBackupPath}"`;
+          this.logger.log(`pg_dump vía Docker para backup: ${backupRun.id}`);
+        }
+        await execAsync(command, { env, maxBuffer: 10 * 1024 * 1024 });
       }
 
-      // Parsear DATABASE_URL para obtener componentes
-      const url = new URL(databaseUrl);
-      const dbName = url.pathname.slice(1);
-      const dbHost = url.hostname;
-      const dbPort = url.port || '5432';
-      const dbUser = url.username;
-      const dbPassword = url.password;
-
-      // Detectar si pg_dump está disponible, si no, usar Docker como fallback
-      let command: string;
-      const env = { ...process.env, PGPASSWORD: dbPassword };
-
-      try {
-        // Intentar verificar si pg_dump está disponible
-        await execAsync('pg_dump --version', { timeout: 2000 });
-        // pg_dump está disponible, usarlo directamente
-        command = `pg_dump -h ${dbHost} -p ${dbPort} -U ${dbUser} -d ${dbName} -F c -f "${filepath}"`;
-        this.logger.log(
-          `Usando pg_dump directamente para backup: ${backupRun.id}`,
-        );
-      } catch {
-        // pg_dump no está disponible, usar Docker como fallback
-        // En Windows/Mac, usar host.docker.internal para conectar al host desde Docker
-        // En Linux, usar --network host o la IP del host
-        const dockerHost =
-          process.platform === 'linux' ? dbHost : 'host.docker.internal';
-        const dockerBackupPath = `/backups/${filename}`;
-        const backupDirNormalized = this.backupDir.replace(/\\/g, '/');
-
-        // Montar el directorio de backups como volumen y ejecutar pg_dump dentro del contenedor
-        // Usar postgres:16-alpine para coincidir con la versión del servidor (16.11)
-        command = `docker run --rm -v "${backupDirNormalized}:/backups" -e PGPASSWORD="${dbPassword}" postgres:16-alpine pg_dump -h ${dockerHost} -p ${dbPort} -U ${dbUser} -d ${dbName} -F c -f "${dockerBackupPath}"`;
-        this.logger.log(
-          `pg_dump no encontrado, usando Docker como fallback para backup: ${backupRun.id}`,
-        );
-      }
-
-      this.logger.log(`Iniciando backup: ${backupRun.id}`);
-      await execAsync(command, { env, maxBuffer: 10 * 1024 * 1024 });
-
-      // Calcular checksum
       const fileContent = await readFile(filepath);
       const checksum = createHash('sha256').update(fileContent).digest('hex');
 
-      // Actualizar registro
       const updated = await this.prisma.backupRun.update({
         where: { id: backupRun.id },
         data: {
@@ -124,12 +135,13 @@ export class BackupsService {
         `Backup completado: ${backupRun.id}, tamaño: ${fileContent.length} bytes`,
       );
 
-      // Copia off-site opcional a S3 (RESILIENCIA_Y_SINCRONIZACION)
-      await this.uploadToS3IfConfigured(filepath, updated.id).catch((err) => {
-        this.logger.warn(
-          `Copia off-site S3 fallida para backup ${updated.id}: ${err instanceof Error ? err.message : String(err)}`,
-        );
-      });
+      if (!isTenantBackup) {
+        await this.uploadToS3IfConfigured(filepath, updated.id).catch((err) => {
+          this.logger.warn(
+            `Copia off-site S3 fallida para backup ${updated.id}: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        });
+      }
 
       return {
         id: updated.id,
@@ -151,34 +163,214 @@ export class BackupsService {
   }
 
   /**
-   * Lista todos los backups
+   * Exporta todos los datos del tenant a un ZIP con un CSV por tabla.
    */
-  async listBackups() {
+  private async createTenantCsvZip(tenantId: string, zipPath: string): Promise<void> {
+    const toRecord = (row: Record<string, unknown>): Record<string, unknown> => {
+      const out: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(row)) {
+        if (v instanceof Date) {
+          out[k] = v.toISOString();
+        } else if (v != null && typeof v === 'object' && 'toNumber' in v) {
+          out[k] = (v as { toNumber(): number }).toNumber();
+        } else {
+          out[k] = v;
+        }
+      }
+      return out;
+    };
+
+    const archive = archiver('zip', { zlib: { level: 6 } });
+    const out = createWriteStream(zipPath);
+    const finished = new Promise<void>((resolve, reject) => {
+      out.on('close', () => resolve());
+      archive.on('error', reject);
+    });
+    archive.pipe(out);
+
+    const tables: { name: string; getData: () => Promise<Record<string, unknown>[]> }[] = [
+      {
+        name: 'categories',
+        getData: async () =>
+          (await this.prisma.category.findMany({ where: { tenantId } })).map(toRecord),
+      },
+      {
+        name: 'products',
+        getData: async () =>
+          (await this.prisma.product.findMany({ where: { tenantId } })).map(toRecord),
+      },
+      {
+        name: 'customers',
+        getData: async () =>
+          (await this.prisma.customer.findMany({ where: { tenantId } })).map(toRecord),
+      },
+      {
+        name: 'suppliers',
+        getData: async () =>
+          (await this.prisma.supplier.findMany({ where: { tenantId } })).map(toRecord),
+      },
+      {
+        name: 'sales',
+        getData: async () =>
+          (await this.prisma.sale.findMany({ where: { tenantId } })).map(toRecord),
+      },
+      {
+        name: 'sale_items',
+        getData: async () => {
+          const sales = await this.prisma.sale.findMany({
+            where: { tenantId },
+            select: { id: true },
+          });
+          const ids = sales.map((s) => s.id);
+          const items = await this.prisma.saleItem.findMany({
+            where: { saleId: { in: ids } },
+          });
+          return items.map(toRecord);
+        },
+      },
+      {
+        name: 'quotes',
+        getData: async () =>
+          (await this.prisma.quote.findMany({ where: { tenantId } })).map(toRecord),
+      },
+      {
+        name: 'quote_items',
+        getData: async () => {
+          const quotes = await this.prisma.quote.findMany({
+            where: { tenantId },
+            select: { id: true },
+          });
+          const items = await this.prisma.quoteItem.findMany({
+            where: { quoteId: { in: quotes.map((q) => q.id) } },
+          });
+          return items.map(toRecord);
+        },
+      },
+      {
+        name: 'invoices',
+        getData: async () =>
+          (await this.prisma.invoice.findMany({ where: { tenantId } })).map(toRecord),
+      },
+      {
+        name: 'purchase_orders',
+        getData: async () =>
+          (await this.prisma.purchaseOrder.findMany({ where: { tenantId } })).map(toRecord),
+      },
+      {
+        name: 'purchase_order_items',
+        getData: async () => {
+          const pos = await this.prisma.purchaseOrder.findMany({
+            where: { tenantId },
+            select: { id: true },
+          });
+          const items = await this.prisma.purchaseOrderItem.findMany({
+            where: { purchaseOrderId: { in: pos.map((p) => p.id) } },
+          });
+          return items.map(toRecord);
+        },
+      },
+      {
+        name: 'supplier_invoices',
+        getData: async () =>
+          (await this.prisma.supplierInvoice.findMany({ where: { tenantId } })).map(toRecord),
+      },
+      {
+        name: 'cash_sessions',
+        getData: async () =>
+          (await this.prisma.cashSession.findMany({ where: { tenantId } })).map(toRecord),
+      },
+      {
+        name: 'expenses',
+        getData: async () =>
+          (await this.prisma.expense.findMany({ where: { tenantId } })).map(toRecord),
+      },
+      {
+        name: 'inventory_movements',
+        getData: async () =>
+          (await this.prisma.inventoryMovement.findMany({ where: { tenantId } })).map(toRecord),
+      },
+      {
+        name: 'inventory_movement_items',
+        getData: async () => {
+          const movs = await this.prisma.inventoryMovement.findMany({
+            where: { tenantId },
+            select: { id: true },
+          });
+          const items = await this.prisma.inventoryMovementItem.findMany({
+            where: { movementId: { in: movs.map((m) => m.id) } },
+          });
+          return items.map(toRecord);
+        },
+      },
+      {
+        name: 'product_dictionary_entries',
+        getData: async () =>
+          (await this.prisma.productDictionaryEntry.findMany({ where: { tenantId } })).map(toRecord),
+      },
+    ];
+
+    for (const { name, getData } of tables) {
+      const rows = await getData();
+      const csv = toCsv(rows);
+      archive.append(Buffer.from(csv, 'utf8'), { name: `${name}.csv` });
+    }
+
+    // Stock por producto del tenant
+    const products = await this.prisma.product.findMany({
+      where: { tenantId },
+      select: { id: true },
+    });
+    const productIds = products.map((p) => p.id);
+    const stocks = await this.prisma.stockBalance.findMany({
+      where: { productId: { in: productIds } },
+    });
+    archive.append(
+      Buffer.from(toCsv(stocks.map(toRecord)), 'utf8'),
+      { name: 'stock_balances.csv' },
+    );
+
+    archive.finalize();
+    await finished;
+  }
+
+  /**
+   * Lista backups. Si tenantId está definido, solo los de ese tenant; si no (plataforma), todos.
+   */
+  async listBackups(tenantId?: string | null) {
+    const where =
+      typeof tenantId === 'string' && tenantId.trim() !== ''
+        ? { tenantId }
+        : {};
     return this.prisma.backupRun.findMany({
+      where,
       orderBy: { startedAt: 'desc' },
     });
   }
 
   /**
-   * Obtiene un backup por ID
+   * Obtiene un backup por ID. Si tenantId está definido, solo si pertenece a ese tenant.
    */
-  async getBackup(id: string) {
+  async getBackup(id: string, tenantId?: string | null) {
     const backup = await this.prisma.backupRun.findUnique({
       where: { id },
     });
     if (!backup) {
       throw new NotFoundException(`Backup ${id} no encontrado`);
     }
+    if (typeof tenantId === 'string' && tenantId.trim() !== '' && backup.tenantId !== tenantId) {
+      throw new ForbiddenException('No tienes permiso para acceder a este backup.');
+    }
     return backup;
   }
 
   /**
-   * Devuelve ruta y nombre de archivo para descargar un backup (solo si existe y está COMPLETED).
+   * Devuelve ruta y nombre para descargar. Plataforma puede descargar cualquier backup; un tenant solo el suyo.
    */
   async getBackupDownload(
     id: string,
+    tenantId?: string | null,
   ): Promise<{ filePath: string; fileName: string }> {
-    const backup = await this.getBackup(id);
+    const backup = await this.getBackup(id, tenantId ?? undefined);
     if (backup.status !== 'COMPLETED' || !backup.storagePath) {
       throw new NotFoundException(
         `Backup ${id} no está disponible para descarga (estado: ${backup.status})`,
@@ -191,15 +383,18 @@ export class BackupsService {
     }
     const started = backup.startedAt;
     const dateStr = started.toISOString().slice(0, 16).replace(/[:T]/g, '-');
-    const fileName = `backup-${dateStr}.dump`;
+    const isZip = backup.storagePath.toLowerCase().endsWith('.zip');
+    const fileName = isZip
+      ? `backup-tenant-${dateStr}.zip`
+      : `backup-${dateStr}.dump`;
     return { filePath: backup.storagePath, fileName };
   }
 
   /**
-   * Verifica la integridad de un backup
+   * Verifica la integridad de un backup. Si tenantId está definido, solo del propio tenant.
    */
-  async verifyBackup(id: string): Promise<boolean> {
-    const backup = await this.getBackup(id);
+  async verifyBackup(id: string, tenantId?: string | null): Promise<boolean> {
+    const backup = await this.getBackup(id, tenantId);
     if (!backup.storagePath || !backup.checksum) {
       return false;
     }
@@ -217,13 +412,14 @@ export class BackupsService {
   }
 
   /**
-   * Elimina un backup
+   * Elimina un backup. Si tenantId está definido, solo si pertenece a ese tenant.
    */
   async deleteBackup(
     id: string,
     deletedByUserId?: string | null,
+    tenantId?: string | null,
   ): Promise<void> {
-    const backup = await this.getBackup(id);
+    const backup = await this.getBackup(id, tenantId);
     if (backup.storagePath && existsSync(backup.storagePath)) {
       await unlink(backup.storagePath);
     }

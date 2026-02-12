@@ -472,7 +472,7 @@ export default function DashboardView() {
         </Card>
       )}
 
-      {indicators.length > 0 && (
+      {actionable.data !== undefined && (
         <section className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 dark:bg-primary/10">
           <h2 className="text-sm font-medium text-foreground flex items-center gap-2">
             <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/15 text-primary">
@@ -481,60 +481,68 @@ export default function DashboardView() {
             Sugerencias
           </h2>
           <p className="mb-3 mt-0.5 text-xs text-muted-foreground">
-            Ideas para mejorar basadas en productos, facturas y rotación (últimos {actionable.data?.periodDays ?? 30} días)
+            {indicators.length > 0
+              ? `Ideas para mejorar basadas en productos, facturas y rotación (últimos ${actionable.data?.periodDays ?? 30} días)`
+              : 'Se generan a partir de tus ventas y datos recientes.'}
           </p>
-          <ul className="space-y-1.5">
-            {indicators.map((ind) => (
-              <li key={ind.code}>
-                <Link
-                  href={
-                    ind.code === 'SALES_BY_EMPLOYEE'
-                      ? '/reports?tab=sales-by-employee'
-                      : ind.code === 'PRODUCTS_NO_ROTATION'
-                        ? '/reports?tab=no-rotation'
-                        : ind.actionHref
-                  }
-                  className={`group flex rounded-md border-l-2 py-2 pr-2 pl-3 transition-colors hover:bg-background/60 ${severityBorderClass[ind.severity] ?? severityBorderClass.info}`}
-                >
-                  <div className="min-w-0 flex-1">
-                    <span className="font-medium text-foreground text-sm">
-                      Sugerencia: {ind.title}
-                    </span>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {ind.insight}
-                      {ind.metric != null && ind.metric !== '' && (
-                        <span className="text-muted-foreground/80"> · {String(ind.metric)}</span>
-                      )}
-                    </p>
-                    {ind.items.length > 0 && (
-                      <ul className="mt-1.5 space-y-0.5 pl-1 border-l border-muted/50">
-                        {ind.items.slice(0, 5).map((item) => (
-                          <li key={item.id} className="text-xs text-muted-foreground flex flex-wrap items-baseline gap-x-1.5">
-                            <span className="font-medium text-foreground/90">{item.name}</span>
-                            {item.value != null && item.value !== '' && (
-                              <span>{String(item.value)}</span>
-                            )}
-                            {item.suggestedPrice != null && (
-                              <span className="text-primary font-medium">
-                                Precio sug. 15%: {formatMoney(item.suggestedPrice)}
-                              </span>
-                            )}
-                          </li>
-                        ))}
-                        {ind.items.length > 5 && (
-                          <li className="text-xs text-muted-foreground/80">+ {ind.items.length - 5} más</li>
+          {indicators.length > 0 ? (
+            <ul className="space-y-1.5">
+              {indicators.map((ind) => (
+                <li key={ind.code}>
+                  <Link
+                    href={
+                      ind.code === 'SALES_BY_EMPLOYEE'
+                        ? '/reports?tab=sales-by-employee'
+                        : ind.code === 'PRODUCTS_NO_ROTATION'
+                          ? '/reports?tab=no-rotation'
+                          : ind.actionHref
+                    }
+                    className={`group flex rounded-md border-l-2 py-2 pr-2 pl-3 transition-colors hover:bg-background/60 ${severityBorderClass[ind.severity] ?? severityBorderClass.info}`}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <span className="font-medium text-foreground text-sm">
+                        Sugerencia: {ind.title}
+                      </span>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {ind.insight}
+                        {ind.metric != null && ind.metric !== '' && (
+                          <span className="text-muted-foreground/80"> · {String(ind.metric)}</span>
                         )}
-                      </ul>
-                    )}
-                    <span className="mt-1 inline-flex items-center gap-0.5 text-xs text-primary group-hover:underline">
-                      {ind.actionLabel}
-                      <ChevronRight className="h-3 w-3" />
-                    </span>
-                  </div>
-                </Link>
-              </li>
-            ))}
-          </ul>
+                      </p>
+                      {ind.items.length > 0 && (
+                        <ul className="mt-1.5 space-y-0.5 pl-1 border-l border-muted/50">
+                          {ind.items.slice(0, 5).map((item) => (
+                            <li key={item.id} className="text-xs text-muted-foreground flex flex-wrap items-baseline gap-x-1.5">
+                              <span className="font-medium text-foreground/90">{item.name}</span>
+                              {item.value != null && item.value !== '' && (
+                                <span>{String(item.value)}</span>
+                              )}
+                              {item.suggestedPrice != null && (
+                                <span className="text-primary font-medium">
+                                  Precio sug. 15%: {formatMoney(item.suggestedPrice)}
+                                </span>
+                              )}
+                            </li>
+                          ))}
+                          {ind.items.length > 5 && (
+                            <li className="text-xs text-muted-foreground/80">+ {ind.items.length - 5} más</li>
+                          )}
+                        </ul>
+                      )}
+                      <span className="mt-1 inline-flex items-center gap-0.5 text-xs text-primary group-hover:underline">
+                        {ind.actionLabel}
+                        <ChevronRight className="h-3 w-3" />
+                      </span>
+                    </div>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-muted-foreground py-2">
+              Las sugerencias aparecerán cuando tengas ventas en los últimos días. Usa el sistema (ventas, productos, clientes) y en poco tiempo verás recomendaciones personalizadas según tu operación.
+            </p>
+          )}
         </section>
       )}
 

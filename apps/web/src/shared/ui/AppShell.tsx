@@ -109,27 +109,29 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         />
       )}
 
-      {/* Drawer móvil */}
+      {/* Drawer móvil: menú de navegación (abrir con el icono de hamburguesa en la barra superior) */}
       <aside
         className={cn(
           'fixed top-0 left-0 z-50 h-full w-[280px] max-w-[85vw] flex flex-col border-r border-border bg-card transition-transform duration-250 ease-out lg:hidden',
+          'pt-[env(safe-area-inset-top)]',
           isMobileOpen ? 'translate-x-0' : '-translate-x-full'
         )}
         aria-hidden={!isMobileOpen}
+        aria-label="Menú de navegación"
       >
-        <div className="flex items-center justify-between p-4 border-b border-border/80">
-          <span className="font-semibold text-foreground">Menú</span>
+        <div className="flex items-center justify-between p-4 border-b border-border/80 shrink-0">
+          <span className="font-semibold text-foreground text-base">Menú</span>
           <Button
             variant="ghost"
             size="icon"
-            className="shrink-0"
+            className="shrink-0 min-h-[44px] min-w-[44px]"
             onClick={() => setMobileOpenState(false)}
             aria-label="Cerrar menú"
           >
             <X className="h-5 w-5" />
           </Button>
         </div>
-        <div className="flex-1 overflow-y-auto min-h-0">
+        <div className="flex-1 overflow-y-auto min-h-0 overscroll-contain">
           <Sidebar
             sections={sections}
             userEmail={null}
@@ -161,24 +163,26 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       {/* Área principal */}
       <div className="flex flex-col min-h-0 flex-1">
-        <header className="h-14 shrink-0 border-b border-border/80 bg-background/80 backdrop-blur-sm px-4 sm:px-6 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3 min-w-0">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="lg:hidden shrink-0"
-              onClick={() => setMobileOpenState(true)}
-              aria-label="Abrir menú"
-            >
-              <Menu className="h-5 w-5" />
-            </Button>
-            <span className="text-sm font-medium text-foreground truncate">
-              {routeLabel}
-            </span>
-          </div>
-          <div className="flex items-center gap-1">
-            <OfflineQueueBell />
-            <AlertsBell />
+        <header className="shrink-0 border-b border-border/80 bg-background/80 backdrop-blur-sm pl-[max(0.75rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))] sm:px-6 pt-[env(safe-area-inset-top)]">
+          <div className="h-14 flex items-center justify-between gap-2 min-h-[56px]">
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="lg:hidden shrink-0 min-h-[44px] min-w-[44px] h-11 w-11 rounded-lg"
+                onClick={() => setMobileOpenState(true)}
+                aria-label="Abrir menú de navegación"
+              >
+                <Menu className="h-6 w-6" aria-hidden />
+              </Button>
+              <span className="text-sm font-medium text-foreground truncate">
+                {routeLabel}
+              </span>
+            </div>
+            <div className="flex items-center gap-1">
+              <OfflineQueueBell />
+              <AlertsBell />
+            </div>
           </div>
         </header>
         <main className="flex-1 overflow-auto p-4 sm:p-6 md:p-8">

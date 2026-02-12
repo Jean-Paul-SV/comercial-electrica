@@ -1107,6 +1107,18 @@ export class ReportsService {
       const indicators: ActionableIndicator[] = [];
       const TARGET_MARGIN_PCT = 15;
 
+      // Si el tenant no tiene ventas en el periodo, no mostrar sugerencias (perfil nuevo o sin uso real).
+      const salesCountInPeriod = await this.prisma.sale.count({
+        where: {
+          tenantId,
+          status: 'PAID',
+          soldAt: soldAtRange,
+        },
+      });
+      if (salesCountInPeriod === 0) {
+        return { indicators: [], periodDays };
+      }
+
       // 1) Productos con pérdida (vendidos por debajo del costo)
       const saleItemsWithProduct = await this.prisma.saleItem.findMany({
         where: {

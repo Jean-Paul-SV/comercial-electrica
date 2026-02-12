@@ -25,10 +25,9 @@ import { PermissionsGuard } from '../auth/permissions.guard';
 import { RequirePermission } from '../auth/require-permission.decorator';
 import { ModulesGuard } from '../auth/modules.guard';
 import { RequireModule } from '../auth/require-module.decorator';
-import { PlatformAdminGuard } from '../provider/platform-admin.guard';
 
 @ApiTags('backups')
-@UseGuards(JwtAuthGuard, PlatformAdminGuard, PermissionsGuard, ModulesGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard, ModulesGuard)
 @RequirePermission('backups:manage')
 @RequireModule('backups')
 @Controller('backups')
@@ -40,26 +39,26 @@ export class BackupsController {
   @ApiOperation({
     summary: 'Crear backup',
     description:
-      'Crea un backup de la base de datos (requiere permiso backups:manage)',
+      'Crea un backup de la base de datos. Cada admin de tenant puede generar backups de su empresa; solo plataforma puede descargar el archivo.',
   })
   @ApiResponse({ status: 201, description: 'Backup creado exitosamente' })
   @ApiResponse({ status: 401, description: 'No autenticado' })
-  @ApiResponse({ status: 403, description: 'No autorizado (requiere ADMIN)' })
-  create() {
-    return this.backups.createBackup();
+  @ApiResponse({ status: 403, description: 'No autorizado' })
+  create(@Req() req: { user?: { tenantId?: string | null } }) {
+    return this.backups.createBackup(req.user?.tenantId ?? undefined);
   }
 
   @Get()
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Listar backups',
-    description: 'Obtiene todos los backups (requiere ADMIN)',
+    description: 'Lista los backups del tenant del usuario (o todos si es admin de plataforma).',
   })
   @ApiResponse({ status: 200, description: 'Lista de backups' })
   @ApiResponse({ status: 401, description: 'No autenticado' })
-  @ApiResponse({ status: 403, description: 'No autorizado (requiere ADMIN)' })
-  list() {
-    return this.backups.listBackups();
+  @ApiResponse({ status: 403, description: 'No autorizado' })
+  list(@Req() req: { user?: { tenantId?: string | null } }) {
+    return this.backups.listBackups(req.user?.tenantId ?? undefined);
   }
 
   @Get(':id/download')
@@ -67,7 +66,7 @@ export class BackupsController {
   @ApiOperation({
     summary: 'Descargar archivo de backup',
     description:
-      'Descarga el archivo del backup (requiere ADMIN). Nombre sugerido: backup-YYYY-MM-DD-HHmm.dump',
+      'Solo administradores de plataforma pueden descargar el archivo. Los admins de tenant pueden crear y ver sus backups pero no descargar.',
   })
   @ApiParam({ name: 'id', description: 'ID del backup' })
   @ApiResponse({
@@ -80,11 +79,15 @@ export class BackupsController {
     description: 'Backup no encontrado o no disponible',
   })
   @ApiResponse({ status: 401, description: 'No autenticado' })
-  @ApiResponse({ status: 403, description: 'No autorizado (requiere ADMIN)' })
+  @ApiResponse({ status: 403, description: 'Solo administradores de plataforma pueden descargar' })
   async download(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @Req() req: { user?: { tenantId?: string | null } },
   ): Promise<StreamableFile> {
-    const { filePath, fileName } = await this.backups.getBackupDownload(id);
+    const { filePath, fileName } = await this.backups.getBackupDownload(
+      id,
+      req.user?.tenantId ?? undefined,
+    );
     const stream = createReadStream(filePath);
     return new StreamableFile(stream, {
       type: 'application/octet-stream',
@@ -96,15 +99,18 @@ export class BackupsController {
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Obtener backup por ID',
-    description: 'Obtiene los detalles de un backup (requiere ADMIN)',
+    description: 'Obtiene los detalles de un backup (del tenant del usuario o cualquiera si es plataforma).',
   })
   @ApiParam({ name: 'id', description: 'ID del backup' })
   @ApiResponse({ status: 200, description: 'Backup encontrado' })
   @ApiResponse({ status: 404, description: 'Backup no encontrado' })
   @ApiResponse({ status: 401, description: 'No autenticado' })
-  @ApiResponse({ status: 403, description: 'No autorizado (requiere ADMIN)' })
-  get(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string) {
-    return this.backups.getBackup(id);
+  @ApiResponse({ status: 403, description: 'No autorizado' })
+  get(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @Req() req: { user?: { tenantId?: string | null } },
+  ) {
+    return this.backups.getBackup(id, req.user?.tenantId ?? undefined);
   }
 
   @Post(':id/verify')
@@ -112,14 +118,17 @@ export class BackupsController {
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Verificar integridad de backup',
-    description: 'Verifica que el backup no esté corrupto (requiere ADMIN)',
+    description: 'Verifica que el backup no esté corrupto (solo del propio tenant si no es plataforma).',
   })
   @ApiParam({ name: 'id', description: 'ID del backup' })
   @ApiResponse({ status: 200, description: 'Backup verificado' })
   @ApiResponse({ status: 401, description: 'No autenticado' })
-  @ApiResponse({ status: 403, description: 'No autorizado (requiere ADMIN)' })
-  verify(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string) {
-    return this.backups.verifyBackup(id).then((isValid: boolean) => ({
+  @ApiResponse({ status: 403, description: 'No autorizado' })
+  verify(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @Req() req: { user?: { tenantId?: string | null } },
+  ) {
+    return this.backups.verifyBackup(id, req.user?.tenantId ?? undefined).then((isValid: boolean) => ({
       id,
       isValid,
     }));
@@ -129,17 +138,17 @@ export class BackupsController {
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Eliminar backup',
-    description: 'Elimina un backup (requiere ADMIN)',
+    description: 'Elimina un backup (solo del propio tenant si no es plataforma).',
   })
   @ApiParam({ name: 'id', description: 'ID del backup' })
   @ApiResponse({ status: 200, description: 'Backup eliminado' })
   @ApiResponse({ status: 404, description: 'Backup no encontrado' })
   @ApiResponse({ status: 401, description: 'No autenticado' })
-  @ApiResponse({ status: 403, description: 'No autorizado (requiere ADMIN)' })
+  @ApiResponse({ status: 403, description: 'No autorizado' })
   delete(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
-    @Req() req: { user?: { sub?: string } },
+    @Req() req: { user?: { sub?: string; tenantId?: string | null } },
   ) {
-    return this.backups.deleteBackup(id, req.user?.sub);
+    return this.backups.deleteBackup(id, req.user?.sub, req.user?.tenantId ?? undefined);
   }
 }

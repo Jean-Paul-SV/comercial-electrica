@@ -8,6 +8,17 @@ import './globals.css';
 
 export const metadata = {
   title: 'Orion',
+  icons: {
+    icon: '/icon.svg',
+    apple: '/icon.svg',
+  },
+};
+
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 5,
+  viewportFit: 'cover' as const,
 };
 
 /** Script que aplica tema guardado antes del primer pintado para evitar parpadeo. */

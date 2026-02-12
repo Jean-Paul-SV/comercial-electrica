@@ -44,6 +44,29 @@ const STATUS_LABELS: Record<InvoiceStatus, string> = {
   VOIDED: 'Anulada',
 };
 
+/** Etiqueta y estilo según estado de factura + estado DIAN (en cola, rechazada, aceptada). */
+function getInvoiceDisplayStatus(inv: InvoiceListItem): { label: string; className: string; title?: string } {
+  if (inv.status === 'VOIDED') {
+    return { label: 'Anulada', className: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400' };
+  }
+  if (inv.status === 'DRAFT') {
+    return { label: 'Borrador', className: 'bg-muted text-muted-foreground' };
+  }
+  const dianStatus = inv.dianDocument?.status;
+  if (dianStatus === 'DRAFT') {
+    return { label: 'En cola DIAN', className: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400' };
+  }
+  if (dianStatus === 'REJECTED') {
+    const err = inv.dianDocument?.lastError ?? '';
+    return {
+      label: 'Rechazada por DIAN',
+      className: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
+      title: err ? `DIAN: ${err}` : undefined,
+    };
+  }
+  return { label: 'Emitida', className: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' };
+}
+
 type StatusFilter = 'all' | InvoiceStatus;
 
 function getStatusFromUrl(searchParams: URLSearchParams): StatusFilter {
@@ -224,17 +247,17 @@ export default function InvoicesPage() {
                           {formatMoney(inv.grandTotal)}
                         </TableCell>
                         <TableCell>
-                          <span
-                            className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                              inv.status === 'ISSUED'
-                                ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
-                                : inv.status === 'VOIDED'
-                                  ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
-                                  : 'bg-muted text-muted-foreground'
-                            }`}
-                          >
-                            {STATUS_LABELS[inv.status]}
-                          </span>
+                          {(() => {
+                            const { label, className, title } = getInvoiceDisplayStatus(inv);
+                            return (
+                              <span
+                                title={title}
+                                className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${className}`}
+                              >
+                                {label}
+                              </span>
+                            );
+                          })()}
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-2">

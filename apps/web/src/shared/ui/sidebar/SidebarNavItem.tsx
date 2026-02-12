@@ -20,11 +20,21 @@ export function SidebarNavItem({ item, collapsed = false, isActive: isActiveProp
   const active = isActiveProp !== undefined ? isActiveProp : activeByPath;
   const Icon = getNavIcon(item.icon);
 
+  const linkClass = cn(
+    'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-200',
+    'min-h-[44px] sm:min-h-0', // Área táctil mínima en móvil (44px recomendado)
+    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+    active
+      ? 'bg-primary/10 text-primary'
+      : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+    collapsed && 'justify-center px-2'
+  );
+
   if (item.disabled) {
     return (
       <span
         className={cn(
-          'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground/60 cursor-not-allowed',
+          'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground/60 cursor-not-allowed min-h-[44px] sm:min-h-0',
           collapsed && 'justify-center px-2'
         )}
         aria-disabled
@@ -38,14 +48,7 @@ export function SidebarNavItem({ item, collapsed = false, isActive: isActiveProp
   return (
     <Link
       href={item.href}
-      className={cn(
-        'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-200',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
-        active
-          ? 'bg-primary/10 text-primary'
-          : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-        collapsed && 'justify-center px-2'
-      )}
+      className={linkClass}
       aria-current={active ? 'page' : undefined}
     >
       {Icon && <Icon className="h-4 w-4 shrink-0" />}

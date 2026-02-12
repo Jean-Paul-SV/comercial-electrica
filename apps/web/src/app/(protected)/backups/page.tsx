@@ -36,6 +36,7 @@ import {
   useDownloadBackup,
 } from '@features/backups/hooks';
 import { formatDateTime } from '@shared/utils/format';
+import { useAuth } from '@shared/providers/AuthProvider';
 
 const STATUS_LABELS: Record<string, string> = {
   IN_PROGRESS: 'En curso',
@@ -50,6 +51,7 @@ const STATUS_VARIANT: Record<string, 'default' | 'secondary' | 'destructive' | '
 };
 
 export default function BackupsPage() {
+  useAuth();
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const list = useBackupsList();
   const createBackup = useCreateBackup();
@@ -108,7 +110,7 @@ export default function BackupsPage() {
           Backups
         </h1>
         <p className="text-sm text-muted-foreground">
-          Crear, descargar y gestionar copias de seguridad de la base de datos
+          Crear y descargar copias de seguridad de los datos de tu empresa (CSV en ZIP). Cada administrador puede generar y descargar el backup de su tenant.
         </p>
       </div>
 
@@ -183,6 +185,7 @@ export default function BackupsPage() {
                               className="gap-1.5 mr-1"
                               onClick={() => handleDownload(b.id)}
                               disabled={downloadBackup.isPending}
+                              title="Descargar backup (CSV en ZIP para tu empresa)"
                             >
                               <Download className="h-3.5 w-3.5" />
                               Descargar

@@ -401,10 +401,10 @@ export class DianService {
   <cac:AccountingSupplierParty>
     <cac:Party>
       <cac:PartyIdentification>
-        <cbc:ID schemeID="4" schemeName="NIT">${this.escapeXml(config.softwareId)}</cbc:ID>
+        <cbc:ID schemeID="4" schemeName="NIT">${this.escapeXml(config.issuerNit)}</cbc:ID>
       </cac:PartyIdentification>
       <cac:PartyName>
-        <cbc:Name>${this.escapeXml(config.softwareId ? 'EMPRESA COMERCIAL ELECTRICA' : 'Emisor')}</cbc:Name>
+        <cbc:Name>${this.escapeXml(config.issuerName)}</cbc:Name>
       </cac:PartyName>
     </cac:Party>
   </cac:AccountingSupplierParty>
@@ -674,8 +674,16 @@ export class DianService {
 
         const responseBody = await res.text();
         if (!res.ok) {
+          const excerpt = responseBody.trim().slice(0, 2000);
+          const headersObj = Object.fromEntries(res.headers.entries());
+          this.logger.warn(
+            `DIAN respuesta ${res.status} cuerpo=${excerpt ? excerpt.length + ' chars' : 'vacío'} body=${excerpt || '(vacío)'}`,
+          );
+          this.logger.warn(
+            `DIAN respuesta ${res.status} headers=${JSON.stringify(headersObj)}`,
+          );
           throw new Error(
-            `DIAN respondió ${res.status} ${res.statusText}: ${responseBody.slice(0, 500)}`,
+            `DIAN respondió ${res.status} ${res.statusText}: ${excerpt || '(cuerpo vacío)'}`,
           );
         }
         return responseBody;
@@ -963,10 +971,16 @@ export class DianService {
   getDianConfig() {
     // Por ahora usa variables de entorno
     // En el futuro puede leer de la tabla DianConfig
+    const issuerNit = this.config.get<string>('DIAN_ISSUER_NIT', '')?.trim();
+    const issuerName = this.config.get<string>('DIAN_ISSUER_NAME', '')?.trim();
     return {
       env: this.dianEnv,
       softwareId: this.softwareId,
       softwarePin: this.softwarePin,
+      /** NIT del emisor (empresa). Si no se define, se usa softwareId en el XML (puede causar 400). */
+      issuerNit: issuerNit || this.softwareId,
+      /** Razón social del emisor. Si no se define, se usa un nombre por defecto. */
+      issuerName: issuerName || (this.softwareId ? 'EMPRESA COMERCIAL ELECTRICA' : 'Emisor'),
       resolutionNumber: this.config.get<string>('DIAN_RESOLUTION_NUMBER'),
       prefix: this.config.get<string>('DIAN_PREFIX', 'FAC'),
       rangeFrom: this.config.get<number>('DIAN_RANGE_FROM', 1),

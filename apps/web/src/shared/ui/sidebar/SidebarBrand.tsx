@@ -1,8 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { Zap } from 'lucide-react';
 import { cn } from '@lib/utils';
+import { OrionLogo } from '@shared/ui/OrionLogo';
 
 type SidebarBrandProps = {
   /** Nombre del producto (ej. "Orion"). */
@@ -27,7 +27,7 @@ export function SidebarBrand({
       )}
       aria-label={productName}
     >
-      <Zap className="h-5 w-5 shrink-0 text-primary" />
+      <OrionLogo size={20} className="text-primary" />
       {!collapsed && (
         <span className="truncate text-sm sm:text-base">{productName}</span>
       )}

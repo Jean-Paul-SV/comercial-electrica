@@ -11,7 +11,7 @@ import { Button } from '@shared/components/ui/button';
 import { Input } from '@shared/components/ui/input';
 import { Label } from '@shared/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@shared/components/ui/card';
-import { Zap } from 'lucide-react';
+import { OrionLogo } from '@shared/ui/OrionLogo';
 
 const loginSchema = z.object({
   email: z.string().email('Email inválido'),
@@ -61,7 +61,7 @@ export default function LoginPage() {
           <CardHeader className="space-y-1 pb-6 pt-8 px-8">
           <div className="flex items-center justify-center gap-3 mb-2">
             <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
-              <Zap className="h-7 w-7" strokeWidth={2.25} />
+              <OrionLogo size={28} withCircle />
             </div>
             <CardTitle className="text-2xl font-semibold tracking-tight text-foreground">
               Orion

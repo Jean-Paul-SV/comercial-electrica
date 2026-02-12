@@ -413,6 +413,9 @@ export class SalesService {
           customerId: true,
           customer: { select: { id: true, name: true } },
           sale: { select: { id: true, soldAt: true } },
+          dianDocument: {
+            select: { status: true, lastError: true },
+          },
         },
         skip,
         take: limit,
