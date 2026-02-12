@@ -11,13 +11,7 @@ import {
 import { Button } from '@shared/components/ui/button';
 import { Input } from '@shared/components/ui/input';
 import { Label } from '@shared/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@shared/components/ui/select';
+import { Select } from '@shared/components/ui/select';
 import { Skeleton } from '@shared/components/ui/skeleton';
 import { Badge } from '@shared/components/ui/badge';
 import {
@@ -123,11 +117,9 @@ export default function ElectronicInvoicingPage() {
 
   const config = configQuery.data ?? null;
   const statusResponse = statusQuery.data;
-  const status = (statusResponse && 'status' in statusResponse
-    ? statusResponse.status
-    : statusResponse?.readyForSend
-      ? 'ready'
-      : 'incomplete') as DianConfigStatus;
+  const status: DianConfigStatus =
+    statusResponse?.status ??
+    (statusResponse?.readyForSend ? 'ready' : 'incomplete');
   const missing = statusResponse?.missing ?? [];
   const readyForSend = statusResponse?.readyForSend ?? false;
 
@@ -293,6 +285,111 @@ export default function ElectronicInvoicingPage() {
                 {statusResponse.rangeTo}.
               </p>
             )}
+          {/* Alertas cuando está listo */}
+          {readyForSend && (
+            <div className="mt-3 space-y-2 border-t pt-3">
+              {statusResponse?.certExpiresInDays != null &&
+                statusResponse.certExpiresInDays < 30 && (
+                  <p
+                    className={
+                      statusResponse.certExpiresInDays < 15
+                        ? 'text-sm text-destructive'
+                        : 'text-sm text-amber-600 dark:text-amber-500'
+                    }
+                  >
+                    Su certificado vence en {statusResponse.certExpiresInDays} día
+                    {statusResponse.certExpiresInDays !== 1 ? 's' : ''}. Renuévelo a tiempo.
+                  </p>
+                )}
+              {statusResponse?.rangeRemaining != null &&
+                statusResponse.rangeRemaining < 500 && (
+                  <p className="text-sm text-amber-600 dark:text-amber-500">
+                    Quedan {statusResponse.rangeRemaining} números en su rango. Solicite un nuevo
+                    rango a la DIAN si es necesario.
+                  </p>
+                )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Diagnóstico: qué hacer cuando no está listo */}
+      {!readyForSend && (
+        <Card className="border-amber-200 dark:border-amber-900/50 bg-amber-50/50 dark:bg-amber-950/20">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Qué hacer</CardTitle>
+            <CardDescription>
+              Siga estos pasos para dejar la facturación electrónica lista para enviar a la DIAN.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ul className="list-disc list-inside space-y-2 text-sm text-foreground">
+              {status === 'not_configured' && (
+                <>
+                  <li>Complete <strong>Datos del emisor</strong> (NIT y razón social) más abajo.</li>
+                  <li>Ingrese <strong>Software ID</strong> y <strong>PIN</strong> asignados por la DIAN.</li>
+                  <li>Suba su <strong>certificado .p12</strong> y contraseña.</li>
+                  <li>Configure <strong>Numeración y ambiente</strong> (resolución, prefijo, rango).</li>
+                  <li>Haga clic en <strong>Guardar configuración</strong>.</li>
+                </>
+              )}
+              {status === 'incomplete' && (
+                <>
+                  {missing.includes('issuer_nit') && <li>Complete el <strong>NIT</strong> del emisor.</li>}
+                  {missing.includes('issuer_name') && <li>Complete la <strong>Razón social</strong>.</li>}
+                  {missing.includes('software_id') && <li>Ingrese el <strong>Software ID</strong> que le asignó la DIAN.</li>}
+                  {missing.includes('software_pin') && <li>Ingrese el <strong>PIN</strong> del software.</li>}
+                  {missing.includes('certificate') && <li>Suba el archivo <strong>.p12</strong> y la contraseña, luego pulse <strong>Subir certificado</strong>.</li>}
+                  {missing.includes('dian_url') && <li>La URL DIAN se configura en el servidor; contacte al administrador si falta.</li>}
+                </>
+              )}
+              {status === 'cert_expired' && (
+                <>
+                  <li>Obtenga un nuevo certificado de firma electrónica con su certificador autorizado.</li>
+                  <li>En esta misma página, suba el nuevo archivo <strong>.p12</strong> y su contraseña.</li>
+                  <li>Pulse <strong>Subir certificado</strong> para reemplazar el certificado vencido.</li>
+                </>
+              )}
+              {status === 'range_exhausted' && (
+                <>
+                  <li>Solicite a la DIAN una nueva resolución con un rango de numeración vigente.</li>
+                  <li>Actualice en <strong>Numeración y ambiente</strong> el número de resolución, prefijo y rango (desde – hasta).</li>
+                  <li>Guarde la configuración.</li>
+                </>
+              )}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Plantillas (Fase 2) */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Plantillas de configuración</CardTitle>
+          <CardDescription>
+            Aplique valores típicos para empezar. Luego complete NIT, razón social, software y certificado.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() =>
+              setForm((p) => ({
+                ...p,
+                env: 'HABILITACION',
+                prefix: 'FAC',
+                rangeFrom: 1,
+                rangeTo: 999999,
+              }))
+            }
+          >
+            Aplicar plantilla: Pyme básico (habilitación)
+          </Button>
+          <p className="text-xs text-muted-foreground mt-2">
+            Prefijo FAC, rango 1–999999, ambiente Habilitación. No modifica emisor ni certificado.
+          </p>
         </CardContent>
       </Card>
 
@@ -436,18 +533,14 @@ export default function ElectronicInvoicingPage() {
           <div className="grid gap-2">
             <Label htmlFor="env">Ambiente</Label>
             <Select
+              id="env"
               value={form.env ?? 'HABILITACION'}
-              onValueChange={(v) =>
-                setForm((p) => ({ ...p, env: v as DianEnvironment }))
+              onChange={(e) =>
+                setForm((p) => ({ ...p, env: e.target.value as DianEnvironment }))
               }
             >
-              <SelectTrigger id="env">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="HABILITACION">Habilitación (pruebas)</SelectItem>
-                <SelectItem value="PRODUCCION">Producción (real)</SelectItem>
-              </SelectContent>
+              <option value="HABILITACION">Habilitación (pruebas)</option>
+              <option value="PRODUCCION">Producción (real)</option>
             </Select>
             <p className="text-xs text-muted-foreground">
               Use Producción solo cuando la DIAN haya habilitado su software.
