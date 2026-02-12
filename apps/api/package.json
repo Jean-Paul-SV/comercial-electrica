@@ -20,6 +20,7 @@
     "prisma:studio": "dotenv -e ../../.env -- prisma studio",
     "prisma:seed": "dotenv -e ../../.env -- prisma db seed",
     "prisma:migrate:status": "dotenv -e ../../.env -- prisma migrate status",
+    "set-admins": "ts-node scripts/set-admins.ts",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
