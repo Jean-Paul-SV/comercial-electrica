@@ -276,156 +276,129 @@ export default function SupplierInvoicesPage() {
 
   return (
     <div className="space-y-6 sm:space-y-8">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">
-          Facturas de proveedores
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Cuentas por pagar
-        </p>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl flex items-center gap-2">
+            <FileCheck className="h-6 w-6 shrink-0 text-primary" aria-hidden />
+            Facturas de proveedores
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Cuentas por pagar
+          </p>
+        </div>
+        <Button size="sm" onClick={() => setOpenNew(true)} className="gap-2 rounded-xl font-medium shrink-0">
+          <Plus className="h-4 w-4" />
+          Nueva factura
+        </Button>
       </div>
 
-      <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 shadow-sm">
+      <div className="rounded-xl border border-border/60 bg-muted/20 p-4">
         <div className="flex items-start gap-3">
-          <Info className="h-4 w-4 text-primary shrink-0 mt-0.5" />
-          <div className="flex-1">
-            <p className="text-sm text-foreground">
-              Cada abono o pago (al crear la factura o después con «Registrar pago») se refleja automáticamente en{' '}
-              <Link href="/expenses?type=compras" className="text-primary font-medium hover:underline underline-offset-2">
-                Gastos
-              </Link>
-              {' '}(categoría Factura proveedor).
-            </p>
-          </div>
+          <Info className="h-4 w-4 text-primary shrink-0 mt-0.5" aria-hidden />
+          <p className="text-sm text-foreground">
+            Cada abono o pago (al crear la factura o después con «Registrar pago») se refleja automáticamente en{' '}
+            <Link href="/expenses?type=compras" className="text-primary font-medium hover:underline underline-offset-2">
+              Gastos
+            </Link>
+            {' '}(categoría Factura proveedor).
+          </p>
         </div>
       </div>
 
       {statusFilter !== 'all' && (
-        <div className="rounded-lg border border-warning/30 bg-warning/5 p-4 shadow-sm">
+        <div className="rounded-xl border border-warning/40 bg-warning/10 p-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-warning shrink-0" />
-              <div className="flex flex-col gap-0.5 sm:flex-row sm:items-center sm:gap-2">
-                <span className="text-sm font-medium text-foreground">
-                  Filtro activo:
-                </span>
-                <span className="text-sm text-muted-foreground">
-                  {STATUS_LABELS[statusFilter] || 'Facturas filtradas'}
-                </span>
-              </div>
+              <AlertTriangle className="h-4 w-4 text-warning shrink-0" aria-hidden />
+              <span className="text-sm font-medium text-foreground">Filtro activo: </span>
+              <span className="text-sm text-muted-foreground">{STATUS_LABELS[statusFilter] || 'Facturas filtradas'}</span>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setStatusAndUrl('all')}
-              className="h-8 text-xs border-border hover:bg-accent"
-            >
+            <Button variant="outline" size="sm" onClick={() => setStatusAndUrl('all')} className="h-9 rounded-lg">
               Ver todas
             </Button>
           </div>
         </div>
       )}
 
-      <Card className="border-0 shadow-sm overflow-hidden">
-        <CardHeader className="pb-4 bg-muted/30 border-b border-border/50">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2 text-lg font-medium">
-                <FileCheck className="h-5 w-5 shrink-0 text-primary" />
-                Listado
-              </CardTitle>
-              <CardDescription>
-                Facturas de proveedores con estado y vencimiento
-              </CardDescription>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <div className="flex items-center gap-2">
-                <Label htmlFor="status-filter" className="text-xs text-muted-foreground whitespace-nowrap">
-                  Estado:
-                </Label>
-                <select
-                  id="status-filter"
-                  value={statusFilter}
-                  onChange={(e) => setStatusAndUrl(e.target.value as StatusFilter)}
-                  className="flex h-9 rounded-lg border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                >
-                  <option value="all">Todos</option>
-                  <option value="PENDING">Pendiente</option>
-                  <option value="PARTIALLY_PAID">Abono</option>
-                  <option value="PAID">Pagada</option>
-                  <option value="OVERDUE">Vencida</option>
-                  <option value="CANCELLED">Cancelada</option>
-                </select>
-              </div>
-              <Button
-                size="sm"
-                onClick={() => setOpenNew(true)}
-                className="gap-2 w-full sm:w-fit shadow-sm"
-              >
-                <Plus className="h-4 w-4" />
-                Nueva factura
-              </Button>
-            </div>
+      <Card className="border border-border/80 shadow-sm rounded-xl overflow-hidden">
+        <CardHeader className="pb-4 border-b border-border/60">
+          <div>
+            <CardTitle className="text-lg font-medium flex items-center gap-2 text-foreground">
+              <FileCheck className="h-5 w-5 shrink-0 text-primary" aria-hidden />
+              Listado
+            </CardTitle>
+            <CardDescription>
+              {meta ? `${meta.total} factura${meta.total !== 1 ? 's' : ''}` : 'Facturas con estado y vencimiento'} · Filtra por estado o busca por número/proveedor
+            </CardDescription>
           </div>
-        </CardHeader>
-        <CardContent className="space-y-4 pt-4">
-          <div className="flex flex-wrap gap-3 pb-3 border-b border-border/60">
-            <div className="flex items-center gap-2 flex-1 min-w-[200px]">
-              <Label htmlFor="search-invoices" className="text-xs text-muted-foreground whitespace-nowrap">
-                Buscar:
-              </Label>
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" aria-hidden />
+          <div className="flex flex-wrap items-end gap-3 pt-4">
+            <div className="flex flex-col gap-1.5 flex-1 min-w-[200px] max-w-sm">
+              <Label htmlFor="search-invoices" className="text-xs font-medium text-muted-foreground">Buscar</Label>
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" aria-hidden />
                 <Input
                   id="search-invoices"
                   type="text"
                   placeholder="Número de factura o nombre del proveedor"
                   value={searchInput}
                   onChange={(e) => setSearchInput(e.target.value)}
-                  className="pl-9 h-9 rounded-lg text-sm"
+                  className="pl-8 h-9 rounded-lg text-sm"
                   autoComplete="off"
                 />
               </div>
             </div>
-            {searchInput.trim() && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setSearchInput('')}
-                className="h-9 text-xs text-muted-foreground hover:text-foreground"
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="status-filter" className="text-xs font-medium text-muted-foreground">Estado</Label>
+              <select
+                id="status-filter"
+                value={statusFilter}
+                onChange={(e) => setStatusAndUrl(e.target.value as StatusFilter)}
+                className="flex h-9 rounded-lg border border-input bg-background px-3 py-2 text-sm min-w-[140px] ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
               >
-                Limpiar búsqueda
+                <option value="all">Todos</option>
+                <option value="PENDING">Pendiente</option>
+                <option value="PARTIALLY_PAID">Abono</option>
+                <option value="PAID">Pagada</option>
+                <option value="OVERDUE">Vencida</option>
+                <option value="CANCELLED">Cancelada</option>
+              </select>
+            </div>
+            {searchInput.trim() && (
+              <Button variant="ghost" size="sm" onClick={() => setSearchInput('')} className="h-9 rounded-lg text-xs">
+                Limpiar
               </Button>
             )}
           </div>
-          <div className="rounded-lg bg-muted/20 border border-border/50 p-3">
+        </CardHeader>
+        <CardContent className="pt-4 space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <Pagination meta={meta} onPageChange={setPage} label="Página" />
           </div>
 
           {query.isLoading && (
-            <div className="rounded-lg border border-border overflow-hidden">
+            <div className="rounded-lg border border-border/80 overflow-hidden">
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-muted/40">
-                    <TableHead className="font-medium">Nº factura</TableHead>
-                    <TableHead className="font-medium">Proveedor</TableHead>
-                    <TableHead className="font-medium">Vencimiento</TableHead>
-                    <TableHead className="text-right font-medium">Total</TableHead>
-                    <TableHead className="text-right font-medium">Pagado</TableHead>
-                    <TableHead className="font-medium">Estado</TableHead>
-                    <TableHead className="font-medium w-32">Acciones</TableHead>
+                  <TableRow className="hover:bg-transparent border-b border-border/80">
+                    <TableHead className="font-medium text-muted-foreground">Nº factura</TableHead>
+                    <TableHead className="font-medium text-muted-foreground">Proveedor</TableHead>
+                    <TableHead className="font-medium text-muted-foreground">Vencimiento</TableHead>
+                    <TableHead className="text-right font-medium text-muted-foreground">Total</TableHead>
+                    <TableHead className="text-right font-medium text-muted-foreground">Pagado</TableHead>
+                    <TableHead className="font-medium text-muted-foreground">Estado</TableHead>
+                    <TableHead className="font-medium text-right text-muted-foreground w-32">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {Array.from({ length: 5 }).map((_, i) => (
                     <TableRow key={i}>
-                      <TableCell><Skeleton className="h-5 w-24" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-28" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-20" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-16 ml-auto" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-14 ml-auto" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-20" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-24 ml-auto" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-24 rounded" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-28 rounded" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-20 rounded" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-16 ml-auto rounded" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-14 ml-auto rounded" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-20 rounded" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-24 ml-auto rounded" /></TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -434,53 +407,48 @@ export default function SupplierInvoicesPage() {
           )}
 
           {query.isError && (
-            <p className="text-sm text-destructive py-4">
-              {(query.error as { message?: string })?.message ??
-                'Error al cargar facturas'}
-            </p>
+            <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3">
+              <p className="text-sm text-destructive font-medium">
+                {(query.error as { message?: string })?.message ?? 'Error al cargar facturas'}
+              </p>
+            </div>
           )}
 
-          {!query.isLoading && (
-            <div className="rounded-lg border border-border overflow-hidden">
+          {!query.isLoading && !query.isError && (
+            <div className="rounded-lg border border-border/80 overflow-hidden">
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-muted/40 hover:bg-muted/40">
-                    <TableHead className="font-medium">Nº factura</TableHead>
-                    <TableHead className="font-medium">Proveedor</TableHead>
-                    <TableHead className="font-medium">Vencimiento</TableHead>
-                    <TableHead className="text-right font-medium">Total</TableHead>
-                    <TableHead className="text-right font-medium">Pagado</TableHead>
-                    <TableHead className="font-medium">Estado</TableHead>
-                    <TableHead className="text-right font-medium w-32">Acciones</TableHead>
+                  <TableRow className="hover:bg-transparent border-b border-border/80">
+                    <TableHead className="font-medium text-muted-foreground">Nº factura</TableHead>
+                    <TableHead className="font-medium text-muted-foreground">Proveedor</TableHead>
+                    <TableHead className="font-medium text-muted-foreground">Vencimiento</TableHead>
+                    <TableHead className="text-right font-medium text-muted-foreground">Total</TableHead>
+                    <TableHead className="text-right font-medium text-muted-foreground">Pagado</TableHead>
+                    <TableHead className="font-medium text-muted-foreground">Estado</TableHead>
+                    <TableHead className="font-medium text-right text-muted-foreground w-32">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {rows.map((inv) => (
-                    <TableRow key={inv.id} className="transition-colors hover:bg-muted/30">
-                      <TableCell className="font-mono text-muted-foreground text-sm">
-                        <Link
-                          href={`/supplier-invoices/${inv.id}`}
-                          className="text-primary hover:underline"
-                        >
+                    <TableRow key={inv.id} className="transition-colors hover:bg-muted/40">
+                      <TableCell className="font-mono text-sm text-muted-foreground">
+                        <Link href={`/supplier-invoices/${inv.id}`} className="text-primary hover:underline font-medium">
                           {inv.invoiceNumber}
                         </Link>
                       </TableCell>
                       <TableCell>
                         {inv.supplier ? (
-                          <Link
-                            href={`/suppliers/${inv.supplier.id}`}
-                            className="text-primary hover:underline"
-                          >
+                          <Link href={`/suppliers/${inv.supplier.id}`} className="text-primary hover:underline font-medium">
                             {inv.supplier.name}
                           </Link>
                         ) : (
-                          '—'
+                          <span className="text-muted-foreground">—</span>
                         )}
                       </TableCell>
-                      <TableCell className="text-muted-foreground text-sm">
+                      <TableCell className="text-sm text-muted-foreground">
                         {new Date(inv.dueDate).toLocaleDateString('es-CO')}
                       </TableCell>
-                      <TableCell className="text-right tabular-nums font-medium">
+                      <TableCell className="text-right tabular-nums font-medium text-foreground">
                         {formatMoney(inv.grandTotal)}
                       </TableCell>
                       <TableCell className="text-right tabular-nums text-muted-foreground">
@@ -501,7 +469,7 @@ export default function SupplierInvoicesPage() {
                             );
                           }}
                           disabled={updateStatusMutation.isPending && updateStatusMutation.variables?.invoiceId === inv.id}
-                          className={`${selectClassName} min-h-9 h-9 py-1.5 text-sm leading-normal w-full max-w-[10rem]`}
+                          className={`${selectClassName} min-h-9 h-9 py-1.5 text-sm leading-normal w-full max-w-[10rem] rounded-lg`}
                           aria-label="Cambiar estado"
                         >
                           {Object.entries(STATUS_LABELS).map(([value, label]) => (
@@ -517,7 +485,7 @@ export default function SupplierInvoicesPage() {
                             type="button"
                             variant="outline"
                             size="sm"
-                            className="gap-1.5 h-8 text-xs"
+                            className="gap-1.5 h-8 text-xs rounded-lg"
                             onClick={() => {
                               setOpenPaymentModal(inv.id);
                               setPaymentAmount('');
@@ -532,11 +500,8 @@ export default function SupplierInvoicesPage() {
                     </TableRow>
                   ))}
                   {rows.length === 0 && (
-                    <TableRow>
-                      <TableCell
-                        colSpan={7}
-                        className="h-24 text-center text-muted-foreground"
-                      >
+                    <TableRow className="hover:bg-transparent">
+                      <TableCell colSpan={7} className="h-24 text-center text-muted-foreground text-sm">
                         No hay facturas de proveedores.
                       </TableCell>
                     </TableRow>

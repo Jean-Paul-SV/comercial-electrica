@@ -90,6 +90,8 @@ describe('DianService', () => {
           DIAN_ENV: DianEnvironment.HABILITACION,
           DIAN_SOFTWARE_ID: 'test-software-id',
           DIAN_SOFTWARE_PIN: 'test-pin',
+          DIAN_CERT_PATH: '/test/cert.p12',
+          DIAN_CERT_PASSWORD: 'test-cert-password',
           DIAN_RESOLUTION_NUMBER: '18764000000010',
           DIAN_PREFIX: 'FAC',
           DIAN_RANGE_FROM: 1,
@@ -266,7 +268,7 @@ describe('DianService', () => {
           id: 'dian-doc-1',
           invoice: { tenantId },
         },
-        select: { status: true },
+        select: { status: true, cufe: true },
       });
     });
 

@@ -1,9 +1,11 @@
 'use client';
 
-import { useMemo, useState, useEffect, useCallback } from 'react';
+import { useMemo, useState, useEffect, useCallback, useRef } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
   Card,
@@ -45,6 +47,8 @@ import {
   useCreateCategory,
   useCreateProductDictionaryEntry,
 } from '@features/products/hooks';
+import { useCreateMovement } from '@features/inventory/hooks';
+import { useLowStockThreshold } from '@shared/hooks/useLowStockThreshold';
 
 const productSchema = z.object({
   internalCode: z.string().min(1, 'Código requerido'),
@@ -52,7 +56,18 @@ const productSchema = z.object({
   categoryId: z.string().optional(),
   cost: z.coerce.number().min(0, 'Costo >= 0'),
   marginPercent: z.coerce.number().min(0, 'Margen >= 0'),
+  salePrice: z.optional(
+    z.preprocess(
+      (v) => (v === '' || v === null || v === undefined ? undefined : Number(v)),
+      z.number().min(0, 'Precio >= 0').optional()
+    )
+  ),
   taxRate: z.coerce.number().min(0).max(100).optional(),
+  minStock: z.preprocess(
+    (v) => (v === '' || v === null || v === undefined ? undefined : Number(v)),
+    z.number().int().min(0, 'Mínimo >= 0').optional()
+  ),
+  initialQuantity: z.coerce.number().min(0, 'Cantidad >= 0').optional(),
 });
 type ProductFormValues = z.infer<typeof productSchema>;
 
@@ -62,6 +77,10 @@ const categorySchema = z.object({
 type CategoryFormValues = z.infer<typeof categorySchema>;
 
 export default function ProductsPage() {
+  const searchParams = useSearchParams();
+  const urlLowStock = searchParams.get('lowStock') === 'true' || searchParams.get('lowStock') === '1';
+  const urlThreshold = searchParams.get('lowStockThreshold');
+  const [lowStockThreshold] = useLowStockThreshold();
   const [page, setPage] = useState(1);
   const [openNewProduct, setOpenNewProduct] = useState(false);
   const [openNewCategory, setOpenNewCategory] = useState(false);
@@ -72,24 +91,34 @@ export default function ProductsPage() {
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>('');
   const limit = 20;
+  const threshold = useMemo(() => {
+    if (urlThreshold != null) {
+      const n = parseInt(urlThreshold, 10);
+      if (!Number.isNaN(n) && n >= 0) return n;
+    }
+    return lowStockThreshold;
+  }, [urlThreshold, lowStockThreshold]);
   const listParams = useMemo(
     () => ({
       page,
       limit,
       search: searchTerm.trim() || undefined,
+      ...(urlLowStock ? { lowStock: true as const, lowStockThreshold: threshold } : {}),
     }),
-    [page, limit, searchTerm]
+    [page, limit, searchTerm, urlLowStock, threshold]
   );
   const query = useProductsList(listParams);
 
   useEffect(() => {
     setPage(1);
   }, [searchTerm]);
+  const queryClient = useQueryClient();
   const categories = useCategories();
   const createProduct = useCreateProduct();
   const updateProduct = useUpdateProduct();
   const createCategory = useCreateCategory();
   const createDictionaryEntry = useCreateProductDictionaryEntry();
+  const createMovement = useCreateMovement();
   const productToEdit = useProduct(editingProductId);
   const productsForDictionary = useProductsList({ page: 1, limit: 100 });
 
@@ -120,9 +149,46 @@ export default function ProductsPage() {
       name: '',
       cost: 0,
       marginPercent: 0,
+      salePrice: undefined as number | undefined,
       taxRate: 0,
+      minStock: undefined as number | undefined,
+      initialQuantity: 0,
     },
   });
+
+  // Sincronizar Margen (%) ↔ Precio de venta: al cambiar uno se actualiza el otro
+  const syncProgrammaticRef = useRef(false);
+  const costW = productForm.watch('cost');
+  const marginW = productForm.watch('marginPercent');
+  const salePriceW = productForm.watch('salePrice');
+
+  useEffect(() => {
+    if (syncProgrammaticRef.current) {
+      syncProgrammaticRef.current = false;
+      return;
+    }
+    const costNum = Number(costW) || 0;
+    const marginNum = Number(marginW) || 0;
+    if (costNum > 0) {
+      const price = Math.round(costNum * (1 + marginNum / 100) * 100) / 100;
+      syncProgrammaticRef.current = true;
+      productForm.setValue('salePrice', price);
+    }
+  }, [costW, marginW]);
+
+  useEffect(() => {
+    if (syncProgrammaticRef.current) {
+      syncProgrammaticRef.current = false;
+      return;
+    }
+    const costNum = Number(costW) || 0;
+    const saleNum = typeof salePriceW === 'number' ? salePriceW : Number(salePriceW);
+    if (costNum > 0 && saleNum > 0 && Number.isFinite(saleNum)) {
+      const margin = Math.round(((saleNum / costNum) - 1) * 10000) / 100;
+      syncProgrammaticRef.current = true;
+      productForm.setValue('marginPercent', Math.max(0, margin));
+    }
+  }, [costW, salePriceW]);
 
   // Cargar datos del producto cuando se abre el modal de edición
   useEffect(() => {
@@ -136,7 +202,10 @@ export default function ProductsPage() {
         categoryId: productToEdit.data.categoryId ?? '',
         cost,
         marginPercent: Math.max(0, Math.round(marginPercent * 100) / 100),
+        salePrice: price > 0 ? price : undefined,
         taxRate: productToEdit.data.taxRate ? Number(productToEdit.data.taxRate) : 0,
+        minStock: productToEdit.data.minStock != null ? Number(productToEdit.data.minStock) : undefined,
+        initialQuantity: 0,
       });
     } else if (!editingProductId) {
       productForm.reset({
@@ -144,7 +213,10 @@ export default function ProductsPage() {
         name: '',
         cost: 0,
         marginPercent: 0,
+        salePrice: undefined,
         taxRate: 0,
+        minStock: undefined,
+        initialQuantity: 0,
       });
     }
   }, [productToEdit.data, editingProductId, productForm]);
@@ -153,8 +225,19 @@ export default function ProductsPage() {
     defaultValues: { name: '' },
   });
 
+  const getPrice = (values: ProductFormValues) => {
+    const manual = values.salePrice;
+    if (typeof manual === 'number' && manual > 0 && Number.isFinite(manual)) return manual;
+    return values.cost * (1 + values.marginPercent / 100);
+  };
+
   const onNewProduct = (values: ProductFormValues) => {
-    const price = values.cost * (1 + values.marginPercent / 100);
+    const price = getPrice(values);
+    const initialQty = Number(values.initialQuantity) || 0;
+    const minStock =
+      values.minStock !== undefined && values.minStock !== '' && Number(values.minStock) >= 0
+        ? Number(values.minStock)
+        : undefined;
     createProduct.mutate(
       {
         internalCode: values.internalCode.trim(),
@@ -163,12 +246,32 @@ export default function ProductsPage() {
         cost: values.cost,
         price,
         taxRate: values.taxRate ?? 0,
+        minStock: minStock ?? null,
       },
       {
-        onSuccess: () => {
-          toast.success('Producto creado');
+        onSuccess: (data) => {
           setOpenNewProduct(false);
           productForm.reset();
+          if (initialQty > 0 && data?.id) {
+            createMovement.mutate(
+              {
+                type: 'IN',
+                reason: 'Stock inicial al crear producto',
+                items: [{ productId: data.id, qty: initialQty, unitCost: values.cost }],
+              },
+              {
+                onSuccess: () => {
+                  toast.success(`Producto creado y ${initialQty} unidad(es) agregada(s) al inventario.`);
+                },
+                onError: () => {
+                  toast.success('Producto creado.');
+                  toast.warning('No se pudo registrar la cantidad inicial. Regístrala desde Inventario.');
+                },
+              }
+            );
+          } else {
+            toast.success('Producto creado');
+          }
         },
         onError: (e: { message?: string }) => {
           toast.error(e?.message ?? 'No se pudo crear el producto');
@@ -179,7 +282,11 @@ export default function ProductsPage() {
 
   const onUpdateProduct = (values: ProductFormValues) => {
     if (!editingProductId) return;
-    const price = values.cost * (1 + values.marginPercent / 100);
+    const price = getPrice(values);
+    const minStock =
+      values.minStock !== undefined && values.minStock !== '' && Number(values.minStock) >= 0
+        ? Number(values.minStock)
+        : null;
     updateProduct.mutate(
       {
         id: editingProductId,
@@ -190,6 +297,7 @@ export default function ProductsPage() {
           cost: values.cost,
           price,
           taxRate: values.taxRate ?? 0,
+          minStock,
         },
       },
       {
@@ -209,11 +317,12 @@ export default function ProductsPage() {
     createCategory.mutate(
       { name: values.name.trim() },
       {
-        onSuccess: (data) => {
+        onSuccess: async (data) => {
           toast.success('Categoría creada');
           setOpenNewCategory(false);
           categoryForm.reset();
           if (addCategoryFromProductForm && data?.id) {
+            await queryClient.refetchQueries({ queryKey: ['categories'] });
             productForm.setValue('categoryId', data.id);
             setAddCategoryFromProductForm(false);
           }
@@ -319,6 +428,11 @@ export default function ProductsPage() {
             {searchTerm.trim() && (
               <p className="text-xs text-muted-foreground w-full">
                 Buscando «<span className="font-medium text-foreground">{searchTerm.trim()}</span>» — {rows.length} resultado{rows.length !== 1 ? 's' : ''} (ordenados por lo más parecido)
+              </p>
+            )}
+            {urlLowStock && (
+              <p className="text-xs text-muted-foreground w-full">
+                Filtro activo: stock bajo (≤ {threshold} unidades).
               </p>
             )}
           </div>
@@ -725,6 +839,26 @@ export default function ProductsPage() {
                 )}
               </div>
               <div className="space-y-2">
+                <Label htmlFor="salePrice">Precio de venta (COP)</Label>
+                <Input
+                  id="salePrice"
+                  type="number"
+                  step="0.01"
+                  min={0}
+                  {...productForm.register('salePrice')}
+                  placeholder="Ej: 25000"
+                  className="rounded-lg"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Precio que piensas colocar. Si lo ingresas, se usará este valor en lugar del calculado por costo y margen.
+                </p>
+                {productForm.formState.errors.salePrice && (
+                  <p className="text-sm text-destructive">
+                    {productForm.formState.errors.salePrice.message}
+                  </p>
+                )}
+              </div>
+              <div className="space-y-2">
                 <Label htmlFor="taxRate">IVA (%)</Label>
                 <Input
                   id="taxRate"
@@ -740,11 +874,50 @@ export default function ProductsPage() {
                   Porcentaje de impuesto sobre el valor añadido. Opcional. Por defecto es 0% si no se especifica.
                 </p>
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="minStock">Stock mínimo (opcional)</Label>
+                <Input
+                  id="minStock"
+                  type="number"
+                  min={0}
+                  step={1}
+                  {...productForm.register('minStock')}
+                  placeholder="Ej: 5"
+                  className="rounded-lg"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Alerta cuando el stock en mano sea ≤ este valor. Si no se define, se usa el umbral global de Inventario.
+                </p>
+                {productForm.formState.errors.minStock && (
+                  <p className="text-sm text-destructive">
+                    {productForm.formState.errors.minStock.message}
+                  </p>
+                )}
+              </div>
+              {!editingProductId && (
+                <div className="space-y-2 sm:col-span-2">
+                  <Label htmlFor="initialQuantity">Cantidad inicial (opcional)</Label>
+                  <Input
+                    id="initialQuantity"
+                    type="number"
+                    min={0}
+                    step={1}
+                    {...productForm.register('initialQuantity')}
+                    placeholder="0"
+                    className="rounded-lg"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Unidades que entran al inventario al crear el producto. Si indicas un valor mayor a 0, se registrará una entrada de stock automáticamente.
+                  </p>
+                </div>
+              )}
               {(() => {
                 const cost = Number(productForm.watch('cost')) || 0;
                 const marginPercent = Number(productForm.watch('marginPercent')) || 0;
+                const salePriceRaw = productForm.watch('salePrice');
+                const salePrice = typeof salePriceRaw === 'number' && salePriceRaw > 0 && Number.isFinite(salePriceRaw) ? salePriceRaw : undefined;
                 const taxRate = Number(productForm.watch('taxRate')) || 0;
-                const price = cost * (1 + marginPercent / 100);
+                const price = salePrice ?? cost * (1 + marginPercent / 100);
                 const totalWithTax = price * (1 + taxRate / 100);
                 return (
                   <div className="rounded-lg border border-border bg-muted/30 px-3 py-2.5 flex justify-between items-center text-sm sm:col-span-2">

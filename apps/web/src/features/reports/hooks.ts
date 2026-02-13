@@ -14,6 +14,7 @@ import {
   getTrendingProducts,
   downloadExportCsv,
 } from './api';
+import type { GetDashboardParams } from './api';
 import type { ExportReportParams } from './api';
 import type {
   SalesReportParams,
@@ -66,13 +67,14 @@ export function useCustomersReport(params: CustomersReportParams = {}) {
   });
 }
 
-export function useDashboard() {
+export function useDashboard(params?: GetDashboardParams) {
   const { token } = useAuth();
+  const lowStockThreshold = params?.lowStockThreshold;
 
   return useQuery({
-    queryKey: ['reports', 'dashboard'],
+    queryKey: ['reports', 'dashboard', lowStockThreshold],
     enabled: Boolean(token),
-    queryFn: () => getDashboard(token!),
+    queryFn: () => getDashboard(token!, params),
     staleTime: 90_000, // 1.5 min: dashboard no cambia tan seguido
   });
 }

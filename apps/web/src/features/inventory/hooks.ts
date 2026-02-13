@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   listMovements,
   createMovement,
+  getTotalInventoryValue,
   type MovementsListParams,
 } from './api';
 import type { CreateMovementPayload } from './types';
@@ -30,5 +31,15 @@ export function useCreateMovement() {
       queryClient.invalidateQueries({ queryKey: ['inventory'] });
       queryClient.invalidateQueries({ queryKey: ['products'] });
     },
+  });
+}
+
+export function useInventoryTotalValue() {
+  const { token } = useAuth();
+
+  return useQuery({
+    queryKey: ['inventory', 'total-value'],
+    enabled: Boolean(token),
+    queryFn: () => getTotalInventoryValue(token!),
   });
 }

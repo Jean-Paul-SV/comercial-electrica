@@ -223,4 +223,30 @@ export class DianController {
 
     return result;
   }
+
+  @Post('documents/:id/process')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Procesar documento DIAN (pruebas)',
+    description:
+      'Ejecuta el procesamiento completo del documento: XML con CUFE, firma, envío a DIAN (o simulado), generación de PDF. Útil para probar sin esperar al worker de la cola.',
+  })
+  @ApiParam({ name: 'id', description: 'UUID del documento DIAN' })
+  @ApiResponse({ status: 200, description: 'Procesamiento iniciado/completado' })
+  @ApiResponse({ status: 403, description: 'No autorizado para este documento' })
+  @ApiResponse({ status: 404, description: 'Documento no encontrado' })
+  async processDocument(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @Req() req: { user?: { tenantId?: string } },
+  ) {
+    const tenantId = req?.user?.tenantId;
+    if (!tenantId) {
+      throw new ForbiddenException('Tenant requerido.');
+    }
+    await this.dianService.processDocumentIfBelongsToTenant(id, tenantId);
+    return {
+      message: 'Documento procesado.',
+      dianDocumentId: id,
+    };
+  }
 }

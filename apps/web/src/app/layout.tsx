@@ -8,6 +8,7 @@ import './globals.css';
 
 export const metadata = {
   title: 'Orion',
+  description: 'Gestión comercial: ventas, inventario, facturación electrónica.',
   icons: {
     icon: [
       { url: '/icon.svg', type: 'image/svg+xml' },
@@ -16,6 +17,17 @@ export const metadata = {
       { url: '/icon.svg', type: 'image/svg+xml' },
     ],
   },
+  // Mejor experiencia en móvil: pantalla completa y barra de estado
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'Orion',
+  },
+  formatDetection: {
+    telephone: false,
+    email: false,
+    address: false,
+  },
 };
 
 export const viewport = {
@@ -23,6 +35,10 @@ export const viewport = {
   initialScale: 1,
   maximumScale: 5,
   viewportFit: 'cover' as const,
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#ffffff' },
+    { media: '(prefers-color-scheme: dark)', color: '#0f172a' },
+  ],
 };
 
 /** Script que aplica tema guardado antes del primer pintado para evitar parpadeo. */

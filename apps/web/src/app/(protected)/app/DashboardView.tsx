@@ -33,6 +33,7 @@ import {
 import Link from 'next/link';
 import { useDashboard, useActionableIndicators, useDashboardSummary, useOperationalState, useTrendingProducts } from '@features/reports/hooks';
 import { useOnboardingStatus } from '@features/onboarding/hooks';
+import { useLowStockThreshold } from '@shared/hooks/useLowStockThreshold';
 import { formatMoney } from '@shared/utils/format';
 import { KpiBarChart } from '@shared/components/charts/KpiBarChart';
 import { Badge } from '@shared/components/ui/badge';
@@ -50,7 +51,8 @@ const severityBorderClass: Record<string, string> = {
 export default function DashboardView() {
   const router = useRouter();
   const { user } = useAuth();
-  const dashboard = useDashboard();
+  const [lowStockThreshold] = useLowStockThreshold();
+  const dashboard = useDashboard({ lowStockThreshold });
   const actionable = useActionableIndicators({ days: 30, top: 10 });
   const dashboardSummary = useDashboardSummary({ days: 30, top: 10 });
   const operationalState = useOperationalState();
@@ -118,7 +120,7 @@ export default function DashboardView() {
                   Alerta de stock
                 </p>
                 <p className="mt-1 text-sm text-orange-700/90 dark:text-orange-300/90">
-                  Hay {d.inventory.lowStockCount} producto(s) con stock bajo (≤10 unidades). Considera reponer.
+                  Hay {d.inventory.lowStockCount} producto(s) con stock bajo (≤{d.inventory.lowStockThreshold ?? lowStockThreshold ?? 10} unidades). Considera reponer.
                 </p>
               </div>
             </div>
@@ -128,7 +130,7 @@ export default function DashboardView() {
               variant="outline"
               className="shrink-0 rounded-xl border-2 border-orange-400/70 bg-white dark:bg-orange-950/50 font-semibold text-orange-700 dark:text-orange-300 hover:bg-orange-100 hover:border-orange-500 dark:hover:bg-orange-900/50 dark:hover:border-orange-400 transition-all shadow-sm"
             >
-              <Link href="/products?lowStock=true">
+              <Link href={`/products?lowStock=true&lowStockThreshold=${d.inventory.lowStockThreshold ?? lowStockThreshold ?? 10}`}>
                 Ver productos con stock bajo
               </Link>
             </Button>
@@ -370,7 +372,7 @@ export default function DashboardView() {
                   </div>
                 )}
                 <Link
-                  href="/products?lowStock=true"
+                  href={`/products?lowStock=true&lowStockThreshold=${d.inventory.lowStockThreshold ?? lowStockThreshold ?? 10}`}
                   className="shrink-0 flex w-full items-center justify-center gap-1.5 rounded-lg border border-primary/30 bg-primary/10 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/20 dark:hover:bg-primary/15"
                 >
                   Ver productos con stock bajo

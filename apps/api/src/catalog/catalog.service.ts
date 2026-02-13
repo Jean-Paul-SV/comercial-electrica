@@ -67,8 +67,63 @@ export class CatalogService {
     if (pagination?.zeroStock === true) {
       where.stock = { qtyOnHand: 0 };
     } else if (pagination?.lowStock === true) {
+      // Stock bajo por producto: qtyOnHand <= COALESCE(product.minStock, threshold). Si minStock no existe (migración pendiente), se usa solo el umbral.
       const threshold = pagination?.lowStockThreshold ?? 10;
-      where.stock = { qtyOnHand: { lte: threshold } };
+      try {
+        const [lowStockRows, total] = await Promise.all([
+          this.prisma.$queryRaw<{ id: string }[]>`
+            SELECT p.id FROM "Product" p
+            INNER JOIN "StockBalance" s ON p.id = s."productId"
+            WHERE p."tenantId" = ${tenantId}
+              AND p."isActive" = true
+              AND s."qtyOnHand" <= COALESCE(p."minStock", ${threshold})
+            ORDER BY s."qtyOnHand" ASC
+            LIMIT ${limit} OFFSET ${skip}
+          `,
+          this.prisma.$queryRaw<[{ count: bigint }]>`
+            SELECT COUNT(*)::bigint as count FROM "Product" p
+            INNER JOIN "StockBalance" s ON p.id = s."productId"
+            WHERE p."tenantId" = ${tenantId}
+              AND p."isActive" = true
+              AND s."qtyOnHand" <= COALESCE(p."minStock", ${threshold})
+          `,
+        ]);
+        const ids = lowStockRows.map((r) => r.id);
+        const totalCount = Number(total[0]?.count ?? 0);
+        const totalPages = Math.ceil(totalCount / limit);
+        if (ids.length === 0) {
+          return {
+            data: [],
+            meta: {
+              total: totalCount,
+              page,
+              limit,
+              totalPages,
+              hasNextPage: page < totalPages,
+              hasPreviousPage: page > 1,
+            },
+          };
+        }
+        const data = await this.prisma.product.findMany({
+          where: { id: { in: ids } },
+          include: { category: true, stock: true },
+        });
+        const orderMap = new Map(ids.map((id, i) => [id, i]));
+        data.sort((a, b) => (orderMap.get(a.id) ?? 0) - (orderMap.get(b.id) ?? 0));
+        return {
+          data,
+          meta: {
+            total: totalCount,
+            page,
+            limit,
+            totalPages,
+            hasNextPage: page < totalPages,
+            hasPreviousPage: page > 1,
+          },
+        };
+      } catch {
+        where.stock = { qtyOnHand: { lte: threshold } };
+      }
     } else if (pagination?.minStock != null || pagination?.maxStock != null) {
       const stockConditions: { gte?: number; lte?: number } = {};
       if (pagination?.minStock != null) {
@@ -172,6 +227,7 @@ export class CatalogService {
         cost: dto.cost,
         price: dto.price,
         taxRate: dto.taxRate ?? 0,
+        minStock: dto.minStock ?? null,
         isActive: dto.isActive ?? true,
         stock: { create: {} },
       },
@@ -213,6 +269,7 @@ export class CatalogService {
         cost: dto.cost ?? undefined,
         price: dto.price ?? undefined,
         taxRate: dto.taxRate ?? undefined,
+        minStock: dto.minStock !== undefined ? dto.minStock : undefined,
         isActive: dto.isActive ?? undefined,
       },
       include: { category: true, stock: true },

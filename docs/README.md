@@ -47,9 +47,10 @@ Para el detalle técnico y el plan de acción, usa estos documentos:
   - Calificación: 8.5/10 - EXCELENTE
   - Mantener como referencia histórica
 
-- **[📋 Recuento Completo: Pendientes por Implementar](./RECUENTO_PENDIENTES.md)** ⭐ **NUEVO**
-  - Lista detallada de TODO lo que falta por implementar
-  - Organizado por prioridad (CRÍTICO, ALTA, MEDIA, OPCIONAL)
+- **[📋 Trazabilidad: qué falta implementar](./TRAZABILIDAD_FALTA_IMPLEMENTAR.md)** ⭐ **ACTUALIZADO**
+  - Lista verificada (Feb 2026): Compras UI, límite login configurable, opcionales; DIAN ya implementado
+- **[📋 Recuento Completo: Pendientes por Implementar](./RECUENTO_PENDIENTES.md)**
+  - Lista extensa por prioridad; sección DIAN puede estar desactualizada (ver TRAZABILIDAD_FALTA_IMPLEMENTAR)
   - Tiempos estimados para cada tarea
   - Estado actual vs. lo que falta
   - **Documento esencial para planificación**
@@ -168,7 +169,7 @@ Ver `historico/README.md` para lista completa de documentos históricos.
 1. **Primero:** Lee [Estado Actual](./ESTADO_ACTUAL_2026-01-28.md) ⭐ - Entiende la fase actual del proyecto
 2. **Segundo:** Revisa el [README principal](../README.md) - Sección "Inicio Rápido" para configurar
 3. **Tercero:** Consulta los resúmenes técnicos según lo que necesites entender
-4. **Cuarto:** Revisa [Recuento de Pendientes](./RECUENTO_PENDIENTES.md) para ver qué falta
+4. **Cuarto:** Revisa [Trazabilidad: qué falta implementar](./TRAZABILIDAD_FALTA_IMPLEMENTAR.md) (o [Recuento de Pendientes](./RECUENTO_PENDIENTES.md)) para ver qué falta
 
 ### **⚙️ Para configurar el proyecto:**
 
@@ -204,8 +205,9 @@ Los documentos marcados con 📚 contienen información útil pero menos actuali
 ### **Debes Leer:**
 1. **[📌 Estado Actual (resumen)](./ESTADO_ACTUAL_2026-01-28.md)** ⭐ - Fase actual, qué está listo y qué falta
 2. **[🎯 Evaluación Final del Proyecto](./EVALUACION_FINAL_SENIOR.md)** ⭐ - Evaluación completa y final
-3. **[📋 Recuento Completo: Pendientes](./RECUENTO_PENDIENTES.md)** ⭐ - TODO lo que falta implementar
-4. **[README Principal](../README.md)** ⭐ - Guía de instalación y uso
+3. **[📋 Trazabilidad: qué falta implementar](./TRAZABILIDAD_FALTA_IMPLEMENTAR.md)** ⭐ - Lista actualizada (Feb 2026)
+4. **[📋 Recuento Completo: Pendientes](./RECUENTO_PENDIENTES.md)** - Lista extensa (puede tener ítems ya hechos)
+5. **[README Principal](../README.md)** ⭐ - Guía de instalación y uso
 
 ### **Consulta Según Necesidad:**
 - Resúmenes técnicos: `RESUMEN_MANEJO_ERRORES.md`, `RESUMEN_VALIDACIONES_ROBUSTAS.md`

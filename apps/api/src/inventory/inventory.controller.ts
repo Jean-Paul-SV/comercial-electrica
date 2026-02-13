@@ -74,6 +74,23 @@ export class InventoryController {
     );
   }
 
+  @Get('total-value')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Valor total del inventario',
+    description:
+      'Suma de (stock × costo) de todos los productos del tenant. Útil para dashboards.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Valor total en COP',
+    schema: { type: 'object', properties: { totalValue: { type: 'number' } } },
+  })
+  @ApiResponse({ status: 401, description: 'No autenticado' })
+  getTotalValue(@Req() req?: { user?: { tenantId?: string } }) {
+    return this.inventory.getTotalInventoryValue(req?.user?.tenantId ?? null);
+  }
+
   @Post('movements')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({

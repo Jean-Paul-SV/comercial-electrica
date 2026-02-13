@@ -2,6 +2,8 @@
 
 El proyecto **no incluye base de datos** en el repositorio. En producción debes crear la BD, aplicar el esquema y luego crear los usuarios iniciales.
 
+> **Solo 3 usuarios (BD purgada, acceso a todo):** Ver **[historico/RENDER_SOLO_3_USUARIOS.md](./historico/RENDER_SOLO_3_USUARIOS.md)**.
+
 ---
 
 ## Si desplegaste en Render: las credenciales no “aparecen” solas
@@ -22,7 +24,7 @@ En Render, el **deploy no ejecuta el seed**. El `startCommand` solo hace migraci
    $env:PLATFORM_ADMIN_PASSWORD = "TuPasswordSegura123!"
    npx prisma db seed
    ```
-2. Si **no** defines `PLATFORM_ADMIN_EMAIL` / `PLATFORM_ADMIN_PASSWORD`, el seed crea por defecto **`platform@admin.local`** / **`PlatformAdmin1!`**. Puedes usar esas credenciales para entrar en la app desplegada y acceder al Panel proveedor.
+2. Si **no** defines `PLATFORM_ADMIN_EMAIL` / `PLATFORM_ADMIN_PASSWORD`, el seed crea por defecto **`platform@proveedor.local`** / **`PlatformProveedor1!`** (Panel proveedor) y **`admin@negocio.local`** / **`AdminNegocio1!`** (admin del tenant). Ver comentarios en `apps/api/prisma/seed.ts`.
 3. (Opcional) Si quieres que en el Dashboard de Render figuren las variables para referencia o para un futuro job que ejecute el seed, añade `PLATFORM_ADMIN_EMAIL` y `PLATFORM_ADMIN_PASSWORD` en Environment; el usuario solo existirá después de ejecutar el seed como en el paso 1.
 
 ---

@@ -1,107 +1,119 @@
 /**
- * Script para purgar la base de datos de test usando Prisma directamente
+ * Script para purgar la base de datos de test usando Prisma directamente.
  * Ejecutar con: node scripts/purgar-db-test.js
  * O desde apps/api: npm run db:purge
+ *
+ * PERFILES QUE SE CONSERVAN (no se borran usuarios ni asignaciones de rol):
+ * - Administrador (admin): todos los permisos en el tenant.
+ * - Usuario (user): permisos básicos de operación (ventas, caja, inventario, etc.).
+ * - Admin de plataforma: mismo rol admin sin tenant (Panel proveedor).
+ *
+ * Se elimina todo lo operativo (ventas, productos, inventario, clientes, DIAN, caja, etc.)
+ * y se mantienen: User, UserRole, Role, Permission, Plan, Tenant, Subscription.
+ *
+ * Para borrar también usuarios y dejar solo estructura + seed: usar PURGE_FULL=1
  */
 
 const path = require('path');
 const fs = require('fs');
 
-// Cargar variables de entorno desde la raíz del proyecto
 const envPath = path.resolve(__dirname, '../.env');
 if (fs.existsSync(envPath)) {
   require('dotenv').config({ path: envPath });
 }
 
-// Intentar cargar PrismaClient desde diferentes ubicaciones posibles
 let PrismaClient;
 try {
-  // Primero intentar desde apps/api/node_modules
   PrismaClient = require(path.resolve(__dirname, '../apps/api/node_modules/@prisma/client')).PrismaClient;
 } catch (e) {
   try {
-    // Si no funciona, intentar desde node_modules raíz
     PrismaClient = require('@prisma/client').PrismaClient;
   } catch (e2) {
-    console.error('[ERROR] No se pudo cargar PrismaClient. Asegúrate de ejecutar "npm install" y "npx prisma generate"');
+    console.error('[ERROR] No se pudo cargar PrismaClient. Ejecuta "npm install" y "npx prisma generate"');
     process.exit(1);
   }
 }
 
 const databaseUrl = process.env.DATABASE_URL || 'postgresql://ce:ce_password@localhost:5432/comercial_electrica?schema=public';
+const purgeFull = process.env.PURGE_FULL === '1' || process.env.PURGE_FULL === 'true';
 
 const prisma = new PrismaClient({
-  datasources: {
-    db: {
-      url: databaseUrl,
-    },
-  },
+  datasources: { db: { url: databaseUrl } },
 });
 
 async function purgeDatabase() {
-  console.log('=== Purgando Base de Datos de Test ===\n');
+  console.log('=== Purgando Base de Datos ===\n');
+  if (!purgeFull) {
+    console.log('Modo: conservar usuarios y perfiles asignados (User, UserRole, Role, Permission, Plan, Tenant).\n');
+  } else {
+    console.log('Modo: purga total (también se borran usuarios). Luego ejecuta "npm run prisma:seed".\n');
+  }
 
   try {
-    console.log('1. Eliminando datos en orden correcto...\n');
+    console.log('Eliminando datos operativos...\n');
 
-    // Orden: primero tablas con foreign keys, luego las referenciadas
     await prisma.auditLog.deleteMany();
-    console.log('   ✓ auditLog eliminado');
+    console.log('   ✓ AuditLog');
 
     await prisma.quoteItem.deleteMany();
-    console.log('   ✓ quoteItem eliminado');
-
     await prisma.quote.deleteMany();
-    console.log('   ✓ quote eliminado');
+    console.log('   ✓ Cotizaciones');
 
+    await prisma.saleReturnItem.deleteMany();
+    await prisma.saleReturn.deleteMany();
     await prisma.saleItem.deleteMany();
-    console.log('   ✓ saleItem eliminado');
-
     await prisma.sale.deleteMany();
-    console.log('   ✓ sale eliminado');
+    console.log('   ✓ Ventas y devoluciones');
 
     await prisma.invoice.deleteMany();
-    console.log('   ✓ invoice eliminado');
-
     await prisma.dianEvent.deleteMany();
-    console.log('   ✓ dianEvent eliminado');
-
     await prisma.dianDocument.deleteMany();
-    console.log('   ✓ dianDocument eliminado');
+    await prisma.dianConfig.deleteMany();
+    console.log('   ✓ Facturación / DIAN');
 
     await prisma.cashMovement.deleteMany();
-    console.log('   ✓ cashMovement eliminado');
-
+    await prisma.expense.deleteMany();
     await prisma.cashSession.deleteMany();
-    console.log('   ✓ cashSession eliminado');
+    console.log('   ✓ Caja y gastos');
 
     await prisma.inventoryMovementItem.deleteMany();
-    console.log('   ✓ inventoryMovementItem eliminado');
-
     await prisma.inventoryMovement.deleteMany();
-    console.log('   ✓ inventoryMovement eliminado');
-
     await prisma.stockBalance.deleteMany();
-    console.log('   ✓ stockBalance eliminado');
+    console.log('   ✓ Inventario / movimientos');
 
-    await prisma.backupRun.deleteMany();
-    console.log('   ✓ backupRun eliminado');
-
+    await prisma.productDictionaryEntry.deleteMany();
     await prisma.product.deleteMany();
-    console.log('   ✓ product eliminado');
-
     await prisma.category.deleteMany();
-    console.log('   ✓ category eliminado');
+    console.log('   ✓ Productos y categorías');
 
     await prisma.customer.deleteMany();
-    console.log('   ✓ customer eliminado');
+    console.log('   ✓ Clientes');
 
-    await prisma.user.deleteMany();
-    console.log('   ✓ user eliminado');
+    await prisma.supplierPayment.deleteMany();
+    await prisma.supplierInvoice.deleteMany();
+    await prisma.purchaseOrderItem.deleteMany();
+    await prisma.purchaseOrder.deleteMany();
+    await prisma.supplier.deleteMany();
+    console.log('   ✓ Proveedores y compras');
 
-    console.log('\n[OK] Base de datos purgada exitosamente');
+    await prisma.backupRun.deleteMany();
+    await prisma.stripeEvent.deleteMany();
+    console.log('   ✓ Backup / Stripe');
+
+    if (purgeFull) {
+      await prisma.userRole.deleteMany();
+      await prisma.user.deleteMany();
+      console.log('   ✓ Usuarios y asignaciones de rol (purga total)');
+    }
+
+    console.log('\n[OK] Purga completada.');
+    if (!purgeFull) {
+      console.log('Usuarios y perfiles asignados (Administrador / Usuario) se mantienen.');
+    } else {
+      console.log('Ejecuta: npm run prisma:seed (desde la raíz) para recrear Plan, Tenant, Roles y admin de plataforma.');
+    }
   } catch (error) {
-    console.error('\n[ERROR] Error al purgar la base de datos:', error);
+    console.error('\n[ERROR]', error.message);
     process.exit(1);
   } finally {
     await prisma.$disconnect();

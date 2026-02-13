@@ -47,7 +47,7 @@ const openSessionSchema = z.object({
 type OpenSessionFormValues = z.infer<typeof openSessionSchema>;
 
 const closeSessionSchema = z.object({
-  closingAmount: z.coerce.number().min(0, 'Monto >= 0'),
+  closingAmount: z.coerce.number().refine((v) => Number.isFinite(v), 'Monto inválido'),
 });
 type CloseSessionFormValues = z.infer<typeof closeSessionSchema>;
 
@@ -435,9 +435,16 @@ export default function CashPage() {
                   {todaySalesCount > 0 && ` (${todaySalesCount} venta${todaySalesCount !== 1 ? 's' : ''})`}
                 </p>
                 {sessionExpectedAmount != null && (
-                  <p className="text-muted-foreground">
-                    Monto esperado en caja (apertura + movimientos): <strong className={sessionExpectedAmount < 0 ? 'text-destructive' : 'text-foreground'}>{formatMoney(sessionExpectedAmount)}</strong>
-                  </p>
+                  <>
+                    <p className="text-muted-foreground">
+                      Monto esperado en caja (apertura + movimientos): <strong className={sessionExpectedAmount < 0 ? 'text-destructive' : 'text-foreground'}>{formatMoney(sessionExpectedAmount)}</strong>
+                    </p>
+                    {sessionExpectedAmount < 0 && (
+                      <p className="text-xs text-amber-600 dark:text-amber-400 bg-amber-500/10 dark:bg-amber-500/15 rounded-lg px-2.5 py-1.5 border border-amber-500/20">
+                        Es normal si hubo más salidas (gastos, retiros) que entradas (ventas en efectivo). Puedes cerrar con este monto negativo; el sistema lo permite.
+                      </p>
+                    )}
+                  </>
                 )}
                 {sessionTotalsByMethod && Object.keys(sessionTotalsByMethod).some((k) => (sessionTotalsByMethod[k] ?? 0) > 0) && (
                   <div className="pt-1.5 border-t border-border mt-1.5">

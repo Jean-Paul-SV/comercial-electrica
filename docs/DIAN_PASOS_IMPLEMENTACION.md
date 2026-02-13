@@ -8,12 +8,12 @@
 
 ## Orden sugerido de implementación
 
-| # | Tarea | Descripción | Ubicación actual |
-|---|--------|-------------|-------------------|
-| 1 | **Envío a API DIAN** | Conectar `sendToDian()` con el Web Service real (habilitación/producción). Autenticación con softwareId/softwarePin. Manejar respuestas ACEPTADO/RECHAZADO y reintentos. | `apps/api/src/dian/dian.service.ts` → `sendToDian()` (hoy simula). |
-| 2 | **CUFE** | Calcular CUFE según Anexo Técnico DIAN e incluirlo en el XML (antes de firmar si aplica). | Hoy simulado en respuesta; ver Anexo Técnico FE 1.9. |
-| 3 | **PDF de factura** | Implementar `generatePDF()`: plantilla estándar, QR, CUFE, guardar en disco o S3. | `generatePDF()` placeholder; requiere pdfkit/puppeteer + plantilla. |
-| 4 | **Consulta estado real** | Consumir Web Service de consulta DIAN y sincronizar estado en BD. | `queryDocumentStatus()` hoy retorna solo estado local. |
+| # | Tarea | Descripción | Estado |
+|---|--------|-------------|--------|
+| 1 | **Envío a API DIAN** | Conectar `sendToDian()` con el Web Service real (habilitación/producción). Autenticación con softwareId/softwarePin. Manejar respuestas ACEPTADO/RECHAZADO y reintentos. | ✅ Implementado (SOAP ReceiveInvoice; cuando `DIAN_USE_DEFAULT_URL=true` o `DIAN_API_BASE_URL` está definida). |
+| 2 | **CUFE** | Calcular CUFE según Anexo Técnico DIAN e incluirlo en el XML (antes de firmar si aplica). | ✅ Implementado: `computeCufe()` SHA384 sobre cadena (número, fecha, hora, NIT emisor, NIT cliente, total, moneda); se incluye en `<cac:AdditionalDocumentReference>` con schemeID CUFE. |
+| 3 | **PDF de factura** | Implementar `generatePDF()`: plantilla estándar, QR, CUFE, guardar en disco o S3. | ✅ Implementado: pdfkit + qrcode; guarda en `storage/invoice-pdfs/`; actualiza `dianDocument.pdfPath`. |
+| 4 | **Consulta estado real** | Consumir Web Service de consulta DIAN y sincronizar estado en BD. | ✅ Implementado: `syncDocumentStatusFromDian()` llama GetStatus (SOAP o REST); `queryDocumentStatus()` sincroniza cuando status=SENT y hay CUFE, luego retorna estado. |
 
 ---
 

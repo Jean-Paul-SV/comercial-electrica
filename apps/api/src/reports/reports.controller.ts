@@ -449,7 +449,7 @@ export class ReportsController {
   @ApiOperation({
     summary: 'Dashboard ejecutivo',
     description:
-      'Obtiene KPIs principales del sistema filtrados por tenant: ventas del día, productos con stock bajo, sesiones de caja abiertas, cotizaciones pendientes, etc.',
+      'Obtiene KPIs principales del sistema filtrados por tenant: ventas del día, productos con stock bajo, sesiones de caja abiertas, cotizaciones pendientes, etc. Opcionalmente lowStockThreshold (por defecto 10) para el umbral de stock bajo.',
   })
   @ApiResponse({
     status: 200,
@@ -457,11 +457,25 @@ export class ReportsController {
   })
   @ApiResponse({ status: 401, description: 'No autenticado' })
   @ApiResponse({ status: 403, description: 'Tenant requerido' })
-  getDashboard(@Req() req: { user?: { tenantId?: string | null } }) {
+  getDashboard(
+    @Req() req: { user?: { tenantId?: string | null } },
+    @Query('lowStockThreshold') lowStockThreshold?: string,
+  ) {
     const tenantId = req.user?.tenantId;
     if (!tenantId) {
       throw new ForbiddenException('Tenant requerido para obtener el dashboard');
     }
-    return this.reportsService.getDashboard(tenantId);
+    const threshold =
+      lowStockThreshold != null && lowStockThreshold !== ''
+        ? parseInt(lowStockThreshold, 10)
+        : undefined;
+    if (threshold !== undefined && (Number.isNaN(threshold) || threshold < 0)) {
+      // ignorar valor inválido y usar defecto
+    }
+    const safeThreshold =
+      threshold !== undefined && !Number.isNaN(threshold) && threshold >= 0
+        ? threshold
+        : undefined;
+    return this.reportsService.getDashboard(tenantId, safeThreshold);
   }
 }

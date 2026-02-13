@@ -164,8 +164,8 @@ export class CashService {
       );
     }
 
-    // Validar límites de monto
-    this.limits.validateCashAmount(closingAmount, 'movement');
+    // Validar límites de monto (permite negativo: caja en rojo)
+    this.limits.validateClosingAmount(closingAmount);
 
     const updated = await this.prisma.cashSession.update({
       where: { id },

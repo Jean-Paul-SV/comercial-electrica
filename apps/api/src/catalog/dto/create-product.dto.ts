@@ -64,6 +64,16 @@ export class CreateProductDto {
   taxRate?: number;
 
   @ApiPropertyOptional({
+    example: 5,
+    description: 'Stock mínimo por producto para alertas; si no se envía, se usa el umbral global.',
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  minStock?: number;
+
+  @ApiPropertyOptional({
     example: true,
     description: 'Producto activo/inactivo (opcional, por defecto true)',
   })

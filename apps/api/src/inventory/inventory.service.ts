@@ -219,4 +219,24 @@ export class InventoryService {
       },
     };
   }
+
+  /**
+   * Valor total del inventario: suma de (stock × costo) de todos los productos del tenant.
+   */
+  async getTotalInventoryValue(tenantId: string | null): Promise<{ totalValue: number }> {
+    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
+    const rows = await this.prisma.product.findMany({
+      where: { tenantId, isActive: true },
+      select: {
+        cost: true,
+        stock: { select: { qtyOnHand: true } },
+      },
+    });
+    const totalValue = rows.reduce((sum, p) => {
+      const qty = p.stock?.qtyOnHand ?? 0;
+      const cost = Number(p.cost) || 0;
+      return sum + qty * cost;
+    }, 0);
+    return { totalValue };
+  }
 }

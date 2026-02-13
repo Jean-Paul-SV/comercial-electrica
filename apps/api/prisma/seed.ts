@@ -1,7 +1,12 @@
 /**
- * Seed: Tenant por defecto, Plan "Todo incluido", Permission, Role (admin, user), UserRole para usuarios existentes.
+ * Seed: Plan "Todo incluido", Tenant por defecto, Permission, Role (admin, user), UserRole,
+ * usuario Panel proveedor (platform) y usuario administrador del tenant (admin negocio).
  * Ejecutar tras migración: npx prisma db seed
- * Ver docs/ROLES_Y_PERMISOS_DISEÑO.md y ARQUITECTURA_MODULAR_SAAS.md
+ *
+ * Correos de prueba por defecto (sin PLATFORM_ADMIN_* / TENANT_ADMIN_* en env):
+ *   - Panel proveedor: platform@proveedor.local / PlatformProveedor1!
+ *   - Admin tenant:    admin@negocio.local / AdminNegocio1!
+ * Ver docs/ROLES_Y_PERMISOS_DISEÑO.md y docs/historico/RENDER_SOLO_3_USUARIOS.md
  */
 
 import { PrismaClient, RoleName } from '@prisma/client';
@@ -20,11 +25,15 @@ const envPlatformPassword = process.env.PLATFORM_ADMIN_PASSWORD?.trim();
 const PLATFORM_ADMIN_EMAIL =
   envPlatformEmail && envPlatformPassword && envPlatformPassword.length >= 8
     ? envPlatformEmail
-    : 'platform@admin.local';
+    : 'platform@proveedor.local';
 const PLATFORM_ADMIN_PASSWORD =
   envPlatformEmail && envPlatformPassword && envPlatformPassword.length >= 8
     ? envPlatformPassword
-    : 'PlatformAdmin1!';
+    : 'PlatformProveedor1!';
+
+/** Administrador del tenant por defecto (correos de prueba si no se definen en env). */
+const TENANT_ADMIN_EMAIL = process.env.TENANT_ADMIN_EMAIL?.trim() || 'admin@negocio.local';
+const TENANT_ADMIN_PASSWORD = process.env.TENANT_ADMIN_PASSWORD?.trim() || 'AdminNegocio1!';
 
 /** Módulos del producto (alineado con ARQUITECTURA_MODULAR_SAAS). Plan "Todo incluido" los tiene todos. */
 const MODULE_CODES = [
@@ -242,6 +251,32 @@ async function main() {
       },
     });
     console.log('Admin de plataforma creado:', PLATFORM_ADMIN_EMAIL);
+  }
+
+  // 7. Usuario administrador del tenant por defecto (acceso a todo el negocio)
+  let tenantAdmin = await prisma.user.findFirst({
+    where: { email: TENANT_ADMIN_EMAIL },
+    select: { id: true },
+  });
+  if (!tenantAdmin && TENANT_ADMIN_PASSWORD.length >= 8) {
+    const tenantAdminHash = await argon2.hash(TENANT_ADMIN_PASSWORD);
+    tenantAdmin = await prisma.user.create({
+      data: {
+        email: TENANT_ADMIN_EMAIL,
+        passwordHash: tenantAdminHash,
+        role: RoleName.ADMIN,
+        tenantId: tenant.id,
+      },
+      select: { id: true },
+    });
+    await prisma.userRole.create({
+      data: {
+        userId: tenantAdmin.id,
+        roleId: adminRole!.id,
+        tenantId: tenant.id,
+      },
+    });
+    console.log('Admin de tenant creado:', TENANT_ADMIN_EMAIL);
   }
 }
 

@@ -21,9 +21,9 @@
 | **Firma digital** | ✅ Implementado | `signDocument()` | xml-crypto + node-forge (.p12). RSA-SHA256, SHA256, C14N. Si no hay certificado retorna XML sin firmar. |
 | **Envío a API DIAN** | ✅ Implementado | `sendToDian()` | POST con sobre SOAP ReceiveInvoice cuando `DIAN_USE_DEFAULT_URL=true` o `DIAN_API_BASE_URL` está definida. Reintentos y log de 4xx/5xx. |
 | **Estado de configuración** | ✅ Nuevo | `GET /dian/config-status` | Indica si falta algo (Software ID, PIN, certificado, DIAN_ISSUER_NIT, DIAN_ISSUER_NAME, URL) sin revelar secretos. |
-| **Generación de PDF** | ❌ Pendiente | `generatePDF()` | Requiere librería (pdfkit, puppeteer), plantilla, QR y CUFE. Hoy solo guarda ruta simulada. |
-| **Consulta estado real** | ❌ Pendiente | `queryDocumentStatus()` | Requiere consumo del Web Service de consulta DIAN. Hoy retorna solo el estado en BD. |
-| **CUFE** | ⚠️ Parcial | Respuesta DIAN / simulado | El CUFE lo asigna la DIAN en la respuesta. Cálculo propio según Anexo (opcional) para incluir en XML/QR. |
+| **Generación de PDF** | ✅ Implementado | `generatePDF()` | pdfkit + qrcode; factura con ítems, totales, CUFE y QR; guarda en `storage/invoice-pdfs/`. |
+| **Consulta estado real** | ✅ Implementado | `syncDocumentStatusFromDian()`, `queryDocumentStatus()` | GetStatus (SOAP/REST); al consultar estado con doc SENT y CUFE se sincroniza con DIAN y se actualiza BD. |
+| **CUFE** | ✅ Implementado | `computeCufe()` + XML | Cálculo SHA384 según Anexo; se incluye en el XML en `<cac:AdditionalDocumentReference>`; DIAN también puede devolverlo en la respuesta. |
 
 ---
 
@@ -66,9 +66,10 @@ Si la DIAN devuelve **400** con cuerpo vacío o rechazo, revisar logs (cuerpo y 
 
 1. ~~**Firma digital:**~~ ✅ Hecho.
 2. ~~**Envío real:**~~ ✅ Hecho (SOAP ReceiveInvoice, reintentos, log de errores).
-3. **CUFE:** Opcional: calcular CUFE según Anexo Técnico e incluirlo en XML/QR antes de firmar.
-4. **PDF:** Generar PDF de la factura con QR y CUFE; guardar en disco o S3.
-5. **Consulta estado:** Consumir Web Service de consulta de estado DIAN para sincronizar estados locales.
+3. ~~**CUFE:**~~ ✅ Hecho (SHA384 según Anexo; incluido en XML y PDF).
+4. ~~**PDF:**~~ ✅ Hecho (pdfkit + QR + CUFE; guarda en `storage/invoice-pdfs/`).
+5. ~~**Consulta estado:**~~ ✅ Hecho (GetStatus SOAP/REST; sincronización en `queryDocumentStatus`).
+6. **Opcional:** Validar flujo completo en ambiente de habilitación/producción con certificado y credenciales reales. Botón “Reintentar envíos pendientes” en UI (ver `CONTINGENCIA_DIAN.md` y `TRAZABILIDAD_FALTA_IMPLEMENTAR.md`).
 
 ---
 

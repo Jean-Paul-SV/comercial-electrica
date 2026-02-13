@@ -19,16 +19,21 @@ const DIAN_DEFAULT_BASE_URL_HAB = 'https://vpfe-hab.dian.gov.co';
 const DIAN_DEFAULT_BASE_URL_PROD = 'https://vpfe.dian.gov.co';
 const DIAN_SEND_PATH = '/WcfDianCustomerServices.svc';
 const DIAN_SOAP_ACTION_RECEIVE = 'http://wcf.dian.colombia/IWcfDianCustomerServices/ReceiveInvoice';
+/** Ruta para consulta de estado (mismo servicio WCF, operación GetStatus). */
+const DIAN_QUERY_STATUS_PATH = '/WcfDianCustomerServices.svc';
 const DIAN_HTTP_TIMEOUT_MS = 30_000;
 const DIAN_HTTP_MAX_RETRIES = 3;
 const DIAN_HTTP_RETRY_DELAY_MS = 5_000;
 import { AuditService } from '../common/services/audit.service';
 import { MailerService } from '../mailer/mailer.service';
-import { readFile } from 'fs/promises';
-import { writeFileSync } from 'fs';
+import { readFile, mkdir } from 'fs/promises';
+import { writeFileSync, createWriteStream, existsSync } from 'fs';
 import { resolve, join } from 'path';
 import { tmpdir } from 'os';
+import { createHash } from 'crypto';
 import * as forge from 'node-forge';
+import PDFDocument from 'pdfkit';
+import QRCode from 'qrcode';
 import { SignedXml } from 'xml-crypto';
 import { decryptCertPayload, encryptCertPayload } from './cert-encryption.util';
 import type { UpdateDianConfigDto } from './dto/dian-config.dto';
@@ -134,6 +139,55 @@ export class DianService {
         `Documento DIAN ${dianDocumentId} no encontrado.`,
       );
     }
+
+    await this.runProcessDocument(dianDoc);
+  }
+
+  /**
+   * Ejecuta el procesamiento solo si el documento pertenece al tenant.
+   * Usado por el endpoint POST /dian/documents/:id/process (pruebas).
+   */
+  async processDocumentIfBelongsToTenant(
+    dianDocumentId: string,
+    tenantId: string,
+  ): Promise<void> {
+    const doc = await this.prisma.dianDocument.findUnique({
+      where: { id: dianDocumentId },
+      include: {
+        invoice: { select: { tenantId: true } },
+      },
+    });
+    if (!doc) {
+      throw new NotFoundException(
+        `Documento DIAN ${dianDocumentId} no encontrado.`,
+      );
+    }
+    if (doc.invoice?.tenantId !== tenantId) {
+      throw new ForbiddenException(
+        'No tiene permiso para procesar este documento.',
+      );
+    }
+    await this.processDocument(dianDocumentId);
+  }
+
+  private async runProcessDocument(
+    dianDoc: Prisma.DianDocumentGetPayload<{
+      include: {
+        invoice: {
+          include: {
+            sale: {
+              include: {
+                items: { include: { product: true } };
+                customer: true;
+              };
+            };
+            customer: true;
+          };
+        };
+      };
+    }>,
+  ): Promise<void> {
+    const dianDocumentId = dianDoc.id;
 
     if (dianDoc.status === DianDocumentStatus.ACCEPTED) {
       this.logger.warn(`Documento ${dianDocumentId} ya fue aceptado por DIAN.`);
@@ -415,6 +469,40 @@ export class DianService {
   }
 
   /**
+   * Calcula el CUFE (Código Único de Factura Electrónica) según Anexo Técnico DIAN.
+   * SHA384 sobre la cadena de concatenación de campos obligatorios, resultado en base64 (64 caracteres).
+   */
+  private computeCufe(params: {
+    invoiceNumber: string;
+    issueDate: string;
+    issueTime: string;
+    issuerNit: string;
+    customerDocNumber: string;
+    grandTotal: number;
+    currencyCode: string;
+  }): string {
+    const normalizeNit = (v: string) => String(v || '').replace(/\D/g, '');
+    const date = params.issueDate;
+    const time = params.issueTime.includes('Z') || params.issueTime.includes('-') || params.issueTime.includes('+')
+      ? params.issueTime
+      : `${params.issueTime}-05:00`;
+    const nitEmisor = normalizeNit(params.issuerNit);
+    const nitCliente = normalizeNit(params.customerDocNumber);
+    const totalFormatted = Math.round(params.grandTotal * 100).toString();
+    const cadena = [
+      params.invoiceNumber,
+      date,
+      time,
+      nitEmisor,
+      nitCliente,
+      totalFormatted,
+      params.currencyCode,
+    ].join('');
+    const hash = createHash('sha384').update(cadena, 'utf8').digest('base64');
+    return hash.slice(0, 64);
+  }
+
+  /**
    * Genera el XML según estándar UBL 2.1 y normativa DIAN.
    * Ref: Resolución 000165/2023, Anexo Técnico Factura Electrónica de Venta v1.9.
    * Documentación: https://micrositios.dian.gov.co/sistema-de-facturacion-electronica/documentacion-tecnica/
@@ -489,6 +577,19 @@ export class DianService {
         )
         .join('') || '';
 
+    const issueDate = invoice.issuedAt.toISOString().split('T')[0];
+    const issueTime = invoice.issuedAt.toISOString().split('T')[1].split('.')[0];
+    const customerDocNumber = customer?.docNumber ? String(customer.docNumber).trim() : '';
+    const cufe = this.computeCufe({
+      invoiceNumber: invoice.number,
+      issueDate,
+      issueTime,
+      issuerNit: config.issuerNit ?? '',
+      customerDocNumber: customerDocNumber || '0',
+      grandTotal: Number(invoice.grandTotal),
+      currencyCode: 'COP',
+    });
+
     const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"
          xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2"
@@ -496,10 +597,13 @@ export class DianService {
   <cbc:CustomizationID>10</cbc:CustomizationID>
   <cbc:ProfileID>DIAN 2.1: Factura Electrónica de Venta</cbc:ProfileID>
   <cbc:ID>${this.escapeXml(invoice.number)}</cbc:ID>
-  <cbc:IssueDate>${invoice.issuedAt.toISOString().split('T')[0]}</cbc:IssueDate>
-  <cbc:IssueTime>${invoice.issuedAt.toISOString().split('T')[1].split('.')[0]}</cbc:IssueTime>
+  <cbc:IssueDate>${issueDate}</cbc:IssueDate>
+  <cbc:IssueTime>${issueTime}</cbc:IssueTime>
   <cbc:InvoiceTypeCode listID="01" listAgencyName="PE" listName="Tipo de Operación">01</cbc:InvoiceTypeCode>
   <cbc:DocumentCurrencyCode listID="ISO 4217 Alpha" listName="Currency" listAgencyName="United Nations Economic Commission for Europe">COP</cbc:DocumentCurrencyCode>
+  <cac:AdditionalDocumentReference>
+    <cbc:ID schemeID="CUFE" schemeName="CUFE-SHA384">${this.escapeXml(cufe)}</cbc:ID>
+  </cac:AdditionalDocumentReference>
   <cac:AccountingSupplierParty>
     <cac:Party>
       <cac:PartyIdentification>
@@ -1149,31 +1253,133 @@ export class DianService {
   }
 
   /**
-   * Genera el PDF de la factura
-   * Por ahora solo registra la acción - debe implementarse con librería de PDF
+   * Genera el PDF de la factura con datos del documento, CUFE y código QR.
+   * Guarda el archivo en storage/invoice-pdfs y actualiza dianDocument.pdfPath.
    */
   async generatePDF(dianDocumentId: string): Promise<string> {
     this.logger.log(`Generando PDF para documento ${dianDocumentId}`);
 
-    // TODO: Implementar generación de PDF
-    // Requiere:
-    // - Librería de PDF (pdfkit, puppeteer, etc.)
-    // - Plantilla de factura
-    // - Incluir QR code y CUFE
-    // - Guardar PDF en storage
-
-    const pdfPath = `pdf/${dianDocumentId}.pdf`;
-
-    await this.prisma.dianDocument.update({
+    const doc = await this.prisma.dianDocument.findUnique({
       where: { id: dianDocumentId },
-      data: { pdfPath },
+      include: {
+        invoice: {
+          include: {
+            sale: {
+              include: {
+                items: { include: { product: true } },
+                customer: true,
+              },
+            },
+            customer: true,
+          },
+        },
+      },
     });
 
-    this.logger.warn(
-      `⚠️ Generación de PDF no implementada. Ruta simulada: ${pdfPath}`,
-    );
+    if (!doc?.invoice) {
+      throw new NotFoundException(
+        `Documento DIAN ${dianDocumentId} o factura no encontrados.`,
+      );
+    }
 
-    return pdfPath;
+    const invoice = doc.invoice;
+    const sale = invoice.sale;
+    const customer = invoice.customer ?? sale?.customer;
+    const cufe = doc.cufe ?? '';
+
+    const baseDir =
+      this.config.get<string>('OBJECT_STORAGE_BASE_PATH', '')?.trim() ||
+      join(process.cwd(), 'storage');
+    const pdfDir = join(baseDir, 'invoice-pdfs');
+    if (!existsSync(pdfDir)) {
+      await mkdir(pdfDir, { recursive: true });
+    }
+    const filename = `${dianDocumentId}.pdf`;
+    const fullPath = join(pdfDir, filename);
+
+    const qrPayload = cufe || dianDocumentId;
+    let qrBuffer: Buffer;
+    try {
+      qrBuffer = await QRCode.toBuffer(qrPayload, {
+        type: 'png',
+        width: 120,
+        margin: 1,
+      });
+    } catch (err) {
+      this.logger.warn(`QR no generado: ${err}`);
+      qrBuffer = Buffer.alloc(0);
+    }
+
+    return new Promise((resolvePromise, rejectPromise) => {
+      const docPdf = new PDFDocument({ size: 'A4', margin: 50 });
+      const stream = createWriteStream(fullPath);
+      docPdf.pipe(stream);
+
+      docPdf.fontSize(18).text('FACTURA ELECTRÓNICA', { align: 'center' });
+      docPdf.moveDown(0.5);
+      docPdf.fontSize(10).text(`Nº ${invoice.number}`, { align: 'right' });
+      docPdf.text(
+        `Fecha: ${invoice.issuedAt.toISOString().split('T')[0]} ${invoice.issuedAt.toISOString().split('T')[1].slice(0, 8)}`,
+        { align: 'right' },
+      );
+      docPdf.moveDown(1);
+
+      docPdf.fontSize(11).text('Cliente:', { continued: false });
+      docPdf.fontSize(10).text(customer?.name ?? 'Cliente', { indent: 10 });
+      docPdf.text(`Doc: ${customer?.docType ?? ''} ${customer?.docNumber ?? ''}`, {
+        indent: 10,
+      });
+      docPdf.moveDown(1);
+
+      docPdf.fontSize(10).text('Ítems', { underline: true });
+      docPdf.moveDown(0.3);
+      (sale?.items ?? []).forEach((item: { product?: { name?: string }; qty: number; unitPrice: unknown }, i: number) => {
+        const name = item.product?.name ?? 'Producto';
+        const qty = item.qty;
+        const unitPrice = Number(item.unitPrice);
+        const total = qty * unitPrice;
+        docPdf.text(`${i + 1}. ${name}`, { indent: 10 });
+        docPdf.text(`   Cant: ${qty} × ${unitPrice.toFixed(2)} = ${total.toFixed(2)} COP`, {
+          indent: 10,
+        });
+      });
+      docPdf.moveDown(0.5);
+      docPdf.text(`Subtotal: ${Number(invoice.subtotal).toFixed(2)} COP`, {
+        align: 'right',
+      });
+      docPdf.text(`IVA: ${Number(invoice.taxTotal).toFixed(2)} COP`, {
+        align: 'right',
+      });
+      docPdf.text(`Total: ${Number(invoice.grandTotal).toFixed(2)} COP`, {
+        align: 'right',
+        underline: true,
+      });
+      docPdf.moveDown(1);
+
+      if (cufe) {
+        docPdf.fontSize(9).text(`CUFE: ${cufe}`, { align: 'center' });
+        docPdf.moveDown(0.5);
+      }
+
+      if (qrBuffer.length > 0) {
+        docPdf.image(qrBuffer, docPdf.page.margins.left, docPdf.y, {
+          width: 100,
+          height: 100,
+        });
+      }
+      docPdf.end();
+
+      stream.on('finish', async () => {
+        const relativePath = `invoice-pdfs/${filename}`;
+        await this.prisma.dianDocument.update({
+          where: { id: dianDocumentId },
+          data: { pdfPath: relativePath },
+        });
+        this.logger.log(`PDF guardado: ${fullPath}`);
+        resolvePromise(relativePath);
+      });
+      stream.on('error', rejectPromise);
+    });
   }
 
   /**
@@ -1627,19 +1833,198 @@ export class DianService {
       },
       select: {
         status: true,
+        cufe: true,
       },
     });
 
     if (!doc) {
-      // No revelamos si el ID existe para otro tenant: mantenemos aislamiento
       throw new NotFoundException(
         `Documento DIAN ${dianDocumentId} no encontrado.`,
       );
     }
 
-    // TODO: Implementar consulta real a DIAN
-    // Por ahora retorna el estado almacenado
+    // Si está SENT y tenemos CUFE, intentar sincronizar estado con la DIAN
+    if (
+      doc.status === DianDocumentStatus.SENT &&
+      doc.cufe?.trim() &&
+      this.getDianQueryStatusUrl()
+    ) {
+      try {
+        await this.syncDocumentStatusFromDian(dianDocumentId, tenantId);
+        const updated = await this.prisma.dianDocument.findFirst({
+          where: { id: dianDocumentId, invoice: { tenantId } },
+          select: { status: true },
+        });
+        return updated?.status ?? doc.status;
+      } catch (err) {
+        this.logger.warn(
+          `Consulta estado DIAN para ${dianDocumentId}: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    }
+
     return doc.status;
+  }
+
+  /**
+   * URL para consulta de estado (GetStatus). Si no está configurada, retorna null.
+   */
+  private getDianQueryStatusUrl(): string | null {
+    const override = this.config
+      .get<string>('DIAN_QUERY_STATUS_URL', '')
+      ?.trim();
+    if (override) return override.replace(/\/$/, '');
+    const base = this.getDianBaseUrl();
+    if (!base) return null;
+    const path =
+      this.config.get<string>('DIAN_QUERY_STATUS_PATH', '')?.trim() ||
+      DIAN_QUERY_STATUS_PATH;
+    return `${base}${path.startsWith('/') ? path : `/${path}`}`;
+  }
+
+  /**
+   * Llama al Web Service de consulta de estado DIAN (GetStatus) y actualiza el documento en BD.
+   * Ref: documentación técnica DIAN - operación GetStatus por CUFE o trackId.
+   */
+  async syncDocumentStatusFromDian(
+    dianDocumentId: string,
+    tenantId: string,
+  ): Promise<void> {
+    const doc = await this.prisma.dianDocument.findFirst({
+      where: { id: dianDocumentId, invoice: { tenantId } },
+      select: { id: true, cufe: true, status: true },
+    });
+    if (!doc?.cufe?.trim()) {
+      this.logger.debug(
+        `syncDocumentStatusFromDian: documento ${dianDocumentId} sin CUFE, omitiendo consulta.`,
+      );
+      return;
+    }
+
+    const url = this.getDianQueryStatusUrl();
+    if (!url) return;
+
+    const softwareId = this.softwareId;
+    const softwarePin = this.softwarePin;
+    if (!softwareId || !softwarePin) return;
+
+    const useSoap =
+      this.config.get<string>('DIAN_USE_SOAP', 'true') !== 'false';
+    const body = useSoap
+      ? this.buildSoapEnvelopeGetStatus(doc.cufe.trim(), softwareId, softwarePin)
+      : JSON.stringify({ cufe: doc.cufe.trim() });
+
+    const controller = new AbortController();
+    const timeoutMs = this.config.get<number>(
+      'DIAN_HTTP_TIMEOUT_MS',
+      DIAN_HTTP_TIMEOUT_MS,
+    );
+    setTimeout(() => controller.abort(), timeoutMs);
+
+    const headers: Record<string, string> = useSoap
+      ? {
+          'Content-Type': 'application/soap+xml; charset=utf-8',
+          SOAPAction: '"http://wcf.dian.colombia/IWcfDianCustomerServices/GetStatus"',
+          Accept: 'text/xml, application/xml, */*',
+        }
+      : {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          SoftwareID: softwareId,
+          SoftwarePIN: softwarePin,
+        };
+
+    const res = await fetch(url, {
+      method: 'POST',
+      headers,
+      body,
+      signal: controller.signal,
+    });
+    const responseBody = await res.text();
+
+    if (!res.ok) {
+      this.logger.warn(
+        `GetStatus DIAN ${res.status} para ${dianDocumentId}: ${responseBody.slice(0, 500)}`,
+      );
+      return;
+    }
+
+    const parsed = this.parseGetStatusResponse(responseBody);
+    if (!parsed) return;
+
+    const newStatus =
+      parsed.isValid === true
+        ? DianDocumentStatus.ACCEPTED
+        : DianDocumentStatus.REJECTED;
+    if (newStatus !== doc.status) {
+      await this.prisma.dianDocument.update({
+        where: { id: dianDocumentId },
+        data: {
+          status: newStatus,
+          lastError:
+            newStatus === DianDocumentStatus.REJECTED
+              ? parsed.message ?? null
+              : null,
+        },
+      });
+      this.logger.log(
+        `Estado DIAN actualizado para ${dianDocumentId}: ${doc.status} -> ${newStatus}`,
+      );
+    }
+  }
+
+  private buildSoapEnvelopeGetStatus(
+    cufe: string,
+    softwareId: string,
+    softwarePin: string,
+  ): string {
+    return `<?xml version="1.0" encoding="UTF-8"?>
+<soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope" xmlns:wcf="http://wcf.dian.colombia">
+  <soap:Header>
+    <wcf:SoftwareID>${this.escapeXml(softwareId)}</wcf:SoftwareID>
+    <wcf:SoftwarePIN>${this.escapeXml(softwarePin)}</wcf:SoftwarePIN>
+  </soap:Header>
+  <soap:Body>
+    <wcf:GetStatus>
+      <wcf:trackId>${this.escapeXml(cufe)}</wcf:trackId>
+    </wcf:GetStatus>
+  </soap:Body>
+</soap:Envelope>`;
+  }
+
+  private parseGetStatusResponse(
+    body: string,
+  ): { isValid: boolean; message?: string } | null {
+    const b = body.trim();
+    if (!b) return null;
+    if (b.startsWith('{')) {
+      try {
+        const j = JSON.parse(b) as Record<string, unknown>;
+        const valid =
+          j.IsValid === true ||
+          j.isValid === true ||
+          j.StatusCode === 0 ||
+          j.statusCode === 0;
+        const msg =
+          (j.StatusDescription as string) ??
+          (j.Message as string) ??
+          (j.message as string);
+        return { isValid: !!valid, message: typeof msg === 'string' ? msg : undefined };
+      } catch {
+        return null;
+      }
+    }
+    const upper = b.toUpperCase();
+    const isValid =
+      upper.includes('<ISVALID>TRUE</ISVALID>') ||
+      upper.includes('<STATUSCODE>0</STATUSCODE>');
+    const msgMatch = b.match(
+      /<StatusDescription[^>]*>([^<]*)<\/StatusDescription>|<Message[^>]*>([^<]*)<\/Message>/i,
+    );
+    const message = msgMatch
+      ? (msgMatch[1] || msgMatch[2] || '').trim()
+      : undefined;
+    return { isValid, message };
   }
 
   /**

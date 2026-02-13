@@ -20,11 +20,12 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 // Cargar .env: desde raíz del repo (cwd/.env) o desde apps/api (cwd/../../.env)
+// override: false para que las variables de entorno ($env:DATABASE_URL) tengan prioridad
 const cwd = process.cwd();
 const envRoot = path.resolve(cwd, '.env');
 const envFromApi = path.resolve(cwd, '../../.env');
 const envPath = fs.existsSync(envRoot) ? envRoot : envFromApi;
-dotenv.config({ path: envPath, override: true });
+dotenv.config({ path: envPath, override: false });
 
 import { PrismaClient, RoleName } from '@prisma/client';
 import * as argon2 from 'argon2';

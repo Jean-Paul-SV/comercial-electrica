@@ -70,6 +70,7 @@ export default function SalesPage() {
   const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(new Set());
   const [addMultipleSearch, setAddMultipleSearch] = useState('');
   const [saleProductSearch, setSaleProductSearch] = useState('');
+  const [saleCustomerSearch, setSaleCustomerSearch] = useState('');
   const [discountPercent, setDiscountPercent] = useState<number>(0);
 
   const limit = 20;
@@ -80,7 +81,11 @@ export default function SalesPage() {
   });
   const createSaleMutation = useCreateSale();
   const cashSessionsQuery = useCashSessionsList({});
-  const customersQuery = useCustomersList({ page: 1, limit: 100 });
+  const customersQuery = useCustomersList({
+    page: 1,
+    limit: 100,
+    search: openNewSale ? (saleCustomerSearch.trim() || undefined) : undefined,
+  });
   const customerSalesStats = useCustomerSalesStats(customerId || null);
   const productsQuery = useProductsList({
     page: 1,
@@ -95,7 +100,33 @@ export default function SalesPage() {
     () => (cashSessionsQuery.data?.data ?? []).filter((s) => !s.closedAt),
     [cashSessionsQuery.data]
   );
-  const customers = useMemo(() => customersQuery.data?.data ?? [], [customersQuery.data]);
+  const customersRaw = useMemo(() => customersQuery.data?.data ?? [], [customersQuery.data]);
+  const customers = useMemo(() => {
+    const term = saleCustomerSearch.trim().toLowerCase();
+    let list = customersRaw;
+    if (term) {
+      list = customersRaw.filter(
+        (c) =>
+          (c.name ?? '').toLowerCase().includes(term) ||
+          (c.docNumber ?? '').toLowerCase().includes(term) ||
+          (c.email ?? '').toLowerCase().includes(term),
+      );
+      list = [...list].sort((a, b) => {
+        const nameA = (a.name ?? '').toLowerCase();
+        const nameB = (b.name ?? '').toLowerCase();
+        const docA = (a.docNumber ?? '').toLowerCase();
+        const docB = (b.docNumber ?? '').toLowerCase();
+        const score = (name: string, doc: string) => {
+          if (name === term || doc === term) return 0;
+          if (name.startsWith(term) || doc.startsWith(term)) return 1;
+          if (name.includes(term) || doc.includes(term)) return 2;
+          return 3;
+        };
+        return score(nameA, docA) - score(nameB, docB);
+      });
+    }
+    return list;
+  }, [customersRaw, saleCustomerSearch]);
   const productsRaw = useMemo(
     () => (productsQuery.data?.data ?? []).filter((p) => p.isActive !== false),
     [productsQuery.data]
@@ -331,6 +362,7 @@ export default function SalesPage() {
     setSelectedProductIds(new Set());
     setAddMultipleSearch('');
     setSaleProductSearch('');
+    setSaleCustomerSearch('');
     setDiscountPercent(0);
   };
 
@@ -601,41 +633,97 @@ export default function SalesPage() {
                     La venta se registra en la sesión de caja abierta. Si no hay ninguna, ve a <strong>Caja</strong> y abre una.
                   </p>
                 </div>
-                <div className="grid gap-2 min-w-0">
+                <div className="grid gap-2 min-w-0 sm:col-span-2">
                   <Label htmlFor="new-sale-customer" className="text-muted-foreground text-sm">Cliente (opcional)</Label>
-                  <select
-                    id="new-sale-customer"
-                    value={customerId || 'none'}
-                    onChange={(e) => setCustomerId(e.target.value === 'none' ? '' : e.target.value)}
-                    className={selectClassName}
-                  >
-                    <option value="none">Sin cliente</option>
-                    {customers.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
-                  <p className="text-xs text-muted-foreground leading-snug">
+                  <p className="text-xs text-muted-foreground -mt-1">
                     Asocia la venta a un cliente para facturación y reportes.
                   </p>
-                  {customerId && (
-                    <div className="flex h-10 items-center rounded-lg border border-border bg-background/50 px-3 py-2 text-sm text-foreground">
-                      {customerSalesStats.isLoading && (
-                        <span className="text-muted-foreground">Cargando historial…</span>
-                      )}
-                      {customerSalesStats.isError && (
-                        <span className="text-muted-foreground">No se pudo cargar el historial.</span>
-                      )}
-                      {customerSalesStats.data && (
-                        <>
-                          <span className="font-medium">
-                            {customerSalesStats.data.totalPurchases} compra{customerSalesStats.data.totalPurchases !== 1 ? 's' : ''} · Total {formatMoney(customerSalesStats.data.totalAmount)}
-                          </span>
-                          <span className="text-muted-foreground text-xs ml-1.5">(para decidir descuentos)</span>
-                        </>
-                      )}
+                  <div className="space-y-1.5">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                      <Input
+                        id="new-sale-customer"
+                        type="text"
+                        placeholder="Buscar cliente por nombre o documento..."
+                        value={saleCustomerSearch}
+                        onChange={(e) => setSaleCustomerSearch(e.target.value)}
+                        className="pl-9 h-9 rounded-lg"
+                        autoComplete="off"
+                      />
                     </div>
+                    {saleCustomerSearch.trim() && (
+                      <p className="text-xs text-muted-foreground">
+                        Buscando «<span className="font-medium text-foreground">{saleCustomerSearch.trim()}</span>» — {customers.length} resultado{customers.length !== 1 ? 's' : ''} (ordenados por lo más parecido)
+                      </p>
+                    )}
+                  </div>
+                  {customerId ? (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div className="flex h-9 flex-1 min-w-0 items-center rounded-lg border border-border bg-background/50 px-3 py-2 text-sm text-foreground">
+                        <span className="truncate font-medium">
+                          {customersRaw.find((c) => c.id === customerId)?.name ?? 'Cliente seleccionado'}
+                        </span>
+                        {customerSalesStats.data && (
+                          <span className="text-muted-foreground text-xs ml-1.5 shrink-0">
+                            ({customerSalesStats.data.totalPurchases} compra{customerSalesStats.data.totalPurchases !== 1 ? 's' : ''} · {formatMoney(customerSalesStats.data.totalAmount)})
+                          </span>
+                        )}
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-9 shrink-0"
+                        onClick={() => setCustomerId('')}
+                      >
+                        Sin cliente
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="rounded-lg border border-border overflow-hidden shadow-sm">
+                      <div
+                        className="grid gap-x-3 px-4 py-2.5 bg-muted/50 border-b border-border text-xs font-medium text-muted-foreground tracking-tight"
+                        style={{ gridTemplateColumns: '1fr 1fr' }}
+                      >
+                        <span>Cliente</span>
+                        <span>Documento</span>
+                      </div>
+                      <div className="max-h-48 overflow-auto divide-y divide-border/80">
+                        {customersQuery.isLoading ? (
+                          <div className="px-4 py-4 text-sm text-muted-foreground">Cargando clientes…</div>
+                        ) : customers.length === 0 ? (
+                          <div className="px-4 py-6 text-center">
+                            <p className="text-sm text-muted-foreground">
+                              {saleCustomerSearch.trim() ? `Ningún cliente coincide con «${saleCustomerSearch.trim()}».` : 'No hay clientes. Escribe para buscar o deja sin cliente.'}
+                            </p>
+                          </div>
+                        ) : (
+                          customers.map((c) => (
+                            <button
+                              key={c.id}
+                              type="button"
+                              className="w-full text-left grid gap-x-3 px-4 py-2.5 text-sm hover:bg-muted/50 focus:bg-muted/50 focus:outline-none focus:ring-0 transition-colors"
+                              style={{ gridTemplateColumns: '1fr 1fr' }}
+                              onClick={() => {
+                                setCustomerId(c.id);
+                                setSaleCustomerSearch('');
+                              }}
+                            >
+                              <span className="font-medium text-foreground truncate">{c.name}</span>
+                              <span className="text-muted-foreground truncate">
+                                {c.docNumber ? `${c.docType} ${c.docNumber}` : '—'}
+                              </span>
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  {customerId && customerSalesStats.isLoading && !customerSalesStats.data && (
+                    <p className="text-xs text-muted-foreground">Cargando historial del cliente…</p>
+                  )}
+                  {customerId && customerSalesStats.isError && (
+                    <p className="text-xs text-muted-foreground">No se pudo cargar el historial.</p>
                   )}
                 </div>
                 <div className="grid gap-2 min-w-0 sm:col-span-2">

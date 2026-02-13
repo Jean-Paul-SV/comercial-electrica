@@ -30,10 +30,11 @@ import {
 import { Skeleton } from '@shared/components/ui/skeleton';
 import { Pagination } from '@shared/components/Pagination';
 import { formatDateTime, formatMoney } from '@shared/utils/format';
-import { Boxes, Plus, Trash2, ChevronUp, ChevronDown, Search, Layers } from 'lucide-react';
-import { useMovementsList, useCreateMovement } from '@features/inventory/hooks';
+import { Boxes, Plus, Trash2, ChevronUp, ChevronDown, Search, Layers, DollarSign, AlertTriangle } from 'lucide-react';
+import { useMovementsList, useCreateMovement, useInventoryTotalValue } from '@features/inventory/hooks';
 import { useProductsList } from '@features/products/hooks';
 import { useSuppliersList } from '@features/suppliers/hooks';
+import { useLowStockThreshold } from '@shared/hooks/useLowStockThreshold';
 import type { MovementType } from '@features/inventory/types';
 
 const selectClassName =
@@ -52,6 +53,8 @@ function StockActualCard() {
   const [stockPage, setStockPage] = useState(1);
   const [stockSearch, setStockSearch] = useState('');
   const [stockSort, setStockSort] = useState<'asc' | 'desc' | null>(null);
+  const [lowStockThreshold, setLowStockThreshold] = useLowStockThreshold();
+  const [thresholdInput, setThresholdInput] = useState<string>('');
   const limit = 20;
   const stockParams = useMemo(
     () => ({
@@ -65,50 +68,92 @@ function StockActualCard() {
   const stockQuery = useProductsList(stockParams);
   const stockRows = useMemo(() => stockQuery.data?.data ?? [], [stockQuery.data]);
   const stockMeta = stockQuery.data?.meta;
+  const totalValueQuery = useInventoryTotalValue();
+  const totalValueAll = totalValueQuery.data?.totalValue ?? 0;
 
   useEffect(() => {
     setStockPage(1);
   }, [stockSearch, stockSort]);
 
   return (
-    <Card className="border-0 shadow-sm overflow-hidden">
-      <CardHeader className="pb-4 border-b border-border/50">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <CardTitle className="text-lg font-medium flex items-center gap-2">
-              <Layers className="h-5 w-5 shrink-0 text-primary" />
-              Stock actual
-            </CardTitle>
-            <CardDescription>
-              Cantidad en mano por producto. Para modificar stock, registra un movimiento (entrada, salida o ajuste) más abajo.
-            </CardDescription>
+    <Card className="border border-border/80 shadow-sm rounded-xl overflow-hidden">
+      <CardHeader className="pb-4 border-b border-border/60">
+        <CardTitle className="text-lg font-medium flex items-center gap-2 text-foreground">
+          <Layers className="h-5 w-5 shrink-0 text-primary" aria-hidden />
+          Stock actual
+        </CardTitle>
+        <CardDescription>
+          Cantidad en mano por producto. Para modificar stock, registra un movimiento (entrada, salida o ajuste) más abajo.
+        </CardDescription>
+        {!stockQuery.isLoading && (
+          <div className="grid gap-4 sm:grid-cols-2 mt-4">
+            <div className="rounded-lg border border-border/60 bg-muted/20 p-4 flex items-start gap-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <DollarSign className="h-4 w-4" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-xs font-medium text-muted-foreground">Valor total del inventario</p>
+                <p className="text-lg font-semibold tabular-nums text-foreground mt-0.5">
+                  {totalValueQuery.isLoading || totalValueQuery.isFetching ? '…' : formatMoney(totalValueAll)}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">Suma de (stock × costo) de todos los productos</p>
+              </div>
+            </div>
+            <div className="rounded-lg border border-border/60 bg-muted/20 p-4 flex items-start gap-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <AlertTriangle className="h-4 w-4" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <Label htmlFor="low-stock-threshold" className="text-xs font-medium text-muted-foreground">
+                  Stock mínimo por defecto
+                </Label>
+                <div className="flex items-center gap-2 mt-1.5">
+                  <Input
+                    id="low-stock-threshold"
+                    type="number"
+                    min={0}
+                    value={thresholdInput !== '' ? thresholdInput : String(lowStockThreshold)}
+                    onChange={(e) => setThresholdInput(e.target.value)}
+                    onBlur={() => {
+                      const n = parseInt(thresholdInput, 10);
+                      if (!Number.isNaN(n) && n >= 0) {
+                        setLowStockThreshold(n);
+                        setThresholdInput('');
+                      } else {
+                        setThresholdInput('');
+                      }
+                    }}
+                    className="h-9 w-20 tabular-nums rounded-lg"
+                  />
+                  <span className="text-xs text-muted-foreground">unidades</span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1.5">Se usa cuando el producto no tiene stock mínimo propio. Stock ≤ mínimo se considera en alerta.</p>
+              </div>
+            </div>
           </div>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-4 pt-4">
-        <div className="flex flex-wrap gap-3 pb-2 border-b border-border">
-          <div className="flex items-center gap-2 flex-1 min-w-[200px]">
-            <Label htmlFor="search-stock" className="text-xs text-muted-foreground whitespace-nowrap">
-              Buscar:
-            </Label>
-            <Input
-              id="search-stock"
-              type="search"
-              placeholder="Nombre o código del producto"
-              value={stockSearch}
-              onChange={(e) => {
-                setStockSearch(e.target.value);
-                setStockPage(1);
-              }}
-              className="h-9 rounded-lg text-sm flex-1 min-w-0"
-              autoComplete="off"
-            />
+        )}
+        <div className="flex flex-wrap items-end gap-3 pt-4 mt-2 border-t border-border/60">
+          <div className="flex flex-col gap-1.5 flex-1 min-w-[200px]">
+            <Label htmlFor="search-stock" className="text-xs font-medium text-muted-foreground">Buscar</Label>
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+              <Input
+                id="search-stock"
+                type="search"
+                placeholder="Nombre o código del producto"
+                value={stockSearch}
+                onChange={(e) => {
+                  setStockSearch(e.target.value);
+                  setStockPage(1);
+                }}
+                className="h-9 rounded-lg pl-8 text-sm flex-1 min-w-0"
+                autoComplete="off"
+              />
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Label className="text-xs text-muted-foreground whitespace-nowrap">
-              Ordenar por stock:
-            </Label>
-            <div className="flex items-center gap-1 border border-input rounded-lg p-0.5">
+          <div className="flex flex-col gap-1.5">
+            <Label className="text-xs font-medium text-muted-foreground">Ordenar por stock</Label>
+            <div className="flex items-center gap-1 border border-input rounded-lg p-0.5 bg-background">
               <button
                 type="button"
                 onClick={() => {
@@ -116,12 +161,12 @@ function StockActualCard() {
                   else setStockSort('desc');
                   setStockPage(1);
                 }}
-                className={`h-7 px-2 flex items-center gap-1 rounded text-xs transition-colors ${
-                  stockSort === 'desc' ? 'bg-primary text-primary-foreground' : 'hover:bg-accent text-muted-foreground'
+                className={`h-8 px-2.5 flex items-center gap-1 rounded-md text-xs font-medium transition-colors ${
+                  stockSort === 'desc' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted text-muted-foreground'
                 }`}
                 title="Mayor a menor"
               >
-                <ChevronUp className="h-3 w-3" />
+                <ChevronUp className="h-3.5 w-3.5" />
                 Mayor
               </button>
               <button
@@ -131,12 +176,12 @@ function StockActualCard() {
                   else setStockSort('asc');
                   setStockPage(1);
                 }}
-                className={`h-7 px-2 flex items-center gap-1 rounded text-xs transition-colors ${
-                  stockSort === 'asc' ? 'bg-primary text-primary-foreground' : 'hover:bg-accent text-muted-foreground'
+                className={`h-8 px-2.5 flex items-center gap-1 rounded-md text-xs font-medium transition-colors ${
+                  stockSort === 'asc' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted text-muted-foreground'
                 }`}
                 title="Menor a mayor"
               >
-                <ChevronDown className="h-3 w-3" />
+                <ChevronDown className="h-3.5 w-3.5" />
                 Menor
               </button>
             </div>
@@ -149,30 +194,34 @@ function StockActualCard() {
               setStockSort(null);
               setStockPage(1);
             }}
-            className="h-9 text-xs"
+            className="h-9 text-xs rounded-lg"
           >
             Limpiar
           </Button>
         </div>
-        <Pagination meta={stockMeta} onPageChange={setStockPage} label="Página" />
+      </CardHeader>
+      <CardContent className="pt-4 space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <Pagination meta={stockMeta} onPageChange={setStockPage} label="Página" />
+        </div>
         {stockQuery.isLoading && (
-          <div className="rounded-lg border border-border overflow-hidden">
+          <div className="rounded-lg border border-border/80 overflow-hidden">
             <Table>
               <TableHeader>
-                <TableRow className="bg-muted/40">
-                  <TableHead className="font-medium">Código</TableHead>
-                  <TableHead className="font-medium">Nombre</TableHead>
-                  <TableHead className="font-medium">Categoría</TableHead>
-                  <TableHead className="font-medium text-right">Stock</TableHead>
+                <TableRow className="hover:bg-transparent border-b border-border/80">
+                  <TableHead className="font-medium text-muted-foreground">Código</TableHead>
+                  <TableHead className="font-medium text-muted-foreground">Nombre</TableHead>
+                  <TableHead className="font-medium text-muted-foreground">Categoría</TableHead>
+                  <TableHead className="font-medium text-right text-muted-foreground">Stock</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {Array.from({ length: 5 }).map((_, i) => (
                   <TableRow key={i}>
-                    <TableCell><Skeleton className="h-5 w-24" /></TableCell>
-                    <TableCell><Skeleton className="h-5 w-32" /></TableCell>
-                    <TableCell><Skeleton className="h-5 w-20" /></TableCell>
-                    <TableCell className="text-right"><Skeleton className="h-5 w-12 ml-auto" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-24 rounded" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-32 rounded" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-20 rounded" /></TableCell>
+                    <TableCell className="text-right"><Skeleton className="h-5 w-12 ml-auto rounded" /></TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -180,35 +229,37 @@ function StockActualCard() {
           </div>
         )}
         {stockQuery.isError && (
-          <p className="text-sm text-destructive py-4">
-            {(stockQuery.error as { message?: string })?.message ?? 'Error al cargar stock'}
-          </p>
+          <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3">
+            <p className="text-sm text-destructive font-medium">
+              {(stockQuery.error as { message?: string })?.message ?? 'Error al cargar stock'}
+            </p>
+          </div>
         )}
-        {!stockQuery.isLoading && (
-          <div className="rounded-lg border border-border overflow-hidden">
+        {!stockQuery.isLoading && !stockQuery.isError && (
+          <div className="rounded-lg border border-border/80 overflow-hidden">
             <Table>
               <TableHeader>
-                <TableRow className="bg-muted/40 hover:bg-muted/40">
-                  <TableHead className="font-medium">Código</TableHead>
-                  <TableHead className="font-medium">Nombre</TableHead>
-                  <TableHead className="font-medium">Categoría</TableHead>
-                  <TableHead className="font-medium text-right">Stock</TableHead>
+                <TableRow className="hover:bg-transparent border-b border-border/80">
+                  <TableHead className="font-medium text-muted-foreground">Código</TableHead>
+                  <TableHead className="font-medium text-muted-foreground">Nombre</TableHead>
+                  <TableHead className="font-medium text-muted-foreground">Categoría</TableHead>
+                  <TableHead className="font-medium text-right text-muted-foreground">Stock</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {stockRows.map((p) => (
-                  <TableRow key={p.id} className="transition-colors hover:bg-muted/30">
-                    <TableCell className="font-mono text-muted-foreground text-sm">{p.internalCode}</TableCell>
-                    <TableCell className="font-medium">{p.name}</TableCell>
-                    <TableCell className="text-muted-foreground">{p.category?.name ?? '—'}</TableCell>
-                    <TableCell className="text-right tabular-nums font-medium">
+                  <TableRow key={p.id} className="transition-colors hover:bg-muted/40">
+                    <TableCell className="font-mono text-sm text-muted-foreground">{p.internalCode}</TableCell>
+                    <TableCell className="font-medium text-foreground">{p.name}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{p.category?.name ?? '—'}</TableCell>
+                    <TableCell className="text-right tabular-nums font-medium text-foreground">
                       {p.stock?.qtyOnHand ?? 0}
                     </TableCell>
                   </TableRow>
                 ))}
                 {stockRows.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={4} className="h-20 text-center text-muted-foreground">
+                  <TableRow className="hover:bg-transparent">
+                    <TableCell colSpan={4} className="h-24 text-center text-muted-foreground text-sm">
                       No hay productos. Crea productos en Catálogo → Productos.
                     </TableCell>
                   </TableRow>
@@ -232,6 +283,7 @@ export default function InventoryPage() {
   const [openAddMultiple, setOpenAddMultiple] = useState(false);
   const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(new Set());
   const [addMultipleSearch, setAddMultipleSearch] = useState('');
+  const [lineProductSearch, setLineProductSearch] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc' | null>(null);
 
@@ -250,9 +302,37 @@ export default function InventoryPage() {
   const meta = query.data?.meta;
   const products = useMemo(() => (productsQuery.data?.data ?? []).filter((p) => p.isActive !== false), [productsQuery.data]);
   const suppliers = useMemo(() => suppliersQuery.data?.data ?? [], [suppliersQuery.data]);
+  const productsFilteredForLines = useMemo(() => {
+    const term = lineProductSearch.trim().toLowerCase();
+    if (!term) return products;
+    const filtered = products.filter(
+      (p) =>
+        (p.name ?? '').toLowerCase().includes(term) ||
+        (p.internalCode ?? '').toLowerCase().includes(term),
+    );
+    return [...filtered].sort((a, b) => {
+      const nameA = (a.name ?? '').toLowerCase();
+      const nameB = (b.name ?? '').toLowerCase();
+      const codeA = (a.internalCode ?? '').toLowerCase();
+      const codeB = (b.internalCode ?? '').toLowerCase();
+      const score = (name: string, code: string) => {
+        if (name === term || code === term) return 0;
+        if (name.startsWith(term) || code.startsWith(term)) return 1;
+        if (name.includes(term) || code.includes(term)) return 2;
+        return 3;
+      };
+      return score(nameA, codeA) - score(nameB, codeB);
+    });
+  }, [products, lineProductSearch]);
 
   const addLine = () => setLines((prev) => [...prev, { productId: '', qty: 1 }]);
-  const updateLine = (index: number, field: keyof MovementLine, value: string | number) => {
+  const addLineWithProduct = (productId: string) => {
+    const p = products.find((x) => x.id === productId);
+    const unitCost = type === 'IN' && p ? Number(p.cost) || undefined : undefined;
+    setLines((prev) => [...prev, { productId, qty: 1, unitCost }]);
+    setLineProductSearch('');
+  };
+  const updateLine = (index: number, field: keyof MovementLine, value: string | number | undefined) => {
     setLines((prev) => {
       const next = [...prev];
       (next[index] as Record<string, unknown>)[field] = value;
@@ -269,6 +349,7 @@ export default function InventoryPage() {
     setOpenAddMultiple(false);
     setSelectedProductIds(new Set());
     setAddMultipleSearch('');
+    setLineProductSearch('');
   };
 
   const toggleProductSelection = (id: string) => {
@@ -343,47 +424,46 @@ export default function InventoryPage() {
 
   return (
     <div className="space-y-6 sm:space-y-8">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">
-          Inventario
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Stock actual por producto y movimientos (entradas, salidas, ajustes)
-        </p>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl flex items-center gap-2">
+            <Layers className="h-6 w-6 shrink-0 text-primary" aria-hidden />
+            Inventario
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Stock actual por producto y movimientos (entradas, salidas, ajustes)
+          </p>
+        </div>
+        <Button
+          size="sm"
+          onClick={() => setOpenNew(true)}
+          className="gap-2 rounded-xl font-medium shrink-0"
+        >
+          <Plus className="h-4 w-4" />
+          Nuevo movimiento
+        </Button>
       </div>
 
-      {/* Stock actual por producto */}
       <StockActualCard />
 
-      <Card className="border-0 shadow-sm overflow-hidden">
-        <CardHeader className="pb-4 bg-muted/30 border-b border-border/50">
+      <Card className="border border-border/80 shadow-sm rounded-xl overflow-hidden">
+        <CardHeader className="pb-4 border-b border-border/60">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <CardTitle className="text-lg font-medium flex items-center gap-2">
-                <Boxes className="h-5 w-5 shrink-0 text-primary" />
+              <CardTitle className="text-lg font-medium flex items-center gap-2 text-foreground">
+                <Boxes className="h-5 w-5 shrink-0 text-primary" aria-hidden />
                 Movimientos
               </CardTitle>
               <CardDescription>
-                Listado de movimientos paginado
+                {meta ? `${meta.total} movimiento${meta.total !== 1 ? 's' : ''}` : 'Listado paginado'} · Entradas, salidas y ajustes
               </CardDescription>
             </div>
-            <Button
-              size="sm"
-              onClick={() => setOpenNew(true)}
-              className="gap-2 w-full sm:w-fit shadow-sm"
-            >
-              <Plus className="h-4 w-4" />
-              Nuevo movimiento
-            </Button>
           </div>
-        </CardHeader>
-        <CardContent className="space-y-4 pt-4">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between rounded-lg bg-muted/20 border border-border/50 p-3">
-            <div className="flex flex-1 flex-wrap items-center gap-3 min-w-0">
-              <div className="flex items-center gap-2 flex-1 min-w-[200px] max-w-sm">
-                <Label htmlFor="search-movement" className="text-sm text-muted-foreground whitespace-nowrap">
-                  Buscar:
-                </Label>
+          <div className="flex flex-wrap items-end gap-3 pt-4">
+            <div className="flex flex-col gap-1.5 flex-1 min-w-[200px] max-w-sm">
+              <Label htmlFor="search-movement" className="text-xs font-medium text-muted-foreground">Buscar</Label>
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
                 <Input
                   id="search-movement"
                   type="search"
@@ -393,96 +473,90 @@ export default function InventoryPage() {
                     setSearchTerm(e.target.value);
                     setPage(1);
                   }}
-                  className="h-9 rounded-lg bg-background border-border/80 text-sm flex-1 min-w-0"
+                  className="h-9 rounded-lg pl-8 text-sm flex-1 min-w-0"
                   autoComplete="off"
                 />
               </div>
-              <div className="flex items-center gap-2">
-                <Label className="text-sm text-muted-foreground whitespace-nowrap">
-                  Ordenar:
-                </Label>
-                <div className="flex items-center gap-1 border border-input rounded-lg p-0.5">
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label className="text-xs font-medium text-muted-foreground">Ordenar por fecha</Label>
+              <div className="flex items-center gap-1 border border-input rounded-lg p-0.5 bg-background">
                 <button
                   type="button"
                   onClick={() => {
-                    if (sortOrder === 'desc') {
-                      setSortOrder(null);
-                    } else {
-                      setSortOrder('desc');
-                    }
+                    if (sortOrder === 'desc') setSortOrder(null);
+                    else setSortOrder('desc');
                     setPage(1);
                   }}
-                  className={`h-7 px-2 flex items-center gap-1 rounded text-xs transition-colors ${
-                    sortOrder === 'desc'
-                      ? 'bg-primary text-primary-foreground'
-                      : 'hover:bg-accent text-muted-foreground'
+                  className={`h-8 px-2.5 flex items-center gap-1 rounded-md text-xs font-medium transition-colors ${
+                    sortOrder === 'desc' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted text-muted-foreground'
                   }`}
                   title="Más reciente primero"
                 >
-                  <ChevronUp className="h-3 w-3" />
+                  <ChevronUp className="h-3.5 w-3.5" />
                   Mayor
                 </button>
                 <button
                   type="button"
                   onClick={() => {
-                    if (sortOrder === 'asc') {
-                      setSortOrder(null);
-                    } else {
-                      setSortOrder('asc');
-                    }
+                    if (sortOrder === 'asc') setSortOrder(null);
+                    else setSortOrder('asc');
                     setPage(1);
                   }}
-                  className={`h-7 px-2 flex items-center gap-1 rounded text-xs transition-colors ${
-                    sortOrder === 'asc'
-                      ? 'bg-primary text-primary-foreground'
-                      : 'hover:bg-accent text-muted-foreground'
+                  className={`h-8 px-2.5 flex items-center gap-1 rounded-md text-xs font-medium transition-colors ${
+                    sortOrder === 'asc' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted text-muted-foreground'
                   }`}
                   title="Más antiguo primero"
                 >
-                  <ChevronDown className="h-3 w-3" />
+                  <ChevronDown className="h-3.5 w-3.5" />
                   Menor
                 </button>
-                </div>
               </div>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setSearchTerm('');
-                  setSortOrder(null);
-                  setPage(1);
-                }}
-                disabled={!searchTerm.trim() && sortOrder === null}
-                className="h-9 shrink-0 border-border bg-background text-foreground hover:bg-muted/50 disabled:opacity-50"
-                aria-label="Limpiar filtros"
-              >
-                Limpiar filtros
-              </Button>
             </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setSearchTerm('');
+                setSortOrder(null);
+                setPage(1);
+              }}
+              disabled={!searchTerm.trim() && sortOrder === null}
+              className="h-9 rounded-lg"
+              aria-label="Limpiar filtros"
+            >
+              Limpiar
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-4 space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <Pagination meta={meta} onPageChange={setPage} label="Página" />
           </div>
 
           {query.isLoading && (
-            <div className="rounded-lg border border-border overflow-hidden">
+            <div className="rounded-lg border border-border/80 overflow-hidden">
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-muted/40">
-                    <TableHead className="font-medium">Fecha</TableHead>
-                    <TableHead className="font-medium">Tipo</TableHead>
-                    <TableHead className="font-medium">Motivo</TableHead>
-                    <TableHead className="font-medium">Productos</TableHead>
-                    <TableHead className="font-medium">Cantidad</TableHead>
+                  <TableRow className="hover:bg-transparent border-b border-border/80">
+                    <TableHead className="font-medium text-muted-foreground">Fecha</TableHead>
+                    <TableHead className="font-medium text-muted-foreground">Tipo</TableHead>
+                    <TableHead className="font-medium text-muted-foreground">Motivo</TableHead>
+                    <TableHead className="font-medium text-muted-foreground">Proveedor</TableHead>
+                    <TableHead className="font-medium text-muted-foreground">Productos</TableHead>
+                    <TableHead className="font-medium text-muted-foreground">Cantidad</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {Array.from({ length: 5 }).map((_, i) => (
                     <TableRow key={i}>
-                      <TableCell><Skeleton className="h-5 w-32" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-20" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-28" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-24" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-16" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-32 rounded" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-20 rounded" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-28 rounded" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-24 rounded" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-24 rounded" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-16 rounded" /></TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -491,40 +565,41 @@ export default function InventoryPage() {
           )}
 
           {query.isError && (
-            <p className="text-sm text-destructive py-4">
-              {(query.error as { message?: string })?.message ??
-                'Error al cargar movimientos'}
-            </p>
+            <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3">
+              <p className="text-sm text-destructive font-medium">
+                {(query.error as { message?: string })?.message ?? 'Error al cargar movimientos'}
+              </p>
+            </div>
           )}
 
-          {!query.isLoading && (
-            <div className="rounded-lg border border-border overflow-hidden">
+          {!query.isLoading && !query.isError && (
+            <div className="rounded-lg border border-border/80 overflow-hidden">
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-muted/40 hover:bg-muted/40">
-                    <TableHead className="font-medium">Fecha</TableHead>
-                    <TableHead className="font-medium">Tipo</TableHead>
-                    <TableHead className="font-medium">Motivo</TableHead>
-                    <TableHead className="font-medium">Proveedor</TableHead>
-                    <TableHead className="font-medium">Productos</TableHead>
-                    <TableHead className="font-medium">Cantidad</TableHead>
+                  <TableRow className="hover:bg-transparent border-b border-border/80">
+                    <TableHead className="font-medium text-muted-foreground">Fecha</TableHead>
+                    <TableHead className="font-medium text-muted-foreground">Tipo</TableHead>
+                    <TableHead className="font-medium text-muted-foreground">Motivo</TableHead>
+                    <TableHead className="font-medium text-muted-foreground">Proveedor</TableHead>
+                    <TableHead className="font-medium text-muted-foreground">Productos</TableHead>
+                    <TableHead className="font-medium text-muted-foreground">Cantidad</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {rows.map((m) => (
-                    <TableRow key={m.id} className="transition-colors hover:bg-muted/30">
-                      <TableCell className="text-muted-foreground text-sm">
+                    <TableRow key={m.id} className="transition-colors hover:bg-muted/40">
+                      <TableCell className="text-sm text-muted-foreground">
                         {formatDateTime(m.createdAt)}
                       </TableCell>
                       <TableCell>
-                        <span className="font-medium">
+                        <span className="font-medium text-foreground">
                           {TYPE_LABELS[m.type] ?? m.type}
                         </span>
                       </TableCell>
-                      <TableCell className="text-muted-foreground">
+                      <TableCell className="text-sm text-muted-foreground">
                         {m.reason ?? '—'}
                       </TableCell>
-                      <TableCell className="text-muted-foreground text-sm">
+                      <TableCell className="text-sm text-muted-foreground">
                         {m.supplier?.name ?? '—'}
                       </TableCell>
                       <TableCell className="text-muted-foreground align-top">
@@ -556,11 +631,8 @@ export default function InventoryPage() {
                     </TableRow>
                   ))}
                   {rows.length === 0 && (
-                    <TableRow>
-                      <TableCell
-                        colSpan={6}
-                        className="h-24 text-center text-muted-foreground"
-                      >
+                    <TableRow className="hover:bg-transparent">
+                      <TableCell colSpan={6} className="h-24 text-center text-muted-foreground text-sm">
                         No hay movimientos.
                       </TableCell>
                     </TableRow>
@@ -651,6 +723,75 @@ export default function InventoryPage() {
                   </Button>
                 </div>
               </div>
+              <div className="space-y-1.5">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                  <Input
+                    type="text"
+                    placeholder="Buscar producto por nombre o código..."
+                    value={lineProductSearch}
+                    onChange={(e) => setLineProductSearch(e.target.value)}
+                    className="pl-9 h-9 rounded-lg"
+                    autoComplete="off"
+                  />
+                </div>
+                {lineProductSearch.trim() && (
+                  <p className="text-xs text-muted-foreground">
+                    Buscando «<span className="font-medium text-foreground">{lineProductSearch.trim()}</span>» — {productsFilteredForLines.length} resultado{productsFilteredForLines.length !== 1 ? 's' : ''} (ordenados por lo más parecido)
+                  </p>
+                )}
+                {lineProductSearch.trim() && (
+                  <div className="rounded-lg border border-input bg-background shadow-sm overflow-hidden max-h-52 overflow-y-auto">
+                    {productsFilteredForLines.length === 0 ? (
+                      <p className="p-4 text-sm text-muted-foreground text-center">
+                        {products.length === 0 ? 'No hay productos disponibles.' : `Ningún producto coincide con «${lineProductSearch.trim()}». Prueba con otra palabra o código.`}
+                      </p>
+                    ) : (
+                      <ul className="py-1">
+                          {productsFilteredForLines.map((p) => {
+                            const stockQty = p.stock?.qtyOnHand ?? 0;
+                            const alreadyInLines = lines.some((l) => l.productId === p.id);
+                            const term = lineProductSearch.trim().toLowerCase();
+                            const name = p.name ?? '';
+                            const highlightName = term
+                              ? (() => {
+                                  const i = name.toLowerCase().indexOf(term);
+                                  if (i === -1) return name;
+                                  return (
+                                    <>
+                                      {name.slice(0, i)}
+                                      <mark className="bg-primary/20 text-primary font-medium rounded px-0.5">{name.slice(i, i + term.length)}</mark>
+                                      {name.slice(i + term.length)}
+                                    </>
+                                  );
+                                })()
+                              : name;
+                            return (
+                              <li key={p.id}>
+                                <button
+                                  type="button"
+                                  onClick={() => !alreadyInLines && addLineWithProduct(p.id)}
+                                  disabled={alreadyInLines}
+                                  className={`w-full text-left px-3 py-2.5 text-sm flex items-center justify-between gap-2 transition-colors ${
+                                    alreadyInLines
+                                      ? 'opacity-50 cursor-not-allowed text-muted-foreground'
+                                      : 'hover:bg-primary/10 hover:text-primary focus:bg-primary/10 focus:text-primary'
+                                  }`}
+                                >
+                                  <span className="font-medium truncate">{highlightName}</span>
+                                  <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
+                                    Stock: {stockQty}
+                                    {type === 'IN' && p.cost != null && ` · $${Number(p.cost).toFixed(2)}`}
+                                  </span>
+                                </button>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                    )}
+                  </div>
+                )}
+              </div>
               <div className="rounded-lg border border-border divide-y divide-border max-h-48 overflow-auto">
                 {lines.length === 0 && (
                   <p className="p-3 text-sm text-muted-foreground">Agrega al menos un producto con cantidad.</p>
@@ -663,7 +804,7 @@ export default function InventoryPage() {
                       className={`${selectClassName} flex-1 h-9`}
                     >
                       <option value="">Producto</option>
-                      {products.map((p) => {
+                      {productsFilteredForLines.map((p) => {
                         const stockQty = p.stock?.qtyOnHand ?? 0;
                         return (
                           <option key={p.id} value={p.id}>
@@ -686,7 +827,10 @@ export default function InventoryPage() {
                         step="0.01"
                         placeholder="Costo"
                         value={line.unitCost ?? ''}
-                        onChange={(e) => updateLine(i, 'unitCost', e.target.value ? Number(e.target.value) : 0)}
+                        onChange={(e) => {
+                          const raw = e.target.value;
+                          updateLine(i, 'unitCost', raw === '' ? undefined : Number(raw));
+                        }}
                         className="w-24 h-9 rounded-md"
                       />
                     )}

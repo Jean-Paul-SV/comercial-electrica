@@ -458,6 +458,22 @@ export class AuthService {
       }
       throw new UnauthorizedException('Credenciales inválidas.');
     }
+    // En producción: restringir login solo a correos permitidos (ej. 3 usuarios)
+    const allowedEmailsRaw = process.env.ALLOWED_LOGIN_EMAILS?.trim();
+    if (allowedEmailsRaw) {
+      const allowed = allowedEmailsRaw
+        .split(',')
+        .map((e) => e.trim().toLowerCase())
+        .filter(Boolean);
+      if (allowed.length > 0 && !allowed.includes(user.email.toLowerCase())) {
+        try {
+          await this.audit.logAuth('login_failed', user.id, { email, reason: 'not_allowed' });
+        } catch (auditErr) {
+          console.error('Error al registrar auditoría login_failed:', auditErr);
+        }
+        throw new UnauthorizedException('Credenciales inválidas.');
+      }
+    }
     const ok = await argon2.verify(user.passwordHash, dto.password);
     if (!ok) {
       try {

@@ -84,4 +84,5 @@ Luego en `.env` pon `DATABASE_URL="postgresql://ce:ce_password@localhost:5432/co
 
 ---
 
-Para probar **todos los cambios recientes** (bloqueos, alertas, auditoría, roles finos, contingencia, panel proveedor, etc.), ver **`docs/COMO_PROBAR_CAMBIOS_RECIENTES.md`**.
+Para probar **todos los cambios recientes** (bloqueos, alertas, auditoría, roles finos, contingencia, panel proveedor, etc.), ver **`docs/COMO_PROBAR_CAMBIOS_RECIENTES.md`**.  
+Para probar el **flujo DIAN completo** (CUFE, PDF, consulta estado), ver **`docs/PROBAR_FLUJO_DIAN_COMPLETO.md`**.

@@ -6,7 +6,8 @@ import { useAuth } from '@shared/providers/AuthProvider';
 import { useOnlineStatus } from '@shared/hooks/useOnlineStatus';
 import { Button } from '@shared/components/ui/button';
 import { cn } from '@lib/utils';
-import { Menu, X, LogOut, WifiOff } from 'lucide-react';
+import { Menu, X, LogOut, WifiOff, LayoutDashboard, ShoppingCart, Wallet, MoreHorizontal } from 'lucide-react';
+import Link from 'next/link';
 import { AlertsBell } from '@shared/components/AlertsBell';
 import { OfflineQueueBell } from '@shared/components/OfflineQueueBell';
 import { DianAlertsBanner } from '@shared/components/DianAlertsBanner';
@@ -186,12 +187,56 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </div>
           </div>
         </header>
-        <main className="flex-1 overflow-auto p-4 sm:p-6 md:p-8">
+        <main className="flex-1 overflow-auto p-4 sm:p-6 md:p-8 pb-20 lg:pb-8">
           <div className="mx-auto max-w-6xl animate-in fade-in duration-200">
             {enabledModules?.includes('electronic_invoicing') && <DianAlertsBanner />}
             {children}
           </div>
         </main>
+
+        {/* Barra inferior móvil: acceso rápido a Inicio, Ventas, Caja y Menú (solo usuarios de tenant) */}
+        {!isPlatformAdmin && (
+          <nav
+            className="lg:hidden fixed bottom-0 left-0 right-0 z-30 border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 pb-[env(safe-area-inset-bottom)]"
+            aria-label="Navegación principal"
+          >
+            <div className="grid grid-cols-4 h-14 min-h-[56px]">
+              <Link
+                href="/app"
+                className="flex flex-col items-center justify-center gap-0.5 text-muted-foreground hover:text-foreground focus:text-foreground min-h-[44px] active:bg-muted/50"
+                aria-current={pathname === '/app' ? 'page' : undefined}
+              >
+                <LayoutDashboard className="h-5 w-5 shrink-0" aria-hidden />
+                <span className="text-[10px] font-medium">Inicio</span>
+              </Link>
+              <Link
+                href="/sales"
+                className="flex flex-col items-center justify-center gap-0.5 text-muted-foreground hover:text-foreground focus:text-foreground min-h-[44px] active:bg-muted/50"
+                aria-current={pathname?.startsWith('/sales') ? 'page' : undefined}
+              >
+                <ShoppingCart className="h-5 w-5 shrink-0" aria-hidden />
+                <span className="text-[10px] font-medium">Ventas</span>
+              </Link>
+              <Link
+                href="/cash"
+                className="flex flex-col items-center justify-center gap-0.5 text-muted-foreground hover:text-foreground focus:text-foreground min-h-[44px] active:bg-muted/50"
+                aria-current={pathname?.startsWith('/cash') ? 'page' : undefined}
+              >
+                <Wallet className="h-5 w-5 shrink-0" aria-hidden />
+                <span className="text-[10px] font-medium">Caja</span>
+              </Link>
+              <button
+                type="button"
+                onClick={() => setMobileOpenState(true)}
+                className="flex flex-col items-center justify-center gap-0.5 text-muted-foreground hover:text-foreground focus:text-foreground min-h-[44px] active:bg-muted/50"
+                aria-label="Abrir menú"
+              >
+                <MoreHorizontal className="h-5 w-5 shrink-0" aria-hidden />
+                <span className="text-[10px] font-medium">Menú</span>
+              </button>
+            </div>
+          </nav>
+        )}
       </div>
       <ChangePasswordDialog
         open={changePasswordOpen}

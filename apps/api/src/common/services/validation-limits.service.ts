@@ -65,7 +65,7 @@ export class ValidationLimitsService {
   }
 
   /**
-   * Valida monto de caja
+   * Valida monto de caja (apertura o movimiento). Los montos son >= 0.
    */
   validateCashAmount(amount: number, operation: 'opening' | 'movement'): void {
     const min = this.MIN_CASH_AMOUNT;
@@ -86,6 +86,19 @@ export class ValidationLimitsService {
           style: 'currency',
           currency: 'COP',
         })}`,
+      );
+    }
+  }
+
+  /**
+   * Valida monto de cierre de sesión. Permite negativo (caja en rojo: más salidas que entradas).
+   */
+  validateClosingAmount(amount: number): void {
+    const max = this.MAX_CASH_AMOUNT;
+    const min = -max;
+    if (amount < min || amount > max) {
+      throw new BadRequestException(
+        `El monto de cierre debe estar entre ${min.toLocaleString('es-CO', { style: 'currency', currency: 'COP' })} y ${max.toLocaleString('es-CO', { style: 'currency', currency: 'COP' })}`,
       );
     }
   }

@@ -31,3 +31,13 @@ export function createMovement(
 ): Promise<InventoryMovementListItem> {
   return apiClient.post('/inventory/movements', payload, { authToken });
 }
+
+export type TotalInventoryValueResponse = { totalValue: number };
+
+export function getTotalInventoryValue(
+  authToken: string,
+): Promise<TotalInventoryValueResponse> {
+  return apiClient.get<TotalInventoryValueResponse>('/inventory/total-value', {
+    authToken,
+  });
+}

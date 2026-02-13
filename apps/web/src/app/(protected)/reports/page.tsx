@@ -36,6 +36,7 @@ import {
   useTrendingProducts,
   useExportReportCsv,
 } from '@features/reports/hooks';
+import { useLowStockThreshold } from '@shared/hooks/useLowStockThreshold';
 import { Button } from '@shared/components/ui/button';
 import { Label } from '@shared/components/ui/label';
 import { toast } from 'sonner';
@@ -181,7 +182,8 @@ export default function ReportsPage() {
     router.replace(`/reports?tab=${id}`, { scroll: false });
   };
 
-  const dashboard = useDashboard();
+  const [lowStockThreshold] = useLowStockThreshold();
+  const dashboard = useDashboard({ lowStockThreshold });
   const [salesPeriod, setSalesPeriod] = useState<SalesPeriodKey>('current_month');
   const salesReport = useSalesReport(getSalesReportParams(salesPeriod));
   const inventoryReport = useInventoryReport({});

@@ -350,6 +350,8 @@ model Product {
   cost         Decimal  @db.Decimal(18, 2)
   price        Decimal  @db.Decimal(18, 2)
   taxRate      Decimal  @db.Decimal(5, 2) @default(0)
+  /// Stock mínimo por producto; si es null se usa el umbral global para alertas de stock bajo.
+  minStock     Int?
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt

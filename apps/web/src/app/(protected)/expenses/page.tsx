@@ -36,10 +36,11 @@ import { Pagination } from '@shared/components/Pagination';
 import { formatMoney, formatDate, formatDateTime } from '@shared/utils/format';
 import { getErrorMessage } from '@shared/utils/errors';
 import { useHasPermission } from '@shared/hooks/useHasPermission';
-import { Receipt, Plus, Wallet, Trash2, FileCheck, ExternalLink } from 'lucide-react';
+import { Receipt, Plus, Wallet, Trash2, FileCheck, ExternalLink, ChevronDown, ChevronUp, Search } from 'lucide-react';
 import { useExpensesList, useCreateExpense, useDeleteExpense } from '@features/expenses/hooks';
 import { useCashSessionsList } from '@features/cash/hooks';
 import Link from 'next/link';
+import { EmptyState } from '@shared/components/EmptyState';
 
 const createExpenseSchema = z.object({
   amount: z.coerce.number().min(0.01, 'Monto mayor a 0'),
@@ -74,9 +75,9 @@ const PAYMENT_METHODS: { value: CreateExpenseFormValues['paymentMethod']; label:
 ];
 
 const formInputClass =
-  'h-9 min-w-0 rounded-xl border border-input bg-background/80 px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 transition-colors';
+  'h-9 min-w-0 rounded-lg border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 transition-colors';
 const formSelectClass =
-  'flex h-10 w-full items-center rounded-xl border border-input bg-background/80 px-3 py-2 text-sm ring-offset-background focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-50 transition-colors';
+  'flex h-9 w-full items-center rounded-lg border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 transition-colors';
 
 const CATEGORY_FACTURA_PROVEEDOR = 'Factura proveedor';
 
@@ -112,6 +113,7 @@ export default function ExpensesPage() {
   const [expenseTypeFilter, setExpenseTypeFilter] = useState<ExpenseTypeFilter>(expenseTypeFromUrl);
   const [kindFilter, setKindFilter] = useState<'' | 'FIXED' | 'VARIABLE' | 'OTHER'>('');
   const [category, setCategory] = useState('');
+  const [resumenOpen, setResumenOpen] = useState(false);
 
   useEffect(() => {
     setExpenseTypeFilter(expenseTypeFromUrl);
@@ -221,103 +223,91 @@ export default function ExpensesPage() {
 
   return (
     <div className="space-y-6 sm:space-y-8">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-xl font-semibold tracking-tight sm:text-2xl flex items-center gap-2">
-          <Receipt className="h-6 w-6 shrink-0 text-primary" />
-          Gastos
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Un solo lugar para todos los gastos: compras, oficina, viáticos, etc.
-        </p>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl flex items-center gap-2">
+            <Receipt className="h-6 w-6 shrink-0 text-primary" aria-hidden />
+            Gastos
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Un solo lugar para todos los gastos: compras, oficina, viáticos, etc.
+          </p>
+        </div>
+        {hasExpensesCreate && (
+          <Button onClick={() => setOpenNew(true)} className="gap-2 rounded-xl font-medium shrink-0" size="sm">
+            <Plus className="h-4 w-4" />
+            Nuevo gasto
+          </Button>
+        )}
       </div>
 
-      <Card className="rounded-2xl border-border/80 shadow-sm overflow-hidden">
-        <CardHeader className="pb-4 bg-muted/30 border-b border-border/50">
-          <CardTitle className="text-lg font-medium flex items-center gap-2">
-            <Receipt className="h-5 w-5 shrink-0 text-primary" />
-            Resumen
-          </CardTitle>
-          <CardDescription>
-            Cómo se registran los gastos en efectivo, por compras y cómo filtrar el listado.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="px-5 py-5 sm:px-6 sm:py-6">
-          <ul className="space-y-4 text-muted-foreground text-sm">
+      <button
+        type="button"
+        onClick={() => setResumenOpen((o) => !o)}
+        className="w-full flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-muted/20 hover:bg-muted/30 px-4 py-3 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+      >
+        <span className="text-sm font-medium text-foreground flex items-center gap-2">
+          <Receipt className="h-4 w-4 shrink-0 text-primary" />
+          Cómo se registran los gastos
+        </span>
+        {resumenOpen ? <ChevronUp className="h-4 w-4 text-muted-foreground shrink-0" /> : <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />}
+      </button>
+      {resumenOpen && (
+        <div className="rounded-xl border border-border/60 bg-muted/10 p-4 space-y-4">
+          <ul className="space-y-3 text-sm text-muted-foreground">
             <li className="flex items-start gap-3">
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                <Wallet className="h-4 w-4" />
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary mt-0.5">
+                <Wallet className="h-3.5 w-3.5" />
               </span>
               <span className="flex flex-wrap items-center gap-x-1.5 gap-y-1 pt-0.5">
-                <span className="font-medium text-foreground/90">Efectivo:</span> se descuenta de la{' '}
-                <Button
-                  asChild
-                  variant="outline"
-                  size="sm"
-                  className="h-8 px-3 text-sm border-primary/40 text-primary bg-primary/5 hover:bg-primary/10 hover:border-primary/60 inline-flex items-center gap-1.5 font-medium shadow-sm"
-                >
-                  <Link href="/cash" className="inline-flex items-center gap-1.5">
-                    <Wallet className="h-3.5 w-3.5 shrink-0" />
-                    Ir a sesión de caja
-                    <ExternalLink className="h-3.5 w-3.5 shrink-0 opacity-70" />
-                  </Link>
-                </Button>{' '}
-                y se refleja en el cierre.
+                <span className="font-medium text-foreground">Efectivo:</span> se descuenta de la{' '}
+                <Button asChild variant="outline" size="sm" className="h-7 px-2.5 text-xs inline-flex gap-1">
+                  <Link href="/cash">Ir a sesión de caja <ExternalLink className="h-3 w-3 opacity-70" /></Link>
+                </Button>
+                {' '}y se refleja en el cierre.
               </span>
             </li>
             <li className="flex items-start gap-3">
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                <FileCheck className="h-4 w-4" />
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary mt-0.5">
+                <FileCheck className="h-3.5 w-3.5" />
               </span>
               <span className="pt-0.5">
-                Gastos por compras: los pagos de facturas de proveedor (abono o «Registrar pago») se reflejan con categoría «{CATEGORY_FACTURA_PROVEEDOR}». Para ver solo esos, usa el filtro <strong className="text-foreground/90 font-medium">Tipo → Por compras</strong> en el listado.
+                <span className="font-medium text-foreground">Por compras:</span> pagos de facturas de proveedor aparecen como «{CATEGORY_FACTURA_PROVEEDOR}». Filtro <strong className="text-foreground">Tipo → Por compras</strong>.
               </span>
             </li>
             <li className="flex items-start gap-3">
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                <Receipt className="h-4 w-4" />
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary mt-0.5">
+                <Receipt className="h-3.5 w-3.5" />
               </span>
               <span className="pt-0.5">
-                Filtra por tipo (compras/otros), naturaleza (fijos/variables/otros), fecha o categoría; puedes eliminar un gasto desde las acciones del listado.
+                Filtra por tipo, fecha, naturaleza o categoría; elimina desde las acciones del listado.
               </span>
             </li>
           </ul>
-        </CardContent>
-      </Card>
+        </div>
+      )}
 
-      <Card className="rounded-2xl border-border/80 shadow-sm overflow-hidden">
-        <CardHeader className="pb-4 bg-muted/30 border-b border-border/50">
+      <Card className="border border-border/80 shadow-sm rounded-xl overflow-hidden">
+        <CardHeader className="pb-4 border-b border-border/60">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <CardTitle className="text-lg font-medium flex items-center gap-2">
-                <Receipt className="h-5 w-5 shrink-0 text-primary" />
+              <CardTitle className="text-lg font-medium flex items-center gap-2 text-foreground">
+                <Receipt className="h-5 w-5 shrink-0 text-primary" aria-hidden />
                 Listado
               </CardTitle>
               <CardDescription>
-                Gastos paginados. Filtra por tipo (compras / otros), fecha, naturaleza y categoría.
+                {meta ? `${meta.total} gasto${meta.total !== 1 ? 's' : ''}` : 'Gastos'} · Filtra por tipo, fecha, naturaleza o categoría.
               </CardDescription>
             </div>
-            {hasExpensesCreate && (
-              <Button
-                size="sm"
-                onClick={() => setOpenNew(true)}
-                className="gap-2 w-full sm:w-auto rounded-xl font-medium shadow-sm"
-              >
-                <Plus className="h-4 w-4" />
-                Nuevo gasto
-              </Button>
-            )}
           </div>
-
-          <div className="flex flex-wrap items-end gap-4 pt-4 rounded-xl bg-muted/20 border border-border/50 p-4 mt-2">
+          <div className="flex flex-wrap items-end gap-3 pt-4">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="filter-type" className="text-muted-foreground text-xs font-medium">
-                Tipo
-              </Label>
+              <Label htmlFor="filter-type" className="text-xs font-medium text-muted-foreground">Tipo</Label>
               <select
                 id="filter-type"
                 value={expenseTypeFilter}
                 onChange={(e) => setTypeAndUrl(e.target.value as ExpenseTypeFilter)}
-                className={formSelectClass + ' h-9 min-w-[140px]'}
+                className={formSelectClass + ' min-w-[130px]'}
               >
                 {EXPENSE_TYPE_OPTIONS.map((o) => (
                   <option key={o.value} value={o.value}>{o.label}</option>
@@ -325,38 +315,32 @@ export default function ExpensesPage() {
               </select>
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="filter-start" className="text-muted-foreground text-xs font-medium">
-                Desde
-              </Label>
+              <Label htmlFor="filter-start" className="text-xs font-medium text-muted-foreground">Desde</Label>
               <Input
                 id="filter-start"
                 type="date"
                 value={startDate}
                 onChange={(e) => { setStartDate(e.target.value); setPage(1); }}
-                className={formInputClass + ' min-w-[140px]'}
+                className={formInputClass + ' min-w-[130px]'}
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="filter-end" className="text-muted-foreground text-xs font-medium">
-                Hasta
-              </Label>
+              <Label htmlFor="filter-end" className="text-xs font-medium text-muted-foreground">Hasta</Label>
               <Input
                 id="filter-end"
                 type="date"
                 value={endDate}
                 onChange={(e) => { setEndDate(e.target.value); setPage(1); }}
-                className={formInputClass + ' min-w-[140px]'}
+                className={formInputClass + ' min-w-[130px]'}
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="filter-kind" className="text-muted-foreground text-xs font-medium">
-                Naturaleza
-              </Label>
+              <Label htmlFor="filter-kind" className="text-xs font-medium text-muted-foreground">Naturaleza</Label>
               <select
                 id="filter-kind"
                 value={kindFilter}
                 onChange={(e) => { setKindFilter((e.target.value || '') as '' | 'FIXED' | 'VARIABLE' | 'OTHER'); setPage(1); }}
-                className={formSelectClass + ' h-9 min-w-[140px]'}
+                className={formSelectClass + ' min-w-[130px]'}
               >
                 <option value="">Todos</option>
                 <option value="FIXED">Fijos</option>
@@ -365,50 +349,53 @@ export default function ExpensesPage() {
               </select>
             </div>
             {expenseTypeFilter === 'all' && (
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="filter-category" className="text-muted-foreground text-xs font-medium">
-                  Categoría o descripción
-                </Label>
-                <Input
-                  id="filter-category"
-                  type="text"
-                  placeholder="Ej. Oficina, inventario..."
-                  value={category}
-                  onChange={(e) => { setCategory(e.target.value); setPage(1); }}
-                  className={formInputClass + ' min-w-[160px]'}
-                />
+              <div className="flex flex-col gap-1.5 flex-1 min-w-[160px]">
+                <Label htmlFor="filter-category" className="text-xs font-medium text-muted-foreground">Categoría o descripción</Label>
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                  <Input
+                    id="filter-category"
+                    type="text"
+                    placeholder="Ej. Oficina, inventario..."
+                    value={category}
+                    onChange={(e) => { setCategory(e.target.value); setPage(1); }}
+                    className={formInputClass + ' pl-8'}
+                  />
+                </div>
               </div>
             )}
           </div>
         </CardHeader>
-        <CardContent className="space-y-4 pt-4">
-          <Pagination meta={meta} onPageChange={setPage} label="Página" />
+        <CardContent className="pt-4 space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <Pagination meta={meta} onPageChange={setPage} label="Página" />
+          </div>
 
           {query.isLoading && (
-            <div className="rounded-xl border border-border/80 overflow-hidden">
+            <div className="rounded-lg border border-border/80 overflow-hidden">
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-muted/40">
-                    <TableHead className="font-medium">Fecha</TableHead>
-                    <TableHead className="font-medium">Descripción</TableHead>
-                    <TableHead className="font-medium">Categoría</TableHead>
-                    <TableHead className="font-medium">Naturaleza</TableHead>
-                    <TableHead className="text-right font-medium">Monto</TableHead>
-                    <TableHead className="font-medium">Método</TableHead>
-                    <TableHead className="text-center font-medium">Caja</TableHead>
-                    <TableHead className="w-[4rem] text-center font-medium">Acciones</TableHead>
+                  <TableRow className="hover:bg-transparent border-b border-border/80">
+                    <TableHead className="font-medium text-muted-foreground">Fecha</TableHead>
+                    <TableHead className="font-medium text-muted-foreground">Descripción</TableHead>
+                    <TableHead className="font-medium text-muted-foreground">Categoría</TableHead>
+                    <TableHead className="font-medium text-muted-foreground">Naturaleza</TableHead>
+                    <TableHead className="text-right font-medium text-muted-foreground">Monto</TableHead>
+                    <TableHead className="font-medium text-muted-foreground">Método</TableHead>
+                    <TableHead className="text-center font-medium text-muted-foreground">Caja</TableHead>
+                    <TableHead className="w-[4rem] text-center font-medium text-muted-foreground">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {Array.from({ length: 5 }).map((_, i) => (
                     <TableRow key={i}>
-                      <TableCell><Skeleton className="h-5 w-24" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-40" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-20" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-16" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-20 ml-auto" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-20" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-16 mx-auto" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-24 rounded" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-40 rounded" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-20 rounded" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-16 rounded" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-20 ml-auto rounded" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-20 rounded" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-16 mx-auto rounded" /></TableCell>
                       <TableCell><Skeleton className="h-8 w-8 mx-auto rounded" /></TableCell>
                     </TableRow>
                   ))}
@@ -418,55 +405,54 @@ export default function ExpensesPage() {
           )}
 
           {query.isError && (
-            <p className="text-sm text-destructive py-4">
-              {getErrorMessage(query.error, 'Error al cargar gastos')}
-            </p>
+            <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3">
+              <p className="text-sm text-destructive">
+                {getErrorMessage(query.error, 'Error al cargar gastos')}
+              </p>
+            </div>
           )}
 
-          {!query.isLoading && (
-            <div className="rounded-xl border border-border/80 overflow-hidden">
+          {!query.isLoading && !query.isError && (
+            <div className="rounded-lg border border-border/80 overflow-hidden">
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-muted/40 hover:bg-muted/40">
-                    <TableHead className="font-medium">Fecha</TableHead>
-                    <TableHead className="font-medium">Descripción</TableHead>
-                    <TableHead className="font-medium">Categoría</TableHead>
-                    <TableHead className="font-medium">Naturaleza</TableHead>
-                    <TableHead className="text-right font-medium">Monto</TableHead>
-                    <TableHead className="font-medium">Método</TableHead>
-                    <TableHead className="text-center font-medium">Caja</TableHead>
-                    <TableHead className="w-[4rem] text-center font-medium">Acciones</TableHead>
+                  <TableRow className="hover:bg-transparent border-b border-border/80">
+                    <TableHead className="font-medium text-muted-foreground">Fecha</TableHead>
+                    <TableHead className="font-medium text-muted-foreground">Descripción</TableHead>
+                    <TableHead className="font-medium text-muted-foreground">Categoría</TableHead>
+                    <TableHead className="font-medium text-muted-foreground">Naturaleza</TableHead>
+                    <TableHead className="text-right font-medium text-muted-foreground">Monto</TableHead>
+                    <TableHead className="font-medium text-muted-foreground">Método</TableHead>
+                    <TableHead className="text-center font-medium text-muted-foreground">Caja</TableHead>
+                    <TableHead className="w-[4rem] text-center font-medium text-muted-foreground">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {rows.map((e) => (
-                    <TableRow key={e.id} className="transition-colors hover:bg-muted/30">
-                      <TableCell className="text-muted-foreground text-sm">
+                    <TableRow key={e.id} className="transition-colors hover:bg-muted/40">
+                      <TableCell className="text-sm text-muted-foreground">
                         {formatDate(e.expenseDate)}
                       </TableCell>
                       <TableCell className="font-medium">
-                        <Link
-                          href={`/expenses/${e.id}`}
-                          className="text-primary hover:underline"
-                        >
+                        <Link href={`/expenses/${e.id}`} className="text-primary hover:underline">
                           {e.description}
                         </Link>
                       </TableCell>
-                      <TableCell className="text-muted-foreground text-sm">
+                      <TableCell className="text-sm text-muted-foreground">
                         {e.category ?? '—'}
                       </TableCell>
-                      <TableCell className="text-muted-foreground text-sm">
+                      <TableCell className="text-sm text-muted-foreground">
                         {e.kind ? EXPENSE_KIND_LABELS[e.kind] ?? e.kind : '—'}
                       </TableCell>
-                      <TableCell className="text-right tabular-nums font-medium">
+                      <TableCell className="text-right tabular-nums font-medium text-foreground">
                         {formatMoney(e.amount)}
                       </TableCell>
-                      <TableCell className="text-sm">
+                      <TableCell className="text-sm text-muted-foreground">
                         {PAYMENT_LABELS[e.paymentMethod] ?? e.paymentMethod}
                       </TableCell>
                       <TableCell className="text-center text-sm">
                         {e.cashSessionId && e.cashSession ? (
-                          <span className="inline-flex items-center gap-1 text-muted-foreground" title={`Sesión abierta el ${formatDateTime(e.cashSession.openedAt)}`}>
+                          <span className="inline-flex items-center gap-1 text-muted-foreground" title={`Sesión ${formatDateTime(e.cashSession.openedAt)}`}>
                             <Wallet className="h-3.5 w-3.5 shrink-0" />
                             Descontado
                           </span>
@@ -480,25 +466,33 @@ export default function ExpensesPage() {
                             type="button"
                             variant="ghost"
                             size="icon"
-                            className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                            className="h-8 w-8 text-muted-foreground hover:text-destructive rounded-lg"
                             onClick={() => setExpenseToDelete({ id: e.id, description: e.description, amount: e.amount })}
                             aria-label="Eliminar gasto"
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         ) : (
-                          <span className="text-xs text-muted-foreground">Sin permiso</span>
+                          <span className="text-xs text-muted-foreground">—</span>
                         )}
                       </TableCell>
                     </TableRow>
                   ))}
                   {rows.length === 0 && (
-                    <TableRow>
-                      <TableCell
-                        colSpan={8}
-                        className="h-24 text-center text-muted-foreground"
-                      >
-                        No hay gastos con los filtros indicados.
+                    <TableRow className="hover:bg-transparent">
+                      <TableCell colSpan={8} className="p-0">
+                        <EmptyState
+                          message="No hay gastos con los filtros indicados"
+                          description="Cambia tipo, fechas o categoría, o registra un nuevo gasto."
+                          icon={Receipt}
+                          action={hasExpensesCreate ? (
+                            <Button size="sm" onClick={() => setOpenNew(true)} className="gap-2">
+                              <Plus className="h-4 w-4" />
+                              Nuevo gasto
+                            </Button>
+                          ) : undefined}
+                          className="py-16"
+                        />
                       </TableCell>
                     </TableRow>
                   )}

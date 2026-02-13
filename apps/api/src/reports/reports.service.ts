@@ -609,9 +609,10 @@ export class ReportsService {
     };
   }
 
-  async getDashboard(tenantId: string) {
+  async getDashboard(tenantId: string, lowStockThreshold?: number) {
+    const threshold = lowStockThreshold ?? 10;
     return this.wrapReport(async () => {
-      const cacheKey = this.cache.buildKey('dashboard', tenantId);
+      const cacheKey = this.cache.buildKey('dashboard', tenantId, String(threshold));
       let cached: unknown = null;
       try {
         cached = await this.cache.get(cacheKey);
@@ -651,21 +652,64 @@ export class ReportsService {
         0,
       );
 
-      // Productos con stock bajo
-      const lowStockProducts = await this.prisma.product.findMany({
-        where: {
-          tenantId,
-          isActive: true,
-          stock: {
-            qtyOnHand: { lte: 10 },
+      // Productos con stock bajo: por producto (minStock) o umbral global. Si la columna minStock no existe (migración pendiente), se usa solo el umbral.
+      let lowStockCount: number;
+      let lowStockProducts: Array<{ id: string; name: string; stock: number; category?: string }>;
+      try {
+        const lowStockRows = await this.prisma.$queryRaw<
+          Array<{ id: string; name: string; qtyOnHand: number; categoryName: string | null }>
+        >`
+          SELECT p.id, p.name, s."qtyOnHand", c.name as "categoryName"
+          FROM "Product" p
+          INNER JOIN "StockBalance" s ON p.id = s."productId"
+          LEFT JOIN "Category" c ON p."categoryId" = c.id
+          WHERE p."tenantId" = ${tenantId}
+            AND p."isActive" = true
+            AND s."qtyOnHand" <= COALESCE(p."minStock", ${threshold})
+          ORDER BY s."qtyOnHand" ASC
+          LIMIT 10
+        `;
+        const lowStockCountResult = await this.prisma.$queryRaw<[{ count: bigint }]>`
+          SELECT COUNT(*)::bigint as count FROM "Product" p
+          INNER JOIN "StockBalance" s ON p.id = s."productId"
+          WHERE p."tenantId" = ${tenantId}
+            AND p."isActive" = true
+            AND s."qtyOnHand" <= COALESCE(p."minStock", ${threshold})
+        `;
+        lowStockCount = Number(lowStockCountResult[0]?.count ?? 0);
+        lowStockProducts = lowStockRows.map((p) => ({
+          id: p.id,
+          name: p.name,
+          stock: p.qtyOnHand,
+          category: p.categoryName ?? undefined,
+        }));
+      } catch (err) {
+        this.logger.warn(
+          `Dashboard lowStock con minStock falló (¿migración pendiente?): ${err instanceof Error ? err.message : String(err)}. Usando umbral global.`,
+        );
+        const fallback = await this.prisma.product.findMany({
+          where: {
+            tenantId,
+            isActive: true,
+            stock: { qtyOnHand: { lte: threshold } },
           },
-        },
-        include: {
-          stock: true,
-          category: true,
-        },
-        take: 10,
-      });
+          include: { stock: true, category: true },
+          take: 10,
+        });
+        lowStockCount = await this.prisma.product.count({
+          where: {
+            tenantId,
+            isActive: true,
+            stock: { qtyOnHand: { lte: threshold } },
+          },
+        });
+        lowStockProducts = fallback.map((p) => ({
+          id: p.id,
+          name: p.name,
+          stock: p.stock?.qtyOnHand ?? 0,
+          category: p.category?.name,
+        }));
+      }
 
       // Sesiones de caja abiertas
       const openCashSessions = await this.prisma.cashSession.findMany({
@@ -728,13 +772,9 @@ export class ReportsService {
         },
         inventory: {
           totalProducts,
-          lowStockCount: lowStockProducts.length,
-          lowStockProducts: lowStockProducts.map((p) => ({
-            id: p.id,
-            name: p.name,
-            stock: p.stock?.qtyOnHand ?? 0,
-            category: p.category?.name,
-          })),
+          lowStockThreshold: threshold,
+          lowStockCount,
+          lowStockProducts,
         },
         cash: {
           openSessions: openCashSessions.length,
@@ -805,14 +845,27 @@ export class ReportsService {
           where: { tenantId, closedAt: null },
           orderBy: { openedAt: 'asc' },
         }),
-        this.prisma.product.findMany({
-          where: {
-            tenantId,
-            isActive: true,
-            stock: { qtyOnHand: { lte: LOW_STOCK_THRESHOLD } },
-          },
-          include: { stock: true },
-        }),
+        (async () => {
+          try {
+            const rows = await this.prisma.$queryRaw<{ id: string }[]>`
+              SELECT p.id FROM "Product" p
+              INNER JOIN "StockBalance" s ON p.id = s."productId"
+              WHERE p."tenantId" = ${tenantId}
+                AND p."isActive" = true
+                AND s."qtyOnHand" <= COALESCE(p."minStock", ${LOW_STOCK_THRESHOLD})
+            `;
+            return rows;
+          } catch {
+            return this.prisma.product.findMany({
+              where: {
+                tenantId,
+                isActive: true,
+                stock: { qtyOnHand: { lte: LOW_STOCK_THRESHOLD } },
+              },
+              select: { id: true },
+            });
+          }
+        })(),
         this.prisma.product.findMany({
           where: {
             tenantId,
@@ -967,7 +1020,7 @@ export class ReportsService {
           severity: 'medium',
           priority: 4,
           title: 'Stock bajo',
-          message: `${lowStockProducts.length} producto(s) con stock ≤ ${LOW_STOCK_THRESHOLD}. Considera reponer.`,
+          message: `${lowStockProducts.length} producto(s) con stock bajo (según mínimo por producto). Considera reponer.`,
           area: 'inventory',
           count: lowStockProducts.length,
           actionLabel: 'Ver productos con stock bajo',

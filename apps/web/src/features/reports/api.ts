@@ -56,8 +56,16 @@ export function getCustomersReport(
   return apiClient.get(`/reports/customers${buildQuery(params)}`, { authToken });
 }
 
-export function getDashboard(authToken: string): Promise<DashboardResponse> {
-  return apiClient.get('/reports/dashboard', { authToken });
+export type GetDashboardParams = { lowStockThreshold?: number };
+
+export function getDashboard(
+  authToken: string,
+  params?: GetDashboardParams,
+): Promise<DashboardResponse> {
+  const qs = new URLSearchParams();
+  if (params?.lowStockThreshold != null) qs.set('lowStockThreshold', String(params.lowStockThreshold));
+  const query = qs.toString() ? `?${qs.toString()}` : '';
+  return apiClient.get(`/reports/dashboard${query}`, { authToken });
 }
 
 export function getActionableIndicators(

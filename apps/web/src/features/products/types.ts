@@ -18,6 +18,7 @@ export type ProductListItem = {
   cost: string | number;
   price: string | number;
   taxRate: string | number;
+  minStock?: number | null;
   isActive: boolean;
   category?: { id: string; name: string } | null;
   stock?: { productId: string; qtyOnHand: number; qtyReserved: number } | null;
@@ -35,10 +36,12 @@ export type CreateProductPayload = {
   cost: number;
   price: number;
   taxRate?: number;
+  minStock?: number | null;
 };
 
 export type UpdateProductPayload = Partial<CreateProductPayload> & {
   isActive?: boolean;
+  minStock?: number | null;
 };
 
 export type Category = {

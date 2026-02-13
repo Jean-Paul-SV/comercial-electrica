@@ -91,6 +91,7 @@ export type DashboardResponse = {
   };
   inventory?: {
     totalProducts?: number;
+    lowStockThreshold?: number;
     lowStockCount?: number;
     lowStockProducts?: Array<{ id: string; name: string; stock: number; category?: string }>;
   };
