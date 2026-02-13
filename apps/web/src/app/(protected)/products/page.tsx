@@ -235,8 +235,8 @@ export default function ProductsPage() {
     const price = getPrice(values);
     const initialQty = Number(values.initialQuantity) || 0;
     const minStock =
-      values.minStock !== undefined && values.minStock !== '' && Number(values.minStock) >= 0
-        ? Number(values.minStock)
+      typeof values.minStock === 'number' && Number.isFinite(values.minStock) && values.minStock >= 0
+        ? values.minStock
         : undefined;
     createProduct.mutate(
       {
@@ -284,8 +284,8 @@ export default function ProductsPage() {
     if (!editingProductId) return;
     const price = getPrice(values);
     const minStock =
-      values.minStock !== undefined && values.minStock !== '' && Number(values.minStock) >= 0
-        ? Number(values.minStock)
+      typeof values.minStock === 'number' && Number.isFinite(values.minStock) && values.minStock >= 0
+        ? values.minStock
         : null;
     updateProduct.mutate(
       {
