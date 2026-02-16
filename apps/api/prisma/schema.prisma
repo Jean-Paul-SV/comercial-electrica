@@ -110,6 +110,7 @@ model Plan {
   description     String?
   priceMonthly    Decimal?  @db.Decimal(10, 2)
   priceYearly     Decimal?  @db.Decimal(10, 2)
+  maxUsers        Int?      // Límite de usuarios por tenant; null = sin límite (legacy)
   stripePriceId   String?   @db.VarChar(255)
   isActive        Boolean   @default(true)
   createdAt       DateTime  @default(now())

@@ -9,7 +9,10 @@ import {
 } from '@nestjs/common';
 import * as express from 'express';
 import { ApiExcludeEndpoint } from '@nestjs/swagger';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 import { BillingService } from './billing.service';
+import Stripe from 'stripe';
 
 /** Request con body raw (para verificación de firma Stripe). */
 interface RequestWithRawBody extends express.Request {
@@ -24,7 +27,10 @@ interface RequestWithRawBody extends express.Request {
 export class BillingController {
   private readonly logger = new Logger(BillingController.name);
 
-  constructor(private readonly billing: BillingService) {}
+  constructor(
+    private readonly billing: BillingService,
+    @InjectQueue('stripe-webhooks') private readonly webhookQueue: Queue,
+  ) {}
 
   @Post('stripe')
   @HttpCode(HttpStatus.OK)
@@ -55,8 +61,38 @@ export class BillingController {
       this.logger.error(
         `Error procesando evento ${event.id} (${event.type}): ${(err as Error).message}`,
       );
-      res.status(500).json({ error: 'Webhook handler failed' });
-      return { received: false };
+      
+      // Encolar para reintento automático (máximo 3 intentos con backoff exponencial)
+      try {
+        await this.webhookQueue.add(
+          `stripe-event-${event.id}`,
+          { event },
+          {
+            attempts: 3,
+            backoff: {
+              type: 'exponential',
+              delay: 5000, // 5s, 10s, 20s
+            },
+            removeOnComplete: {
+              age: 86400, // Mantener completados por 24h
+            },
+            removeOnFail: {
+              age: 604800, // Mantener fallidos por 7 días para debugging
+            },
+          },
+        );
+        this.logger.log(
+          `Evento Stripe ${event.id} encolado para reintento automático`,
+        );
+      } catch (queueErr) {
+        this.logger.error(
+          `Error encolando evento Stripe ${event.id} para reintento: ${(queueErr as Error).message}`,
+        );
+      }
+      
+      // Responder 200 a Stripe para evitar reenvíos inmediatos
+      // El evento se procesará en segundo plano
+      return { received: true, queued: true };
     }
 
     return { received: true };

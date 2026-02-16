@@ -132,6 +132,19 @@ export default function LoginPage() {
               {loginMutation.isPending ? 'Accediendo…' : 'Iniciar sesión'}
             </Button>
           </form>
+          <div className="mt-6 pt-4 border-t border-border/60 text-center text-xs text-muted-foreground space-y-1">
+            <p className="font-medium text-foreground/80">¿Aún no eres cliente de Orion?</p>
+            <p>
+              Conoce cómo adquirir nuestros servicios escribiendo a{' '}
+              <a
+                href="mailto:soporte@orion-app.cloud?subject=Quiero%20adquirir%20Orion"
+                className="text-primary hover:underline underline-offset-2"
+              >
+                soporte@orion-app.cloud
+              </a>
+              .
+            </p>
+          </div>
         </CardContent>
       </Card>
     </main>

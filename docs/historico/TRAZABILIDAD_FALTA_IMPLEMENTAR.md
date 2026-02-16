@@ -9,7 +9,7 @@
 
 | Prioridad   | Área                         | Qué falta (resumen) |
 |------------|------------------------------|---------------------|
-| **Media**  | Compras (flujo UI)           | Listado, crear pedido, “Recibir pedido” en `/purchases` |
+| **—**     | ~~Compras~~                  | ✅ Hecho: listado, crear, Recibir en `/purchases`; “Recibir pedido” en `/purchases` |
 | **Baja**   | Configuración / operación    | Límite de login configurable por env (`LOGIN_THROTTLE_LIMIT`) |
 | **Opcional** | Contingencia DIAN         | Botón “Reintentar envíos pendientes” (reencolar DRAFT) |
 | **Opcional** | UX / producto             | Toasts donde falten, pulido responsive/accesibilidad |

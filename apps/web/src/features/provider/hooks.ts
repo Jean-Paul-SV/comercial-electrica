@@ -13,6 +13,18 @@ export function usePlans(activeOnly?: boolean) {
   });
 }
 
+export function useCreatePlan() {
+  const { token } = useAuth();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: import('./types').CreatePlanPayload) =>
+      api.createPlan(payload, token!),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['provider', 'plans'] });
+    },
+  });
+}
+
 export function useUpdatePlan() {
   const { token } = useAuth();
   const queryClient = useQueryClient();
@@ -35,6 +47,15 @@ export function useListTenants(query?: ListTenantsQuery) {
   return useQuery({
     queryKey: ['provider', 'tenants', query],
     queryFn: () => api.listTenants(token!, query),
+    enabled: Boolean(token),
+  });
+}
+
+export function useTenantsSummary() {
+  const { token } = useAuth();
+  return useQuery({
+    queryKey: ['provider', 'tenants', 'summary'],
+    queryFn: () => api.getTenantsSummary(token!),
     enabled: Boolean(token),
   });
 }

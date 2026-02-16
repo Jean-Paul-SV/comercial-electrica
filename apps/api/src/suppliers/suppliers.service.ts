@@ -3,7 +3,6 @@ import {
   NotFoundException,
   Logger,
   BadRequestException,
-  ForbiddenException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -11,6 +10,8 @@ import { CreateSupplierDto } from './dto/create-supplier.dto';
 import { UpdateSupplierDto } from './dto/update-supplier.dto';
 import { AuditService } from '../common/services/audit.service';
 import { CacheService } from '../common/services/cache.service';
+import { TenantContextService } from '../common/services/tenant-context.service';
+import { buildPaginationMeta } from '../common/utils/pagination';
 
 @Injectable()
 export class SuppliersService {
@@ -20,6 +21,7 @@ export class SuppliersService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly cache: CacheService,
+    private readonly tenantContext: TenantContextService,
   ) {}
 
   async list(
@@ -31,11 +33,11 @@ export class SuppliersService {
     },
     tenantId?: string | null,
   ) {
-    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
+    const currentTenantId = this.tenantContext.ensureTenant(tenantId);
     const page = pagination?.page ?? 1;
     const limit = pagination?.limit ?? 20;
     const skip = (page - 1) * limit;
-    const where: Prisma.SupplierWhereInput = { tenantId };
+    const where: Prisma.SupplierWhereInput = { tenantId: currentTenantId };
     if (pagination?.isActive === true) where.isActive = true;
     const searchTerm = pagination?.search?.trim();
     if (searchTerm) {
@@ -57,24 +59,15 @@ export class SuppliersService {
       this.prisma.supplier.count({ where }),
     ]);
 
-    const totalPages = Math.ceil(total / limit);
-
     return {
       data,
-      meta: {
-        total,
-        page,
-        limit,
-        totalPages,
-        hasNextPage: page < totalPages,
-        hasPreviousPage: page > 1,
-      },
+      meta: buildPaginationMeta(total, page, limit),
     };
   }
 
   async get(id: string, tenantId?: string | null) {
-    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
-    const cacheKey = this.cache.buildKey('supplier', id, tenantId);
+    const currentTenantId = this.tenantContext.ensureTenant(tenantId);
+    const cacheKey = this.cache.buildKey('supplier', id, currentTenantId);
     const cached = await this.cache.get(cacheKey);
     if (cached) {
       this.logger.debug(`Supplier ${id} retrieved from cache`);
@@ -82,7 +75,7 @@ export class SuppliersService {
     }
 
     const s = await this.prisma.supplier.findFirst({
-      where: { id, tenantId },
+      where: { id, tenantId: currentTenantId },
     });
     if (!s) throw new NotFoundException('Proveedor no encontrado.');
 
@@ -96,7 +89,7 @@ export class SuppliersService {
     createdByUserId?: string,
     tenantId?: string | null,
   ) {
-    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
+    const currentTenantId = this.tenantContext.ensureTenant(tenantId);
     const startTime = Date.now();
     this.logger.log(`Creando proveedor ${dto.nit}`, {
       nit: dto.nit,
@@ -107,7 +100,7 @@ export class SuppliersService {
     try {
       const created = await this.prisma.supplier.create({
         data: {
-          tenantId,
+          tenantId: currentTenantId,
           nit: dto.nit.trim(),
           name: dto.name.trim(),
           description: dto.description?.trim(),
@@ -156,9 +149,9 @@ export class SuppliersService {
     updatedByUserId?: string,
     tenantId?: string | null,
   ) {
-    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
+    const currentTenantId = this.tenantContext.ensureTenant(tenantId);
     const oldSupplierData = await this.prisma.supplier.findFirst({
-      where: { id, tenantId },
+      where: { id, tenantId: currentTenantId },
     });
     if (!oldSupplierData)
       throw new NotFoundException('Proveedor no encontrado.');
@@ -228,9 +221,9 @@ export class SuppliersService {
   }
 
   async delete(id: string, deletedByUserId?: string, tenantId?: string | null) {
-    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
+    const currentTenantId = this.tenantContext.ensureTenant(tenantId);
     const supplier = await this.prisma.supplier.findFirst({
-      where: { id, tenantId },
+      where: { id, tenantId: currentTenantId },
     });
 
     if (!supplier) {

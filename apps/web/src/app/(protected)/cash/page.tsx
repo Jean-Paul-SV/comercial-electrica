@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
@@ -15,6 +15,7 @@ import {
 } from '@shared/components/ui/card';
 import { Button } from '@shared/components/ui/button';
 import { Input } from '@shared/components/ui/input';
+import { MoneyInput } from '@shared/components/ui/money-input';
 import { Label } from '@shared/components/ui/label';
 import {
   Table,
@@ -381,14 +382,18 @@ export default function CashPage() {
           <form onSubmit={form.handleSubmit(onOpenSession)} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="openingAmount">Monto de apertura (COP)</Label>
-              <Input
-                id="openingAmount"
-                type="number"
-                step="1"
-                min="0"
-                {...form.register('openingAmount')}
-                placeholder="Ej. 0 o 100000"
-                className="rounded-lg"
+              <Controller
+                control={form.control}
+                name="openingAmount"
+                render={({ field }) => (
+                  <MoneyInput
+                    id="openingAmount"
+                    placeholder="Ej. 0 o 100000"
+                    className="rounded-lg"
+                    value={field.value ?? 0}
+                    onChangeValue={(val) => field.onChange(val ?? 0)}
+                  />
+                )}
               />
               <p className="text-xs text-muted-foreground">
                 Puedes usar 0 si no dejas efectivo inicial en caja.
@@ -515,13 +520,18 @@ export default function CashPage() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="closingAmount" className="text-foreground font-medium">Monto contado en caja (COP)</Label>
-              <Input
-                id="closingAmount"
-                type="number"
-                step="1"
-                {...closeForm.register('closingAmount')}
-                placeholder="Ej. 174034"
-                className="rounded-xl h-10 border-input bg-background/80 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+              <Controller
+                control={closeForm.control}
+                name="closingAmount"
+                render={({ field }) => (
+                  <MoneyInput
+                    id="closingAmount"
+                    placeholder="Ej. 174.034"
+                    className="rounded-xl h-10 border-input bg-background/80 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                    value={field.value ?? 0}
+                    onChangeValue={(val) => field.onChange(val ?? 0)}
+                  />
+                )}
               />
               {closeForm.formState.errors.closingAmount && (
                 <p className="text-sm text-destructive">

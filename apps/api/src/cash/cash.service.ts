@@ -1,6 +1,5 @@
 import {
   BadRequestException,
-  ForbiddenException,
   Injectable,
   NotFoundException,
   Logger,
@@ -8,6 +7,8 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { ValidationLimitsService } from '../common/services/validation-limits.service';
 import { AuditService } from '../common/services/audit.service';
+import { TenantContextService } from '../common/services/tenant-context.service';
+import { buildPaginationMeta } from '../common/utils/pagination';
 
 @Injectable()
 export class CashService {
@@ -17,47 +18,39 @@ export class CashService {
     private readonly prisma: PrismaService,
     private readonly limits: ValidationLimitsService,
     private readonly audit: AuditService,
+    private readonly tenantContext: TenantContextService,
   ) {}
 
   async listSessions(
     pagination?: { page?: number; limit?: number },
     tenantId?: string | null,
   ) {
-    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
+    const currentTenantId = this.tenantContext.ensureTenant(tenantId);
     const page = pagination?.page ?? 1;
     const limit = pagination?.limit ?? 20;
     const skip = (page - 1) * limit;
 
     const [data, total] = await Promise.all([
       this.prisma.cashSession.findMany({
-        where: { tenantId },
+        where: { tenantId: currentTenantId },
         orderBy: { openedAt: 'desc' },
         skip,
         take: limit,
         include: { movements: { orderBy: { createdAt: 'desc' }, take: 50 } },
       }),
-      this.prisma.cashSession.count({ where: { tenantId } }),
+      this.prisma.cashSession.count({ where: { tenantId: currentTenantId } }),
     ]);
-
-    const totalPages = Math.ceil(total / limit);
 
     return {
       data,
-      meta: {
-        total,
-        page,
-        limit,
-        totalPages,
-        hasNextPage: page < totalPages,
-        hasPreviousPage: page > 1,
-      },
+      meta: buildPaginationMeta(total, page, limit),
     };
   }
 
   async getSession(id: string, tenantId?: string | null) {
-    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
+    const currentTenantId = this.tenantContext.ensureTenant(tenantId);
     const s = await this.prisma.cashSession.findFirst({
-      where: { id, tenantId },
+      where: { id, tenantId: currentTenantId },
     });
     if (!s) throw new NotFoundException('Caja no encontrada.');
     return s;
@@ -68,7 +61,7 @@ export class CashService {
     openedBy?: string,
     tenantId?: string | null,
   ) {
-    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
+    const currentTenantId = this.tenantContext.ensureTenant(tenantId);
     const startTime = Date.now();
     this.logger.log(`Abriendo sesión de caja`, {
       openingAmount,
@@ -80,7 +73,7 @@ export class CashService {
 
     const session = await this.prisma.cashSession.create({
       data: {
-        tenantId,
+        tenantId: currentTenantId,
         openingAmount,
         openedBy: openedBy ?? null,
       },
@@ -118,7 +111,7 @@ export class CashService {
     closedBy?: string,
     tenantId?: string | null,
   ) {
-    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
+    const currentTenantId = this.tenantContext.ensureTenant(tenantId);
     const startTime = Date.now();
     this.logger.log(`Cerrando sesión de caja ${id}`, {
       sessionId: id,
@@ -126,7 +119,7 @@ export class CashService {
       userId: closedBy,
     });
 
-    const session = await this.getSession(id, tenantId);
+    const session = await this.getSession(id, currentTenantId);
 
     // Validar que la sesión no esté ya cerrada
     if (session.closedAt) {
@@ -211,8 +204,8 @@ export class CashService {
     pagination?: { page?: number; limit?: number },
     tenantId?: string | null,
   ) {
-    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
-    const session = await this.getSession(sessionId, tenantId);
+    const currentTenantId = this.tenantContext.ensureTenant(tenantId);
+    const session = await this.getSession(sessionId, currentTenantId);
     const page = pagination?.page ?? 1;
     const limit = pagination?.limit ?? 50;
     const skip = (page - 1) * limit;
@@ -242,18 +235,9 @@ export class CashService {
       this.prisma.cashMovement.count({ where: { sessionId } }),
     ]);
 
-    const totalPages = Math.ceil(total / limit);
-
     return {
       data,
-      meta: {
-        total,
-        page,
-        limit,
-        totalPages,
-        hasNextPage: page < totalPages,
-        hasPreviousPage: page > 1,
-      },
+      meta: buildPaginationMeta(total, page, limit),
     };
   }
 
@@ -268,7 +252,7 @@ export class CashService {
     },
     tenantId?: string | null,
   ) {
-    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
+    const currentTenantId = this.tenantContext.ensureTenant(tenantId);
     const page = params.page ?? 1;
     const limit = params.limit ?? 20;
     const skip = (page - 1) * limit;
@@ -278,7 +262,7 @@ export class CashService {
       sessionId?: string;
       type?: 'IN' | 'OUT' | 'ADJUST';
       createdAt?: { gte?: Date; lte?: Date };
-    } = { session: { tenantId } };
+    } = { session: { tenantId: currentTenantId } };
 
     if (params.sessionId) where.sessionId = params.sessionId;
     if (params.type) where.type = params.type;
@@ -303,18 +287,9 @@ export class CashService {
       this.prisma.cashMovement.count({ where }),
     ]);
 
-    const totalPages = Math.ceil(total / limit);
-
     return {
       data,
-      meta: {
-        total,
-        page,
-        limit,
-        totalPages,
-        hasNextPage: page < totalPages,
-        hasPreviousPage: page > 1,
-      },
+      meta: buildPaginationMeta(total, page, limit),
     };
   }
 
@@ -329,9 +304,9 @@ export class CashService {
     createdBy?: string,
     tenantId?: string | null,
   ) {
-    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
+    const currentTenantId = this.tenantContext.ensureTenant(tenantId);
     const session = await this.prisma.cashSession.findFirst({
-      where: { id: sessionId, tenantId },
+      where: { id: sessionId, tenantId: currentTenantId },
     });
     if (!session) throw new NotFoundException('Caja no encontrada.');
     if (session.closedAt) {

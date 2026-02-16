@@ -15,6 +15,35 @@ import { UpdateTenantDto } from './dto/update-tenant.dto';
 import { UpdateTenantStatusDto } from './dto/update-tenant-status.dto';
 import { RenewSubscriptionDto } from './dto/renew-subscription.dto';
 import { UpdatePlanDto } from './dto/update-plan.dto';
+import { CreatePlanDto } from './dto/create-plan.dto';
+import { Prisma } from '@prisma/client';
+
+const DEFAULT_MODULE_CODES = [
+  'core',
+  'inventory',
+  'suppliers',
+  'electronic_invoicing',
+  'advanced_reports',
+  'audit',
+  'backups',
+] as const;
+
+type PlanDecimalFields = Pick<
+  import('@prisma/client').Plan,
+  'priceMonthly' | 'priceYearly'
+>;
+
+type PlanDto = {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  priceMonthly: number | null;
+  priceYearly: number | null;
+  maxUsers: number | null;
+  stripePriceId: string | null;
+  isActive: boolean;
+};
 
 @Injectable()
 export class ProviderService {
@@ -22,6 +51,55 @@ export class ProviderService {
     private readonly prisma: PrismaService,
     private readonly billing: BillingService,
   ) {}
+
+  /**
+   * Métricas agregadas para el panel proveedor.
+   * No devuelve datos personales; solo conteos por tenant / plan / módulo.
+   */
+  async getTenantsSummary() {
+    const [totalTenants, activeTenants, suspendedTenants, totalUsers] =
+      await Promise.all([
+        this.prisma.tenant.count(),
+        this.prisma.tenant.count({ where: { isActive: true } }),
+        this.prisma.tenant.count({ where: { isActive: false } }),
+        this.prisma.user.count({
+          // Excluye admins de plataforma (tenantId null)
+          where: { tenantId: { not: null } },
+        }),
+      ]);
+
+    const plans = await this.prisma.plan.findMany({
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        _count: { select: { tenants: true } },
+      },
+      orderBy: { name: 'asc' },
+    });
+
+    const modules = await this.prisma.tenantModule.groupBy({
+      by: ['moduleCode'],
+      _count: { _all: true },
+    });
+
+    return {
+      totalTenants,
+      activeTenants,
+      suspendedTenants,
+      totalUsers,
+      plansUsage: plans.map((p) => ({
+        id: p.id,
+        name: p.name,
+        slug: p.slug,
+        tenantsCount: p._count.tenants,
+      })),
+      modulesUsage: modules.map((m) => ({
+        moduleCode: m.moduleCode,
+        tenantsCount: m._count._all,
+      })),
+    };
+  }
 
   async listPlans(activeOnly?: boolean) {
     const plans = await this.prisma.plan.findMany({
@@ -33,21 +111,49 @@ export class ProviderService {
         description: true,
         priceMonthly: true,
         priceYearly: true,
+        maxUsers: true,
         stripePriceId: true,
         isActive: true,
       },
       orderBy: { name: 'asc' },
     });
-    return plans.map((p) => ({
-      id: p.id,
-      name: p.name,
-      slug: p.slug,
-      description: p.description ?? null,
-      priceMonthly: p.priceMonthly != null ? Number(p.priceMonthly) : null,
-      priceYearly: p.priceYearly != null ? Number(p.priceYearly) : null,
-      stripePriceId: p.stripePriceId ?? null,
-      isActive: p.isActive,
-    }));
+    return plans.map((plan) => this.mapPlanToDto(plan));
+  }
+
+  async createPlan(dto: CreatePlanDto) {
+    const existing = await this.prisma.plan.findUnique({
+      where: { slug: dto.slug },
+    });
+    if (existing) {
+      throw new ConflictException(`Ya existe un plan con el slug "${dto.slug}".`);
+    }
+    const plan = await this.prisma.plan.create({
+      data: {
+        name: dto.name,
+        slug: dto.slug,
+        description: dto.description ?? null,
+        priceMonthly: dto.priceMonthly != null ? new Prisma.Decimal(dto.priceMonthly) : null,
+        priceYearly: dto.priceYearly != null ? new Prisma.Decimal(dto.priceYearly) : null,
+        maxUsers: dto.maxUsers ?? null,
+        stripePriceId: dto.stripePriceId ?? null,
+        isActive: dto.isActive ?? true,
+        features: {
+          create: DEFAULT_MODULE_CODES.map((moduleCode) => ({ moduleCode })),
+        },
+      },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        description: true,
+        priceMonthly: true,
+        priceYearly: true,
+        maxUsers: true,
+        stripePriceId: true,
+        isActive: true,
+      },
+    });
+    return this.mapPlanToDto(plan);
   }
 
   async updatePlan(id: string, dto: UpdatePlanDto) {
@@ -55,44 +161,20 @@ export class ProviderService {
     if (!plan) {
       throw new NotFoundException('Plan no encontrado.');
     }
-    const data: {
-      name?: string;
-      description?: string;
-      priceMonthly?: number;
-      priceYearly?: number;
-      stripePriceId?: string | null;
-      isActive?: boolean;
-    } = {};
-    if (dto.name !== undefined) data.name = dto.name;
-    if (dto.description !== undefined) data.description = dto.description;
-    if (dto.priceMonthly !== undefined) data.priceMonthly = dto.priceMonthly;
-    if (dto.priceYearly !== undefined) data.priceYearly = dto.priceYearly;
-    if (dto.stripePriceId !== undefined) data.stripePriceId = dto.stripePriceId || null;
-    if (dto.isActive !== undefined) data.isActive = dto.isActive;
+    const data = this.buildPlanUpdateData(dto);
 
     const updated = await this.prisma.plan.update({
       where: { id },
       data,
     });
-    return {
-      id: updated.id,
-      name: updated.name,
-      slug: updated.slug,
-      description: updated.description ?? null,
-      priceMonthly: updated.priceMonthly != null ? Number(updated.priceMonthly) : null,
-      priceYearly: updated.priceYearly != null ? Number(updated.priceYearly) : null,
-      stripePriceId: updated.stripePriceId ?? null,
-      isActive: updated.isActive,
-    };
+    return this.mapPlanToDto(updated);
   }
 
   async listTenants(query: ListTenantsQueryDto) {
     const limit = Math.min(query.limit ?? 20, 100);
     const offset = query.offset ?? 0;
     const isActiveFilter =
-      query.isActive === undefined
-        ? undefined
-        : query.isActive === 'true';
+      query.isActive === undefined ? undefined : query.isActive === 'true';
 
     const [tenants, total] = await Promise.all([
       this.prisma.tenant.findMany({
@@ -126,16 +208,16 @@ export class ProviderService {
       }),
     ]);
 
-    const items = tenants.map((t) => ({
-      id: t.id,
-      name: t.name,
-      slug: t.slug,
-      isActive: t.isActive,
-      lastActivityAt: t.lastActivityAt?.toISOString() ?? null,
-      createdAt: t.createdAt.toISOString(),
-      plan: t.plan,
-      subscription: t.subscription,
-      usersCount: t._count.users,
+    const items = tenants.map((tenant) => ({
+      id: tenant.id,
+      name: tenant.name,
+      slug: tenant.slug,
+      isActive: tenant.isActive,
+      lastActivityAt: tenant.lastActivityAt?.toISOString() ?? null,
+      createdAt: tenant.createdAt.toISOString(),
+      plan: tenant.plan,
+      subscription: tenant.subscription,
+      usersCount: tenant._count.users,
     }));
 
     return { items, total, limit, offset };
@@ -220,9 +302,7 @@ export class ProviderService {
           data: { planId },
         });
       } else {
-        const now = new Date();
-        const periodEnd = new Date(now);
-        periodEnd.setDate(periodEnd.getDate() + 30);
+        const { now, periodEnd } = this.calculateDefaultSubscriptionPeriod();
         await tx.subscription.create({
           data: {
             tenantId: id,
@@ -244,9 +324,10 @@ export class ProviderService {
     });
     if (!sub) throw new NotFoundException('Tenant sin suscripción.');
     const extendDays = dto.extendDays ?? 30;
-    const from = sub.currentPeriodEnd && sub.currentPeriodEnd > new Date()
-      ? sub.currentPeriodEnd
-      : new Date();
+    const from =
+      sub.currentPeriodEnd && sub.currentPeriodEnd > new Date()
+        ? sub.currentPeriodEnd
+        : new Date();
     const newEnd = new Date(from);
     newEnd.setDate(newEnd.getDate() + extendDays);
     await this.prisma.subscription.update({
@@ -289,19 +370,17 @@ export class ProviderService {
     const passwordHash = await argon2.hash(adminPassword);
 
     const tenant = await this.prisma.$transaction(async (tx) => {
-      const t = await tx.tenant.create({
+      const createdTenant = await tx.tenant.create({
         data: {
           name: dto.name.trim(),
           slug,
           planId: dto.planId ?? undefined,
         },
       });
-      const now = new Date();
-      const periodEnd = new Date(now);
-      periodEnd.setDate(periodEnd.getDate() + 30);
+      const { now, periodEnd } = this.calculateDefaultSubscriptionPeriod();
       await tx.subscription.create({
         data: {
-          tenantId: t.id,
+          tenantId: createdTenant.id,
           planId: dto.planId ?? undefined,
           status: 'ACTIVE',
           currentPeriodStart: now,
@@ -314,11 +393,11 @@ export class ProviderService {
           name: dto.adminName?.trim() || undefined,
           passwordHash,
           role: RoleName.ADMIN,
-          tenantId: t.id,
+          tenantId: createdTenant.id,
           mustChangePassword: generateTempPassword,
         },
       });
-      return t;
+      return createdTenant;
     });
 
     if (dto.planId) {
@@ -349,9 +428,65 @@ export class ProviderService {
         name: tenant.name,
         slug: tenant.slug,
       },
-      ...(isDev && generateTempPassword
-        ? { tempAdminPassword: adminPassword }
-        : {}),
+      ...(isDev && generateTempPassword ? { tempAdminPassword: adminPassword } : {}),
     };
+  }
+
+  private mapPlanToDto(
+    plan: Pick<
+      PlanDecimalFields,
+      keyof PlanDecimalFields
+    > & {
+      id: string;
+      name: string;
+      slug: string;
+      description: string | null;
+      maxUsers: number | null;
+      stripePriceId: string | null;
+      isActive: boolean;
+    },
+  ): PlanDto {
+    return {
+      id: plan.id,
+      name: plan.name,
+      slug: plan.slug,
+      description: plan.description ?? null,
+      priceMonthly: plan.priceMonthly != null ? Number(plan.priceMonthly) : null,
+      priceYearly: plan.priceYearly != null ? Number(plan.priceYearly) : null,
+      maxUsers: plan.maxUsers,
+      stripePriceId: plan.stripePriceId ?? null,
+      isActive: plan.isActive,
+    };
+  }
+
+  private buildPlanUpdateData(dto: UpdatePlanDto) {
+    const data: {
+      name?: string;
+      description?: string;
+      priceMonthly?: number;
+      priceYearly?: number;
+      maxUsers?: number | null;
+      stripePriceId?: string | null;
+      isActive?: boolean;
+    } = {};
+
+    if (dto.name !== undefined) data.name = dto.name;
+    if (dto.description !== undefined) data.description = dto.description;
+    if (dto.priceMonthly !== undefined) data.priceMonthly = dto.priceMonthly;
+    if (dto.priceYearly !== undefined) data.priceYearly = dto.priceYearly;
+    if (dto.maxUsers !== undefined) data.maxUsers = dto.maxUsers;
+    if (dto.stripePriceId !== undefined) {
+      data.stripePriceId = dto.stripePriceId || null;
+    }
+    if (dto.isActive !== undefined) data.isActive = dto.isActive;
+
+    return data;
+  }
+
+  private calculateDefaultSubscriptionPeriod() {
+    const now = new Date();
+    const periodEnd = new Date(now);
+    periodEnd.setDate(periodEnd.getDate() + 30);
+    return { now, periodEnd };
   }
 }

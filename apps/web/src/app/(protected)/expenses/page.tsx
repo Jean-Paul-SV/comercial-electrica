@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useEffect, useCallback } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
@@ -15,6 +15,7 @@ import {
 } from '@shared/components/ui/card';
 import { Button } from '@shared/components/ui/button';
 import { Input } from '@shared/components/ui/input';
+import { MoneyInput } from '@shared/components/ui/money-input';
 import { Label } from '@shared/components/ui/label';
 import {
   Table,
@@ -520,14 +521,18 @@ export default function ExpensesPage() {
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label htmlFor="amount" className="text-sm font-medium text-foreground">Monto (COP) *</Label>
-                <Input
-                  id="amount"
-                  type="number"
-                  min={0.01}
-                  step="0.01"
-                  {...form.register('amount')}
-                  placeholder="Ej.: 50000"
-                  className={formInputClass + ' h-10'}
+                <Controller
+                  control={form.control}
+                  name="amount"
+                  render={({ field }) => (
+                    <MoneyInput
+                      id="amount"
+                      className={formInputClass + ' h-10'}
+                      placeholder="Ej.: 50.000"
+                      value={field.value ?? undefined}
+                      onChangeValue={(val) => field.onChange(val ?? undefined)}
+                    />
+                  )}
                 />
                 <p className="text-xs text-muted-foreground">
                   Monto en pesos colombianos.

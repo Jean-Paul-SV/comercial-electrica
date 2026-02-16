@@ -1,6 +1,5 @@
 import {
   BadRequestException,
-  ForbiddenException,
   Injectable,
   NotFoundException,
   Logger,
@@ -8,6 +7,8 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { ValidationLimitsService } from '../common/services/validation-limits.service';
 import { AuditService } from '../common/services/audit.service';
+import { TenantContextService } from '../common/services/tenant-context.service';
+import { buildPaginationMeta } from '../common/utils/pagination';
 import { CreateExpenseDto } from './dto/create-expense.dto';
 import { ListExpensesDto } from './dto/list-expenses.dto';
 
@@ -19,6 +20,7 @@ export class ExpensesService {
     private readonly prisma: PrismaService,
     private readonly limits: ValidationLimitsService,
     private readonly audit: AuditService,
+    private readonly tenantContext: TenantContextService,
   ) {}
 
   /** Delegate Expense (cliente Prisma: ejecutar `npx prisma generate` en apps/api para tipos completos). */
@@ -31,7 +33,7 @@ export class ExpensesService {
     createdBy?: string,
     tenantId?: string | null,
   ) {
-    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
+    const currentTenantId = this.tenantContext.ensureTenant(tenantId);
     this.limits.validateCashAmount(Number(dto.amount), 'movement');
 
     const expenseDate = dto.expenseDate
@@ -49,7 +51,7 @@ export class ExpensesService {
 
     if (dto.cashSessionId) {
       const session = await this.prisma.cashSession.findFirst({
-        where: { id: dto.cashSessionId, tenantId },
+        where: { id: dto.cashSessionId, tenantId: currentTenantId },
       });
       if (!session)
         throw new NotFoundException('Sesión de caja no encontrada.');
@@ -62,7 +64,7 @@ export class ExpensesService {
 
     const expense = await this.expenseDelegate.create({
       data: {
-        tenantId,
+        tenantId: currentTenantId,
         amount: dto.amount,
         description: dto.description.trim(),
         category: dto.category?.trim() ?? null,
@@ -107,7 +109,7 @@ export class ExpensesService {
     pagination?: { page?: number; limit?: number },
     tenantId?: string | null,
   ) {
-    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
+    const currentTenantId = this.tenantContext.ensureTenant(tenantId);
     const page = pagination?.page ?? 1;
     const limit = pagination?.limit ?? 20;
     const skip = (page - 1) * limit;
@@ -129,7 +131,7 @@ export class ExpensesService {
       >;
       AND?: unknown[];
     };
-    const where: Where = { tenantId };
+    const where: Where = { tenantId: currentTenantId };
 
     if (dto.cashSessionId?.trim()) {
       where.cashSessionId = dto.cashSessionId.trim();
@@ -184,25 +186,16 @@ export class ExpensesService {
       this.expenseDelegate.count({ where }),
     ]);
 
-    const totalPages = Math.ceil(total / limit);
-
     return {
       data,
-      meta: {
-        total,
-        page,
-        limit,
-        totalPages,
-        hasNextPage: page < totalPages,
-        hasPreviousPage: page > 1,
-      },
+      meta: buildPaginationMeta(total, page, limit),
     };
   }
 
   async getById(id: string, tenantId?: string | null) {
-    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
+    const currentTenantId = this.tenantContext.ensureTenant(tenantId);
     const expense = await this.expenseDelegate.findFirst({
-      where: { id, tenantId },
+      where: { id, tenantId: currentTenantId },
       include: { cashSession: true },
     });
     if (!expense) throw new NotFoundException('Gasto no encontrado.');
@@ -215,9 +208,9 @@ export class ExpensesService {
     deletionReason?: string,
     tenantId?: string | null,
   ) {
-    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
+    const currentTenantId = this.tenantContext.ensureTenant(tenantId);
     const expense = await this.expenseDelegate.findFirst({
-      where: { id, tenantId },
+      where: { id, tenantId: currentTenantId },
       include: { cashSession: true },
     });
     if (!expense) throw new NotFoundException('Gasto no encontrado.');

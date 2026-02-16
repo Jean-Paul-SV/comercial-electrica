@@ -252,6 +252,31 @@ export class AuthController {
     return this.auth.listUsers(req.user?.tenantId ?? null);
   }
 
+  @UseGuards(JwtAuthGuard)
+  @Get('limits')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Obtener límites del plan del tenant',
+    description:
+      'Devuelve límites de usuarios (maxUsers, currentUsers, canAddUsers) del plan del tenant actual.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Límites del tenant',
+    schema: {
+      type: 'object',
+      properties: {
+        maxUsers: { type: 'number', nullable: true },
+        currentUsers: { type: 'number' },
+        canAddUsers: { type: 'boolean' },
+      },
+    },
+  })
+  @ApiResponse({ status: 401, description: 'No autenticado' })
+  getLimits(@Req() req: { user?: { sub?: string; tenantId?: string | null } }) {
+    return this.auth.getTenantLimits(req.user?.tenantId ?? null);
+  }
+
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @RequirePermission('users:update')
   @Patch('users/:id')

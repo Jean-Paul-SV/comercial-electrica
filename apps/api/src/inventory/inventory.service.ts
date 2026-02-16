@@ -1,6 +1,5 @@
 import {
   BadRequestException,
-  ForbiddenException,
   Injectable,
   Logger,
 } from '@nestjs/common';
@@ -9,6 +8,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateInventoryMovementDto } from './dto/create-movement.dto';
 import { ValidationLimitsService } from '../common/services/validation-limits.service';
 import { AuditService } from '../common/services/audit.service';
+import { TenantContextService } from '../common/services/tenant-context.service';
+import { buildPaginationMeta } from '../common/utils/pagination';
 
 @Injectable()
 export class InventoryService {
@@ -18,6 +19,7 @@ export class InventoryService {
     private readonly prisma: PrismaService,
     private readonly limits: ValidationLimitsService,
     private readonly audit: AuditService,
+    private readonly tenantContext: TenantContextService,
   ) {}
 
   async createMovement(
@@ -25,7 +27,7 @@ export class InventoryService {
     createdByUserId?: string,
     tenantId?: string | null,
   ) {
-    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
+    const currentTenantId = this.tenantContext.ensureTenant(tenantId);
     const startTime = Date.now();
     this.logger.log(`Creando movimiento de inventario tipo ${dto.type}`, {
       type: dto.type,
@@ -47,7 +49,7 @@ export class InventoryService {
     // Validar que el proveedor existe y pertenece al tenant si se proporciona
     if (dto.supplierId) {
       const supplier = await this.prisma.supplier.findFirst({
-        where: { id: dto.supplierId, tenantId },
+        where: { id: dto.supplierId, tenantId: currentTenantId },
       });
       if (!supplier) {
         throw new BadRequestException(
@@ -69,7 +71,7 @@ export class InventoryService {
     // Validar que todos los productos existen antes de iniciar la transacción
     const productIds = dto.items.map((it) => it.productId);
     const products = await this.prisma.product.findMany({
-      where: { id: { in: productIds } },
+      where: { id: { in: productIds }, tenantId: currentTenantId },
     });
 
     if (products.length !== productIds.length) {
@@ -97,7 +99,7 @@ export class InventoryService {
         async (tx) => {
           const movement = await tx.inventoryMovement.create({
             data: {
-              tenantId,
+              tenantId: currentTenantId,
               type,
               reason: dto.reason,
               supplierId: dto.supplierId,
@@ -166,14 +168,16 @@ export class InventoryService {
     },
     tenantId?: string | null,
   ) {
-    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
+    const currentTenantId = this.tenantContext.ensureTenant(tenantId);
     const page = pagination?.page ?? 1;
     const limit = pagination?.limit ?? 20;
     const skip = (page - 1) * limit;
     const search = pagination?.search?.trim();
     const order = pagination?.sortOrder === 'asc' ? 'asc' : 'desc';
 
-    const where: Prisma.InventoryMovementWhereInput = { tenantId };
+    const where: Prisma.InventoryMovementWhereInput = {
+      tenantId: currentTenantId,
+    };
     if (search) {
       where.items = {
         some: {
@@ -205,18 +209,9 @@ export class InventoryService {
       this.prisma.inventoryMovement.count({ where }),
     ]);
 
-    const totalPages = Math.ceil(total / limit);
-
     return {
       data,
-      meta: {
-        total,
-        page,
-        limit,
-        totalPages,
-        hasNextPage: page < totalPages,
-        hasPreviousPage: page > 1,
-      },
+      meta: buildPaginationMeta(total, page, limit),
     };
   }
 
@@ -224,9 +219,9 @@ export class InventoryService {
    * Valor total del inventario: suma de (stock × costo) de todos los productos del tenant.
    */
   async getTotalInventoryValue(tenantId: string | null): Promise<{ totalValue: number }> {
-    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
+    const currentTenantId = this.tenantContext.ensureTenant(tenantId);
     const rows = await this.prisma.product.findMany({
-      where: { tenantId, isActive: true },
+      where: { tenantId: currentTenantId, isActive: true },
       select: {
         cost: true,
         stock: { select: { qtyOnHand: true } },

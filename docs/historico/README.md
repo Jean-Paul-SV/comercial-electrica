@@ -47,8 +47,10 @@ Para el detalle técnico y el plan de acción, usa estos documentos:
   - Calificación: 8.5/10 - EXCELENTE
   - Mantener como referencia histórica
 
-- **[📋 Trazabilidad: qué falta implementar](./TRAZABILIDAD_FALTA_IMPLEMENTAR.md)** ⭐ **ACTUALIZADO**
-  - Lista verificada (Feb 2026): Compras UI, límite login configurable, opcionales; DIAN ya implementado
+- **[📋 Qué falta: resumen completo](./QUE_FALTA_TODO_RESUMEN.md)** ⭐ **TODO EN UNO**
+  - Plan de negocio, técnico, operación y comercial en una sola lista (Feb 2026)
+- **[📋 Trazabilidad: qué falta implementar](./TRAZABILIDAD_FALTA_IMPLEMENTAR.md)**
+  - IDs F-001 a F-004, detalle técnico; DIAN ya implementado
 - **[📋 Recuento Completo: Pendientes por Implementar](./RECUENTO_PENDIENTES.md)**
   - Lista extensa por prioridad; sección DIAN puede estar desactualizada (ver TRAZABILIDAD_FALTA_IMPLEMENTAR)
   - Tiempos estimados para cada tarea

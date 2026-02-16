@@ -26,6 +26,7 @@ import { MailerService } from '../mailer/mailer.service';
 import { PermissionsService } from './permissions.service';
 import { TenantModulesService } from './tenant-modules.service';
 import { StorageService } from '../common/services/storage.service';
+import { PlanLimitsService } from '../common/services/plan-limits.service';
 import type { MulterFile } from '../common/types/multer';
 
 export type JwtPayload = {
@@ -62,6 +63,7 @@ export class AuthService {
     private readonly permissions: PermissionsService,
     private readonly tenantModules: TenantModulesService,
     private readonly storage: StorageService,
+    private readonly planLimits: PlanLimitsService,
   ) {}
 
   async bootstrapAdmin(dto: BootstrapAdminDto) {
@@ -111,6 +113,10 @@ export class AuthService {
       createdByUserId != null
         ? await this.tenantModules.getEffectiveTenantId(createdByUserId)
         : await this.tenantModules.getDefaultTenantId();
+    
+    // Validar límite de usuarios del plan
+    await this.planLimits.validateUserLimit(tenantId);
+    
     const generateTemp = dto.generateTempPassword === true;
     const password = generateTemp
       ? randomBytes(16).toString('hex')
@@ -151,6 +157,10 @@ export class AuthService {
     if (existing) throw new BadRequestException('Email ya registrado.');
     const tenantId =
       await this.tenantModules.getEffectiveTenantId(createdByUserId);
+    
+    // Validar límite de usuarios del plan
+    await this.planLimits.validateUserLimit(tenantId);
+    
     const tempPassword = randomBytes(16).toString('hex');
     const passwordHash = await argon2.hash(tempPassword);
     const user = await this.prisma.user.create({
@@ -624,6 +634,13 @@ export class AuthService {
     );
 
     return { profilePictureUrl };
+  }
+
+  /**
+   * Obtiene los límites del plan del tenant (maxUsers, currentUsers, canAddUsers).
+   */
+  async getTenantLimits(tenantId: string | null) {
+    return this.planLimits.getTenantLimits(tenantId);
   }
 
   /**

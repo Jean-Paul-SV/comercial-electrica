@@ -1,6 +1,5 @@
 import {
   BadRequestException,
-  ForbiddenException,
   Injectable,
   NotFoundException,
   Logger,
@@ -8,6 +7,7 @@ import {
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
+import { UpdateCategoryDto } from './dto/update-category.dto';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { CreateProductDictionaryEntryDto } from './dto/create-product-dictionary-entry.dto';
@@ -15,6 +15,8 @@ import { UpdateProductDictionaryEntryDto } from './dto/update-product-dictionary
 import { ListProductDictionaryQueryDto } from './dto/list-product-dictionary-query.dto';
 import { AuditService } from '../common/services/audit.service';
 import { CacheService } from '../common/services/cache.service';
+import { TenantContextService } from '../common/services/tenant-context.service';
+import { buildPaginationMeta } from '../common/utils/pagination';
 
 @Injectable()
 export class CatalogService {
@@ -24,6 +26,7 @@ export class CatalogService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly cache: CacheService,
+    private readonly tenantContext: TenantContextService,
   ) {}
 
   async listProducts(
@@ -40,12 +43,12 @@ export class CatalogService {
     },
     tenantId?: string | null,
   ) {
-    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
+    const currentTenantId = this.tenantContext.ensureTenant(tenantId);
     const page = pagination?.page ?? 1;
     const limit = pagination?.limit ?? 20;
     const skip = (page - 1) * limit;
 
-    const where: Prisma.ProductWhereInput = { tenantId };
+    const where: Prisma.ProductWhereInput = { tenantId: currentTenantId };
 
     // Caché para listado por tenant + página (solo primera página sin búsqueda ni filtros)
     const useListCache =
@@ -57,8 +60,14 @@ export class CatalogService {
       pagination?.minStock == null &&
       pagination?.maxStock == null &&
       !pagination?.sortByStock;
-    if (useListCache && tenantId) {
-      const listCacheKey = this.cache.buildKey('products', 'list', tenantId, 1, 20);
+    if (useListCache && currentTenantId) {
+      const listCacheKey = this.cache.buildKey(
+        'products',
+        'list',
+        currentTenantId,
+        1,
+        20,
+      );
       const cached = await this.cache.get<{ data: unknown[]; meta: unknown }>(listCacheKey);
       if (cached) return cached;
     }
@@ -74,7 +83,7 @@ export class CatalogService {
           this.prisma.$queryRaw<{ id: string }[]>`
             SELECT p.id FROM "Product" p
             INNER JOIN "StockBalance" s ON p.id = s."productId"
-            WHERE p."tenantId" = ${tenantId}
+            WHERE p."tenantId" = ${currentTenantId}
               AND p."isActive" = true
               AND s."qtyOnHand" <= COALESCE(p."minStock", ${threshold})
             ORDER BY s."qtyOnHand" ASC
@@ -83,25 +92,18 @@ export class CatalogService {
           this.prisma.$queryRaw<[{ count: bigint }]>`
             SELECT COUNT(*)::bigint as count FROM "Product" p
             INNER JOIN "StockBalance" s ON p.id = s."productId"
-            WHERE p."tenantId" = ${tenantId}
+            WHERE p."tenantId" = ${currentTenantId}
               AND p."isActive" = true
               AND s."qtyOnHand" <= COALESCE(p."minStock", ${threshold})
           `,
         ]);
         const ids = lowStockRows.map((r) => r.id);
         const totalCount = Number(total[0]?.count ?? 0);
-        const totalPages = Math.ceil(totalCount / limit);
+        const meta = buildPaginationMeta(totalCount, page, limit);
         if (ids.length === 0) {
           return {
             data: [],
-            meta: {
-              total: totalCount,
-              page,
-              limit,
-              totalPages,
-              hasNextPage: page < totalPages,
-              hasPreviousPage: page > 1,
-            },
+            meta,
           };
         }
         const data = await this.prisma.product.findMany({
@@ -112,14 +114,7 @@ export class CatalogService {
         data.sort((a, b) => (orderMap.get(a.id) ?? 0) - (orderMap.get(b.id) ?? 0));
         return {
           data,
-          meta: {
-            total: totalCount,
-            page,
-            limit,
-            totalPages,
-            hasNextPage: page < totalPages,
-            hasPreviousPage: page > 1,
-          },
+          meta,
         };
       } catch {
         where.stock = { qtyOnHand: { lte: threshold } };
@@ -168,30 +163,27 @@ export class CatalogService {
       this.prisma.product.count({ where }),
     ]);
 
-    const totalPages = Math.ceil(total / limit);
-
     const result = {
       data,
-      meta: {
-        total,
-        page,
-        limit,
-        totalPages,
-        hasNextPage: page < totalPages,
-        hasPreviousPage: page > 1,
-      },
+      meta: buildPaginationMeta(total, page, limit),
     };
 
-    if (useListCache && tenantId) {
-      const listCacheKey = this.cache.buildKey('products', 'list', tenantId, 1, 20);
+    if (useListCache && currentTenantId) {
+      const listCacheKey = this.cache.buildKey(
+        'products',
+        'list',
+        currentTenantId,
+        1,
+        20,
+      );
       await this.cache.set(listCacheKey, result, 90); // 90 segundos
     }
     return result;
   }
 
   async getProduct(id: string, tenantId?: string | null) {
-    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
-    const cacheKey = this.cache.buildKey('product', id, tenantId);
+    const currentTenantId = this.tenantContext.ensureTenant(tenantId);
+    const cacheKey = this.cache.buildKey('product', id, currentTenantId);
     const cached = await this.cache.get(cacheKey);
     if (cached) {
       this.logger.debug(`Product ${id} retrieved from cache`);
@@ -199,7 +191,7 @@ export class CatalogService {
     }
 
     const p = await this.prisma.product.findFirst({
-      where: { id, tenantId },
+      where: { id, tenantId: currentTenantId },
       include: { category: true, stock: true },
     });
     if (!p) throw new NotFoundException('Producto no encontrado.');
@@ -214,13 +206,13 @@ export class CatalogService {
     createdByUserId?: string,
     tenantId?: string | null,
   ) {
-    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
+    const currentTenantId = this.tenantContext.ensureTenant(tenantId);
     const internalCode = dto.internalCode.trim();
     if (!internalCode) throw new BadRequestException('internalCode requerido.');
 
     const created = await this.prisma.product.create({
       data: {
-        tenantId,
+        tenantId: currentTenantId,
         internalCode,
         name: dto.name.trim(),
         categoryId: dto.categoryId ?? null,
@@ -252,9 +244,9 @@ export class CatalogService {
     updatedByUserId?: string,
     tenantId?: string | null,
   ) {
-    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
+    const currentTenantId = this.tenantContext.ensureTenant(tenantId);
     const oldProductData = await this.prisma.product.findFirst({
-      where: { id, tenantId },
+      where: { id, tenantId: currentTenantId },
       include: { category: true, stock: true },
     });
     if (!oldProductData) throw new NotFoundException('Producto no encontrado.');
@@ -294,7 +286,7 @@ export class CatalogService {
     );
 
     // Invalidar caché del producto y listados
-    await this.cache.delete(this.cache.buildKey('product', id, tenantId));
+    await this.cache.delete(this.cache.buildKey('product', id, currentTenantId));
     await this.cache.deletePattern('cache:products:*');
 
     return updated;
@@ -305,8 +297,8 @@ export class CatalogService {
     deactivatedByUserId?: string,
     tenantId?: string | null,
   ) {
-    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
-    const product = await this.getProduct(id, tenantId);
+    const currentTenantId = this.tenantContext.ensureTenant(tenantId);
+    const product = await this.getProduct(id, currentTenantId);
 
     // Validar que no tiene ventas asociadas
     const salesCount = await this.prisma.saleItem.count({
@@ -345,15 +337,15 @@ export class CatalogService {
     );
 
     // Invalidar caché del producto y listados
-    await this.cache.delete(this.cache.buildKey('product', id, tenantId));
+    await this.cache.delete(this.cache.buildKey('product', id, currentTenantId));
     await this.cache.deletePattern('cache:products:*');
 
     return updated;
   }
 
   async listCategories(tenantId?: string | null) {
-    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
-    const cacheKey = this.cache.buildKey('categories', 'list', tenantId);
+    const currentTenantId = this.tenantContext.ensureTenant(tenantId);
+    const cacheKey = this.cache.buildKey('categories', 'list', currentTenantId);
     const cached = await this.cache.get(cacheKey);
     if (cached) {
       this.logger.debug('Categories list retrieved from cache');
@@ -361,7 +353,7 @@ export class CatalogService {
     }
 
     const categories = await this.prisma.category.findMany({
-      where: { tenantId },
+      where: { tenantId: currentTenantId },
       orderBy: { name: 'asc' },
     });
 
@@ -375,12 +367,12 @@ export class CatalogService {
     createdByUserId?: string,
     tenantId?: string | null,
   ) {
-    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
+    const currentTenantId = this.tenantContext.ensureTenant(tenantId);
     const name = dto.name.trim();
     if (!name) throw new BadRequestException('name requerido.');
 
     const created = await this.prisma.category.create({
-      data: { tenantId, name },
+      data: { tenantId: currentTenantId, name },
     });
 
     await this.audit.logCreate('category', created.id, createdByUserId, {
@@ -388,9 +380,72 @@ export class CatalogService {
     });
 
     // Invalidar caché de categorías
-    await this.cache.delete(this.cache.buildKey('categories', 'list'));
+    await this.cache.delete(this.cache.buildKey('categories', 'list', currentTenantId));
 
     return created;
+  }
+
+  async updateCategory(
+    id: string,
+    dto: UpdateCategoryDto,
+    updatedByUserId?: string,
+    tenantId?: string | null,
+  ) {
+    const currentTenantId = this.tenantContext.ensureTenant(tenantId);
+    const existing = await this.prisma.category.findFirst({
+      where: { id, tenantId: currentTenantId },
+    });
+    if (!existing) throw new NotFoundException('Categoría no encontrada.');
+
+    const name = dto.name?.trim();
+    if (!name) throw new BadRequestException('name requerido.');
+
+    const updated = await this.prisma.category.update({
+      where: { id },
+      data: { name },
+    });
+
+    await this.audit.logUpdate(
+      'category',
+      id,
+      updatedByUserId,
+      { name: existing.name },
+      { name: updated.name },
+    );
+
+    await this.cache.delete(this.cache.buildKey('categories', 'list', currentTenantId));
+
+    return updated;
+  }
+
+  async deleteCategory(
+    id: string,
+    deletedByUserId?: string,
+    tenantId?: string | null,
+  ) {
+    const currentTenantId = this.tenantContext.ensureTenant(tenantId);
+
+    const existing = await this.prisma.category.findFirst({
+      where: { id, tenantId: currentTenantId },
+      include: { products: { select: { id: true }, take: 1 } },
+    });
+    if (!existing) throw new NotFoundException('Categoría no encontrada.');
+
+    if (existing.products.length > 0) {
+      throw new BadRequestException(
+        'No se puede eliminar una categoría con productos asociados. Actualiza o elimina los productos primero.',
+      );
+    }
+
+    await this.prisma.category.delete({ where: { id } });
+
+    await this.audit.logDelete('category', id, deletedByUserId, {
+      name: existing.name,
+    });
+
+    await this.cache.delete(this.cache.buildKey('categories', 'list', currentTenantId));
+
+    return { deleted: true };
   }
 
   // --- Diccionario de términos que los clientes escriben al preguntar por productos ---
@@ -399,9 +454,9 @@ export class CatalogService {
     query: ListProductDictionaryQueryDto,
     tenantId?: string | null,
   ) {
-    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
+    const currentTenantId = this.tenantContext.ensureTenant(tenantId);
 
-    const where: Prisma.ProductDictionaryEntryWhereInput = { tenantId };
+    const where: Prisma.ProductDictionaryEntryWhereInput = { tenantId: currentTenantId };
     if (query?.search?.trim()) {
       where.term = { contains: query.search.trim(), mode: 'insensitive' };
     }
@@ -445,26 +500,26 @@ export class CatalogService {
     dto: CreateProductDictionaryEntryDto,
     tenantId?: string | null,
   ) {
-    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
+    const currentTenantId = this.tenantContext.ensureTenant(tenantId);
     const term = dto.term.trim();
     if (!term) throw new BadRequestException('El término no puede estar vacío.');
 
     if (dto.productId) {
       const product = await this.prisma.product.findFirst({
-        where: { id: dto.productId, tenantId },
+        where: { id: dto.productId, tenantId: currentTenantId },
       });
       if (!product) throw new NotFoundException('Producto no encontrado.');
     }
     if (dto.categoryId) {
       const category = await this.prisma.category.findFirst({
-        where: { id: dto.categoryId, tenantId },
+        where: { id: dto.categoryId, tenantId: currentTenantId },
       });
       if (!category) throw new NotFoundException('Categoría no encontrada.');
     }
 
     const created = await this.prisma.productDictionaryEntry.create({
       data: {
-        tenantId,
+        tenantId: currentTenantId,
         term: term.slice(0, 200),
         productId: dto.productId ?? null,
         categoryId: dto.categoryId ?? null,
@@ -483,22 +538,22 @@ export class CatalogService {
     dto: UpdateProductDictionaryEntryDto,
     tenantId?: string | null,
   ) {
-    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
+    const currentTenantId = this.tenantContext.ensureTenant(tenantId);
 
     const existing = await this.prisma.productDictionaryEntry.findFirst({
-      where: { id, tenantId },
+      where: { id, tenantId: currentTenantId },
     });
     if (!existing) throw new NotFoundException('Entrada del diccionario no encontrada.');
 
     if (dto.productId !== undefined && dto.productId !== null) {
       const product = await this.prisma.product.findFirst({
-        where: { id: dto.productId, tenantId },
+        where: { id: dto.productId, tenantId: currentTenantId },
       });
       if (!product) throw new NotFoundException('Producto no encontrado.');
     }
     if (dto.categoryId !== undefined && dto.categoryId !== null) {
       const category = await this.prisma.category.findFirst({
-        where: { id: dto.categoryId, tenantId },
+        where: { id: dto.categoryId, tenantId: currentTenantId },
       });
       if (!category) throw new NotFoundException('Categoría no encontrada.');
     }
@@ -519,10 +574,10 @@ export class CatalogService {
   }
 
   async deleteProductDictionaryEntry(id: string, tenantId?: string | null) {
-    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
+    const currentTenantId = this.tenantContext.ensureTenant(tenantId);
 
     const existing = await this.prisma.productDictionaryEntry.findFirst({
-      where: { id, tenantId },
+      where: { id, tenantId: currentTenantId },
     });
     if (!existing) throw new NotFoundException('Entrada del diccionario no encontrada.');
 
@@ -532,4 +587,5 @@ export class CatalogService {
     });
     return { deleted: true };
   }
+
 }

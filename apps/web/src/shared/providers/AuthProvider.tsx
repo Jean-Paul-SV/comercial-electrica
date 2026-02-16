@@ -6,6 +6,9 @@ import { getMe } from '@features/auth/api';
 
 const TOKEN_KEY = 'ce_access_token';
 
+/** Email del admin de plataforma; si coincide, se trata como isPlatformAdmin aunque la API no lo indique. */
+const PLATFORM_ADMIN_EMAIL = 'platform@proveedor.local';
+
 export type AuthState = {
   token: string | null;
   /** False hasta que se lee localStorage en el cliente; evita hidratación #418 y redirección prematura. */
@@ -61,7 +64,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(res.user);
       setPermissions(res.permissions ?? []);
       setEnabledModules(res.tenant?.enabledModules ?? []);
-      setIsPlatformAdmin(res.isPlatformAdmin ?? false);
+      setIsPlatformAdmin(Boolean(res.isPlatformAdmin || res.user?.email === PLATFORM_ADMIN_EMAIL));
     } catch {
       setUser(null);
       setPermissions([]);
@@ -89,13 +92,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
     setUser({ id, email, role });
-    setIsPlatformAdmin(claims?.isPlatformAdmin ?? false);
+    setIsPlatformAdmin(Boolean(claims?.isPlatformAdmin || email === PLATFORM_ADMIN_EMAIL));
     getMe(token)
       .then((res) => {
         setUser(res.user);
         setPermissions(res.permissions ?? []);
         setEnabledModules(res.tenant?.enabledModules ?? []);
-        setIsPlatformAdmin(res.isPlatformAdmin ?? false);
+        setIsPlatformAdmin(Boolean(res.isPlatformAdmin || res.user?.email === PLATFORM_ADMIN_EMAIL));
       })
       .catch((err: { status?: number }) => {
         // Solo cerrar sesión si el servidor responde 401 (token inválido/expirado).

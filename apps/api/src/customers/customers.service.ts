@@ -3,13 +3,14 @@ import {
   NotFoundException,
   Logger,
   BadRequestException,
-  ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateCustomerDto } from './dto/create-customer.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
 import { AuditService } from '../common/services/audit.service';
 import { CacheService } from '../common/services/cache.service';
+import { TenantContextService } from '../common/services/tenant-context.service';
+import { buildPaginationMeta } from '../common/utils/pagination';
 import type { Prisma } from '@prisma/client';
 
 @Injectable()
@@ -20,6 +21,7 @@ export class CustomersService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly cache: CacheService,
+    private readonly tenantContext: TenantContextService,
   ) {}
 
   async list(
@@ -31,14 +33,14 @@ export class CustomersService {
     },
     tenantId?: string | null,
   ) {
-    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
+    const currentTenantId = this.tenantContext.ensureTenant(tenantId);
     const page = pagination?.page ?? 1;
     const limit = pagination?.limit ?? 20;
     const skip = (page - 1) * limit;
     const search = pagination?.search?.trim();
     const order = pagination?.sortOrder ?? 'asc';
 
-    const where: Prisma.CustomerWhereInput = { tenantId };
+    const where: Prisma.CustomerWhereInput = { tenantId: currentTenantId };
     if (search) {
       where.OR = [
         { name: { contains: search, mode: 'insensitive' } },
@@ -47,7 +49,7 @@ export class CustomersService {
       ];
     }
 
-    const useListCache = !search && page === 1 && limit === 20 && tenantId;
+    const useListCache = !search && page === 1 && limit === 20 && currentTenantId;
     if (useListCache) {
       const listCacheKey = this.cache.buildKey('customers', 'list', tenantId, 1, 20);
       const cached = await this.cache.get<{ data: unknown[]; meta: unknown }>(listCacheKey);
@@ -64,18 +66,9 @@ export class CustomersService {
       this.prisma.customer.count({ where }),
     ]);
 
-    const totalPages = Math.ceil(total / limit);
-
     const result = {
       data,
-      meta: {
-        total,
-        page,
-        limit,
-        totalPages,
-        hasNextPage: page < totalPages,
-        hasPreviousPage: page > 1,
-      },
+      meta: buildPaginationMeta(total, page, limit),
     };
 
     if (useListCache) {
@@ -86,8 +79,8 @@ export class CustomersService {
   }
 
   async get(id: string, tenantId?: string | null) {
-    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
-    const cacheKey = this.cache.buildKey('customer', id, tenantId);
+    const currentTenantId = this.tenantContext.ensureTenant(tenantId);
+    const cacheKey = this.cache.buildKey('customer', id, currentTenantId);
     const cached = await this.cache.get(cacheKey);
     if (cached) {
       this.logger.debug(`Customer ${id} retrieved from cache`);
@@ -95,7 +88,7 @@ export class CustomersService {
     }
 
     const c = await this.prisma.customer.findFirst({
-      where: { id, tenantId },
+      where: { id, tenantId: currentTenantId },
     });
     if (!c) throw new NotFoundException('Cliente no encontrado.');
 
@@ -106,15 +99,15 @@ export class CustomersService {
 
   /** Cantidad de compras (ventas pagadas) y monto total del cliente. Para mostrar en ventas al seleccionar cliente. */
   async getSalesStats(id: string, tenantId?: string | null) {
-    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
+    const currentTenantId = this.tenantContext.ensureTenant(tenantId);
 
     const customer = await this.prisma.customer.findFirst({
-      where: { id, tenantId },
+      where: { id, tenantId: currentTenantId },
     });
     if (!customer) throw new NotFoundException('Cliente no encontrado.');
 
     const sales = await this.prisma.sale.findMany({
-      where: { customerId: id, tenantId, status: 'PAID' },
+      where: { customerId: id, tenantId: currentTenantId, status: 'PAID' },
       select: { grandTotal: true },
     });
 
@@ -129,7 +122,7 @@ export class CustomersService {
     createdByUserId?: string,
     tenantId?: string | null,
   ) {
-    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
+    const currentTenantId = this.tenantContext.ensureTenant(tenantId);
     const startTime = Date.now();
     this.logger.log(`Creando cliente ${dto.docNumber}`, {
       docType: dto.docType,
@@ -140,7 +133,7 @@ export class CustomersService {
 
     const created = await this.prisma.customer.create({
       data: {
-        tenantId,
+        tenantId: currentTenantId,
         docType: dto.docType,
         docNumber: dto.docNumber.trim(),
         name: dto.name.trim(),
@@ -181,9 +174,9 @@ export class CustomersService {
     updatedByUserId?: string,
     tenantId?: string | null,
   ) {
-    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
+    const currentTenantId = this.tenantContext.ensureTenant(tenantId);
     const oldCustomerData = await this.prisma.customer.findFirst({
-      where: { id, tenantId },
+      where: { id, tenantId: currentTenantId },
     });
     if (!oldCustomerData) throw new NotFoundException('Cliente no encontrado.');
 

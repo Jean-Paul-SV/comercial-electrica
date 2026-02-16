@@ -5,7 +5,9 @@ import type {
   CreateTenantPayload,
   CreateTenantResponse,
   PlanListItem,
+  CreatePlanPayload,
   UpdatePlanPayload,
+  ProviderTenantsSummary,
 } from './types';
 
 export type ListTenantsQuery = {
@@ -20,6 +22,13 @@ export function listPlans(
 ): Promise<PlanListItem[]> {
   const qs = activeOnly === true ? '?activeOnly=true' : '';
   return apiClient.get(`/provider/plans${qs}`, { authToken });
+}
+
+export function createPlan(
+  payload: CreatePlanPayload,
+  authToken: string
+): Promise<PlanListItem> {
+  return apiClient.post<PlanListItem>('/provider/plans', payload, { authToken });
 }
 
 export function updatePlan(
@@ -42,6 +51,12 @@ export function listTenants(
   return apiClient.get(`/provider/tenants${qs ? `?${qs}` : ''}`, {
     authToken,
   });
+}
+
+export function getTenantsSummary(
+  authToken: string
+): Promise<ProviderTenantsSummary> {
+  return apiClient.get('/provider/tenants/summary', { authToken });
 }
 
 export function getTenant(id: string, authToken: string): Promise<TenantDetail> {

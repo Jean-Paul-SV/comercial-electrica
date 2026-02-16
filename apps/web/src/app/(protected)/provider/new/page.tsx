@@ -108,76 +108,107 @@ export default function ProviderNewTenantPage() {
         <CardHeader>
           <CardTitle>Datos de la empresa</CardTitle>
           <CardDescription>
-            El slug debe ser único (minúsculas, números o guiones). Si no indicas
-            contraseña del admin, se generará una temporal (cambio obligatorio en el
-            primer login).
+            Crea la empresa (tenant) y su primer administrador en un solo paso. El identificador (slug) no se puede cambiar después.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={onSubmit} className="space-y-6 max-w-xl">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="name">Nombre de la empresa</Label>
-                <Input
-                  id="name"
-                  {...form.register('name')}
-                  placeholder="Ej. Mi Comercio S.A.S."
-                />
-                {form.formState.errors.name && (
-                  <p className="text-sm text-destructive">
-                    {form.formState.errors.name.message}
+          <form onSubmit={onSubmit} className="space-y-8 max-w-xl">
+            {/* Datos de la empresa */}
+            <div className="space-y-4">
+              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                Datos de la empresa
+              </p>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="name">Nombre (como aparecerá en la app)</Label>
+                  <Input
+                    id="name"
+                    {...form.register('name')}
+                    placeholder="Ej. Mi Comercio S.A.S."
+                    className="rounded-lg"
+                  />
+                  {form.formState.errors.name && (
+                    <p className="text-sm text-destructive">
+                      {form.formState.errors.name.message}
+                    </p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="slug">Slug (identificador único)</Label>
+                  <Input
+                    id="slug"
+                    {...form.register('slug')}
+                    placeholder="mi-empresa"
+                    className="rounded-lg font-mono"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Solo minúsculas, números y guiones. Debe ser único en el sistema.
                   </p>
-                )}
+                  {form.formState.errors.slug && (
+                    <p className="text-sm text-destructive">
+                      {form.formState.errors.slug.message}
+                    </p>
+                  )}
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="slug">Slug (identificador único)</Label>
-                <Input
-                  id="slug"
-                  {...form.register('slug')}
-                  placeholder="mi-empresa"
-                />
-                {form.formState.errors.slug && (
-                  <p className="text-sm text-destructive">
-                    {form.formState.errors.slug.message}
-                  </p>
-                )}
-              </div>
-            </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="planId">Plan (opcional)</Label>
-              <Select
-                id="planId"
-                {...form.register('planId')}
-                disabled={plansLoading}
-              >
-                <option value="">Sin plan</option>
-                {plans.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                    {p.priceMonthly != null ? ` — $${p.priceMonthly}/mes` : ''}
+              <div className="space-y-2">
+                <Label htmlFor="planId">Plan para esta empresa (opcional)</Label>
+                <Select
+                  id="planId"
+                  {...form.register('planId')}
+                  disabled={plansLoading}
+                >
+                  <option value="">
+                    {plansLoading ? 'Cargando planes…' : 'Sin plan (acceso por defecto)'}
                   </option>
-                ))}
-              </Select>
-              {form.formState.errors.planId && (
-                <p className="text-sm text-destructive">
-                  {form.formState.errors.planId.message}
-                </p>
-              )}
+                  {plans.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                      {p.priceMonthly != null ? ` — $${p.priceMonthly.toLocaleString('es-CO')} / mes` : ''}
+                    </option>
+                  ))}
+                </Select>
+                {plansLoading ? (
+                  <p className="text-xs text-muted-foreground">Obteniendo planes disponibles…</p>
+                ) : plans.length === 0 ? (
+                  <p className="text-xs text-amber-400">
+                    Aún no hay planes creados. Ve a <span className="font-medium">Panel proveedor → Planes</span>{' '}
+                    para definirlos y poder asignarlos a las nuevas empresas.
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    Si eliges un plan, la empresa tendrá acceso a los módulos incluidos y podrás controlar límites
+                    como usuarios máximos.
+                  </p>
+                )}
+                {form.formState.errors.planId && (
+                  <p className="text-sm text-destructive">
+                    {form.formState.errors.planId.message}
+                  </p>
+                )}
+              </div>
             </div>
 
-            <hr />
-
-            <div>
-              <h3 className="font-medium mb-3">Primer usuario administrador</h3>
+            {/* Primer usuario administrador */}
+            <div className="space-y-4 rounded-lg border border-border/60 bg-muted/10 p-4">
+              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                Primer usuario administrador
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Este usuario podrá gestionar la empresa desde el primer momento. Obligatorio indicar correo; el resto es opcional.
+              </p>
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="adminEmail">Correo del admin *</Label>
+                  <Label htmlFor="adminEmail">
+                    Correo del admin <span className="text-destructive">*</span>
+                  </Label>
                   <Input
                     id="adminEmail"
                     type="email"
                     {...form.register('adminEmail')}
                     placeholder="admin@empresa.com"
+                    className="rounded-lg"
                   />
                   {form.formState.errors.adminEmail && (
                     <p className="text-sm text-destructive">
@@ -190,19 +221,22 @@ export default function ProviderNewTenantPage() {
                   <Input
                     id="adminName"
                     {...form.register('adminName')}
-                    placeholder="Juan Pérez"
+                    placeholder="Ej. Juan Pérez"
+                    className="rounded-lg"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="adminPassword">
-                    Contraseña inicial (opcional; si se deja vacío se genera temporal)
-                  </Label>
+                  <Label htmlFor="adminPassword">Contraseña inicial (opcional)</Label>
                   <Input
                     id="adminPassword"
                     type="password"
                     {...form.register('adminPassword')}
-                    placeholder="Mínimo 8 caracteres"
+                    placeholder="Dejar vacío para generar una temporal"
+                    className="rounded-lg"
                   />
+                  <p className="text-xs text-muted-foreground">
+                    Mínimo 8 caracteres. Si la dejas vacía, se generará una contraseña temporal que el admin deberá cambiar en el primer acceso.
+                  </p>
                   {form.formState.errors.adminPassword && (
                     <p className="text-sm text-destructive">
                       {form.formState.errors.adminPassword.message}
@@ -212,7 +246,7 @@ export default function ProviderNewTenantPage() {
               </div>
             </div>
 
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2 pt-2">
               <Button type="submit" disabled={createTenant.isPending}>
                 {createTenant.isPending ? 'Creando…' : 'Crear empresa y admin'}
               </Button>

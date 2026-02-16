@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useQueryClient } from '@tanstack/react-query';
@@ -16,6 +16,7 @@ import {
 } from '@shared/components/ui/card';
 import { Button } from '@shared/components/ui/button';
 import { Input } from '@shared/components/ui/input';
+import { MoneyInput } from '@shared/components/ui/money-input';
 import { Label } from '@shared/components/ui/label';
 import {
   Table,
@@ -147,12 +148,12 @@ export default function ProductsPage() {
     defaultValues: {
       internalCode: '',
       name: '',
-      cost: 0,
-      marginPercent: 0,
+      cost: undefined as number | undefined,
+      marginPercent: undefined as number | undefined,
       salePrice: undefined as number | undefined,
-      taxRate: 0,
+      taxRate: undefined as number | undefined,
       minStock: undefined as number | undefined,
-      initialQuantity: 0,
+      initialQuantity: undefined as number | undefined,
     },
   });
 
@@ -800,14 +801,18 @@ export default function ProductsPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="cost">Costo (COP)</Label>
-                <Input
-                  id="cost"
-                  type="number"
-                  step="0.01"
-                  min={0.01}
-                  {...productForm.register('cost')}
-                  placeholder="15000"
-                  className="rounded-lg"
+                <Controller
+                  control={productForm.control}
+                  name="cost"
+                  render={({ field }) => (
+                    <MoneyInput
+                      id="cost"
+                      className="rounded-lg"
+                      placeholder="15.000"
+                      value={field.value ?? undefined}
+                      onChangeValue={(val) => field.onChange(val ?? undefined)}
+                    />
+                  )}
                 />
                 <p className="text-xs text-muted-foreground">
                   Costo de compra o producción del producto. Se usa para calcular márgenes de ganancia.
@@ -840,14 +845,18 @@ export default function ProductsPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="salePrice">Precio de venta (COP)</Label>
-                <Input
-                  id="salePrice"
-                  type="number"
-                  step="0.01"
-                  min={0}
-                  {...productForm.register('salePrice')}
-                  placeholder="Ej: 25000"
-                  className="rounded-lg"
+                <Controller
+                  control={productForm.control}
+                  name="salePrice"
+                  render={({ field }) => (
+                    <MoneyInput
+                      id="salePrice"
+                      className="rounded-lg"
+                      placeholder="Ej: 25.000"
+                      value={field.value ?? undefined}
+                      onChangeValue={(val) => field.onChange(val ?? undefined)}
+                    />
+                  )}
                 />
                 <p className="text-xs text-muted-foreground">
                   Precio que piensas colocar. Si lo ingresas, se usará este valor en lugar del calculado por costo y margen.
@@ -903,7 +912,7 @@ export default function ProductsPage() {
                     min={0}
                     step={1}
                     {...productForm.register('initialQuantity')}
-                    placeholder="0"
+                    placeholder="Ej: 0"
                     className="rounded-lg"
                   />
                   <p className="text-xs text-muted-foreground">

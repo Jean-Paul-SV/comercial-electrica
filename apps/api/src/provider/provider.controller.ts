@@ -22,6 +22,7 @@ import { ListTenantsQueryDto } from './dto/list-tenants-query.dto';
 import { UpdateTenantDto } from './dto/update-tenant.dto';
 import { UpdateTenantStatusDto } from './dto/update-tenant-status.dto';
 import { RenewSubscriptionDto } from './dto/renew-subscription.dto';
+import { CreatePlanDto } from './dto/create-plan.dto';
 import { UpdatePlanDto } from './dto/update-plan.dto';
 
 @ApiTags('provider')
@@ -30,6 +31,17 @@ import { UpdatePlanDto } from './dto/update-plan.dto';
 @UseGuards(JwtAuthGuard, PlatformAdminGuard)
 export class ProviderController {
   constructor(private readonly provider: ProviderService) {}
+
+  @Get('tenants/summary')
+  @ApiOperation({
+    summary: 'Resumen de tenants para panel proveedor',
+    description:
+      'Devuelve métricas agregadas (nº de empresas, usuarios, uso por plan y por módulo). No incluye datos personales.',
+  })
+  @ApiResponse({ status: 200, description: 'Resumen calculado correctamente.' })
+  getTenantsSummary() {
+    return this.provider.getTenantsSummary();
+  }
 
   @Get('plans')
   @ApiOperation({
@@ -40,6 +52,18 @@ export class ProviderController {
   @ApiResponse({ status: 200, description: 'Lista de planes.' })
   listPlans(@Query('activeOnly') activeOnly?: string) {
     return this.provider.listPlans(activeOnly === 'true');
+  }
+
+  @Post('plans')
+  @ApiOperation({
+    summary: 'Crear plan',
+    description:
+      'Crea un plan con todos los módulos por defecto. El slug debe ser único.',
+  })
+  @ApiResponse({ status: 201, description: 'Plan creado.' })
+  @ApiResponse({ status: 409, description: 'Ya existe un plan con ese slug.' })
+  createPlan(@Body() dto: CreatePlanDto) {
+    return this.provider.createPlan(dto);
   }
 
   @Patch('plans/:id')

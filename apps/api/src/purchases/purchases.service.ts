@@ -1,6 +1,5 @@
 import {
   BadRequestException,
-  ForbiddenException,
   Injectable,
   NotFoundException,
   Logger,
@@ -17,6 +16,7 @@ import { ValidationLimitsService } from '../common/services/validation-limits.se
 import { AuditService } from '../common/services/audit.service';
 import { CacheService } from '../common/services/cache.service';
 import { createPaginatedResponse } from '../common/interfaces/pagination.interface';
+import { TenantContextService } from '../common/services/tenant-context.service';
 
 @Injectable()
 export class PurchasesService {
@@ -27,6 +27,7 @@ export class PurchasesService {
     private readonly limits: ValidationLimitsService,
     private readonly audit: AuditService,
     private readonly cache: CacheService,
+    private readonly tenantContext: TenantContextService,
   ) {}
 
   async createPurchaseOrder(
@@ -34,7 +35,7 @@ export class PurchasesService {
     createdByUserId?: string,
     tenantId?: string,
   ) {
-    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
+    const currentTenantId = this.tenantContext.ensureTenant(tenantId);
     if (!dto.items || dto.items.length === 0) {
       throw new BadRequestException('Debe incluir items.');
     }
@@ -63,7 +64,10 @@ export class PurchasesService {
         async (tx) => {
           // Validar que los productos existan y pertenezcan al tenant
           const products = await tx.product.findMany({
-            where: { id: { in: dto.items.map((i) => i.productId) }, tenantId },
+            where: {
+              id: { in: dto.items.map((i) => i.productId) },
+              tenantId: currentTenantId,
+            },
           });
 
           if (products.length !== dto.items.length) {
@@ -99,12 +103,12 @@ export class PurchasesService {
           const grandTotal = round2(subtotal + taxTotal);
 
           // Generar número de pedido único por tenant
-          const orderNumber = await this.generateOrderNumber(tx, tenantId);
+          const orderNumber = await this.generateOrderNumber(tx, currentTenantId);
 
           // Crear pedido (Decimal explícito para evitar PrismaClientValidationError)
           const purchaseOrder = await tx.purchaseOrder.create({
             data: {
-              tenantId,
+              tenantId: currentTenantId,
               supplierId: dto.supplierId,
               orderNumber,
               status: PurchaseOrderStatus.DRAFT,
@@ -164,14 +168,14 @@ export class PurchasesService {
     pagination?: { page?: number; limit?: number },
     tenantId?: string | null,
   ) {
-    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
+    const currentTenantId = this.tenantContext.ensureTenant(tenantId);
     const page = pagination?.page ?? 1;
     const limit = pagination?.limit ?? 20;
     const skip = (page - 1) * limit;
 
     const [data, total] = await Promise.all([
       this.prisma.purchaseOrder.findMany({
-        where: { tenantId },
+        where: { tenantId: currentTenantId },
         orderBy: { orderDate: 'desc' },
         include: {
           supplier: true,
@@ -180,15 +184,15 @@ export class PurchasesService {
         skip,
         take: limit,
       }),
-      this.prisma.purchaseOrder.count({ where: { tenantId } }),
+      this.prisma.purchaseOrder.count({ where: { tenantId: currentTenantId } }),
     ]);
 
     return createPaginatedResponse(data, total, page, limit);
   }
 
   async getPurchaseOrder(id: string, tenantId?: string | null) {
-    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
-    const cacheKey = this.cache.buildKey('purchaseOrder', id, tenantId);
+    const currentTenantId = this.tenantContext.ensureTenant(tenantId);
+    const cacheKey = this.cache.buildKey('purchaseOrder', id, currentTenantId);
     const cached = await this.cache.get(cacheKey);
     if (cached) {
       this.logger.debug(`PurchaseOrder ${id} retrieved from cache`);
@@ -196,7 +200,7 @@ export class PurchasesService {
     }
 
     const order = await this.prisma.purchaseOrder.findFirst({
-      where: { id, tenantId },
+      where: { id, tenantId: currentTenantId },
       include: {
         supplier: true,
         items: { include: { product: true } },
@@ -218,9 +222,9 @@ export class PurchasesService {
     receivedByUserId?: string,
     tenantId?: string | null,
   ) {
-    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
+    const currentTenantId = this.tenantContext.ensureTenant(tenantId);
     const purchaseOrder = await this.prisma.purchaseOrder.findFirst({
-      where: { id, tenantId },
+      where: { id, tenantId: currentTenantId },
       include: {
         items: { include: { product: true } },
         supplier: true,

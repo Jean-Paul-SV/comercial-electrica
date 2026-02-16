@@ -47,7 +47,7 @@ export default function BillingPage() {
     return (
       <div className="space-y-6 max-w-2xl">
         <h1 className="text-2xl font-semibold tracking-tight">
-          Facturación
+          Plan
         </h1>
         <Card>
           <CardContent className="pt-6">
@@ -73,7 +73,7 @@ export default function BillingPage() {
     return (
       <div className="space-y-6 max-w-2xl">
         <h1 className="text-2xl font-semibold tracking-tight">
-          Facturación
+          Plan
         </h1>
         <Card>
           <CardHeader>
@@ -93,7 +93,7 @@ export default function BillingPage() {
     return (
       <div className="space-y-6 max-w-2xl">
         <h1 className="text-2xl font-semibold tracking-tight">
-          Facturación
+          Plan
         </h1>
         <Card>
           <CardContent className="pt-6">
@@ -115,7 +115,7 @@ export default function BillingPage() {
   return (
     <div className="space-y-6 max-w-2xl">
       <h1 className="text-2xl font-semibold tracking-tight">
-        Facturación
+        Plan
       </h1>
       <Card>
         <CardHeader>
@@ -124,7 +124,7 @@ export default function BillingPage() {
             Plan actual
           </CardTitle>
           <CardDescription>
-            Información de tu suscripción y opciones de pago.
+            Información de tu plan, suscripción y opciones de pago.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -161,6 +161,31 @@ export default function BillingPage() {
                     )}
                   </p>
                 )}
+              </div>
+            </div>
+          )}
+
+          {plan && (
+            <div className="space-y-2 rounded-lg border border-dashed border-border/70 bg-muted/10 p-4">
+              <p className="text-sm font-medium">¿Necesitas mejorar tu plan?</p>
+              <p className="text-sm text-muted-foreground">
+                Si tu negocio crece y necesitas más usuarios o módulos (por ejemplo pasar de Básico a
+                Premium o Empresarial), podemos cambiar tu plan sin interrumpir la operación.
+              </p>
+              <div className="pt-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  type="button"
+                  onClick={() => {
+                    if (typeof window !== 'undefined') {
+                      window.location.href =
+                        'mailto:soporte@orion-app.cloud?subject=Mejorar%20plan%20Orion';
+                    }
+                  }}
+                >
+                  Mejorar plan
+                </Button>
               </div>
             </div>
           )}

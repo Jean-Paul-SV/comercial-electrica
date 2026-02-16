@@ -28,14 +28,25 @@ export class PrismaService
       }
     }
 
+    // Configurar connection pooling según entorno
+    // En producción: connection_limit=20-50, pool_timeout=20
+    // En desarrollo: connection_limit=5, pool_timeout=10
+    const isProd = process.env.NODE_ENV === 'production';
+    const connectionLimit = isProd ? 20 : 5;
+    const poolTimeout = isProd ? 20 : 10;
+    
+    const baseUrl = url ?? 'postgresql://ce:ce_password@localhost:5432/comercial_electrica?schema=public';
+    const urlWithPool = baseUrl.includes('?')
+      ? `${baseUrl}&connection_limit=${connectionLimit}&pool_timeout=${poolTimeout}`
+      : `${baseUrl}?connection_limit=${connectionLimit}&pool_timeout=${poolTimeout}`;
+
     super({
       datasources: {
         db: {
-          url:
-            url ??
-            'postgresql://ce:ce_password@localhost:5432/comercial_electrica?schema=public',
+          url: urlWithPool,
         },
       },
+      log: isProd ? ['error', 'warn'] : ['query', 'error', 'warn'],
     });
   }
 

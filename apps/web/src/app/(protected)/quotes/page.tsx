@@ -57,6 +57,9 @@ const PAYMENT_METHODS = [
   { value: 'OTHER', label: 'Otro' },
 ] as const;
 
+// IVA por defecto (porcentaje) cuando el producto no tiene tasa configurada.
+const DEFAULT_TAX_RATE_PERCENT = 19;
+
 type QuoteLine = { productId: string; qty: number; unitPrice?: number };
 
 export default function QuotesPage() {
@@ -193,7 +196,11 @@ export default function QuotesPage() {
       const product = products.find((p) => p.id === line.productId);
       const unitPrice = line.unitPrice ?? (product ? Number(product.price) : 0);
       const lineSubtotal = unitPrice * line.qty;
-      const taxRate = product ? Number(product.taxRate ?? 0) : 0;
+      const rawRate = product?.taxRate;
+      const taxRate =
+        rawRate == null
+          ? DEFAULT_TAX_RATE_PERCENT
+          : Number(rawRate);
       return sum + (lineSubtotal * taxRate) / 100;
     }, 0);
   }, [lines, products]);

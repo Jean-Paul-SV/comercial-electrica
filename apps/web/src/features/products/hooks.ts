@@ -13,8 +13,11 @@ import {
   createProductDictionaryEntry,
   updateProductDictionaryEntry,
   deleteProductDictionaryEntry,
+  updateCategory,
+  deleteCategory,
   type ProductsListParams,
   type CreateCategoryPayload,
+  type UpdateCategoryPayload,
 } from './api';
 import type {
   CreateProductPayload,
@@ -62,6 +65,31 @@ export function useCreateCategory() {
   return useMutation({
     mutationFn: (payload: CreateCategoryPayload) =>
       createCategory(payload, token!),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['categories'] });
+    },
+  });
+}
+
+export function useUpdateCategory() {
+  const queryClient = useQueryClient();
+  const { token } = useAuth();
+
+  return useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: UpdateCategoryPayload }) =>
+      updateCategory(id, payload, token!),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['categories'] });
+    },
+  });
+}
+
+export function useDeleteCategory() {
+  const queryClient = useQueryClient();
+  const { token } = useAuth();
+
+  return useMutation({
+    mutationFn: (id: string) => deleteCategory(id, token!),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['categories'] });
     },

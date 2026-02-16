@@ -1,6 +1,5 @@
 import {
   BadRequestException,
-  ForbiddenException,
   Injectable,
   NotFoundException,
   Logger,
@@ -23,6 +22,7 @@ import { AuditService } from '../common/services/audit.service';
 import { CacheService } from '../common/services/cache.service';
 import { createPaginatedResponse } from '../common/interfaces/pagination.interface';
 import { DianService } from '../dian/dian.service';
+import { TenantContextService } from '../common/services/tenant-context.service';
 
 @Injectable()
 export class QuotesService {
@@ -35,6 +35,7 @@ export class QuotesService {
     private readonly audit: AuditService,
     private readonly cache: CacheService,
     private readonly dianService: DianService,
+    private readonly tenantContext: TenantContextService,
   ) {}
 
   async createQuote(
@@ -42,7 +43,7 @@ export class QuotesService {
     createdByUserId?: string,
     tenantId?: string | null,
   ) {
-    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
+    const currentTenantId = this.tenantContext.ensureTenant(tenantId);
     if (!dto.items || dto.items.length === 0) {
       throw new BadRequestException('Debe incluir items.');
     }
@@ -62,7 +63,7 @@ export class QuotesService {
     // Validar que el cliente existe y pertenece al tenant si se proporciona
     if (dto.customerId) {
       const customer = await this.prisma.customer.findFirst({
-        where: { id: dto.customerId, tenantId },
+        where: { id: dto.customerId, tenantId: currentTenantId },
       });
       if (!customer) {
         throw new NotFoundException(
@@ -76,7 +77,10 @@ export class QuotesService {
         async (tx) => {
           // Validar que los productos existan y pertenezcan al tenant
           const products = await tx.product.findMany({
-            where: { id: { in: dto.items.map((i) => i.productId) }, tenantId },
+            where: {
+              id: { in: dto.items.map((i) => i.productId) },
+              tenantId: currentTenantId,
+            },
           });
 
           if (products.length !== dto.items.length) {
@@ -120,7 +124,7 @@ export class QuotesService {
           // Crear cotización
           const quote = await tx.quote.create({
             data: {
-              tenantId,
+              tenantId: currentTenantId,
               customerId: dto.customerId ?? null,
               status: QuoteStatus.DRAFT,
               validUntil,
@@ -160,7 +164,7 @@ export class QuotesService {
     pagination?: { page?: number; limit?: number },
     tenantId?: string | null,
   ) {
-    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
+    const currentTenantId = this.tenantContext.ensureTenant(tenantId);
     // Cachear listados frecuentes (sin filtros o con filtros comunes)
     if (
       !filters ||
@@ -169,7 +173,7 @@ export class QuotesService {
       const cacheKey = this.cache.buildKey(
         'quotes',
         'list',
-        tenantId,
+        currentTenantId,
         pagination?.page,
         pagination?.limit,
       );
@@ -179,7 +183,7 @@ export class QuotesService {
         return cached;
       }
     }
-    const where: Prisma.QuoteWhereInput = { tenantId };
+    const where: Prisma.QuoteWhereInput = { tenantId: currentTenantId };
     if (filters?.status) {
       where.status = filters.status;
     }
@@ -223,7 +227,7 @@ export class QuotesService {
       const cacheKey = this.cache.buildKey(
         'quotes',
         'list',
-        tenantId,
+        currentTenantId,
         page,
         limit,
       );
@@ -234,9 +238,9 @@ export class QuotesService {
   }
 
   async getQuoteById(id: string, tenantId?: string | null) {
-    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
+    const currentTenantId = this.tenantContext.ensureTenant(tenantId);
     const quote = await this.prisma.quote.findFirst({
-      where: { id, tenantId },
+      where: { id, tenantId: currentTenantId },
       include: {
         items: { include: { product: true } },
         customer: true,

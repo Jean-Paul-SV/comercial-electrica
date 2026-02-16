@@ -25,6 +25,7 @@ import { ListProductsQueryDto } from './dto/list-products-query.dto';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { CreateCategoryDto } from './dto/create-category.dto';
+import { UpdateCategoryDto } from './dto/update-category.dto';
 import { CreateProductDictionaryEntryDto } from './dto/create-product-dictionary-entry.dto';
 import { UpdateProductDictionaryEntryDto } from './dto/update-product-dictionary-entry.dto';
 import { ListProductDictionaryQueryDto } from './dto/list-product-dictionary-query.dto';
@@ -247,6 +248,42 @@ export class CatalogController {
     @Req() req: { user?: { sub?: string; tenantId?: string } },
   ) {
     return this.catalog.createCategory(dto, req.user?.sub, req.user?.tenantId);
+  }
+
+  @Patch('categories/:id')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Actualizar categoría',
+    description: 'Actualiza el nombre de una categoría existente.',
+  })
+  @ApiResponse({ status: 200, description: 'Categoría actualizada exitosamente' })
+  @ApiResponse({ status: 400, description: 'Error de validación' })
+  @ApiResponse({ status: 401, description: 'No autenticado' })
+  @ApiResponse({ status: 404, description: 'Categoría no encontrada' })
+  updateCategory(
+    @Param('id') id: string,
+    @Body() dto: UpdateCategoryDto,
+    @Req() req: { user?: { sub?: string; tenantId?: string } },
+  ) {
+    return this.catalog.updateCategory(id, dto, req.user?.sub, req.user?.tenantId);
+  }
+
+  @Delete('categories/:id')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Eliminar categoría',
+    description:
+      'Elimina una categoría sin productos asociados. Si hay productos que la usan, devuelve un error.',
+  })
+  @ApiResponse({ status: 200, description: 'Categoría eliminada exitosamente' })
+  @ApiResponse({ status: 400, description: 'No se puede eliminar por tener productos asociados' })
+  @ApiResponse({ status: 401, description: 'No autenticado' })
+  @ApiResponse({ status: 404, description: 'Categoría no encontrada' })
+  deleteCategory(
+    @Param('id') id: string,
+    @Req() req: { user?: { sub?: string; tenantId?: string } },
+  ) {
+    return this.catalog.deleteCategory(id, req.user?.sub, req.user?.tenantId);
   }
 
   // --- Diccionario de términos que los clientes escriben al preguntar por productos ---

@@ -72,6 +72,7 @@ export default function SalesPage() {
   const [saleProductSearch, setSaleProductSearch] = useState('');
   const [saleCustomerSearch, setSaleCustomerSearch] = useState('');
   const [discountPercent, setDiscountPercent] = useState<number>(0);
+  const [applyTax, setApplyTax] = useState<boolean>(true);
 
   const limit = 20;
   const salesQuery = useSalesList({
@@ -320,7 +321,7 @@ export default function SalesPage() {
     }, 0);
   }, [lines, products]);
 
-  const taxEstimate = Math.round(subtotal * 0.19);
+  const taxEstimate = applyTax ? Math.round(subtotal * 0.19) : 0;
   const discountPercentCapped = Math.max(0, Math.min(Number(discountPercent) || 0, 100));
   const discountCapped = Math.round((subtotal + taxEstimate) * discountPercentCapped / 100);
   const grandTotal = Math.max(0, subtotal + taxEstimate - discountCapped);
@@ -929,6 +930,18 @@ export default function SalesPage() {
                   <span className="tabular-nums text-right text-foreground">{formatMoney(subtotal)}</span>
                   <span className="text-muted-foreground">IVA (aprox.)</span>
                   <span className="tabular-nums text-right text-foreground">{formatMoney(taxEstimate)}</span>
+                  <div className="col-span-2 flex items-center justify-between text-xs text-muted-foreground">
+                    <label htmlFor="apply-tax" className="flex items-center gap-2 cursor-pointer select-none">
+                      <input
+                        id="apply-tax"
+                        type="checkbox"
+                        checked={applyTax}
+                        onChange={(e) => setApplyTax(e.target.checked)}
+                        className="h-3.5 w-3.5 rounded border-input"
+                      />
+                      <span>Aplicar IVA del 19 % sobre el subtotal</span>
+                    </label>
+                  </div>
                   <Label htmlFor="sale-discount" className="text-muted-foreground font-normal pt-1">
                     Descuento %
                   </Label>

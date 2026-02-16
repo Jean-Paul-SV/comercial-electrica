@@ -1719,11 +1719,51 @@ export class DianService {
         'certBase64 no es un base64 válido del archivo .p12.',
       );
     }
+    
+    // Validar formato del certificado antes de procesar
+    try {
+      const binary = certBuffer.toString('binary');
+      const p12Asn1 = forge.asn1.fromDer(binary);
+      forge.pkcs12.pkcs12FromAsn1(p12Asn1, password);
+    } catch (err) {
+      throw new BadRequestException(
+        `Certificado .p12 inválido o contraseña incorrecta: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+    
     const validUntil = this.getCertValidUntilFromP12(certBuffer, password);
     if (!validUntil) {
       throw new BadRequestException(
-        'No se pudo leer el certificado .p12 (contraseña incorrecta o archivo inválido).',
+        'No se pudo leer la fecha de vencimiento del certificado .p12.',
       );
+    }
+    
+    // Validar que el certificado no esté vencido
+    if (validUntil < new Date()) {
+      throw new BadRequestException(
+        `El certificado está vencido desde ${validUntil.toISOString().split('T')[0]}. Suba un certificado vigente.`,
+      );
+    }
+    
+    // Validar que el certificado corresponde al NIT del tenant (si está configurado)
+    const config = await this.prisma.dianConfig.findUnique({
+      where: { tenantId },
+      select: { issuerNit: true },
+    });
+    if (config?.issuerNit) {
+      // Intentar extraer NIT del certificado para validar
+      try {
+        const { certPem } = this.loadCertFromP12Buffer(certBuffer, password);
+        // El certificado contiene información del emisor, pero validar NIT requiere parsear el certificado
+        // Por ahora solo validamos formato y vencimiento
+        this.logger.debug(
+          `Certificado validado para tenant ${tenantId}. NIT del tenant: ${config.issuerNit}`,
+        );
+      } catch (err) {
+        this.logger.warn(
+          `No se pudo validar NIT del certificado para tenant ${tenantId}: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
     }
     const certEncrypted = encryptCertPayload(certBuffer, encKey);
     const certPasswordEncrypted = encryptCertPayload(

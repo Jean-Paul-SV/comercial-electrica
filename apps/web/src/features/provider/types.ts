@@ -66,8 +66,20 @@ export type PlanListItem = {
   description: string | null;
   priceMonthly: number | null;
   priceYearly: number | null;
+  maxUsers: number | null;
   stripePriceId: string | null;
   isActive: boolean;
+};
+
+export type CreatePlanPayload = {
+  name: string;
+  slug: string;
+  description?: string;
+  priceMonthly?: number;
+  priceYearly?: number;
+  maxUsers?: number | null;
+  stripePriceId?: string | null;
+  isActive?: boolean;
 };
 
 export type UpdatePlanPayload = {
@@ -75,6 +87,24 @@ export type UpdatePlanPayload = {
   description?: string;
   priceMonthly?: number;
   priceYearly?: number;
+  maxUsers?: number | null;
   stripePriceId?: string | null;
   isActive?: boolean;
+};
+
+export type ProviderTenantsSummary = {
+  totalTenants: number;
+  activeTenants: number;
+  suspendedTenants: number;
+  totalUsers: number;
+  plansUsage: {
+    id: string;
+    name: string;
+    slug: string;
+    tenantsCount: number;
+  }[];
+  modulesUsage: {
+    moduleCode: string;
+    tenantsCount: number;
+  }[];
 };

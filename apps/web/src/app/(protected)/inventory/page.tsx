@@ -48,6 +48,24 @@ const TYPE_LABELS: Record<string, string> = {
 
 type MovementLine = { productId: string; qty: number; unitCost?: number };
 
+const numberFormatter = new Intl.NumberFormat('es-CO', {
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 2,
+});
+
+function formatNumberEs(value: number | undefined): string {
+  if (value == null || Number.isNaN(value)) return '';
+  return numberFormatter.format(value);
+}
+
+function parseNumberEs(input: string): number | undefined {
+  const trimmed = input.trim();
+  if (!trimmed) return undefined;
+  const normalized = trimmed.replace(/\./g, '').replace(',', '.').replace(/[^0-9.-]/g, '');
+  const n = Number(normalized);
+  return Number.isNaN(n) ? undefined : n;
+}
+
 /** Tarjeta de stock actual por producto (código, nombre, categoría, cantidad). */
 function StockActualCard() {
   const [stockPage, setStockPage] = useState(1);
@@ -822,16 +840,16 @@ export default function InventoryPage() {
                     />
                     {type === 'IN' && (
                       <Input
-                        type="number"
-                        min={0}
-                        step="0.01"
+                        type="text"
+                        inputMode="decimal"
                         placeholder="Costo"
-                        value={line.unitCost ?? ''}
+                        value={formatNumberEs(line.unitCost)}
                         onChange={(e) => {
                           const raw = e.target.value;
-                          updateLine(i, 'unitCost', raw === '' ? undefined : Number(raw));
+                          const parsed = parseNumberEs(raw);
+                          updateLine(i, 'unitCost', parsed);
                         }}
-                        className="w-24 h-9 rounded-md"
+                        className="w-28 h-9 rounded-md tabular-nums"
                       />
                     )}
                     <Button

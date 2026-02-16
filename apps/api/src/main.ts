@@ -88,6 +88,55 @@ async function bootstrap() {
         }
       : true;
 
+  // Security Headers (protección contra XSS, clickjacking, MIME sniffing, etc.)
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    // X-Content-Type-Options: previene MIME type sniffing
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    
+    // X-Frame-Options: previene clickjacking
+    res.setHeader('X-Frame-Options', 'DENY');
+    
+    // X-XSS-Protection: protección básica contra XSS
+    res.setHeader('X-XSS-Protection', '1; mode=block');
+    
+    // Referrer-Policy: controla qué información del referrer se envía
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    
+    // Permissions-Policy: controla qué APIs del navegador pueden usar
+    res.setHeader(
+      'Permissions-Policy',
+      'geolocation=(), microphone=(), camera=()',
+    );
+    
+    // Content-Security-Policy: política de seguridad de contenido
+    if (isProd) {
+      // CSP estricto para producción
+      res.setHeader(
+        'Content-Security-Policy',
+        "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https:;",
+      );
+    } else {
+      // CSP más permisivo para desarrollo (permite Swagger, etc.)
+      res.setHeader(
+        'Content-Security-Policy',
+        "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https: http://localhost:* ws://localhost:* ws:;",
+      );
+    }
+    
+    // Strict-Transport-Security (HSTS): solo en producción con HTTPS
+    if (isProd && req.secure) {
+      res.setHeader(
+        'Strict-Transport-Security',
+        'max-age=31536000; includeSubDomains; preload',
+      );
+    }
+    
+    // X-Powered-By: ocultar información del servidor
+    res.removeHeader('X-Powered-By');
+    
+    next();
+  });
+
   // Correlation / Request ID (útil para debugging y trazabilidad)
   app.use((req: Request, res: Response, next: NextFunction) => {
     const r = req as Request & { requestId?: string };

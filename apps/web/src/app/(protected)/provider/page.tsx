@@ -20,8 +20,8 @@ import {
 } from '@shared/components/ui/table';
 import { Badge } from '@shared/components/ui/badge';
 import { Skeleton } from '@shared/components/ui/skeleton';
-import { Building2, PlusCircle, Eye, ChevronLeft } from 'lucide-react';
-import { useListTenants } from '@features/provider/hooks';
+import { Building2, PlusCircle, Eye, ChevronLeft, BarChart3 } from 'lucide-react';
+import { useListTenants, useTenantsSummary } from '@features/provider/hooks';
 
 const PAGE_SIZE = 20;
 
@@ -29,6 +29,7 @@ export default function ProviderTenantsPage() {
   const [page, setPage] = useState(0);
   const [activeFilter, setActiveFilter] = useState<string | undefined>(undefined);
 
+  const { data: summary, isLoading: isLoadingSummary } = useTenantsSummary();
   const { data, isLoading, error } = useListTenants({
     limit: PAGE_SIZE,
     offset: page * PAGE_SIZE,
@@ -54,6 +55,64 @@ export default function ProviderTenantsPage() {
             Nueva empresa
           </Link>
         </Button>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <BarChart3 className="h-4 w-4" />
+              Empresas totales
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-semibold tracking-tight">
+              {isLoadingSummary ? '—' : summary?.totalTenants ?? 0}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Incluye activas y suspendidas.
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Empresas activas</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-semibold tracking-tight">
+              {isLoadingSummary ? '—' : summary?.activeTenants ?? 0}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Con acceso habilitado al sistema.
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Empresas suspendidas</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-semibold tracking-tight">
+              {isLoadingSummary ? '—' : summary?.suspendedTenants ?? 0}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              No pueden iniciar sesión hasta reactivarlas.
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Usuarios totales</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-semibold tracking-tight">
+              {isLoadingSummary ? '—' : summary?.totalUsers ?? 0}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Usuarios dentro de las empresas (sin contar admins de plataforma).
+            </p>
+          </CardContent>
+        </Card>
       </div>
 
       <Card>

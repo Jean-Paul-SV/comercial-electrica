@@ -70,12 +70,28 @@ export function listCategories(authToken: string): Promise<Category[]> {
 }
 
 export type CreateCategoryPayload = { name: string };
+export type UpdateCategoryPayload = { name: string };
 
 export function createCategory(
   payload: CreateCategoryPayload,
   authToken: string,
 ): Promise<Category> {
   return apiClient.post('/categories', payload, { authToken });
+}
+
+export function updateCategory(
+  id: string,
+  payload: UpdateCategoryPayload,
+  authToken: string,
+): Promise<Category> {
+  return apiClient.patch(`/categories/${id}`, payload, { authToken });
+}
+
+export function deleteCategory(
+  id: string,
+  authToken: string,
+): Promise<{ deleted: boolean }> {
+  return apiClient.delete(`/categories/${id}`, { authToken });
 }
 
 // --- Diccionario de búsqueda (términos que los clientes escriben al preguntar) ---

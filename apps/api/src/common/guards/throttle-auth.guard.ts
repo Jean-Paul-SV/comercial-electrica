@@ -1,5 +1,6 @@
-import { Injectable, ExecutionContext } from '@nestjs/common';
-import { ThrottlerGuard } from '@nestjs/throttler';
+import { Injectable, ExecutionContext, ModuleRef } from '@nestjs/core';
+import { ThrottlerGuard, ThrottlerOptions } from '@nestjs/throttler';
+import { PlanLimitsService } from '../services/plan-limits.service';
 
 /**
  * Guard personalizado para rate limiting.
@@ -7,12 +8,23 @@ import { ThrottlerGuard } from '@nestjs/throttler';
  * - En producción:
  *   - POST /auth/login: 50 req/min por IP (o desactivar con THROTTLE_LOGIN_DISABLED=true)
  *   - POST /auth/forgot-password: 3 por 15 min por email
- *   - GET /reports/*: 30 req/min por usuario autenticado
- *   - GET /reports/export: 10 req/min por usuario autenticado
+ *   - GET /reports/*: límite dinámico según plan del tenant (básico: 30/min, pro: 300/min, enterprise: 1000/min)
+ *   - GET /reports/export: límite dinámico según plan (básico: 10/min, pro: 100/min, enterprise: 500/min)
  *   - Resto: sin límite (navegación normal)
  */
 @Injectable()
 export class ThrottleAuthGuard extends ThrottlerGuard {
+  constructor(
+    options: ThrottlerOptions[],
+    storageService: any,
+    private readonly moduleRef: ModuleRef,
+  ) {
+    super(options, storageService);
+  }
+
+  private getPlanLimitsService(): PlanLimitsService {
+    return this.moduleRef.get(PlanLimitsService, { strict: false });
+  }
   async canActivate(context: ExecutionContext): Promise<boolean> {
     if (process.env.NODE_ENV !== 'production') {
       return true;
@@ -21,7 +33,7 @@ export class ThrottleAuthGuard extends ThrottlerGuard {
       method?: string;
       url?: string;
       originalUrl?: string;
-      user?: { sub?: string };
+      user?: { sub?: string; tenantId?: string | null };
     }>();
     const path = (req.originalUrl ?? req.url ?? '').split('?')[0];
     const normalizedPath = path.replace(/^\/+/, '') || '/';
@@ -46,7 +58,7 @@ export class ThrottleAuthGuard extends ThrottlerGuard {
       return super.canActivate(context);
     }
 
-    // Reportes y export: límite por usuario autenticado
+    // Reportes y export: límite dinámico según plan del tenant
     const isExpensiveReport =
       req.method === 'GET' &&
       (normalizedPath.startsWith('reports/') ||
@@ -57,6 +69,50 @@ export class ThrottleAuthGuard extends ThrottlerGuard {
 
     // Resto: sin límite (navegación normal)
     return true;
+  }
+
+  /**
+   * Sobrescribe el límite dinámicamente según el plan del tenant para endpoints costosos.
+   */
+  protected async getLimit(context: ExecutionContext): Promise<number> {
+    const req = context.switchToHttp().getRequest<{
+      method?: string;
+      url?: string;
+      originalUrl?: string;
+      user?: { sub?: string; tenantId?: string | null };
+    }>();
+    const path = (req.originalUrl ?? req.url ?? '').split('?')[0];
+    const normalizedPath = path.replace(/^\/+/, '') || '/';
+
+    // Para reportes y exports, usar límite según plan
+    const isExpensiveReport =
+      req.method === 'GET' &&
+      (normalizedPath.startsWith('reports/') ||
+        normalizedPath === 'reports/export');
+    
+    if (isExpensiveReport && req.user?.tenantId) {
+      try {
+        const planLimitsService = this.getPlanLimitsService();
+        const planLimit = await planLimitsService.getRateLimitForTenant(
+          req.user.tenantId,
+        );
+      
+        // Para exports, usar 1/3 del límite de reportes
+        if (normalizedPath === 'reports/export' || normalizedPath.includes('/export')) {
+          return Math.max(1, Math.floor(planLimit / 3));
+        }
+        
+        // Para reportes normales, usar el límite del plan
+        return planLimit;
+      } catch (error) {
+        // Si hay error obteniendo el servicio o el límite, usar límite por defecto
+        // Esto puede pasar si el servicio no está disponible o hay problemas de BD
+        return super.getLimit(context);
+      }
+    }
+
+    // Para otros endpoints, usar el límite por defecto del throttler configurado
+    return super.getLimit(context);
   }
 
   protected getTracker(req: Record<string, unknown>): Promise<string> {
@@ -85,9 +141,10 @@ export class ThrottleAuthGuard extends ThrottlerGuard {
     }
 
     // Reportes: por userId
-    const user = req.user as { sub?: string } | undefined;
+    const user = req.user as { sub?: string; tenantId?: string | null } | undefined;
     if (user?.sub && path.startsWith('reports/')) {
-      return Promise.resolve(`user:${user.sub}`);
+      const tenantKey = user.tenantId ?? user.sub;
+      return Promise.resolve(`tenant:${tenantKey}`);
     }
 
     // Default: por IP

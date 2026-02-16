@@ -45,6 +45,7 @@ function parseRedis(urlStr: string) {
       { name: 'dian' },
       { name: 'backup' },
       { name: 'reports' },
+      { name: 'stripe-webhooks' },
     ),
   ],
   exports: [BullModule],

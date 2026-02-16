@@ -67,7 +67,7 @@ function buildPermissionSlugs(): { resource: string; action: string }[] {
 async function main() {
   const slugList = buildPermissionSlugs();
 
-  // 1. Plan "Todo incluido" (todos los módulos)
+  // 1. Plan "Todo incluido" (todos los módulos) — compatibilidad con tenant por defecto
   let plan = await prisma.plan.findFirst({ where: { slug: 'all' } });
   if (!plan) {
     plan = await prisma.plan.create({
@@ -75,6 +75,7 @@ async function main() {
         name: 'Todo incluido',
         slug: 'all',
         description: 'Todos los módulos activos (comportamiento por defecto)',
+        maxUsers: 50,
         isActive: true,
       },
     });
@@ -84,6 +85,74 @@ async function main() {
       });
     }
     console.log('Plan "Todo incluido" creado con', MODULE_CODES.length, 'módulos');
+  }
+
+  // 1.1 Planes de ejemplo: Básico, Premium, Empresarial
+  const examplePlans = [
+    {
+      slug: 'basico',
+      name: 'Plan Básico',
+      description: 'Ideal para empezar: ventas, inventario y clientes.',
+      priceMonthly: 99_000,
+      priceYearly: 990_000,
+      maxUsers: 5,
+      moduleCodes: ['core', 'inventory'] as const,
+    },
+    {
+      slug: 'premium',
+      name: 'Plan Premium',
+      description: 'Incluye proveedores, facturación electrónica y reportes avanzados.',
+      priceMonthly: 199_000,
+      priceYearly: 1_990_000,
+      maxUsers: 25,
+      moduleCodes: ['core', 'inventory', 'suppliers', 'electronic_invoicing', 'advanced_reports'] as const,
+    },
+    {
+      slug: 'empresarial',
+      name: 'Plan Empresarial',
+      description: 'Todo: auditoría, backups y soporte completo.',
+      priceMonthly: 399_000,
+      priceYearly: 3_990_000,
+      maxUsers: 50,
+      moduleCodes: [...MODULE_CODES],
+    },
+  ];
+  for (const p of examplePlans) {
+    let existing = await prisma.plan.findFirst({ where: { slug: p.slug } });
+    if (!existing) {
+      existing = await prisma.plan.create({
+        data: {
+          name: p.name,
+          slug: p.slug,
+          description: p.description,
+          priceMonthly: p.priceMonthly,
+          priceYearly: p.priceYearly,
+          maxUsers: p.maxUsers,
+          isActive: true,
+        },
+      });
+      for (const code of p.moduleCodes) {
+        await prisma.planFeature.create({
+          data: { planId: existing.id, moduleCode: code },
+        });
+      }
+      console.log('Plan ejemplo creado:', p.name, 'con', p.moduleCodes.length, 'módulos');
+    } else if (existing.maxUsers == null) {
+      await prisma.plan.update({
+        where: { id: existing.id },
+        data: { maxUsers: p.maxUsers },
+      });
+      console.log('Plan ejemplo actualizado con maxUsers:', p.name, '->', p.maxUsers);
+    }
+  }
+  // Backfill maxUsers para plan "Todo incluido" si existe sin límite
+  const allPlan = await prisma.plan.findFirst({ where: { slug: 'all' } });
+  if (allPlan != null && allPlan.maxUsers == null) {
+    await prisma.plan.update({
+      where: { id: allPlan.id },
+      data: { maxUsers: 50 },
+    });
+    console.log('Plan "Todo incluido" actualizado con maxUsers: 50');
   }
 
   // 2. Tenant por defecto (con plan "Todo incluido")
@@ -230,7 +299,7 @@ async function main() {
   // 6. Usuario administrador de plataforma (sin tenant) para Panel proveedor
   let platformAdmin = await prisma.user.findFirst({
     where: { email: PLATFORM_ADMIN_EMAIL },
-    select: { id: true },
+    select: { id: true, tenantId: true },
   });
   if (!platformAdmin) {
     const passwordHash = await argon2.hash(PLATFORM_ADMIN_PASSWORD);
@@ -241,7 +310,7 @@ async function main() {
         role: RoleName.ADMIN,
         tenantId: null,
       },
-      select: { id: true },
+      select: { id: true, tenantId: true },
     });
     await prisma.userRole.create({
       data: {
@@ -251,6 +320,17 @@ async function main() {
       },
     });
     console.log('Admin de plataforma creado:', PLATFORM_ADMIN_EMAIL);
+  } else if (platformAdmin.tenantId !== null) {
+    // Si ya existía pero tenía tenant, corregir para que sea admin de plataforma
+    await prisma.user.update({
+      where: { id: platformAdmin.id },
+      data: { tenantId: null },
+    });
+    await prisma.userRole.updateMany({
+      where: { userId: platformAdmin.id },
+      data: { tenantId: null },
+    });
+    console.log('Admin de plataforma corregido (tenantId = null):', PLATFORM_ADMIN_EMAIL);
   }
 
   // 7. Usuario administrador del tenant por defecto (acceso a todo el negocio)

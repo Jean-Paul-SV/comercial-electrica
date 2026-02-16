@@ -1,6 +1,5 @@
 import {
   BadRequestException,
-  ForbiddenException,
   Injectable,
   NotFoundException,
   Logger,
@@ -13,6 +12,7 @@ import { UpdateStatusDto } from './dto/update-status.dto';
 import { AuditService } from '../common/services/audit.service';
 import { CacheService } from '../common/services/cache.service';
 import { createPaginatedResponse } from '../common/interfaces/pagination.interface';
+import { TenantContextService } from '../common/services/tenant-context.service';
 
 @Injectable()
 export class SupplierInvoicesService {
@@ -22,6 +22,7 @@ export class SupplierInvoicesService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly cache: CacheService,
+    private readonly tenantContext: TenantContextService,
   ) {}
 
   async createSupplierInvoice(
@@ -29,10 +30,10 @@ export class SupplierInvoicesService {
     createdByUserId?: string,
     tenantId?: string | null,
   ) {
-    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
+    const currentTenantId = this.tenantContext.ensureTenant(tenantId);
     // Validar que el proveedor existe, está activo y pertenece al tenant
     const supplier = await this.prisma.supplier.findFirst({
-      where: { id: dto.supplierId, tenantId },
+      where: { id: dto.supplierId, tenantId: currentTenantId },
     });
     if (!supplier) {
       throw new NotFoundException(
@@ -88,7 +89,7 @@ export class SupplierInvoicesService {
         async (tx) => {
           // Verificar que el número de factura no existe en este tenant
           const existing = await tx.supplierInvoice.findFirst({
-            where: { tenantId, invoiceNumber: dto.invoiceNumber },
+            where: { tenantId: currentTenantId, invoiceNumber: dto.invoiceNumber },
           });
           if (existing) {
             throw new BadRequestException(
@@ -110,7 +111,7 @@ export class SupplierInvoicesService {
 
           const invoice = await tx.supplierInvoice.create({
             data: {
-              tenantId,
+              tenantId: currentTenantId,
               supplierId: dto.supplierId,
               purchaseOrderId: dto.purchaseOrderId,
               invoiceNumber: dto.invoiceNumber,
@@ -170,7 +171,7 @@ export class SupplierInvoicesService {
             if (expenseDelegate) {
               await expenseDelegate.create({
                 data: {
-                  tenantId,
+                  tenantId: currentTenantId,
                   amount: abono,
                   description: expenseDescription,
                   category: 'Factura proveedor',
@@ -230,14 +231,14 @@ export class SupplierInvoicesService {
     },
     tenantId?: string | null,
   ) {
-    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
+    const currentTenantId = this.tenantContext.ensureTenant(tenantId);
     const page = Math.max(1, Number(pagination?.page) || 1);
     const limit = Math.min(100, Math.max(1, Number(pagination?.limit) || 20));
     const skip = (page - 1) * limit;
     const searchTrim =
       typeof pagination?.search === 'string' ? pagination.search.trim() : '';
 
-    const where: Prisma.SupplierInvoiceWhereInput = { tenantId };
+    const where: Prisma.SupplierInvoiceWhereInput = { tenantId: currentTenantId };
     const validStatuses = Object.values(SupplierInvoiceStatus);
     if (
       pagination?.status &&
@@ -298,9 +299,9 @@ export class SupplierInvoicesService {
     updatedByUserId?: string,
     tenantId?: string | null,
   ) {
-    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
+    const currentTenantId = this.tenantContext.ensureTenant(tenantId);
     const invoice = await this.prisma.supplierInvoice.findFirst({
-      where: { id, tenantId },
+      where: { id, tenantId: currentTenantId },
       include: { supplier: true },
     });
     if (!invoice) {
@@ -329,15 +330,15 @@ export class SupplierInvoicesService {
       { status: dto.status },
     );
     await this.cache.delete(
-      this.cache.buildKey('supplierInvoice', id, tenantId),
+      this.cache.buildKey('supplierInvoice', id, currentTenantId),
     );
     await this.cache.deletePattern('cache:supplierInvoices:*');
     return updated;
   }
 
   async getSupplierInvoice(id: string, tenantId?: string | null) {
-    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
-    const cacheKey = this.cache.buildKey('supplierInvoice', id, tenantId);
+    const currentTenantId = this.tenantContext.ensureTenant(tenantId);
+    const cacheKey = this.cache.buildKey('supplierInvoice', id, currentTenantId);
     const cached = await this.cache.get(cacheKey);
     if (cached) {
       this.logger.debug(`SupplierInvoice ${id} retrieved from cache`);
@@ -345,7 +346,7 @@ export class SupplierInvoicesService {
     }
 
     const invoice = await this.prisma.supplierInvoice.findFirst({
-      where: { id, tenantId },
+      where: { id, tenantId: currentTenantId },
       include: {
         supplier: true,
         purchaseOrder: true,
@@ -369,9 +370,9 @@ export class SupplierInvoicesService {
     createdByUserId?: string,
     tenantId?: string | null,
   ) {
-    if (!tenantId) throw new ForbiddenException('Tenant requerido.');
+    const currentTenantId = this.tenantContext.ensureTenant(tenantId);
     const invoice = await this.prisma.supplierInvoice.findFirst({
-      where: { id: invoiceId, tenantId },
+      where: { id: invoiceId, tenantId: currentTenantId },
       include: { payments: true, supplier: true },
     });
 
@@ -489,11 +490,11 @@ export class SupplierInvoicesService {
               255,
             );
           const openSession = await tx.cashSession.findFirst({
-            where: { tenantId, closedAt: null },
+            where: { tenantId: currentTenantId, closedAt: null },
           });
           const expense = await tx.expense.create({
             data: {
-              tenantId: tenantId,
+              tenantId: currentTenantId,
               amount: dto.amount,
               description: expenseDescription,
               category: 'Factura proveedor',
@@ -539,7 +540,7 @@ export class SupplierInvoicesService {
     if (!tenantId) throw new ForbiddenException('Tenant requerido.');
     const invoices = await this.prisma.supplierInvoice.findMany({
       where: {
-        tenantId,
+        tenantId: currentTenantId,
         status: {
           in: [
             SupplierInvoiceStatus.PENDING,

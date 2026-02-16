@@ -31,8 +31,9 @@ export const navConfig: NavTreeConfig = {
       moduleCode: 'core',
       items: [
         { id: 'products', href: '/products', label: 'Productos', icon: 'Package', order: 0, moduleCode: 'core' },
-        { id: 'product-dictionary', href: '/products/dictionary', label: 'Diccionario', icon: 'BookOpen', order: 1, moduleCode: 'core' },
-        { id: 'customers', href: '/customers', label: 'Clientes', icon: 'Users', order: 2, moduleCode: 'core' },
+        { id: 'categories', href: '/products/categories', label: 'Categorías', icon: 'Tag', order: 1, moduleCode: 'core' },
+        { id: 'product-dictionary', href: '/products/dictionary', label: 'Diccionario', icon: 'BookOpen', order: 2, moduleCode: 'core' },
+        { id: 'customers', href: '/customers', label: 'Clientes', icon: 'Users', order: 3, moduleCode: 'core' },
       ],
     },
     {
@@ -73,7 +74,7 @@ export const navConfig: NavTreeConfig = {
       order: 5,
       moduleCode: 'core',
       items: [
-        { id: 'billing', href: '/settings/billing', label: 'Facturación', icon: 'CreditCard', order: 0, moduleCode: 'core' },
+        { id: 'billing', href: '/settings/billing', label: 'Plan', icon: 'CreditCard', order: 0, moduleCode: 'core' },
         { id: 'electronic-invoicing', href: '/settings/electronic-invoicing', label: 'Facturación electrónica', icon: 'FileCheck', order: 1, requiredPermission: 'dian:manage', moduleCode: 'electronic_invoicing' },
       ],
     },

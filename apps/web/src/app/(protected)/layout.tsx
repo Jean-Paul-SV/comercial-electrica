@@ -57,8 +57,15 @@ function ProtectedLayoutContent({ children }: { children: React.ReactNode }) {
       router.replace('/app');
       return;
     }
-    // Admin de plataforma solo usa Panel proveedor; redirigir /app a /provider
-    if (isPlatformAdmin && (pathname === '/app' || pathname === '/')) {
+    // Admin de plataforma solo usa Panel proveedor; redirigir cualquier ruta del negocio a /provider
+    const isTenantPath =
+      pathname === '/app' ||
+      pathname === '/' ||
+      (pathname != null &&
+        !pathname.startsWith('/provider') &&
+        !pathname.startsWith('/onboarding') &&
+        pathname !== '/plan-required');
+    if (isPlatformAdmin && isTenantPath) {
       router.replace('/provider');
       return;
     }
@@ -81,7 +88,17 @@ function ProtectedLayoutContent({ children }: { children: React.ReactNode }) {
   if (user?.role && pathname && !canAccessPath(pathname, user.role)) {
     return null;
   }
-  if (pathname?.startsWith('/provider') && !isPlatformAdmin) {
+  if ((pathname ?? '').startsWith('/provider') && !isPlatformAdmin) {
+    return null;
+  }
+  const isTenantPathRender =
+    pathname === '/app' ||
+    pathname === '/' ||
+    (pathname != null &&
+      !pathname.startsWith('/provider') &&
+      !pathname.startsWith('/onboarding') &&
+      pathname !== '/plan-required');
+  if (isPlatformAdmin && isTenantPathRender) {
     return null;
   }
   if (
