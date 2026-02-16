@@ -50,7 +50,7 @@ export class CustomersService {
     }
 
     const useListCache = !search && page === 1 && limit === 20 && currentTenantId;
-    if (useListCache) {
+    if (useListCache && tenantId) {
       const listCacheKey = this.cache.buildKey('customers', 'list', tenantId, 1, 20);
       const cached = await this.cache.get<{ data: unknown[]; meta: unknown }>(listCacheKey);
       if (cached) return cached;
@@ -71,7 +71,7 @@ export class CustomersService {
       meta: buildPaginationMeta(total, page, limit),
     };
 
-    if (useListCache) {
+    if (useListCache && tenantId) {
       const listCacheKey = this.cache.buildKey('customers', 'list', tenantId, 1, 20);
       await this.cache.set(listCacheKey, result, 90);
     }

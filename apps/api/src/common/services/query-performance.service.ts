@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
 
-interface SlowQuery {
+export interface SlowQuery {
   query: string;
   duration: number;
   timestamp: Date;

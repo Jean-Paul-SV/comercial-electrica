@@ -31,7 +31,6 @@ export class PrismaService
     // Configurar connection pooling según entorno
     // En producción: connection_limit=20-50, pool_timeout=20
     // En desarrollo: connection_limit=5, pool_timeout=10
-    const isProd = process.env.NODE_ENV === 'production';
     const connectionLimit = isProd ? 20 : 5;
     const poolTimeout = isProd ? 20 : 10;
     

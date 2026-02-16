@@ -92,7 +92,7 @@ export class BillingController {
       
       // Responder 200 a Stripe para evitar reenvíos inmediatos
       // El evento se procesará en segundo plano
-      return { received: true, queued: true };
+      return { received: true };
     }
 
     return { received: true };

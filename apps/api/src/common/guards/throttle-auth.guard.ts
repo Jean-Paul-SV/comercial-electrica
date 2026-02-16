@@ -1,4 +1,5 @@
-import { Injectable, ExecutionContext, ModuleRef } from '@nestjs/core';
+import { Injectable, ExecutionContext, ModuleRef } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerOptions } from '@nestjs/throttler';
 import { PlanLimitsService } from '../services/plan-limits.service';
 
@@ -17,9 +18,10 @@ export class ThrottleAuthGuard extends ThrottlerGuard {
   constructor(
     options: ThrottlerOptions[],
     storageService: any,
+    reflector: Reflector,
     private readonly moduleRef: ModuleRef,
   ) {
-    super(options, storageService);
+    super(options, storageService, reflector);
   }
 
   private getPlanLimitsService(): PlanLimitsService {
@@ -107,12 +109,12 @@ export class ThrottleAuthGuard extends ThrottlerGuard {
       } catch (error) {
         // Si hay error obteniendo el servicio o el límite, usar límite por defecto
         // Esto puede pasar si el servicio no está disponible o hay problemas de BD
-        return super.getLimit(context);
+        return 100;
       }
     }
 
     // Para otros endpoints, usar el límite por defecto del throttler configurado
-    return super.getLimit(context);
+    return 100;
   }
 
   protected getTracker(req: Record<string, unknown>): Promise<string> {

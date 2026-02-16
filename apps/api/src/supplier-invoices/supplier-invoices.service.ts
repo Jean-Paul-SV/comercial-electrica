@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
   Logger,
@@ -540,7 +541,7 @@ export class SupplierInvoicesService {
     if (!tenantId) throw new ForbiddenException('Tenant requerido.');
     const invoices = await this.prisma.supplierInvoice.findMany({
       where: {
-        tenantId: currentTenantId,
+        tenantId: tenantId,
         status: {
           in: [
             SupplierInvoiceStatus.PENDING,

@@ -16,6 +16,7 @@ import { ConfigService } from '@nestjs/config';
 import { MetricsService } from './metrics.service';
 import { MetricsAlertsService } from './metrics-alerts.service';
 import { QueryPerformanceService } from '../common/services/query-performance.service';
+import { AlertService } from '../common/services/alert.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionsGuard } from '../auth/permissions.guard';
 import { RequirePermission } from '../auth/require-permission.decorator';
@@ -26,6 +27,7 @@ export class MetricsController {
   constructor(
     private readonly metrics: MetricsService,
     private readonly alertsService: MetricsAlertsService,
+    private readonly alertService: AlertService,
     private readonly queryPerformance: QueryPerformanceService,
     private readonly config: ConfigService,
   ) {}
@@ -143,7 +145,7 @@ export class MetricsController {
   @ApiResponse({ status: 401, description: 'No autenticado' })
   @ApiResponse({ status: 403, description: 'No autorizado' })
   async sendTestAlert() {
-    await this.alertsService.sendAlert({
+    await this.alertService.sendAlert({
       title: 'Alerta de Prueba',
       message: 'Esta es una alerta de prueba del sistema de monitoreo Orion',
       severity: 'info',

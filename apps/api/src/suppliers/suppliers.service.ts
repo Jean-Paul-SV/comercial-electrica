@@ -206,7 +206,9 @@ export class SuppliersService {
       );
 
       // Invalidar caché del proveedor y listados
-      await this.cache.delete(this.cache.buildKey('supplier', id, tenantId));
+      if (tenantId) {
+        await this.cache.delete(this.cache.buildKey('supplier', id, tenantId));
+      }
       await this.cache.deletePattern('cache:suppliers:*');
 
       return updated;
