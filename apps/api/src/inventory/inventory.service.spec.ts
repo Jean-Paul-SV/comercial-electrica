@@ -6,6 +6,7 @@ import { CreateInventoryMovementDto } from './dto/create-movement.dto';
 import { InventoryMovementType } from '@prisma/client';
 import { ValidationLimitsService } from '../common/services/validation-limits.service';
 import { AuditService } from '../common/services/audit.service';
+import { TenantContextService } from '../common/services/tenant-context.service';
 
 describe('InventoryService', () => {
   let service: InventoryService;
@@ -46,6 +47,12 @@ describe('InventoryService', () => {
           provide: AuditService,
           useValue: {
             logCreate: jest.fn().mockResolvedValue(undefined),
+          },
+        },
+        {
+          provide: TenantContextService,
+          useValue: {
+            ensureTenant: jest.fn((tenantId) => tenantId || 'tenant-default'),
           },
         },
       ],

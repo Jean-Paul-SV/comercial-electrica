@@ -91,34 +91,31 @@ describe('ValidationLimitsService', () => {
     });
   });
 
-  describe('validateSaleItems', () => {
+  describe('validateItemsCount (venta)', () => {
     it('debe permitir número válido de items', () => {
-      const items = Array(50).fill({ productId: 'prod-1', qty: 1 });
-      expect(() => service.validateSaleItems(items)).not.toThrow();
+      expect(() => service.validateItemsCount(50, 'sale')).not.toThrow();
     });
 
     it('debe lanzar error si hay demasiados items', () => {
-      const items = Array(101).fill({ productId: 'prod-1', qty: 1 });
-      expect(() => service.validateSaleItems(items)).toThrow(BadRequestException);
-      expect(() => service.validateSaleItems(items)).toThrow('máximo');
-    });
-
-    it('debe validar cantidad por item', () => {
-      const items = [{ productId: 'prod-1', qty: 15000 }];
-      expect(() => service.validateSaleItems(items)).toThrow(BadRequestException);
-      expect(() => service.validateSaleItems(items)).toThrow('cantidad');
+      expect(() => service.validateItemsCount(101, 'sale')).toThrow(BadRequestException);
+      expect(() => service.validateItemsCount(101, 'sale')).toThrow('máximo');
     });
   });
 
-  describe('validateQuoteItems', () => {
+  describe('validateItemQty', () => {
+    it('debe validar cantidad por item', () => {
+      expect(() => service.validateItemQty(15000)).toThrow(BadRequestException);
+      expect(() => service.validateItemQty(15000)).toThrow('cantidad');
+    });
+  });
+
+  describe('validateItemsCount (cotización)', () => {
     it('debe permitir número válido de items', () => {
-      const items = Array(50).fill({ productId: 'prod-1', qty: 1 });
-      expect(() => service.validateQuoteItems(items)).not.toThrow();
+      expect(() => service.validateItemsCount(50, 'quote')).not.toThrow();
     });
 
     it('debe lanzar error si hay demasiados items', () => {
-      const items = Array(101).fill({ productId: 'prod-1', qty: 1 });
-      expect(() => service.validateQuoteItems(items)).toThrow(BadRequestException);
+      expect(() => service.validateItemsCount(101, 'quote')).toThrow(BadRequestException);
     });
   });
 });

@@ -39,6 +39,14 @@ export class BillingController {
     @Req() req: RequestWithRawBody,
     @Res({ passthrough: true }) res: express.Response,
   ): Promise<{ received: boolean }> {
+    // Validar configuración en producción
+    const isProd = process.env.NODE_ENV === 'production';
+    if (isProd && !this.billing.isWebhookConfigured()) {
+      this.logger.error('STRIPE_WEBHOOK_SECRET no configurado en producción');
+      res.status(500).json({ error: 'Webhook no configurado' });
+      return { received: false };
+    }
+
     const signature = req.headers['stripe-signature'] as string | undefined;
     const rawBody = req.rawBody ?? (Buffer.isBuffer(req.body) ? req.body : undefined);
 

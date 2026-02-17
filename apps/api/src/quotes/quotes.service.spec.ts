@@ -7,6 +7,8 @@ import { Queue } from 'bullmq';
 import { ValidationLimitsService } from '../common/services/validation-limits.service';
 import { AuditService } from '../common/services/audit.service';
 import { CacheService } from '../common/services/cache.service';
+import { TenantContextService } from '../common/services/tenant-context.service';
+import { DianService } from '../dian/dian.service';
 import { CreateQuoteDto } from './dto/create-quote.dto';
 import { UpdateQuoteDto } from './dto/update-quote.dto';
 import { ConvertQuoteDto } from './dto/convert-quote.dto';
@@ -84,14 +86,17 @@ describe('QuotesService', () => {
       quote: {
         findMany: jest.fn(),
         findUnique: jest.fn(),
+        findFirst: jest.fn(),
         create: jest.fn(),
         update: jest.fn(),
       },
       cashSession: {
         findUnique: jest.fn(),
+        findFirst: jest.fn(),
       },
       customer: {
         findUnique: jest.fn(),
+        findFirst: jest.fn(),
       },
       product: {
         findMany: jest.fn(),
@@ -126,6 +131,7 @@ describe('QuotesService', () => {
           useValue: {
             logCreate: jest.fn().mockResolvedValue(undefined),
             logUpdate: jest.fn().mockResolvedValue(undefined),
+            log: jest.fn().mockResolvedValue(undefined),
           },
         },
         {
@@ -137,6 +143,18 @@ describe('QuotesService', () => {
             set: jest.fn().mockResolvedValue(undefined),
           },
         },
+        {
+          provide: TenantContextService,
+          useValue: {
+            ensureTenant: jest.fn((tenantId) => tenantId || 'tenant-default'),
+          },
+        },
+        {
+          provide: DianService,
+          useValue: {
+            getConfigStatusForTenant: jest.fn().mockResolvedValue({ readyForSend: true, status: 'ready' }),
+          },
+        },
       ],
     }).compile();
 
@@ -144,10 +162,10 @@ describe('QuotesService', () => {
     prisma = module.get(PrismaService);
     dianQueue = module.get(getQueueToken('dian'));
 
-    // Mocks por defecto
-    prisma.cashSession.findUnique = jest
-      .fn()
-      .mockResolvedValue(mockCashSession);
+    // Mocks por defecto (el servicio usa findFirst para tenant)
+    prisma.cashSession.findFirst = jest.fn().mockResolvedValue(mockCashSession);
+    prisma.cashSession.findUnique = jest.fn().mockResolvedValue(mockCashSession);
+    prisma.customer.findFirst = jest.fn().mockResolvedValue(mockCustomer);
     prisma.customer.findUnique = jest.fn().mockResolvedValue(mockCustomer);
     prisma.product.findMany = jest.fn().mockResolvedValue([mockProduct]);
     dianQueue.add = jest.fn().mockResolvedValue({ id: 'job-1' });
@@ -193,8 +211,8 @@ describe('QuotesService', () => {
       const result = await service.createQuote(createQuoteDto);
 
       expect(result).toBeDefined();
-      expect(prisma.customer.findUnique).toHaveBeenCalledWith({
-        where: { id: 'customer-1' },
+      expect(prisma.customer.findFirst).toHaveBeenCalledWith({
+        where: { id: 'customer-1', tenantId: 'tenant-default' },
       });
     });
 
@@ -213,7 +231,7 @@ describe('QuotesService', () => {
     });
 
     it('debe lanzar error si el cliente no existe', async () => {
-      prisma.customer.findUnique = jest.fn().mockResolvedValue(null);
+      prisma.customer.findFirst = jest.fn().mockResolvedValue(null);
 
       await expect(service.createQuote(createQuoteDto)).rejects.toThrow(
         NotFoundException,
@@ -281,7 +299,7 @@ describe('QuotesService', () => {
         })),
         customer: mockCustomer,
       };
-      prisma.quote.findUnique = jest.fn().mockResolvedValue(quoteWithIncludes);
+      prisma.quote.findFirst = jest.fn().mockResolvedValue(quoteWithIncludes);
 
       const mockTransaction = jest.fn(async (callback) => {
         const mockTx = {
@@ -312,7 +330,7 @@ describe('QuotesService', () => {
     });
 
     it('debe lanzar error si la cotización no existe', async () => {
-      prisma.quote.findUnique = jest.fn().mockResolvedValue(null);
+      prisma.quote.findFirst = jest.fn().mockResolvedValue(null);
 
       await expect(
         service.updateQuote('quote-inexistente', updateQuoteDto),
@@ -330,7 +348,7 @@ describe('QuotesService', () => {
         customer: mockCustomer,
       };
 
-      prisma.quote.findUnique = jest.fn().mockResolvedValue(quoteConvertida);
+      prisma.quote.findFirst = jest.fn().mockResolvedValue(quoteConvertida);
 
       await expect(
         service.updateQuote('quote-1', updateQuoteDto),
@@ -349,7 +367,7 @@ describe('QuotesService', () => {
         })),
         customer: mockCustomer,
       };
-      prisma.quote.findUnique = jest.fn().mockResolvedValue(quoteWithIncludes);
+      prisma.quote.findFirst = jest.fn().mockResolvedValue(quoteWithIncludes);
       prisma.customer.findUnique = jest.fn().mockResolvedValue(null);
 
       await expect(
@@ -376,7 +394,7 @@ describe('QuotesService', () => {
         })),
         customer: mockCustomer,
       };
-      prisma.quote.findUnique = jest.fn().mockResolvedValue(quoteWithIncludes);
+      prisma.quote.findFirst = jest.fn().mockResolvedValue(quoteWithIncludes);
 
       const mockSale = {
         id: 'sale-1',
@@ -455,7 +473,7 @@ describe('QuotesService', () => {
     });
 
     it('debe lanzar error si la cotización no existe', async () => {
-      prisma.quote.findUnique = jest.fn().mockResolvedValue(null);
+      prisma.quote.findFirst = jest.fn().mockResolvedValue(null);
 
       await expect(
         service.convertQuoteToSale('quote-inexistente', convertDto),
@@ -473,7 +491,7 @@ describe('QuotesService', () => {
         customer: mockCustomer,
       };
 
-      prisma.quote.findUnique = jest.fn().mockResolvedValue(quoteConvertida);
+      prisma.quote.findFirst = jest.fn().mockResolvedValue(quoteConvertida);
 
       await expect(
         service.convertQuoteToSale('quote-1', convertDto),
@@ -492,7 +510,7 @@ describe('QuotesService', () => {
         })),
         customer: mockCustomer,
       };
-      prisma.quote.findUnique = jest.fn().mockResolvedValue(quoteWithIncludes);
+      prisma.quote.findFirst = jest.fn().mockResolvedValue(quoteWithIncludes);
       prisma.cashSession.findUnique = jest.fn().mockResolvedValue(null);
 
       await expect(
@@ -517,7 +535,7 @@ describe('QuotesService', () => {
         })),
         customer: mockCustomer,
       };
-      prisma.quote.findUnique = jest.fn().mockResolvedValue(quoteWithIncludes);
+      prisma.quote.findFirst = jest.fn().mockResolvedValue(quoteWithIncludes);
       prisma.cashSession.findUnique = jest
         .fn()
         .mockResolvedValue(sessionCerrada);
@@ -539,7 +557,7 @@ describe('QuotesService', () => {
         })),
         customer: mockCustomer,
       };
-      prisma.quote.findUnique = jest.fn().mockResolvedValue(quoteWithIncludes);
+      prisma.quote.findFirst = jest.fn().mockResolvedValue(quoteWithIncludes);
 
       const dtoSinCaja: ConvertQuoteDto = {
         paymentMethod: PaymentMethod.CASH,
@@ -564,7 +582,7 @@ describe('QuotesService', () => {
         })),
         customer: mockCustomer,
       };
-      prisma.quote.findUnique = jest.fn().mockResolvedValue(quoteWithIncludes);
+      prisma.quote.findFirst = jest.fn().mockResolvedValue(quoteWithIncludes);
 
       const updatedQuote = {
         ...quoteWithIncludes,
@@ -605,7 +623,7 @@ describe('QuotesService', () => {
         customer: mockCustomer,
       };
 
-      prisma.quote.findUnique = jest.fn().mockResolvedValue(quoteConvertida);
+      prisma.quote.findFirst = jest.fn().mockResolvedValue(quoteConvertida);
 
       await expect(
         service.updateQuoteStatus('quote-1', QuoteStatus.SENT),
@@ -626,7 +644,7 @@ describe('QuotesService', () => {
         customer: mockCustomer,
       };
 
-      prisma.quote.findUnique = jest.fn().mockResolvedValue(quoteCancelada);
+      prisma.quote.findFirst = jest.fn().mockResolvedValue(quoteCancelada);
 
       await expect(
         service.updateQuoteStatus('quote-1', QuoteStatus.DRAFT),
@@ -647,7 +665,7 @@ describe('QuotesService', () => {
         customer: mockCustomer,
       };
 
-      prisma.quote.findUnique = jest.fn().mockResolvedValue(quoteExpirada);
+      prisma.quote.findFirst = jest.fn().mockResolvedValue(quoteExpirada);
 
       // EXPIRED solo puede cambiar a CANCELLED
       await expect(

@@ -11,6 +11,7 @@ import Link from 'next/link';
 import { AlertsBell } from '@shared/components/AlertsBell';
 import { OfflineQueueBell } from '@shared/components/OfflineQueueBell';
 import { DianAlertsBanner } from '@shared/components/DianAlertsBanner';
+import { SupportWhatsAppButton } from '@shared/components/SupportWhatsAppButton';
 import { Sidebar, useSidebarOptional } from '@shared/ui/sidebar';
 import { navConfig } from '@shared/navigation/config';
 import { getNavForRole } from '@shared/navigation/filterByRole';
@@ -195,6 +196,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </main>
 
         {/* Barra inferior móvil: acceso rápido a Inicio, Ventas, Caja y Menú (solo usuarios de tenant) */}
+        <SupportWhatsAppButton />
         {!isPlatformAdmin && (
           <nav
             className="lg:hidden fixed bottom-0 left-0 right-0 z-30 border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 pb-[env(safe-area-inset-bottom)]"

@@ -9,6 +9,7 @@ import {
 import { Request, Response } from 'express';
 import { ErrorResponseDto } from '../dto/error-response.dto';
 import { Prisma } from '@prisma/client';
+import { sanitizePrismaMeta } from '../utils/sanitize.util';
 
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
@@ -110,7 +111,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
           status: HttpStatus.INTERNAL_SERVER_ERROR,
           error: 'Internal Server Error',
           message: 'Error interno del servidor (esquema de base de datos).',
-          details: isProd ? { prismaCode } : { prismaCode, meta },
+          details: isProd ? { prismaCode } : { prismaCode, meta: sanitizePrismaMeta(meta) },
         };
       }
 
@@ -119,7 +120,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
         status: HttpStatus.BAD_REQUEST,
         error: 'Bad Request',
         message: 'Solicitud inválida (error de base de datos).',
-        details: isProd ? { prismaCode } : { prismaCode, meta },
+        details: isProd ? { prismaCode } : { prismaCode, meta: sanitizePrismaMeta(meta) },
       };
     }
 
@@ -263,12 +264,14 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const statusCode = Number(status);
 
     if (statusCode >= 500) {
-      // Errores del servidor - log completo con stack trace
+      // Errores del servidor - log completo con stack trace (sanitizado en producción)
+      const isProd = process.env.NODE_ENV === 'production';
+      const stackTrace = exception instanceof Error
+        ? (isProd ? '[Stack trace oculto en producción]' : exception.stack)
+        : (isProd ? '[Error details ocultos en producción]' : JSON.stringify(exception));
       this.logger.error(
         `${request.method} ${request.url} - ${statusCode} - ${messageStr}`,
-        exception instanceof Error
-          ? exception.stack
-          : JSON.stringify(exception),
+        stackTrace,
         JSON.stringify(logContext),
       );
     } else if (statusCode >= 400) {

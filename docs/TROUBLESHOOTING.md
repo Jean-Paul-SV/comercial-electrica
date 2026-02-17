@@ -16,6 +16,8 @@
 7. [Problemas de DIAN](#problemas-de-dian)
 8. [Problemas de Performance](#problemas-de-performance)
 9. [Problemas Multi-Tenant](#problemas-multi-tenant)
+10. [Seguridad y validación de configuración](#seguridad-y-validación-de-configuración)
+11. [Configuración de soporte (WhatsApp)](#configuración-de-soporte-whatsapp)
 
 ---
 
@@ -489,6 +491,69 @@ SELECT 'Customer', count(*), count("tenantId"), count(*) - count("tenantId") FRO
 
 ---
 
+## 🔒 Seguridad y validación de configuración
+
+### La API no arranca: "Variables de entorno faltantes"
+
+**Síntomas:**
+- Al iniciar la API aparece un error listando variables faltantes (p. ej. `DATABASE_URL`, `JWT_ACCESS_SECRET`).
+- El mensaje indica "Variables de entorno faltantes o vacías".
+
+**Causa:** El `ConfigValidationModule` valida al inicio que las variables críticas estén definidas. En desarrollo y producción **no** hay fallback con credenciales; debe existir un `.env` o variables en el entorno.
+
+**Solución:**
+1. Crear o editar `.env` en la raíz del monorepo o en `apps/api/`.
+2. Definir al menos:
+   - `DATABASE_URL` – conexión a PostgreSQL.
+   - `JWT_ACCESS_SECRET` – secreto para firmar tokens (string largo y aleatorio).
+3. Si usas Stripe en producción, definir también `STRIPE_WEBHOOK_SECRET` (y `STRIPE_SECRET_KEY`).
+4. Reiniciar la API.
+
+**Verificación:**
+```bash
+# Desde apps/api
+node -e "require('dotenv').config({ path: require('path').resolve(process.cwd(), '../../.env') }); console.log('DATABASE_URL:', process.env.DATABASE_URL ? 'OK' : 'MISSING'); console.log('JWT_ACCESS_SECRET:', process.env.JWT_ACCESS_SECRET ? 'OK' : 'MISSING');"
+```
+
+---
+
+### Mensajes de error genéricos (sin IDs)
+
+**Comportamiento esperado:** Las respuestas de error **no** incluyen IDs internos (UUID de cliente, producto, etc.) para evitar enumeración. Verás mensajes como "Cliente no encontrado", "Sesión de caja no encontrada", "Proveedor no encontrado".
+
+**Si necesitas depurar:** Revisa los logs del servidor (ahí puede haber más contexto para el desarrollador). No expongas IDs en respuestas al cliente.
+
+---
+
+### Webhook Stripe: "Webhook no configurado" (500)
+
+**Síntomas:** Al recibir un webhook de Stripe en producción, la API responde 500 con mensaje tipo "Webhook no configurado".
+
+**Causa:** En producción se exige que estén configurados `STRIPE_WEBHOOK_SECRET` y (para procesar eventos) `STRIPE_SECRET_KEY`. Si falta el secret del webhook, la API rechaza explícitamente.
+
+**Solución:**
+1. En el Dashboard de Stripe → Developers → Webhooks, copiar el "Signing secret" (whsec_...).
+2. Definir en el entorno de producción: `STRIPE_WEBHOOK_SECRET=whsec_...`.
+3. Reiniciar la API. Los siguientes eventos de Stripe se validarán con la firma.
+
+---
+
+### Logs: datos enmascarados (NIT, documento)
+
+**Comportamiento esperado:** En los logs, datos sensibles como NIT o número de documento aparecen enmascarados (ej. `***1234`). Es intencional para cumplir con buenas prácticas de privacidad.
+
+**Si necesitas correlacionar un log con un registro:** Usa el identificador de entidad (id) o el timestamp; evita buscar por NIT/documento completo en logs.
+
+---
+
+### Stack traces en producción
+
+**Comportamiento esperado:** En producción, ante un error 500 los logs **no** muestran el stack trace completo; aparece un mensaje genérico tipo "[Stack trace oculto en producción]". Así se evita filtrar rutas o detalles internos.
+
+**Depuración:** Reproduce el error en desarrollo (sin `NODE_ENV=production`) para ver el stack completo, o revisa el código en el punto indicado por el mensaje de error y los logs de contexto (path, método, requestId).
+
+---
+
 ## 📞 Contacto y Soporte
 
 ### Información Necesaria para Reportar Problemas
@@ -520,4 +585,17 @@ docker-compose ps
 
 ---
 
-**Última actualización:** 2026-02-16
+## Configuración de soporte (WhatsApp)
+
+Para mostrar el botón flotante de WhatsApp y la entrada "Soporte" en el menú (Cuenta → Soporte), configura en el frontend (`apps/web`) las variables de entorno:
+
+| Variable | Descripción | Ejemplo |
+|----------|-------------|---------|
+| `NEXT_PUBLIC_SUPPORT_WHATSAPP_NUMBER` | Número de WhatsApp en formato internacional **sin** el símbolo + (solo dígitos). | `573001234567` |
+| `NEXT_PUBLIC_SUPPORT_WHATSAPP_MESSAGE` | (Opcional) Mensaje por defecto que se rellenará al abrir el chat. | `Hola, necesito ayuda con Orion.` |
+
+Si no se define `NEXT_PUBLIC_SUPPORT_WHATSAPP_NUMBER`, el botón flotante no se muestra y la página `/support` indicará que el soporte no está configurado.
+
+---
+
+**Última actualización:** 2026-02-16 (sección Configuración de soporte WhatsApp)

@@ -7,6 +7,9 @@ import { Queue } from 'bullmq';
 import { ValidationLimitsService } from '../common/services/validation-limits.service';
 import { AuditService } from '../common/services/audit.service';
 import { CacheService } from '../common/services/cache.service';
+import { TenantContextService } from '../common/services/tenant-context.service';
+import { DianService } from '../dian/dian.service';
+import { CreateSaleUseCase } from './use-cases/create-sale.use-case';
 import { CreateSaleDto } from './dto/create-sale.dto';
 import {
   SaleStatus,
@@ -73,9 +76,11 @@ describe('SalesService', () => {
       },
       cashSession: {
         findUnique: jest.fn(),
+        findFirst: jest.fn(),
       },
       customer: {
         findUnique: jest.fn().mockResolvedValue(mockCustomer),
+        findFirst: jest.fn().mockResolvedValue(mockCustomer),
       },
     };
 
@@ -110,11 +115,25 @@ describe('SalesService', () => {
         {
           provide: CacheService,
           useValue: {
+            get: jest.fn().mockResolvedValue(null),
             deletePattern: jest.fn().mockResolvedValue(undefined),
             buildKey: jest.fn((...args) => `cache:${args.join(':')}`),
             set: jest.fn().mockResolvedValue(undefined),
           },
         },
+        {
+          provide: TenantContextService,
+          useValue: {
+            ensureTenant: jest.fn((tenantId) => tenantId || 'tenant-default'),
+          },
+        },
+        {
+          provide: DianService,
+          useValue: {
+            getConfigStatusForTenant: jest.fn().mockResolvedValue({ readyForSend: true, status: 'ready' }),
+          },
+        },
+        CreateSaleUseCase,
       ],
     }).compile();
 
@@ -122,10 +141,9 @@ describe('SalesService', () => {
     prisma = module.get(PrismaService);
     dianQueue = module.get(getQueueToken('dian'));
 
-    // Mock por defecto para sesión de caja abierta
-    prisma.cashSession.findUnique = jest
-      .fn()
-      .mockResolvedValue(mockCashSession);
+    // Mock por defecto para sesión de caja abierta (use case usa findFirst)
+    prisma.cashSession.findFirst = jest.fn().mockResolvedValue(mockCashSession);
+    prisma.cashSession.findUnique = jest.fn().mockResolvedValue(mockCashSession);
   });
 
   afterEach(() => {
@@ -238,6 +256,9 @@ describe('SalesService', () => {
               createdAt: new Date(),
             }),
           },
+          inventoryMovement: {
+            create: jest.fn().mockResolvedValue({ id: 'inv-mov-1' }),
+          },
         };
         return callback(mockTx);
       });
@@ -255,7 +276,11 @@ describe('SalesService', () => {
       expect(dianQueue.add).toHaveBeenCalledWith(
         'send',
         { dianDocumentId: 'dian-1' },
-        { attempts: 10, backoff: { type: 'exponential', delay: 5000 } },
+        {
+          jobId: 'dian-dian-1',
+          attempts: 10,
+          backoff: { type: 'exponential', delay: 5000 },
+        },
       );
     });
 
@@ -293,11 +318,7 @@ describe('SalesService', () => {
       const response = (err as BadRequestException).getResponse();
       expect(response).toMatchObject({
         message: 'Uno o más productos no existen o están inactivos.',
-        missingProductIds: expect.any(Array),
       });
-      expect(
-        (response as { missingProductIds: string[] }).missingProductIds,
-      ).toContain(createSaleDto.items[0].productId);
     });
 
     it('debe lanzar error si stock es insuficiente', async () => {
@@ -379,9 +400,7 @@ describe('SalesService', () => {
     });
 
     it('debe lanzar error si la sesión de caja no existe', async () => {
-      prisma.cashSession = {
-        findUnique: jest.fn().mockResolvedValue(null),
-      } as any;
+      prisma.cashSession.findFirst = jest.fn().mockResolvedValue(null);
 
       await expect(service.createSale(createSaleDto)).rejects.toThrow(
         'Sesión de caja',
@@ -397,9 +416,7 @@ describe('SalesService', () => {
         closedAt: new Date(),
       };
 
-      prisma.cashSession = {
-        findUnique: jest.fn().mockResolvedValue(sessionCerrada),
-      } as any;
+      prisma.cashSession.findFirst = jest.fn().mockResolvedValue(sessionCerrada);
 
       await expect(service.createSale(createSaleDto)).rejects.toThrow(
         BadRequestException,
@@ -415,12 +432,7 @@ describe('SalesService', () => {
         customerId: 'cliente-inexistente',
       };
 
-      prisma.cashSession = {
-        findUnique: jest.fn().mockResolvedValue(mockCashSession),
-      } as any;
-      prisma.customer = {
-        findUnique: jest.fn().mockResolvedValue(null),
-      } as any;
+      prisma.customer.findFirst = jest.fn().mockResolvedValue(null);
 
       await expect(
         service.createSale(dtoConClienteInexistente),
@@ -474,6 +486,9 @@ describe('SalesService', () => {
           },
           auditLog: {
             create: jest.fn().mockResolvedValue({}),
+          },
+          inventoryMovement: {
+            create: jest.fn().mockResolvedValue({ id: 'inv-mov-1' }),
           },
         };
         return callback(mockTx);
@@ -537,6 +552,9 @@ describe('SalesService', () => {
           },
           auditLog: {
             create: jest.fn().mockResolvedValue({}),
+          },
+          inventoryMovement: {
+            create: jest.fn().mockResolvedValue({ id: 'inv-mov-1' }),
           },
         };
         return callback(mockTx);

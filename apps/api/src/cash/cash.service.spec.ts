@@ -4,6 +4,7 @@ import { CashService } from './cash.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ValidationLimitsService } from '../common/services/validation-limits.service';
 import { AuditService } from '../common/services/audit.service';
+import { TenantContextService } from '../common/services/tenant-context.service';
 
 describe('CashService', () => {
   let service: CashService;
@@ -61,6 +62,7 @@ describe('CashService', () => {
           provide: ValidationLimitsService,
           useValue: {
             validateCashAmount: jest.fn().mockResolvedValue(undefined),
+            validateClosingAmount: jest.fn().mockResolvedValue(undefined),
           },
         },
         {
@@ -68,6 +70,12 @@ describe('CashService', () => {
           useValue: {
             logCreate: jest.fn().mockResolvedValue(undefined),
             logUpdate: jest.fn().mockResolvedValue(undefined),
+          },
+        },
+        {
+          provide: TenantContextService,
+          useValue: {
+            ensureTenant: jest.fn((tenantId) => tenantId || 'tenant-default'),
           },
         },
       ],
@@ -92,6 +100,7 @@ describe('CashService', () => {
         data: {
           openingAmount: 50000,
           openedBy: 'user-1',
+          tenantId: 'tenant-default',
         },
       });
     });
@@ -113,6 +122,7 @@ describe('CashService', () => {
         data: {
           openingAmount: 50000,
           openedBy: null,
+          tenantId: 'tenant-default',
         },
       });
     });
@@ -259,10 +269,12 @@ describe('CashService', () => {
         },
       ];
 
+      // Mock getSession (llama a findFirst)
+      prisma.cashSession.findFirst = jest.fn().mockResolvedValue(mockCashSession);
       prisma.cashMovement.findMany = jest.fn().mockResolvedValue(mockMovements);
       prisma.cashMovement.count = jest.fn().mockResolvedValue(2);
 
-      const result = await service.listMovements('session-1');
+      const result = await service.listMovements('session-1', 'tenant-1');
 
       expect(result).toHaveProperty('data');
       expect(result).toHaveProperty('meta');

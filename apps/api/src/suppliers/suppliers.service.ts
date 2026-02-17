@@ -12,6 +12,7 @@ import { AuditService } from '../common/services/audit.service';
 import { CacheService } from '../common/services/cache.service';
 import { TenantContextService } from '../common/services/tenant-context.service';
 import { buildPaginationMeta } from '../common/utils/pagination';
+import { maskSensitive } from '../common/utils/sanitize.util';
 
 @Injectable()
 export class SuppliersService {
@@ -91,8 +92,8 @@ export class SuppliersService {
   ) {
     const currentTenantId = this.tenantContext.ensureTenant(tenantId);
     const startTime = Date.now();
-    this.logger.log(`Creando proveedor ${dto.nit}`, {
-      nit: dto.nit,
+    this.logger.log('Creando proveedor', {
+      nit: maskSensitive(dto.nit, 4),
       name: dto.name,
       userId: createdByUserId,
     });
@@ -118,7 +119,7 @@ export class SuppliersService {
         {
           supplierId: created.id,
           name: created.name,
-          nit: created.nit,
+          nit: maskSensitive(created.nit, 4),
           duration,
           userId: createdByUserId,
         },
@@ -215,7 +216,7 @@ export class SuppliersService {
     } catch (error: any) {
       if (error.code === 'P2002') {
         throw new BadRequestException(
-          `Ya existe un proveedor con NIT ${dto.nit}`,
+          'Ya existe un proveedor con ese NIT.',
         );
       }
       throw error;

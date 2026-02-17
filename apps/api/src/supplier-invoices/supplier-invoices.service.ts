@@ -37,9 +37,7 @@ export class SupplierInvoicesService {
       where: { id: dto.supplierId, tenantId: currentTenantId },
     });
     if (!supplier) {
-      throw new NotFoundException(
-        `Proveedor con id ${dto.supplierId} no encontrado.`,
-      );
+      throw new NotFoundException('Proveedor no encontrado.');
     }
     if (!supplier.isActive) {
       throw new BadRequestException('El proveedor está inactivo.');
@@ -51,9 +49,7 @@ export class SupplierInvoicesService {
         where: { id: dto.purchaseOrderId },
       });
       if (!purchaseOrder) {
-        throw new NotFoundException(
-          `Pedido de compra con id ${dto.purchaseOrderId} no encontrado.`,
-        );
+        throw new NotFoundException('Pedido de compra no encontrado.');
       }
     }
 

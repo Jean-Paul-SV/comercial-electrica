@@ -31,7 +31,7 @@ import type { MulterFile } from '../common/types/multer';
 
 export type JwtPayload = {
   sub: string;
-  email: string;
+  // email removido por seguridad - obtener desde BD usando sub
   role: RoleName;
   /** Tenant del usuario; si no tiene, se usa el default para aislamiento de datos. */
   tenantId?: string | null;
@@ -509,7 +509,7 @@ export class AuthService {
     }
     const payload: JwtPayload = {
       sub: user.id,
-      email: user.email,
+      // email removido del payload por seguridad
       role: user.role,
       tenantId: effectiveTenantId ?? undefined,
       isPlatformAdmin: user.tenantId === null,

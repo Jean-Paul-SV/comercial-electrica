@@ -42,6 +42,13 @@ export class BillingService {
   }
 
   /**
+   * Verifica si el webhook está configurado correctamente.
+   */
+  isWebhookConfigured(): boolean {
+    return !!(this.webhookSecret && this.stripe);
+  }
+
+  /**
    * Verifica la firma del webhook y devuelve el evento Stripe o null si falla.
    */
   constructEvent(

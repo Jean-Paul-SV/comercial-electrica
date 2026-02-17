@@ -85,14 +85,12 @@ export class CreateSaleUseCase {
     });
 
     if (!cashSession) {
-      throw new NotFoundException(
-        `Sesión de caja con id ${dto.cashSessionId} no encontrada.`,
-      );
+      throw new NotFoundException('Sesión de caja no encontrada.');
     }
 
     if (cashSession.closedAt) {
       throw new BadRequestException(
-        `No se puede crear venta. La sesión de caja ${dto.cashSessionId} está cerrada.`,
+        'No se puede crear venta. La sesión de caja está cerrada.',
       );
     }
 
@@ -101,9 +99,7 @@ export class CreateSaleUseCase {
         where: { id: dto.customerId, tenantId },
       });
       if (!customer) {
-        throw new NotFoundException(
-          `Cliente con id ${dto.customerId} no encontrado.`,
-        );
+        throw new NotFoundException('Cliente no encontrado.');
       }
     }
 
@@ -118,14 +114,9 @@ export class CreateSaleUseCase {
             include: { stock: true },
           });
           if (products.length !== dto.items.length) {
-            const foundIds = new Set(products.map((p) => p.id));
-            const missingProductIds = dto.items
-              .map((i) => i.productId)
-              .filter((id) => !foundIds.has(id));
-            throw new BadRequestException({
-              message: 'Uno o más productos no existen o están inactivos.',
-              missingProductIds,
-            });
+            throw new BadRequestException(
+              'Uno o más productos no existen o están inactivos.',
+            );
           }
 
           let subtotal = 0;

@@ -13,6 +13,7 @@ import { MailerService } from '../mailer/mailer.service';
 import { PermissionsService } from './permissions.service';
 import { TenantModulesService } from './tenant-modules.service';
 import { StorageService } from '../common/services/storage.service';
+import { PlanLimitsService } from '../common/services/plan-limits.service';
 import * as argon2 from 'argon2';
 
 // Mock argon2
@@ -44,9 +45,15 @@ describe('AuthService', () => {
         count: jest.fn(),
         findUnique: jest.fn(),
         create: jest.fn(),
+        update: jest.fn().mockResolvedValue({}),
       },
       role: { findFirst: jest.fn() },
       userRole: { create: jest.fn().mockResolvedValue({}) },
+      tenant: {
+        findUnique: jest.fn().mockResolvedValue({ isActive: true }),
+        update: jest.fn().mockResolvedValue({}),
+      },
+      $transaction: jest.fn().mockImplementation((ops) => Promise.all(ops)),
     };
 
     const mockJwt = {
@@ -100,6 +107,13 @@ describe('AuthService', () => {
           useValue: {
             getSignedUrl: jest.fn().mockResolvedValue(''),
             upload: jest.fn().mockResolvedValue({ key: '', url: '' }),
+          },
+        },
+        {
+          provide: PlanLimitsService,
+          useValue: {
+            validateUserLimit: jest.fn().mockResolvedValue(undefined),
+            getTenantLimits: jest.fn().mockResolvedValue({ maxUsers: null, currentUsers: 0, canAddUsers: true }),
           },
         },
       ],
@@ -302,11 +316,12 @@ describe('AuthService', () => {
         password: 'Admin123!',
       };
 
+      // Payload sin email (seguridad: email no va en JWT). mockUser.tenantId es null → isPlatformAdmin true
       const mockPayload = {
         sub: 'user-1',
-        email: 'admin@test.com',
         role: RoleName.ADMIN,
         tenantId: 'tenant-default',
+        isPlatformAdmin: true,
       };
 
       prisma.user.findUnique = jest.fn().mockResolvedValue(mockUser);
@@ -318,6 +333,7 @@ describe('AuthService', () => {
       expect(result).toEqual({
         accessToken: 'jwt-token-123',
         mustChangePassword: false,
+        isPlatformAdmin: true,
       });
       expect(prisma.user.findUnique).toHaveBeenCalledWith({
         where: { email: 'admin@test.com' },
@@ -328,6 +344,7 @@ describe('AuthService', () => {
           tenantId: true,
           passwordHash: true,
           mustChangePassword: true,
+          isActive: true,
         },
       });
       expect(argon2.verify).toHaveBeenCalledWith(
@@ -408,6 +425,7 @@ describe('AuthService', () => {
           tenantId: true,
           passwordHash: true,
           mustChangePassword: true,
+          isActive: true,
         },
       });
     });

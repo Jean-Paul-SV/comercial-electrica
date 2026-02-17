@@ -21,11 +21,9 @@ export class PrismaService
     const isProd = process.env.NODE_ENV === 'production';
 
     if (!url || url.trim().length === 0) {
-      if (isProd) {
-        throw new Error(
-          'DATABASE_URL no configurada. En producción es obligatorio configurar la conexión a la base de datos.',
-        );
-      }
+      throw new Error(
+        'DATABASE_URL no configurada. Configura esta variable de entorno en .env o en el entorno de ejecución.',
+      );
     }
 
     // Configurar connection pooling según entorno
@@ -34,10 +32,9 @@ export class PrismaService
     const connectionLimit = isProd ? 20 : 5;
     const poolTimeout = isProd ? 20 : 10;
     
-    const baseUrl = url ?? 'postgresql://ce:ce_password@localhost:5432/comercial_electrica?schema=public';
-    const urlWithPool = baseUrl.includes('?')
-      ? `${baseUrl}&connection_limit=${connectionLimit}&pool_timeout=${poolTimeout}`
-      : `${baseUrl}?connection_limit=${connectionLimit}&pool_timeout=${poolTimeout}`;
+    const urlWithPool = url.includes('?')
+      ? `${url}&connection_limit=${connectionLimit}&pool_timeout=${poolTimeout}`
+      : `${url}?connection_limit=${connectionLimit}&pool_timeout=${poolTimeout}`;
 
     super({
       datasources: {

@@ -10,6 +10,7 @@ describe('BillingService', () => {
   let prisma: PrismaService;
 
   const mockPrismaService = {
+    $transaction: jest.fn((ops) => (Array.isArray(ops) ? Promise.all(ops) : ops)),
     stripeEvent: {
       findUnique: jest.fn(),
       create: jest.fn(),
@@ -17,6 +18,7 @@ describe('BillingService', () => {
     subscription: {
       findUnique: jest.fn(),
       update: jest.fn(),
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
     },
   };
 
@@ -223,12 +225,12 @@ describe('BillingService', () => {
         id: 'sub-db-id',
         stripeSubscriptionId: 'sub_test',
       });
-      mockPrismaService.subscription.update.mockResolvedValue({});
+      mockPrismaService.subscription.updateMany.mockResolvedValue({ count: 1 });
       mockPrismaService.stripeEvent.create.mockResolvedValue({});
 
       await service.handleStripeEvent(event);
 
-      expect(mockPrismaService.subscription.update).toHaveBeenCalled();
+      expect(mockPrismaService.subscription.updateMany).toHaveBeenCalled();
     });
 
     it('debe guardar eventos desconocidos sin procesarlos', async () => {

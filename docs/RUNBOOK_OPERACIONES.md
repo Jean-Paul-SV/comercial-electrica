@@ -36,9 +36,27 @@ curl https://tu-dominio.com/health
 ### Checklist Pre-Despliegue
 
 - [ ] Migraciones aplicadas (`npx prisma migrate status`)
-- [ ] Variables de entorno configuradas (especialmente `ALLOWED_ORIGINS` en producción)
-- [ ] Secretos configurados (JWT secrets, Stripe, DIAN)
+- [ ] **Variables de entorno obligatorias** (la API no arranca si faltan):
+  - [ ] `DATABASE_URL` — conexión a PostgreSQL
+  - [ ] `JWT_ACCESS_SECRET` — firma de tokens
+  - [ ] `STRIPE_WEBHOOK_SECRET` — si usas Stripe en producción (obligatorio cuando `STRIPE_SECRET_KEY` está definido)
+- [ ] Resto de variables: `ALLOWED_ORIGINS`, Redis, DIAN, etc., según entorno
 - [ ] Backup reciente verificado
+
+### Comprobar variables antes de desplegar
+
+La API valida al arranque que existan las variables críticas (`ConfigValidationModule`). Para comprobar en local o en el servidor:
+
+```bash
+# Debe existir
+echo $DATABASE_URL
+echo $JWT_ACCESS_SECRET
+
+# Si usas Stripe en producción, también:
+echo $STRIPE_WEBHOOK_SECRET
+```
+
+Si falta alguna obligatoria, la API falla al iniciar con un mensaje explícito (ej. "Falta variable de entorno requerida: DATABASE_URL").
 
 ### Pasos de Despliegue
 

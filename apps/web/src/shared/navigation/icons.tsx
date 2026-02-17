@@ -26,6 +26,7 @@ import {
   PlusCircle,
   CreditCard,
   Tag,
+  MessageCircle,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -51,6 +52,7 @@ export const navIconMap: Record<string, LucideIcon> = {
   PlusCircle,
   CreditCard,
   Tag,
+  MessageCircle,
 };
 
 export function getNavIcon(name: string): LucideIcon | undefined {

@@ -36,6 +36,7 @@ import { AuditContextInterceptor } from './common/interceptors/audit-context.int
 import { IdempotencyInterceptor } from './common/interceptors/idempotency.interceptor';
 import { TenantContextInterceptor } from './auth/tenant-context.interceptor';
 import { MailerModule } from './mailer/mailer.module';
+import { ConfigValidationModule } from './common/config/config-validation.module';
 
 @Module({
   imports: [
@@ -114,6 +115,7 @@ import { MailerModule } from './mailer/mailer.module';
     OnboardingModule,
     ProviderModule,
     BillingModule,
+    ConfigValidationModule, // Validar configuración después de ConfigModule
   ],
   controllers: [AppController],
   providers: [
