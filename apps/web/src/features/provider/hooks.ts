@@ -121,6 +121,18 @@ export function useCreateTenant() {
   });
 }
 
+export function useDeleteTenant() {
+  const { token } = useAuth();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.deleteTenant(id, token!),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['provider', 'tenants'] });
+      queryClient.invalidateQueries({ queryKey: ['provider', 'tenants', 'summary'] });
+    },
+  });
+}
+
 /** Alertas del panel proveedor (planes sin Stripe, empresas sin plan, etc.). */
 export function useProviderAlerts(): { alerts: ProviderAlert[]; isLoading: boolean } {
   const plansQuery = usePlans(false);

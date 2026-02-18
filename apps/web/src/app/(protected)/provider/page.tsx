@@ -12,6 +12,15 @@ import {
 import { Button } from '@shared/components/ui/button';
 import { Input } from '@shared/components/ui/input';
 import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@shared/components/ui/dialog';
+import {
   Table,
   TableBody,
   TableCell,
@@ -23,9 +32,19 @@ import { Badge } from '@shared/components/ui/badge';
 import { Label } from '@shared/components/ui/label';
 import { Skeleton } from '@shared/components/ui/skeleton';
 import { Building2, PlusCircle, Eye, ChevronLeft, ChevronRight, BarChart3, Search, Filter } from 'lucide-react';
-import { useListTenants, useTenantsSummary } from '@features/provider/hooks';
+import { useListTenants, useTenantsSummary, useDeleteTenant } from '@features/provider/hooks';
 
 const PAGE_SIZE = 20;
+
+type TenantRow = {
+  id: string;
+  name: string;
+  slug: string;
+  isActive: boolean;
+  plan?: { name: string } | null;
+  usersCount: number;
+  lastActivityAt: string | null;
+};
 
 export default function ProviderTenantsPage() {
   const [page, setPage] = useState(0);
@@ -34,6 +53,9 @@ export default function ProviderTenantsPage() {
   const [searchNumber, setSearchNumber] = useState('');
   const [debouncedName, setDebouncedName] = useState('');
   const [debouncedNumber, setDebouncedNumber] = useState('');
+  const [tenantToDelete, setTenantToDelete] = useState<TenantRow | null>(null);
+
+  const deleteTenant = useDeleteTenant();
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -312,6 +334,36 @@ export default function ProviderTenantsPage() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={!!tenantToDelete} onOpenChange={(open) => !open && setTenantToDelete(null)}>
+        <DialogContent showClose>
+          <DialogHeader>
+            <DialogTitle>Eliminar empresa</DialogTitle>
+            <DialogDescription>
+              ¿Eliminar la empresa &quot;{tenantToDelete?.name}&quot;? Se borrarán todos los datos
+              (ventas, productos, clientes, etc.) y los usuarios quedarán desactivados. Esta acción
+              no se puede deshacer.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <DialogClose asChild>
+              <Button variant="outline">Cancelar</Button>
+            </DialogClose>
+            <Button
+              variant="destructive"
+              disabled={deleteTenant.isPending}
+              onClick={() => {
+                if (!tenantToDelete) return;
+                deleteTenant.mutate(tenantToDelete.id, {
+                  onSuccess: () => setTenantToDelete(null),
+                });
+              }}
+            >
+              {deleteTenant.isPending ? 'Eliminando…' : 'Eliminar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

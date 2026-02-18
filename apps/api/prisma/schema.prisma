@@ -114,6 +114,11 @@ enum PaymentStatus {
   REFUNDED
 }
 
+enum BackupScope {
+  TENANT
+  PLATFORM
+}
+
 // ---------- Multi-tenant (RBAC + Plan/módulos, ver docs/ROLES_Y_PERMISOS_DISEÑO.md y ARQUITECTURA_MODULAR_SAAS.md) ----------
 model Plan {
   id              String    @id @default(uuid()) @db.Uuid
@@ -935,6 +940,7 @@ model AuditLog {
 model BackupRun {
   id          String   @id @default(uuid()) @db.Uuid
   tenantId    String   @db.Uuid
+  scope       BackupScope @default(TENANT)
   startedAt   DateTime @default(now())
   finishedAt DateTime?
   status      String
@@ -947,4 +953,5 @@ model BackupRun {
   @@index([tenantId])
   @@index([startedAt])
   @@index([status])
+  @@index([scope])
 }

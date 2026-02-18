@@ -1,5 +1,5 @@
 export type SubscriptionInfo = {
-  plan: { name: string; slug: string } | null;
+  plan: { id: string; name: string; slug: string } | null;
   subscription: {
     status: string;
     currentPeriodEnd: string | null;
@@ -11,4 +11,13 @@ export type SubscriptionInfo = {
 
 export type PortalSessionResponse = {
   url: string;
+};
+
+export type BillingPlan = {
+  id: string;
+  name: string;
+  slug: string;
+  priceMonthly: number | null;
+  priceYearly: number | null;
+  maxUsers: number | null;
 };

@@ -15,6 +15,10 @@ export type AuthState = {
   hasCheckedStorage: boolean;
   /** True cuando hay token pero aún no se ha cargado el user (getMe); evita redirigir a login al refrescar. */
   isRestoringSession: boolean;
+  /** Momento en que expira la sesión (exp del JWT) o null si no se puede determinar. */
+  sessionExpiresAt: Date | null;
+  /** Segundos aproximados restantes antes de que expire el JWT (se actualiza cada minuto). */
+  sessionRemainingSeconds: number | null;
   user: { id: string; email: string; role: 'ADMIN' | 'USER'; profilePictureUrl?: string | null } | null;
   permissions: string[];
   /** Módulos habilitados para el tenant (SaaS). Si vacío/undefined, no se filtra nav por módulo. */
@@ -50,12 +54,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [enabledModules, setEnabledModules] = useState<string[]>([]);
   const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
   const [mustChangePassword, setMustChangePassword] = useState(false);
+  const [sessionExpiresAt, setSessionExpiresAt] = useState<Date | null>(null);
+  const [sessionRemainingSeconds, setSessionRemainingSeconds] = useState<number | null>(null);
 
   useEffect(() => {
     const stored = readStoredToken();
     if (stored) setToken(stored);
     setHasCheckedStorage(true);
   }, []);
+
+  useEffect(() => {
+    if (!token) {
+      setSessionExpiresAt(null);
+      setSessionRemainingSeconds(null);
+      return;
+    }
+    const claims = decodeJwtClaims(token);
+    if (claims?.exp) {
+      const expiresAt = new Date(claims.exp * 1000);
+      setSessionExpiresAt(expiresAt);
+      const remaining = Math.max(0, Math.floor((expiresAt.getTime() - Date.now()) / 1000));
+      setSessionRemainingSeconds(Number.isFinite(remaining) ? remaining : null);
+    } else {
+      setSessionExpiresAt(null);
+      setSessionRemainingSeconds(null);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    if (!sessionExpiresAt) return;
+    const updateRemaining = () => {
+      const remaining = Math.floor((sessionExpiresAt.getTime() - Date.now()) / 1000);
+      setSessionRemainingSeconds(remaining > 0 && Number.isFinite(remaining) ? remaining : 0);
+    };
+    updateRemaining();
+    const id = setInterval(updateRemaining, 60_000);
+    return () => clearInterval(id);
+  }, [sessionExpiresAt]);
 
   const refreshMe = useCallback(async () => {
     if (!token) return;
@@ -79,6 +114,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setPermissions([]);
       setEnabledModules([]);
       setIsPlatformAdmin(false);
+      setSessionExpiresAt(null);
+      setSessionRemainingSeconds(null);
       return;
     }
     const claims = decodeJwtClaims(token);
@@ -124,6 +161,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       token,
       hasCheckedStorage,
       isRestoringSession,
+      sessionExpiresAt,
+      sessionRemainingSeconds,
       user,
       permissions,
       enabledModules,
@@ -143,11 +182,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setEnabledModules([]);
         setIsPlatformAdmin(false);
         setMustChangePassword(false);
+        setSessionExpiresAt(null);
+        setSessionRemainingSeconds(null);
       },
       clearMustChangePassword: () => setMustChangePassword(false),
       refreshMe,
     };
-  }, [token, hasCheckedStorage, user, permissions, enabledModules, isPlatformAdmin, mustChangePassword, refreshMe]);
+  }, [
+    token,
+    hasCheckedStorage,
+    user,
+    permissions,
+    enabledModules,
+    isPlatformAdmin,
+    mustChangePassword,
+    sessionExpiresAt,
+    sessionRemainingSeconds,
+    refreshMe,
+  ]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

@@ -325,6 +325,25 @@ export class ProviderService {
     return { success: true, isActive: dto.isActive };
   }
 
+  async deleteTenant(id: string) {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id },
+      select: { id: true },
+    });
+    if (!tenant) throw new NotFoundException('Tenant no encontrado.');
+
+    await this.prisma.$transaction(async (tx) => {
+      // Evitar que usuarios queden activos sin empresa
+      await tx.user.updateMany({
+        where: { tenantId: id },
+        data: { isActive: false, tenantId: null },
+      });
+      await tx.tenant.delete({ where: { id } });
+    });
+
+    return { success: true };
+  }
+
   async updateTenant(id: string, dto: UpdateTenantDto) {
     const tenant = await this.prisma.tenant.findUnique({
       where: { id },

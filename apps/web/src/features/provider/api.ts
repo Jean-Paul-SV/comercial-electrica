@@ -103,3 +103,10 @@ export function createTenant(
     authToken,
   });
 }
+
+export function deleteTenant(
+  id: string,
+  authToken: string
+): Promise<{ success: boolean }> {
+  return apiClient.delete(`/provider/tenants/${id}`, { authToken });
+}

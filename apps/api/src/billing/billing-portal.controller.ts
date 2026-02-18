@@ -1,6 +1,7 @@
 import {
   Controller,
   Get,
+  Patch,
   Post,
   Body,
   Req,
@@ -17,6 +18,7 @@ import { ConfigService } from '@nestjs/config';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { BillingService } from './billing.service';
 import { CreatePortalSessionDto } from './dto/create-portal-session.dto';
+import { ChangePlanDto } from './dto/change-plan.dto';
 
 @ApiTags('billing')
 @Controller('billing')
@@ -27,16 +29,56 @@ export class BillingPortalController {
   ) {}
 
   @UseGuards(JwtAuthGuard)
+  @Get('plans')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Listar planes disponibles',
+    description:
+      'Planes activos con precios mensual y anual para que el cliente pueda cambiar. Solo usuarios con tenant.',
+  })
+  @ApiResponse({ status: 200, description: 'Lista de planes.' })
+  getPlans(@Req() req: { user?: { tenantId?: string | null } }) {
+    if (!req.user?.tenantId) {
+      throw new BadRequestException(
+        'Solo los usuarios de una empresa pueden ver los planes. Los administradores de plataforma usan el panel proveedor.',
+      );
+    }
+    return this.billing.getActivePlans();
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch('plan')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Cambiar plan del tenant',
+    description: 'Actualiza el plan de la empresa del usuario. El periodo de suscripci?n se mantiene.',
+  })
+  @ApiResponse({ status: 200, description: 'Plan actualizado.' })
+  @ApiResponse({ status: 404, description: 'Plan o empresa no encontrados.' })
+  async changePlan(
+    @Req() req: { user?: { tenantId?: string | null } },
+    @Body() dto: ChangePlanDto,
+  ) {
+    const tenantId = req.user?.tenantId;
+    if (!tenantId) {
+      throw new BadRequestException(
+        'Solo los usuarios de una empresa pueden cambiar el plan.',
+      );
+    }
+    return this.billing.changeTenantPlan(tenantId, dto.planId);
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Get('subscription')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
-    summary: 'Información de suscripción del tenant',
+    summary: 'Informaci?n de suscripci?n del tenant',
     description:
-      'Devuelve plan, estado de la suscripción y si el usuario puede abrir el portal de Stripe (gestión de pago y facturas). Solo para usuarios con tenant (no platform admin).',
+      'Devuelve plan, estado de la suscripci?n y si el usuario puede abrir el portal de Stripe (gesti?n de pago y facturas). Solo para usuarios con tenant (no platform admin).',
   })
   @ApiResponse({
     status: 200,
-    description: 'Datos de plan y suscripción',
+    description: 'Datos de plan y suscripci?n',
     schema: {
       type: 'object',
       properties: {
@@ -58,12 +100,12 @@ export class BillingPortalController {
       },
     },
   })
-  @ApiResponse({ status: 404, description: 'Usuario sin tenant o sin suscripción' })
+  @ApiResponse({ status: 404, description: 'Usuario sin tenant o sin suscripci?n' })
   getSubscription(@Req() req: { user?: { tenantId?: string | null } }) {
     const tenantId = req.user?.tenantId;
     if (!tenantId) {
       throw new BadRequestException(
-        'Solo los usuarios de una empresa pueden ver la facturación. Los administradores de plataforma usan el panel proveedor.',
+        'Solo los usuarios de una empresa pueden ver la facturaci?n. Los administradores de plataforma usan el panel proveedor.',
       );
     }
     return this.billing.getSubscriptionForTenant(tenantId);
@@ -73,9 +115,9 @@ export class BillingPortalController {
   @Post('portal-session')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
-    summary: 'Crear sesión del portal de facturación Stripe',
+    summary: 'Crear sesi?n del portal de facturaci?n Stripe',
     description:
-      'Genera una URL de Stripe Customer Portal para que el usuario gestione método de pago, facturas y suscripción. Redirigir al usuario a la URL devuelta.',
+      'Genera una URL de Stripe Customer Portal para que el usuario gestione m?todo de pago, facturas y suscripci?n. Redirigir al usuario a la URL devuelta.',
   })
   @ApiResponse({
     status: 201,
@@ -85,7 +127,7 @@ export class BillingPortalController {
       properties: { url: { type: 'string', format: 'uri' } },
     },
   })
-  @ApiResponse({ status: 400, description: 'Sin suscripción Stripe o Stripe no configurado' })
+  @ApiResponse({ status: 400, description: 'Sin suscripci?n Stripe o Stripe no configurado' })
   async createPortalSession(
     @Req() req: { user?: { tenantId?: string | null } },
     @Body() dto: CreatePortalSessionDto,
@@ -93,7 +135,7 @@ export class BillingPortalController {
     const tenantId = req.user?.tenantId;
     if (!tenantId) {
       throw new BadRequestException(
-        'Solo los usuarios de una empresa pueden abrir el portal de facturación.',
+        'Solo los usuarios de una empresa pueden abrir el portal de facturaci?n.',
       );
     }
     const baseUrl =

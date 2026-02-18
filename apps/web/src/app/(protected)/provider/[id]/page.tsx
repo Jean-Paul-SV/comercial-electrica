@@ -15,7 +15,7 @@ import { Button } from '@shared/components/ui/button';
 import { Badge } from '@shared/components/ui/badge';
 import { Select } from '@shared/components/ui/select';
 import { Skeleton } from '@shared/components/ui/skeleton';
-import { ArrowLeft, Building2, FileCheck, PauseCircle, PlayCircle } from 'lucide-react';
+import { ArrowLeft, Building2, Calendar, FileCheck, PauseCircle, PlayCircle } from 'lucide-react';
 import { useTenant, useUpdateTenantStatus, useUpdateTenant, usePlans, useRenewSubscription } from '@features/provider/hooks';
 
 export default function ProviderTenantDetailPage() {
@@ -48,11 +48,12 @@ export default function ProviderTenantDetailPage() {
     }
   };
 
-  const handleRenewSubscription = async () => {
+  const handleRenewSubscription = async (extendDays: number) => {
     if (!id) return;
     try {
-      await renewSubscription.mutateAsync({ tenantId: id, extendDays: 30 });
-      toast.success('Suscripción renovada 30 días.');
+      await renewSubscription.mutateAsync({ tenantId: id, extendDays });
+      const label = extendDays === 365 ? '1 año' : '30 días';
+      toast.success(`Suscripción renovada ${label}.`);
     } catch (e: unknown) {
       const msg = (e as { message?: string })?.message ?? 'Error al renovar.';
       toast.error(msg);
@@ -172,28 +173,28 @@ export default function ProviderTenantDetailPage() {
       </Card>
 
       <div className="grid gap-4 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Estado y suscripción</CardTitle>
+        <Card className="overflow-hidden">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg">Estado y suscripción</CardTitle>
             <CardDescription>Datos de la cuenta y plan.</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-2">
-            <div className="flex justify-between text-sm">
+          <CardContent className="space-y-5">
+            <div className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-3 text-sm items-center">
               <span className="text-muted-foreground">Estado</span>
-              <Badge variant={tenant.isActive ? 'default' : 'secondary'}>
+              <Badge variant={tenant.isActive ? 'default' : 'secondary'} className="justify-self-end">
                 {tenant.isActive ? 'Activa' : 'Suspendida'}
               </Badge>
-            </div>
-            <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Plan</span>
-              <span>{tenant.plan?.name ?? '—'}</span>
+              <span className="font-medium">{tenant.plan?.name ?? '—'}</span>
             </div>
-            <div className="flex flex-col gap-2 pt-2 border-t">
-              <span className="text-sm text-muted-foreground">Cambiar plan</span>
-              <div className="flex gap-2">
+
+            <div className="space-y-3 pt-4 border-t border-border/60">
+              <p className="text-sm font-medium text-foreground">Cambiar plan</p>
+              <div className="flex flex-wrap gap-2">
                 <Select
                   value={selectedPlanId}
                   onChange={(e) => setSelectedPlanId(e.target.value)}
+                  className="min-w-[200px]"
                 >
                   <option value="">Sin plan</option>
                   {plans.map((p) => (
@@ -212,35 +213,51 @@ export default function ProviderTenantDetailPage() {
                 </Button>
               </div>
             </div>
+
             {tenant.subscription && (
-              <>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Estado suscripción</span>
-                  <span>{tenant.subscription.status}</span>
+              <div className="rounded-lg bg-muted/40 border border-border/50 p-4 space-y-4">
+                <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                  Suscripción
                 </div>
-                {tenant.subscription.currentPeriodEnd && (
-                  <div className="flex justify-between text-sm items-center">
-                    <span className="text-muted-foreground">Periodo hasta</span>
-                    <span>
-                      {new Date(tenant.subscription.currentPeriodEnd).toLocaleDateString()}
-                    </span>
-                  </div>
-                )}
-                <div className="pt-2">
+                <div className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-2 text-sm">
+                  <span className="text-muted-foreground">Estado</span>
+                  <span className="uppercase tracking-wide">{tenant.subscription.status}</span>
+                  {tenant.subscription.currentPeriodEnd && (
+                    <>
+                      <span className="text-muted-foreground">Periodo hasta</span>
+                      <span className="tabular-nums">
+                        {new Date(tenant.subscription.currentPeriodEnd).toLocaleDateString()}
+                      </span>
+                    </>
+                  )}
+                </div>
+                <div className="pt-2 flex flex-wrap gap-2">
                   <Button
                     size="sm"
                     variant="outline"
                     disabled={renewSubscription.isPending}
-                    onClick={handleRenewSubscription}
+                    onClick={() => handleRenewSubscription(30)}
+                    className="min-w-[120px]"
                   >
                     {renewSubscription.isPending ? 'Renovando…' : 'Renovar 30 días'}
                   </Button>
+                  <Button
+                    size="sm"
+                    variant="default"
+                    disabled={renewSubscription.isPending}
+                    onClick={() => handleRenewSubscription(365)}
+                    className="min-w-[120px]"
+                  >
+                    {renewSubscription.isPending ? 'Renovando…' : 'Renovar 1 año'}
+                  </Button>
                 </div>
-              </>
+              </div>
             )}
-            <div className="flex justify-between text-sm">
+
+            <div className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-2 text-sm items-center pt-2 border-t border-border/60">
               <span className="text-muted-foreground">Última actividad</span>
-              <span>
+              <span className="tabular-nums">
                 {tenant.lastActivityAt
                   ? new Date(tenant.lastActivityAt).toLocaleString()
                   : '—'}

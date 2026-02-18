@@ -6,6 +6,8 @@ import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useState } from 'react';
+import { Eye, EyeOff } from 'lucide-react';
 import { useLogin } from '@features/auth/hooks';
 import { useAuth } from '@shared/providers/AuthProvider';
 import { Button } from '@shared/components/ui/button';
@@ -30,6 +32,7 @@ export default function LoginPage() {
   const router = useRouter();
   const auth = useAuth();
   const loginMutation = useLogin();
+  const [showPassword, setShowPassword] = useState(false);
 
   const {
     register,
@@ -108,15 +111,27 @@ export default function LoginPage() {
                   ¿Olvidaste tu contraseña?
                 </Link>
               </div>
-              <Input
-                id="password"
-                type="password"
-                autoComplete="current-password"
-                placeholder="••••••••"
-                className="h-11 rounded-lg border-input/80 bg-background focus-visible:ring-2"
-                disabled={loginMutation.isPending}
-                {...register('password')}
-              />
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? 'text' : 'password'}
+                  autoComplete="current-password"
+                  placeholder="••••••••"
+                  className="h-11 rounded-lg border-input/80 bg-background focus-visible:ring-2 pr-10"
+                  disabled={loginMutation.isPending}
+                  {...register('password')}
+                />
+                <button
+                  type="button"
+                  className="absolute inset-y-0 right-2 flex items-center text-muted-foreground hover:text-foreground"
+                  onMouseDown={() => setShowPassword(true)}
+                  onMouseUp={() => setShowPassword(false)}
+                  onMouseLeave={() => setShowPassword(false)}
+                  aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
               {errors.password && (
                 <p className="text-sm text-destructive">{errors.password.message}</p>
               )}

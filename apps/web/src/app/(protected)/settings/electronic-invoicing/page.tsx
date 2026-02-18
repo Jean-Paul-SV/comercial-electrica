@@ -245,6 +245,10 @@ export default function ElectronicInvoicingPage() {
         Facturación electrónica (DIAN)
       </h1>
 
+      <p className="text-sm text-muted-foreground rounded-lg border border-border/60 bg-muted/20 px-4 py-3">
+        Tu plan incluye esta función. Para <strong>enviar facturas a la DIAN</strong> debes contratar nuestro servicio de configuración; contáctanos para activarla. Mientras tanto puedes seguir usando documentos internos en ventas.
+      </p>
+
       {/* Estado */}
       <Card>
         <CardHeader className="pb-2">

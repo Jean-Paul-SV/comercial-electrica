@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -124,6 +125,18 @@ export class ProviderController {
     @Body() dto: UpdateTenantStatusDto,
   ) {
     return this.provider.updateTenantStatus(id, dto);
+  }
+
+  @Delete('tenants/:id')
+  @ApiOperation({
+    summary: 'Eliminar empresa (tenant)',
+    description:
+      'Elimina la empresa y todos sus datos. Desactiva los usuarios asociados. No se puede deshacer.',
+  })
+  @ApiResponse({ status: 200, description: 'Empresa eliminada.' })
+  @ApiResponse({ status: 404, description: 'Tenant no encontrado.' })
+  deleteTenant(@Param('id') id: string) {
+    return this.provider.deleteTenant(id);
   }
 
   @Patch('tenants/:id')

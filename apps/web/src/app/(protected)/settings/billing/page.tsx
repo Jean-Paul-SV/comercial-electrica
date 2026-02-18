@@ -10,8 +10,8 @@ import {
 import { Button } from '@shared/components/ui/button';
 import { Badge } from '@shared/components/ui/badge';
 import { Skeleton } from '@shared/components/ui/skeleton';
-import { CreditCard, Calendar, Package, AlertCircle, CheckCircle2, Sparkles } from 'lucide-react';
-import { useSubscriptionInfo, useCreatePortalSession } from '@features/billing/hooks';
+import { CreditCard, Calendar, Package, AlertCircle, CheckCircle2, Sparkles, RefreshCw } from 'lucide-react';
+import { useSubscriptionInfo, useCreatePortalSession, useBillingPlans, useChangePlan } from '@features/billing/hooks';
 import { useAuth } from '@shared/providers/AuthProvider';
 import { toast } from 'sonner';
 import { getErrorMessage } from '@shared/utils/errors';
@@ -22,10 +22,20 @@ const STATUS_LABELS: Record<string, string> = {
   CANCELLED: 'Cancelada',
 };
 
+function formatPrice(value: number): string {
+  return new Intl.NumberFormat('es-CO', {
+    style: 'currency',
+    currency: 'COP',
+    maximumFractionDigits: 0,
+  }).format(value);
+}
+
 export default function BillingPage() {
   const { isPlatformAdmin } = useAuth();
   const subscriptionQuery = useSubscriptionInfo();
   const createPortalMutation = useCreatePortalSession();
+  const plansQuery = useBillingPlans();
+  const changePlanMutation = useChangePlan();
 
   const handleOpenPortal = () => {
     const returnUrl =
@@ -144,7 +154,7 @@ export default function BillingPage() {
             Plan actual
           </CardTitle>
           <CardDescription>
-            Tu plan incluye todos los módulos activos para tu empresa.
+            Tu plan incluye los módulos activos para tu empresa. Si tu plan incluye facturación electrónica (DIAN), para emitir a la DIAN debes contratar nuestro servicio de configuración (certificado, datos ante la DIAN); contáctanos para activarla.
           </CardDescription>
         </CardHeader>
         <CardContent className="pt-6 space-y-6">
@@ -212,27 +222,92 @@ export default function BillingPage() {
 
           {plan && (
             <div className="space-y-4 rounded-xl border border-primary/20 bg-primary/5 p-4 sm:p-5">
-              <p className="text-sm font-semibold text-foreground">
-                ¿Necesitas mejorar tu plan?
+              <p className="text-sm font-semibold text-foreground flex items-center gap-2">
+                <RefreshCw className="h-4 w-4" />
+                Cambiar de plan
               </p>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                Si tu negocio crece y necesitas más usuarios o módulos (por ejemplo pasar de Básico a
-                Premium o Empresarial), podemos cambiar tu plan sin interrumpir la operación.
+                Elige plan mensual o anual. El cambio se aplica de inmediato; el periodo actual se mantiene.
               </p>
-              <Button
-                variant="outline"
-                size="sm"
-                className="border-primary/40 text-primary hover:bg-primary/10"
-                type="button"
-                onClick={() => {
-                  if (typeof window !== 'undefined') {
-                    window.location.href =
-                      'mailto:soporte@orion-app.cloud?subject=Mejorar%20plan%20Orion';
-                  }
-                }}
-              >
-                Mejorar plan
-              </Button>
+              <p className="text-xs text-muted-foreground/90 leading-relaxed">
+                Los planes &quot;con DIAN&quot; te dan acceso a facturación electrónica. Para enviar facturas a la DIAN debes contratar nuestro servicio de configuración; contáctanos para más información. Hasta entonces podrás usar documentos internos.
+              </p>
+              {plansQuery.isLoading ? (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {[1, 2, 3].map((i) => (
+                    <Skeleton key={i} className="h-28 rounded-lg" />
+                  ))}
+                </div>
+              ) : plansQuery.data && plansQuery.data.length > 0 ? (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {plansQuery.data.map((p) => {
+                    const isCurrent = plan.id === p.id;
+                    return (
+                      <div
+                        key={p.id}
+                        className={`rounded-lg border p-4 transition-colors ${
+                          isCurrent
+                            ? 'border-primary/50 bg-primary/10'
+                            : 'border-border/80 bg-card hover:border-primary/30'
+                        }`}
+                      >
+                        <div className="flex flex-col gap-3">
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <p className="font-semibold text-foreground">{p.name}</p>
+                              {p.maxUsers != null && (
+                                <p className="text-xs text-muted-foreground">
+                                  hasta {p.maxUsers} usuarios
+                                </p>
+                              )}
+                            </div>
+                            {isCurrent && (
+                              <Badge variant="secondary" className="shrink-0">
+                                Vigente
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+                            {p.priceMonthly != null && (
+                              <span className="text-muted-foreground">
+                                Mensual: <span className="font-medium text-foreground">{formatPrice(p.priceMonthly)}</span>
+                              </span>
+                            )}
+                            {p.priceYearly != null && (
+                              <span className="text-muted-foreground">
+                                Anual: <span className="font-medium text-foreground">{formatPrice(p.priceYearly)}</span>
+                              </span>
+                            )}
+                            {p.priceMonthly == null && p.priceYearly == null && (
+                              <span className="text-muted-foreground text-xs">Consultar precio</span>
+                            )}
+                          </div>
+                          {!isCurrent && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="w-full sm:w-auto border-primary/40 text-primary hover:bg-primary/10"
+                              disabled={changePlanMutation.isPending}
+                              onClick={() => {
+                                changePlanMutation.mutate(p.id, {
+                                  onSuccess: () => toast.success('Plan actualizado.'),
+                                  onError: (e) => toast.error(getErrorMessage(e)),
+                                });
+                              }}
+                            >
+                              {changePlanMutation.isPending ? 'Cambiando…' : 'Cambiar a este plan'}
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  No hay planes disponibles. Contacte a soporte para cambiar su plan.
+                </p>
+              )}
             </div>
           )}
 

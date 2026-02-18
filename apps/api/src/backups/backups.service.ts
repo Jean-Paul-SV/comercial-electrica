@@ -18,6 +18,7 @@ import { existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import archiver from 'archiver';
+import { TenantModulesService } from '../auth/tenant-modules.service';
 
 const execAsync = promisify(exec);
 
@@ -50,9 +51,104 @@ export class BackupsService {
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
     private readonly audit: AuditService,
+    private readonly tenantModules: TenantModulesService,
   ) {
     this.backupDir =
       this.config.get<string>('BACKUP_DIR') || join(process.cwd(), 'backups');
+  }
+
+  private getBackupPolicyForPlanSlug(
+    planSlug: string | null | undefined,
+  ):
+    | { tier: 'basic'; daysPerWeek: 1 | 2 | 3; retentionDays: number; maxToKeep: number }
+    | { tier: 'daily'; retentionDays: number; maxToKeep: number }
+    | { tier: 'daily_retention'; retentionDays: number; maxToKeep: number } {
+    const slug = (planSlug ?? '').trim().toLowerCase();
+
+    // Política acordada:
+    // Básico sin DIAN  -> basic (1 día/semana)
+    // Premium sin DIAN -> basic (2 días/semana)
+    // Básico con DIAN  -> basic (3 días/semana)
+    // Premium con DIAN -> daily
+    // Enterprise       -> daily_retention
+    if (slug === 'basico-sin-dian') {
+      return { tier: 'basic', daysPerWeek: 1, retentionDays: 30, maxToKeep: 12 };
+    }
+    if (slug === 'premium-sin-dian') {
+      return { tier: 'basic', daysPerWeek: 2, retentionDays: 45, maxToKeep: 24 };
+    }
+    if (slug === 'basico-con-dian') {
+      return { tier: 'basic', daysPerWeek: 3, retentionDays: 60, maxToKeep: 36 };
+    }
+    if (slug === 'premium-con-dian') {
+      return { tier: 'daily', retentionDays: 90, maxToKeep: 120 };
+    }
+    if (slug === 'enterprise' || slug === 'all') {
+      return { tier: 'daily_retention', retentionDays: 365, maxToKeep: 400 };
+    }
+
+    // Fallback conservador (si hay backups por add-on o tenant legacy):
+    return { tier: 'basic', daysPerWeek: 1, retentionDays: 30, maxToKeep: 12 };
+  }
+
+  private getStableWeekdays(tenantId: string, daysPerWeek: 1 | 2 | 3): number[] {
+    // Distribución estable por tenant (evita que todos corran el mismo día).
+    const base = createHash('sha256').update(tenantId).digest()[0] % 7; // 0..6
+    if (daysPerWeek === 1) return [base];
+    if (daysPerWeek === 2) return [base, (base + 3) % 7].sort((a, b) => a - b);
+    return [base, (base + 2) % 7, (base + 4) % 7].sort((a, b) => a - b);
+  }
+
+  private startOfToday(d = new Date()): Date {
+    const x = new Date(d);
+    x.setHours(0, 0, 0, 0);
+    return x;
+  }
+
+  private async hasTenantBackupToday(tenantId: string): Promise<boolean> {
+    const start = this.startOfToday();
+    const end = new Date(start);
+    end.setDate(end.getDate() + 1);
+    const count = await this.prisma.backupRun.count({
+      where: {
+        tenantId,
+        scope: 'TENANT',
+        status: 'COMPLETED',
+        startedAt: { gte: start, lt: end },
+      },
+    });
+    return count > 0;
+  }
+
+  private async assertTenantBackupAllowed(tenantId: string): Promise<void> {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { isActive: true, plan: { select: { slug: true } } },
+    });
+    if (!tenant || !tenant.isActive) {
+      throw new ForbiddenException('Empresa inactiva o no encontrada.');
+    }
+
+    const enabled = await this.tenantModules.getEnabledModules(tenantId);
+    if (!enabled.includes('backups')) {
+      throw new ForbiddenException('Tu plan no incluye Backups.');
+    }
+
+    const policy = this.getBackupPolicyForPlanSlug(tenant.plan?.slug);
+    const todayDow = new Date().getDay(); // 0..6
+
+    if (policy.tier === 'basic') {
+      const allowedDays = this.getStableWeekdays(tenantId, policy.daysPerWeek);
+      if (!allowedDays.includes(todayDow)) {
+        throw new ForbiddenException(
+          `Tu plan permite backups ${policy.daysPerWeek} día(s) por semana. Hoy no es un día programado para tu empresa.`,
+        );
+      }
+    }
+
+    if (await this.hasTenantBackupToday(tenantId)) {
+      throw new BadRequestException('Ya existe un backup de hoy para tu empresa.');
+    }
   }
 
   /**
@@ -66,12 +162,19 @@ export class BackupsService {
   }> {
     const isTenantBackup =
       typeof tenantId === 'string' && tenantId.trim() !== '';
+    if (isTenantBackup) {
+      await this.assertTenantBackupAllowed(tenantId!);
+    }
     const tidForRun = isTenantBackup
       ? tenantId!
       : (await this.prisma.tenant.findFirst({ select: { id: true } }))?.id;
     if (!tidForRun) throw new BadRequestException('No hay tenant para el backup.');
     const backupRun = await this.prisma.backupRun.create({
-      data: { tenantId: tidForRun, status: 'IN_PROGRESS' },
+      data: {
+        tenantId: tidForRun,
+        scope: isTenantBackup ? 'TENANT' : 'PLATFORM',
+        status: 'IN_PROGRESS',
+      },
     });
 
     try {
@@ -339,7 +442,7 @@ export class BackupsService {
   async listBackups(tenantId?: string | null) {
     const where =
       typeof tenantId === 'string' && tenantId.trim() !== ''
-        ? { tenantId }
+        ? { tenantId, scope: 'TENANT' as const }
         : {};
     return this.prisma.backupRun.findMany({
       where,
@@ -357,8 +460,10 @@ export class BackupsService {
     if (!backup) {
       throw new NotFoundException(`Backup ${id} no encontrado`);
     }
-    if (typeof tenantId === 'string' && tenantId.trim() !== '' && backup.tenantId !== tenantId) {
-      throw new ForbiddenException('No tienes permiso para acceder a este backup.');
+    if (typeof tenantId === 'string' && tenantId.trim() !== '') {
+      if (backup.scope !== 'TENANT' || backup.tenantId !== tenantId) {
+        throw new ForbiddenException('No tienes permiso para acceder a este backup.');
+      }
     }
     return backup;
   }
@@ -444,15 +549,19 @@ export class BackupsService {
     }
 
     try {
-      this.logger.log('Iniciando backup automático programado');
-      const result = await this.createBackup();
+      this.logger.log('Iniciando backups automáticos programados (tenants + plataforma)');
+
+      await this.runScheduledTenantBackups();
+      await this.cleanupScheduledTenantBackups();
+
+      // Backup de plataforma (pg_dump completo)
+      const platformResult = await this.createBackup();
       this.logger.log(
-        `Backup automático completado: ${result.id}, checksum: ${result.checksum.substring(0, 8)}...`,
+        `Backup plataforma completado: ${platformResult.id}, checksum: ${platformResult.checksum.substring(0, 8)}...`,
       );
 
-      // Limpiar backups antiguos (mantener solo los últimos N)
-      const maxBackups = this.config.get<number>('MAX_BACKUPS_TO_KEEP', 30);
-      await this.cleanupOldBackups(maxBackups);
+      const maxPlatformBackups = this.config.get<number>('MAX_PLATFORM_BACKUPS_TO_KEEP', 30);
+      await this.cleanupPlatformBackups(maxPlatformBackups);
     } catch (error) {
       this.logger.error('Error en backup automático:', error);
     }
@@ -510,28 +619,124 @@ export class BackupsService {
   }
 
   /**
-   * Limpia backups antiguos, manteniendo solo los últimos N
+   * Crea backups de tenants según su plan (política estable por día de la semana).
    */
-  private async cleanupOldBackups(maxToKeep: number): Promise<void> {
-    const backups = await this.prisma.backupRun.findMany({
-      where: { status: 'COMPLETED' },
+  private async runScheduledTenantBackups(): Promise<void> {
+    const tenants = await this.prisma.tenant.findMany({
+      where: { isActive: true },
+      select: { id: true, plan: { select: { slug: true } } },
+    });
+
+    const todayDow = new Date().getDay(); // 0..6
+
+    for (const t of tenants) {
+      try {
+        const enabled = await this.tenantModules.getEnabledModules(t.id);
+        if (!enabled.includes('backups')) continue;
+
+        const policy = this.getBackupPolicyForPlanSlug(t.plan?.slug);
+        const alreadyToday = await this.hasTenantBackupToday(t.id);
+        if (alreadyToday) continue;
+
+        if (policy.tier === 'daily' || policy.tier === 'daily_retention') {
+          await this.createBackup(t.id);
+          continue;
+        }
+
+        const allowedDays = this.getStableWeekdays(t.id, policy.daysPerWeek);
+        if (!allowedDays.includes(todayDow)) continue;
+
+        await this.createBackup(t.id);
+      } catch (err) {
+        this.logger.warn(
+          `Auto backup tenant fallido (tenantId=${t.id}): ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    }
+  }
+
+  private async cleanupScheduledTenantBackups(): Promise<void> {
+    const tenants = await this.prisma.tenant.findMany({
+      where: { isActive: true },
+      select: { id: true, plan: { select: { slug: true } } },
+    });
+
+    for (const t of tenants) {
+      try {
+        const enabled = await this.tenantModules.getEnabledModules(t.id);
+        if (!enabled.includes('backups')) continue;
+
+        const policy = this.getBackupPolicyForPlanSlug(t.plan?.slug);
+        await this.cleanupTenantBackups(t.id, policy.retentionDays, policy.maxToKeep);
+      } catch (err) {
+        this.logger.warn(
+          `Cleanup tenant backups fallido (tenantId=${t.id}): ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    }
+  }
+
+  private async cleanupTenantBackups(
+    tenantId: string,
+    retentionDays: number,
+    maxToKeep: number,
+  ): Promise<void> {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - retentionDays);
+
+    const old = await this.prisma.backupRun.findMany({
+      where: {
+        tenantId,
+        scope: 'TENANT',
+        status: 'COMPLETED',
+        startedAt: { lt: cutoff },
+      },
+      select: { id: true },
+      orderBy: { startedAt: 'asc' },
+    });
+
+    for (const b of old) {
+      try {
+        await this.deleteBackup(b.id);
+      } catch (err) {
+        this.logger.warn(
+          `Error al eliminar backup antiguo ${b.id}: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    }
+
+    const extra = await this.prisma.backupRun.findMany({
+      where: { tenantId, scope: 'TENANT', status: 'COMPLETED' },
       orderBy: { startedAt: 'desc' },
       skip: maxToKeep,
+      select: { id: true },
+    });
+    for (const b of extra) {
+      try {
+        await this.deleteBackup(b.id);
+      } catch (err) {
+        this.logger.warn(
+          `Error al eliminar backup excedente ${b.id}: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    }
+  }
+
+  private async cleanupPlatformBackups(maxToKeep: number): Promise<void> {
+    const backups = await this.prisma.backupRun.findMany({
+      where: { scope: 'PLATFORM', status: 'COMPLETED' },
+      orderBy: { startedAt: 'desc' },
+      skip: maxToKeep,
+      select: { id: true },
     });
 
     for (const backup of backups) {
       try {
         await this.deleteBackup(backup.id);
-        this.logger.log(`Backup antiguo eliminado: ${backup.id}`);
+        this.logger.log(`Backup plataforma antiguo eliminado: ${backup.id}`);
       } catch (error) {
-        this.logger.warn(`Error al eliminar backup ${backup.id}:`, error);
+        this.logger.warn(`Error al eliminar backup plataforma ${backup.id}:`, error);
       }
-    }
-
-    if (backups.length > 0) {
-      this.logger.log(
-        `Limpieza completada: ${backups.length} backup(s) antiguo(s) eliminado(s)`,
-      );
     }
   }
 }

@@ -6,7 +6,7 @@ import { useAuth } from '@shared/providers/AuthProvider';
 import { useOnlineStatus } from '@shared/hooks/useOnlineStatus';
 import { Button } from '@shared/components/ui/button';
 import { cn } from '@lib/utils';
-import { Menu, X, LogOut, WifiOff, LayoutDashboard, ShoppingCart, Wallet, MoreHorizontal } from 'lucide-react';
+import { Menu, X, LogOut, WifiOff, LayoutDashboard, ShoppingCart, Wallet, MoreHorizontal, Clock } from 'lucide-react';
 import Link from 'next/link';
 import { AlertsBell } from '@shared/components/AlertsBell';
 import { ProviderAlertsBell } from '@shared/components/ProviderAlertsBell';
@@ -22,7 +22,16 @@ import type { AppRole } from '@shared/navigation/types';
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { user, permissions, enabledModules, isPlatformAdmin, logout, mustChangePassword, clearMustChangePassword } = useAuth();
+  const {
+    user,
+    permissions,
+    enabledModules,
+    isPlatformAdmin,
+    logout,
+    mustChangePassword,
+    clearMustChangePassword,
+    sessionRemainingSeconds,
+  } = useAuth();
   const isOnline = useOnlineStatus();
   const sidebarContext = useSidebarOptional();
 
@@ -31,6 +40,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const isMobileOpen = sidebarContext?.isMobileOpen ?? mobileOpen;
   const setMobileOpenState = sidebarContext?.setMobileOpen ?? setMobileOpen;
   const isCollapsed = sidebarContext?.isCollapsed ?? false;
+
+  function formatRemainingMinutes(totalSeconds: number): string {
+    if (!Number.isFinite(totalSeconds) || totalSeconds <= 0) return '< 1 min';
+    const totalMinutes = Math.floor(totalSeconds / 60);
+    if (totalMinutes <= 0) return '< 1 min';
+    if (totalMinutes < 60) return `${totalMinutes} min`;
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    if (minutes === 0) return `${hours} h`;
+    return `${hours} h ${minutes} min`;
+  }
 
   const sections = getNavForRole(
     navConfig.sections,
@@ -183,7 +203,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 {routeLabel}
               </span>
             </div>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-2">
+              {sessionRemainingSeconds != null && sessionRemainingSeconds > 0 && (
+                <div className="hidden sm:inline-flex items-center gap-1 rounded-full border border-border/70 bg-muted/40 px-2 py-0.5 text-[11px] text-muted-foreground">
+                  <Clock className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                  <span>
+                    Sesión: {formatRemainingMinutes(sessionRemainingSeconds)}
+                  </span>
+                </div>
+              )}
               <OfflineQueueBell />
               {/* Alertas operativas (caja, ventas, inventario) solo en rutas del negocio */}
               {!pathname?.startsWith('/provider') && <AlertsBell />}

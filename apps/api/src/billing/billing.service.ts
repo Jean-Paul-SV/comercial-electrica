@@ -10,7 +10,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import Stripe from 'stripe';
 
 export type SubscriptionInfoDto = {
-  plan: { name: string; slug: string } | null;
+  plan: { id: string; name: string; slug: string } | null;
   subscription: {
     status: string;
     currentPeriodEnd: string | null;
@@ -236,13 +236,87 @@ export class BillingService {
   }
 
   /**
+   * Lista planes activos para que el cliente pueda cambiar (precios mensual y anual).
+   */
+  async getActivePlans(): Promise<
+    { id: string; name: string; slug: string; priceMonthly: number | null; priceYearly: number | null; maxUsers: number | null }[]
+  > {
+    const plans = await this.prisma.plan.findMany({
+      where: { isActive: true },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        priceMonthly: true,
+        priceYearly: true,
+        maxUsers: true,
+      },
+      orderBy: { priceMonthly: 'asc' },
+    });
+    return plans.map((p) => ({
+      id: p.id,
+      name: p.name,
+      slug: p.slug,
+      priceMonthly: p.priceMonthly != null ? Number(p.priceMonthly) : null,
+      priceYearly: p.priceYearly != null ? Number(p.priceYearly) : null,
+      maxUsers: p.maxUsers,
+    }));
+  }
+
+  /**
+   * Cambia el plan del tenant (y su suscripción). Solo para el tenant del usuario autenticado.
+   */
+  async changeTenantPlan(tenantId: string, planId: string): Promise<{ success: boolean }> {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { id: true, subscription: { select: { id: true } } },
+    });
+    if (!tenant) {
+      throw new NotFoundException('Empresa no encontrada.');
+    }
+    const plan = await this.prisma.plan.findUnique({
+      where: { id: planId },
+      select: { id: true },
+    });
+    if (!plan) {
+      throw new NotFoundException('Plan no encontrado.');
+    }
+    const now = new Date();
+    const periodEnd = new Date(now);
+    periodEnd.setDate(periodEnd.getDate() + 30);
+    await this.prisma.$transaction(async (tx) => {
+      await tx.tenant.update({
+        where: { id: tenantId },
+        data: { planId },
+      });
+      if (tenant.subscription) {
+        await tx.subscription.update({
+          where: { tenantId },
+          data: { planId },
+        });
+      } else {
+        await tx.subscription.create({
+          data: {
+            tenantId,
+            planId,
+            status: 'ACTIVE',
+            currentPeriodStart: now,
+            currentPeriodEnd: periodEnd,
+          },
+        });
+      }
+    });
+    return { success: true };
+  }
+
+  /**
    * Devuelve la información de plan y suscripción del tenant para mostrar en la UI de facturación.
    */
   async getSubscriptionForTenant(tenantId: string): Promise<SubscriptionInfoDto> {
     const subscription = await this.prisma.subscription.findUnique({
       where: { tenantId },
       include: {
-        plan: { select: { name: true, slug: true } },
+        plan: { select: { id: true, name: true, slug: true } },
       },
     });
     if (!subscription) {
@@ -253,6 +327,7 @@ export class BillingService {
     return {
       plan: subscription.plan
         ? {
+            id: subscription.plan.id,
             name: subscription.plan.name,
             slug: subscription.plan.slug,
           }
