@@ -17,6 +17,7 @@ import { RenewSubscriptionDto } from './dto/renew-subscription.dto';
 import { UpdatePlanDto } from './dto/update-plan.dto';
 import { CreatePlanDto } from './dto/create-plan.dto';
 import { Prisma } from '@prisma/client';
+import { emailIsPlatformAdminOnly } from '../common/utils/platform-admin-emails';
 
 const DEFAULT_MODULE_CODES = [
   'core',
@@ -386,6 +387,12 @@ export class ProviderService {
   async createTenant(dto: CreateTenantDto) {
     const slug = dto.slug.toLowerCase().trim();
     const adminEmail = dto.adminEmail.toLowerCase().trim();
+
+    if (emailIsPlatformAdminOnly(adminEmail)) {
+      throw new BadRequestException(
+        'Este correo está reservado para el Panel proveedor y no puede asociarse a una empresa.',
+      );
+    }
 
     const [existingSlug, existingEmail] = await Promise.all([
       this.prisma.tenant.findUnique({ where: { slug } }),

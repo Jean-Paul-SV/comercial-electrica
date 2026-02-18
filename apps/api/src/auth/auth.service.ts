@@ -27,6 +27,7 @@ import { PermissionsService } from './permissions.service';
 import { TenantModulesService } from './tenant-modules.service';
 import { StorageService } from '../common/services/storage.service';
 import { PlanLimitsService } from '../common/services/plan-limits.service';
+import { emailIsPlatformAdminOnly } from '../common/utils/platform-admin-emails';
 import type { MulterFile } from '../common/types/multer';
 
 export type JwtPayload = {
@@ -65,6 +66,12 @@ export class AuthService {
     private readonly storage: StorageService,
     private readonly planLimits: PlanLimitsService,
   ) {}
+
+  /** true si el usuario es admin de plataforma: sin tenant o su email está en PLATFORM_ADMIN_EMAILS. */
+  private isPlatformAdminUser(tenantId: string | null, email: string): boolean {
+    if (tenantId === null) return true;
+    return emailIsPlatformAdminOnly(email);
+  }
 
   async bootstrapAdmin(dto: BootstrapAdminDto) {
     const count = await this.prisma.user.count();
@@ -109,14 +116,14 @@ export class AuthService {
     const email = dto.email.toLowerCase();
     const existing = await this.prisma.user.findUnique({ where: { email } });
     if (existing) throw new BadRequestException('Email ya registrado.');
-    const tenantId =
-      createdByUserId != null
+    const isPlatformOnly = emailIsPlatformAdminOnly(email);
+    const tenantId = isPlatformOnly
+      ? null
+      : createdByUserId != null
         ? await this.tenantModules.getEffectiveTenantId(createdByUserId)
         : await this.tenantModules.getDefaultTenantId();
-    
-    // Validar límite de usuarios del plan
-    await this.planLimits.validateUserLimit(tenantId);
-    
+    if (!isPlatformOnly) await this.planLimits.validateUserLimit(tenantId);
+
     const generateTemp = dto.generateTempPassword === true;
     const password = generateTemp
       ? randomBytes(16).toString('hex')
@@ -153,6 +160,11 @@ export class AuthService {
   /** Invitar usuario por correo: crea usuario con contraseña temporal y devuelve token de invitación (7 días). */
   async inviteUser(dto: InviteUserDto, createdByUserId: string) {
     const email = dto.email.toLowerCase();
+    if (emailIsPlatformAdminOnly(email)) {
+      throw new BadRequestException(
+        'Este correo está reservado para el Panel proveedor y no puede asociarse a una empresa.',
+      );
+    }
     const existing = await this.prisma.user.findUnique({ where: { email } });
     if (existing) throw new BadRequestException('Email ya registrado.');
     const tenantId =
@@ -524,11 +536,12 @@ export class AuthService {
         );
       }
     }
+    const platformAdmin = this.isPlatformAdminUser(user.tenantId, user.email);
     const payload: JwtPayload = {
       sub: user.id,
       role: user.role ?? RoleName.USER,
       tenantId: effectiveTenantId ?? undefined,
-      isPlatformAdmin: user.tenantId === null,
+      isPlatformAdmin: platformAdmin,
     };
     const now = new Date();
     await this.prisma.$transaction([
@@ -554,7 +567,7 @@ export class AuthService {
     return {
       accessToken,
       mustChangePassword: user.mustChangePassword ?? false,
-      isPlatformAdmin: user.tenantId === null,
+      isPlatformAdmin: platformAdmin,
     };
   }
 
@@ -590,7 +603,7 @@ export class AuthService {
     const response: MeResponse = {
       user: { id: user.id, email: user.email, role: user.role, profilePictureUrl: user.profilePictureUrl },
       permissions,
-      isPlatformAdmin: user.tenantId === null,
+      isPlatformAdmin: this.isPlatformAdminUser(user.tenantId, user.email),
     };
     if (user.tenant) {
       response.tenant = {

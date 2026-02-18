@@ -1,11 +1,9 @@
 /**
- * Seed: permisos, roles, plan "Todo incluido" y usuarios.
+ * Seed: permisos, roles, planes y (opcional) usuarios.
  * Ejecutar tras migración: npx prisma db seed
  *
- * Si defines PLATFORM_ADMIN_EMAIL y PLATFORM_ADMIN_PASSWORD en .env (mín. 8 caracteres):
- *   - Modo "todo vacío": solo se crea tu usuario (Panel proveedor). 0 empresas, sin datos de prueba.
- * Si no los defines:
- *   - Se crean usuario Panel proveedor (platform@proveedor.local) y admin de negocio (admin@negocio.local).
+ * SEED_PLANS_ONLY=true: solo planes y permisos/roles. No crea tenant ni usuarios. Borra platform@proveedor.local y admin@negocio.local.
+ * Sin SEED_PLANS_ONLY: comportamiento completo (plan, tenant, usuarios según PLATFORM_ADMIN_EMAIL / TENANT_ADMIN_EMAIL).
  * Ver docs/PASO_A_PASO_SEED_MI_CORREO.md
  */
 
@@ -41,6 +39,9 @@ const SEED_ONLY_PLATFORM_ADMIN =
   process.env.SEED_ONLY_PLATFORM_ADMIN === 'true' ||
   process.env.SEED_ONLY_PLATFORM_ADMIN === '1' ||
   (Boolean(envPlatformEmail && envPlatformPassword && envPlatformPassword.length >= 8));
+
+/** Si true, el seed solo actualiza planes y permisos/roles. No crea tenant ni usuarios. Elimina platform@proveedor.local y admin@negocio.local. */
+const SEED_PLANS_ONLY = process.env.SEED_PLANS_ONLY === 'true' || process.env.SEED_PLANS_ONLY === '1';
 
 /** Módulos del producto (alineado con ARQUITECTURA_MODULAR_SAAS). Plan "Todo incluido" los tiene todos. */
 const MODULE_CODES = [
@@ -145,6 +146,26 @@ async function main() {
       console.log('Plan actualizado:', p.name, 'con', moduleCodes.length, 'módulos');
     }
   }
+
+  // Eliminar planes viejos/duplicados (reasignar empresas al plan nuevo equivalente y borrar)
+  const oldPlanSlugsToRemove = ['plan-premium', 'con-dian', 'sin-dian'] as const;
+  const oldToNewSlug: Record<string, string> = { 'sin-dian': 'basico-sin-dian', 'con-dian': 'basico-con-dian', 'plan-premium': 'premium-con-dian' };
+  for (const oldSlug of oldPlanSlugsToRemove) {
+    const oldPlan = await prisma.plan.findFirst({ where: { slug: oldSlug } });
+    if (!oldPlan) continue;
+    const newSlug = oldToNewSlug[oldSlug];
+    const newPlan = newSlug ? await prisma.plan.findFirst({ where: { slug: newSlug } }) : null;
+    if (newPlan) {
+      await prisma.tenant.updateMany({ where: { planId: oldPlan.id }, data: { planId: newPlan.id } });
+      await prisma.subscription.updateMany({ where: { planId: oldPlan.id }, data: { planId: newPlan.id } });
+    } else {
+      await prisma.tenant.updateMany({ where: { planId: oldPlan.id }, data: { planId: null } });
+      await prisma.subscription.updateMany({ where: { planId: oldPlan.id }, data: { planId: null } });
+    }
+    await prisma.planFeature.deleteMany({ where: { planId: oldPlan.id } });
+    await prisma.plan.delete({ where: { id: oldPlan.id } });
+    console.log('Plan antiguo eliminado:', oldSlug);
+  }
   }
   // Backfill maxUsers para plan "Todo incluido" si existe sin límite
   const allPlan = await prisma.plan.findFirst({ where: { slug: 'all' } });
@@ -156,9 +177,9 @@ async function main() {
     console.log('Plan "Todo incluido" actualizado con maxUsers: 50');
   }
 
-  // 2. Tenant por defecto (con plan "Todo incluido") — se omite si SEED_ONLY_PLATFORM_ADMIN=true
+  // 2. Tenant por defecto (con plan "Todo incluido") — se omite si SEED_ONLY_PLATFORM_ADMIN o SEED_PLANS_ONLY
   let tenant: { id: string; planId: string | null } | null = null;
-  if (!SEED_ONLY_PLATFORM_ADMIN) {
+  if (!SEED_PLANS_ONLY && !SEED_ONLY_PLATFORM_ADMIN) {
     tenant = await prisma.tenant.findFirst({ where: { slug: 'default' } });
     if (!tenant) {
       tenant = await prisma.tenant.create({
@@ -280,8 +301,8 @@ async function main() {
     console.log('Rol user creado con', userPermIds.length, 'permisos');
   }
 
-  // 5. Asignar tenant a usuarios existentes y UserRole según role legacy (solo si hay tenant)
-  if (tenant) {
+  // 5. Asignar tenant a usuarios existentes y UserRole según role legacy (solo si hay tenant) — omitido si SEED_PLANS_ONLY
+  if (!SEED_PLANS_ONLY && tenant) {
     const users = await prisma.user.findMany({
       select: { id: true, email: true, role: true },
     });
@@ -307,7 +328,8 @@ async function main() {
     }
   }
 
-  // 6. Usuario administrador de plataforma (sin tenant) para Panel proveedor
+  // 6. Usuario administrador de plataforma (sin tenant) para Panel proveedor — omitido si SEED_PLANS_ONLY
+  if (!SEED_PLANS_ONLY) {
   let platformAdmin = await prisma.user.findFirst({
     where: { email: PLATFORM_ADMIN_EMAIL },
     select: { id: true, tenantId: true },
@@ -384,6 +406,30 @@ async function main() {
     });
     if (deleted.count > 0) {
       console.log('Usuarios de prueba eliminados; solo queda:', PLATFORM_ADMIN_EMAIL);
+    }
+  }
+  } // fin if (!SEED_PLANS_ONLY)
+
+  // SEED_PLANS_ONLY: eliminar usuarios de prueba por defecto (el perfil ya está asignado en producción)
+  if (SEED_PLANS_ONLY) {
+    const emailsToRemove = ['platform@proveedor.local', 'admin@negocio.local'];
+    for (const email of emailsToRemove) {
+      const deleted = await prisma.user.deleteMany({ where: { email } });
+      if (deleted.count > 0) console.log('Usuario eliminado:', email);
+    }
+  }
+
+  // Desvincular de tenant a los correos en PLATFORM_ADMIN_EMAILS (nunca deben tener empresa asignada)
+  const platformEmailsRaw = process.env.PLATFORM_ADMIN_EMAILS?.trim();
+  if (platformEmailsRaw) {
+    const platformEmails = platformEmailsRaw.split(',').map((e) => e.trim().toLowerCase()).filter(Boolean);
+    for (const email of platformEmails) {
+      const user = await prisma.user.findFirst({ where: { email }, select: { id: true } });
+      if (user) {
+        await prisma.userRole.updateMany({ where: { userId: user.id }, data: { tenantId: null } });
+        await prisma.user.update({ where: { id: user.id }, data: { tenantId: null } });
+        console.log('Usuario desvinculado de tenant (Panel proveedor):', email);
+      }
     }
   }
 }

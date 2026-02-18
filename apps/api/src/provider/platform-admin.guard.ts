@@ -5,6 +5,7 @@ import {
   Injectable,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { emailIsPlatformAdminOnly } from '../common/utils/platform-admin-emails';
 
 /**
  * Solo permite acceso a usuarios que no pertenecen a ningún tenant (admins de plataforma).
@@ -54,22 +55,26 @@ export class PlatformAdminGuard implements CanActivate {
       return true;
     }
 
-    // 3) Último recurso: verificar en base de datos por si el token es antiguo y no trae isPlatformAdmin/tenantId
+    // 3) Último recurso: verificar en base de datos por si el token es antiguo
     const user = await this.prisma.user.findUnique({
       where: { id: authUser.sub },
-      select: { tenantId: true },
+      select: { tenantId: true, email: true },
     });
-    if (process.env.NODE_ENV !== 'production') {
-      // eslint-disable-next-line no-console
-      console.log('[PlatformAdminGuard] dbUser', {
-        tenantId: user?.tenantId ?? null,
-      });
-    }
-    if (!user || user.tenantId !== null) {
+    if (!user) {
       throw new ForbiddenException(
         'Solo los administradores de plataforma pueden acceder.',
       );
     }
-    return true;
+    if (user.tenantId === null) return true;
+    if (emailIsPlatformAdminOnly(user.email)) return true;
+    if (process.env.NODE_ENV !== 'production') {
+      // eslint-disable-next-line no-console
+      console.log('[PlatformAdminGuard] dbUser', {
+        tenantId: user.tenantId ?? null,
+      });
+    }
+    throw new ForbiddenException(
+      'Solo los administradores de plataforma pueden acceder.',
+    );
   }
 }

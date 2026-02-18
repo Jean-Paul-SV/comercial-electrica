@@ -3,11 +3,11 @@
 # y el usuario platform@admin.local (contraseña: PlatformAdmin1!) si no existe.
 #
 # Uso:
-#   1. Copia la "Internal Database URL" de Render (comercial-electrica-db -> Connect).
+#   1. Copia la "External Database URL" de Render (comercial-electrica-db -> Connect) para ejecutar desde tu PC.
 #   2. En PowerShell: cd apps\api; .\scripts\seed-production.ps1
 #   3. Cuando pida la URL, pega la que copiaste y pulsa Enter.
 
-$url = Read-Host "Pega la Internal Database URL de Render (postgresql://...) y pulsa Enter"
+$url = Read-Host "Pega la External Database URL de Render (postgresql://...) y pulsa Enter"
 if ([string]::IsNullOrWhiteSpace($url)) {
     Write-Host "No se ingresó URL. Saliendo." -ForegroundColor Red
     exit 1
@@ -33,13 +33,12 @@ if (Test-Path $envPath) {
 
 try {
     $env:DATABASE_URL = $url
-    Write-Host "Ejecutando: npx prisma db seed" -ForegroundColor Cyan
+    $env:SEED_PLANS_ONLY = "true"
+    Write-Host "Ejecutando: npx prisma db seed (solo planes; se eliminan platform@proveedor.local y admin@negocio.local)" -ForegroundColor Cyan
     npx prisma db seed
     if ($LASTEXITCODE -eq 0) {
         Write-Host ""
-        Write-Host "Seed completado. Puedes iniciar sesión en la web con:" -ForegroundColor Green
-        Write-Host "  Email:      platform@admin.local" -ForegroundColor White
-        Write-Host "  Contraseña: PlatformAdmin1!" -ForegroundColor White
+        Write-Host "Seed completado. Planes actualizados; usuarios de prueba eliminados si existían." -ForegroundColor Green
         Write-Host ""
     }
 } finally {
