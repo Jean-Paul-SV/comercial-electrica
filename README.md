@@ -75,8 +75,8 @@ Requisitos: **Node.js 18+**, **Docker** (Postgres + Redis).
 
 ```bash
 # Clonar y entrar al proyecto
-git clone https://github.com/Jean-Paul-SV/comercial-electrica.git
-cd comercial-electrica
+git clone https://github.com/Jean-Paul-SV/orion-corp-cloud.git
+cd orion-corp-cloud
 
 # Dependencias
 npm install
