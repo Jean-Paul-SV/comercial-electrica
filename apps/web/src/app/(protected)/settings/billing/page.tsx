@@ -13,11 +13,13 @@ import { Skeleton } from '@shared/components/ui/skeleton';
 import { CreditCard, Calendar, Package, AlertCircle, CheckCircle2, Sparkles, RefreshCw } from 'lucide-react';
 import { useSubscriptionInfo, useCreatePortalSession, useBillingPlans, useChangePlan } from '@features/billing/hooks';
 import { useAuth } from '@shared/providers/AuthProvider';
+import { DianActivationDisclaimer } from '@shared/components/DianActivationDisclaimer';
 import { toast } from 'sonner';
 import { getErrorMessage } from '@shared/utils/errors';
 
 const STATUS_LABELS: Record<string, string> = {
   ACTIVE: 'Activa',
+  PENDING_PAYMENT: 'Pago pendiente',
   SUSPENDED: 'Suspendida',
   CANCELLED: 'Cancelada',
 };
@@ -130,6 +132,7 @@ export default function BillingPage() {
   const plan = data?.plan;
   const subscription = data?.subscription;
   const canManageBilling = data?.canManageBilling ?? false;
+  const requiresPayment = data?.requiresPayment === true;
 
   const statusLabel = subscription
     ? (STATUS_LABELS[subscription.status] ?? subscription.status)
@@ -140,12 +143,25 @@ export default function BillingPage() {
     <div className="space-y-8 max-w-2xl mx-auto">
       <div className="flex flex-col gap-1">
         <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-          Plan
+          {requiresPayment ? 'Completa tu pago' : 'Plan'}
         </h1>
         <p className="text-sm text-muted-foreground">
-          Información de tu suscripción, renovación y opciones de pago.
+          {requiresPayment
+            ? 'Tu empresa está creada. Activa tu acceso completando el pago de tu suscripción.'
+            : 'Información de tu suscripción, renovación y opciones de pago.'}
         </p>
       </div>
+
+      {requiresPayment && (
+        <Card className="border-amber-500/40 bg-amber-500/5 shadow-sm">
+          <CardContent className="pt-6">
+            <p className="text-sm text-foreground flex items-center gap-2 font-medium mb-4">
+              <AlertCircle className="h-5 w-5 shrink-0 text-amber-600 dark:text-amber-500" />
+              Pago pendiente. Completa el pago para desbloquear tu cuenta y acceder a todos los módulos.
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       <Card className="border border-border/80 shadow-sm rounded-xl overflow-hidden">
         <CardHeader className="pb-4 border-b border-border/60 bg-muted/20">
@@ -154,8 +170,9 @@ export default function BillingPage() {
             Plan actual
           </CardTitle>
           <CardDescription>
-            Tu plan incluye los módulos activos para tu empresa. Si tu plan incluye facturación electrónica (DIAN), para emitir a la DIAN debes contratar nuestro servicio de configuración (certificado, datos ante la DIAN); contáctanos para activarla.
+            Tu plan incluye los módulos activos para tu empresa.
           </CardDescription>
+          <DianActivationDisclaimer variant="card" className="mt-3" />
         </CardHeader>
         <CardContent className="pt-6 space-y-6">
           {plan ? (
@@ -230,8 +247,9 @@ export default function BillingPage() {
                 Elige plan mensual o anual. El cambio se aplica de inmediato; el periodo actual se mantiene.
               </p>
               <p className="text-xs text-muted-foreground/90 leading-relaxed">
-                Los planes &quot;con DIAN&quot; te dan acceso a facturación electrónica. Para enviar facturas a la DIAN debes contratar nuestro servicio de configuración; contáctanos para más información. Hasta entonces podrás usar documentos internos.
+                Los planes &quot;con DIAN&quot; te dan acceso a facturación electrónica. Hasta que actives el servicio podrás usar documentos internos.
               </p>
+              <DianActivationDisclaimer variant="inline" className="text-xs mt-2" />
               {plansQuery.isLoading ? (
                 <div className="grid gap-3 sm:grid-cols-2">
                   {[1, 2, 3].map((i) => (

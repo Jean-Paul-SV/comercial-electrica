@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Lock, LayoutDashboard, CreditCard } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@shared/components/ui/card';
 import { Button } from '@shared/components/ui/button';
+import { DianActivationDisclaimer } from '@shared/components/DianActivationDisclaimer';
 
 const MODULE_LABELS: Record<string, string> = {
   inventory: 'Inventario',
@@ -18,7 +19,7 @@ const MODULE_LABELS: Record<string, string> = {
 /** Mensaje extra cuando el módulo es DIAN: cómo activarlo. */
 const MODULE_UPGRADE_HINT: Record<string, string> = {
   electronic_invoicing:
-    'Para activar facturación electrónica (DIAN), cambia a un plan que la incluya (Básico con DIAN, Premium con DIAN o Enterprise). Luego deberás contratar nuestro servicio de configuración para poder emitir a la DIAN.',
+    'Cambia a un plan que incluya facturación electrónica (Básico con DIAN, Premium con DIAN o Enterprise).',
 };
 
 export default function PlanRequiredPage() {
@@ -44,6 +45,11 @@ export default function PlanRequiredPage() {
               <span className="block mt-2 text-foreground/90">{upgradeHint}</span>
             )}
           </CardDescription>
+          {moduleCode === 'electronic_invoicing' && (
+            <div className="mt-3">
+              <DianActivationDisclaimer variant="card" />
+            </div>
+          )}
         </CardHeader>
         <CardContent className="flex flex-col sm:flex-row gap-2">
           <Button asChild className="w-full sm:w-auto" variant="default">

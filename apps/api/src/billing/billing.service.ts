@@ -18,6 +18,8 @@ export type SubscriptionInfoDto = {
   } | null;
   /** Si true, el usuario puede abrir el portal de Stripe (actualizar pago, facturas). */
   canManageBilling: boolean;
+  /** Si true, la app debe mostrarse bloqueada y solo el botón de pagar hasta completar el primer pago. */
+  requiresPayment: boolean;
 };
 
 @Injectable()
@@ -324,6 +326,7 @@ export class BillingService {
     }
     const canManageBilling =
       !!this.stripe && !!subscription.stripeSubscriptionId;
+    const requiresPayment = String(subscription.status) === 'PENDING_PAYMENT';
     return {
       plan: subscription.plan
         ? {
@@ -339,6 +342,7 @@ export class BillingService {
           subscription.currentPeriodStart?.toISOString() ?? null,
       },
       canManageBilling,
+      requiresPayment,
     };
   }
 

@@ -24,6 +24,7 @@ import {
   Loader2,
   ShieldAlert,
 } from 'lucide-react';
+import { DianActivationDisclaimer } from '@shared/components/DianActivationDisclaimer';
 import { toast } from 'sonner';
 import { getErrorMessage } from '@shared/utils/errors';
 import {
@@ -245,8 +246,9 @@ export default function ElectronicInvoicingPage() {
         Facturación electrónica (DIAN)
       </h1>
 
-      <p className="text-sm text-muted-foreground rounded-lg border border-border/60 bg-muted/20 px-4 py-3">
-        Tu plan incluye esta función. Para <strong>enviar facturas a la DIAN</strong> debes contratar nuestro servicio de configuración; contáctanos para activarla. Mientras tanto puedes seguir usando documentos internos en ventas.
+      <DianActivationDisclaimer variant="card" />
+      <p className="text-sm text-muted-foreground">
+        Mientras tanto puedes seguir usando documentos internos en ventas.
       </p>
 
       {/* Estado */}

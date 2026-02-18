@@ -95,9 +95,9 @@ async function main() {
     console.log('Plan "Todo incluido" creado con', MODULE_CODES.length, 'módulos (con DIAN)');
   }
 
-  // 1.1 Planes estándar: Básico/Premium sin DIAN, Básico/Premium con DIAN, Enterprise (se omiten si SEED_ONLY_PLATFORM_ADMIN=true)
+  // 1.1 Planes estándar: Básico/Premium sin DIAN, Básico/Premium con DIAN, Enterprise
+  // Nota: se crean SIEMPRE (incluso en modo \"solo tu usuario\"), porque son configuración de plataforma.
   // Lógica: Básico = sin reportes; Premium = con reportes; con DIAN añade facturación electrónica; Enterprise = todo.
-  if (!SEED_ONLY_PLATFORM_ADMIN) {
   const standardPlans = [
     { slug: 'basico-sin-dian', name: 'Plan Básico sin DIAN', description: 'Ventas, inventario y clientes. Backup 1 día a la semana. Sin facturación electrónica ni reportes.', priceMonthly: 89_000, priceYearly: 890_000, maxUsers: 3, moduleCodes: ['core', 'inventory', 'backups'] as const },
     { slug: 'premium-sin-dian', name: 'Plan Premium sin DIAN', description: 'Todo lo del Básico más reportes. Backup 2 días a la semana. Sin facturación electrónica DIAN.', priceMonthly: 120_000, priceYearly: 1_150_000, maxUsers: 5, moduleCodes: ['core', 'inventory', 'advanced_reports', 'backups'] as const },
@@ -165,7 +165,6 @@ async function main() {
     await prisma.planFeature.deleteMany({ where: { planId: oldPlan.id } });
     await prisma.plan.delete({ where: { id: oldPlan.id } });
     console.log('Plan antiguo eliminado:', oldSlug);
-  }
   }
   // Backfill maxUsers para plan "Todo incluido" si existe sin límite
   const allPlan = await prisma.plan.findFirst({ where: { slug: 'all' } });

@@ -493,7 +493,10 @@ export class ProviderService {
         if (stripeSubscriptionId) {
           await this.prisma.subscription.update({
             where: { tenantId: tenant.id },
-            data: { stripeSubscriptionId },
+            data: {
+              stripeSubscriptionId,
+              status: 'PENDING_PAYMENT', // Bloqueado hasta que el cliente pague en Stripe
+            },
           });
         }
       }

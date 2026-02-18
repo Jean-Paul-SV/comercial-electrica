@@ -7,6 +7,8 @@ export type SubscriptionInfo = {
   } | null;
   /** Si true, el usuario puede abrir el portal de Stripe. */
   canManageBilling: boolean;
+  /** Si true, la app se muestra bloqueada; solo se muestra la pantalla de pagar. */
+  requiresPayment: boolean;
 };
 
 export type PortalSessionResponse = {

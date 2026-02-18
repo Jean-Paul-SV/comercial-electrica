@@ -98,6 +98,7 @@ enum SupplierInvoiceStatus {
 
 enum SubscriptionStatus {
   ACTIVE
+  PENDING_PAYMENT  // Creada con plan Stripe; bloqueada hasta primer pago
   SUSPENDED
   CANCELLED
 }

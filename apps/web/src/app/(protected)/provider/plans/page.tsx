@@ -14,6 +14,7 @@ import {
   CardTitle,
 } from '@shared/components/ui/card';
 import { Button } from '@shared/components/ui/button';
+import { DianActivationDisclaimer } from '@shared/components/DianActivationDisclaimer';
 import { Input } from '@shared/components/ui/input';
 import { MoneyInput } from '@shared/components/ui/money-input';
 import { Label } from '@shared/components/ui/label';
@@ -352,6 +353,7 @@ export default function ProviderPlansPage() {
               <p className="text-xs text-muted-foreground">
                 Si lo marcas, la empresa podrá configurar certificado y emitir facturas electrónicas a la DIAN. Si no, solo tendrá documentos internos.
               </p>
+              <DianActivationDisclaimer variant="inline" className="text-xs mt-2" />
             </div>
 
             {/* Datos del plan */}

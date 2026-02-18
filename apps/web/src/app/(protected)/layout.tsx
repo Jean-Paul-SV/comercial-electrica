@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@shared/providers/AuthProvider';
 import { useOnlineStatus } from '@shared/hooks/useOnlineStatus';
+import { useSubscriptionInfo } from '@features/billing/hooks';
 import { AppShell } from '@shared/ui/AppShell';
 import { SidebarProvider } from '@shared/ui/sidebar';
 import { canAccessPath } from '@shared/auth/roles';
@@ -40,6 +41,9 @@ function ProtectedLayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { isAuthenticated, user, enabledModules, isPlatformAdmin, hasCheckedStorage, isRestoringSession } = useAuth();
   const isOnline = useOnlineStatus();
+  const subscriptionQuery = useSubscriptionInfo();
+  const requiresPayment = subscriptionQuery.data?.requiresPayment === true;
+  const isBillingPath = (pathname ?? '').startsWith('/settings/billing');
 
   useEffect(() => {
     if (!hasCheckedStorage) return;
@@ -127,6 +131,23 @@ function ProtectedLayoutContent({ children }: { children: React.ReactNode }) {
             </span>
           </div>
         )}
+        {children}
+      </div>
+    );
+  }
+
+  // Pago pendiente: solo mostrar pantalla de facturación (sin sidebar)
+  if (!isPlatformAdmin && !subscriptionQuery.isLoading && requiresPayment) {
+    if (!isBillingPath) {
+      router.replace('/settings/billing');
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-background">
+          <p className="text-muted-foreground text-sm">Redirigiendo a pago…</p>
+        </div>
+      );
+    }
+    return (
+      <div className="min-h-screen bg-background">
         {children}
       </div>
     );
