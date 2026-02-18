@@ -203,7 +203,7 @@ export default function BillingPage() {
                   </p>
                 </div>
               </div>
-              <Badge variant="secondary" className="w-fit font-medium rounded-full px-3">
+              <Badge variant="secondary" className="w-fit font-medium px-3">
                 Plan vigente
               </Badge>
             </div>
@@ -239,8 +239,8 @@ export default function BillingPage() {
                     variant={isActive ? 'default' : 'secondary'}
                     className={
                       isActive
-                        ? 'rounded-full bg-emerald-600 hover:bg-emerald-600 dark:bg-emerald-700'
-                        : 'rounded-full bg-amber-600/90 text-white hover:bg-amber-600 dark:bg-amber-500'
+                        ? 'bg-emerald-600 hover:bg-emerald-600 dark:bg-emerald-700'
+                        : 'bg-amber-600/90 text-white hover:bg-amber-600 dark:bg-amber-500'
                     }
                   >
                     {statusLabel}
@@ -307,7 +307,7 @@ export default function BillingPage() {
                               )}
                             </div>
                             {isCurrent && (
-                              <Badge variant="secondary" className="shrink-0 rounded-full px-2.5">
+                              <Badge variant="secondary" className="shrink-0 px-2.5">
                                 Vigente
                               </Badge>
                             )}

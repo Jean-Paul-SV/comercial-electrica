@@ -136,8 +136,17 @@ function ProtectedLayoutContent({ children }: { children: React.ReactNode }) {
     );
   }
 
+  // No mostrar sidebar hasta saber si el tenant tiene pago pendiente (evita flash de menú)
+  if (!isPlatformAdmin && subscriptionQuery.isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <p className="text-muted-foreground text-sm">Cargando…</p>
+      </div>
+    );
+  }
+
   // Pago pendiente: solo mostrar pantalla de facturación (sin sidebar)
-  if (!isPlatformAdmin && !subscriptionQuery.isLoading && requiresPayment) {
+  if (!isPlatformAdmin && requiresPayment) {
     if (!isBillingPath) {
       router.replace('/settings/billing');
       return (
