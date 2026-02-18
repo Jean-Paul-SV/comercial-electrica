@@ -15,6 +15,9 @@ export function LoginVideoBackground() {
     if (!video) return;
     video.load();
     video.play().catch(() => {});
+    return () => {
+      video.pause();
+    };
   }, [videoSrc]);
 
   const onVideoError = () => {

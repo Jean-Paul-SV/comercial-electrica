@@ -107,6 +107,15 @@
   display: none !important;
 }
 
+/* Mejor respuesta táctil en móvil: reduce retraso y doble zoom en inputs */
+@layer base {
+  @media (pointer: coarse) {
+    input, select, textarea, button, [role="button"], a {
+      touch-action: manipulation;
+    }
+  }
+}
+
 @layer utilities {
   .animate-in-page {
     animation: fade-in-up 0.4s ease-out forwards;
