@@ -256,3 +256,5 @@ Redis se usa para:
 2. Crea una rama para tu cambio.
 3. Asegura que los tests pasen: `npm run test:e2e` (con DB y Redis levantados).
 4. Abre un Pull Request contra `main`.
+
+<!-- trigger vercel deploy -->
