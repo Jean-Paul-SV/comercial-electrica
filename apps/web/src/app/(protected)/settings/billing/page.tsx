@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import {
   Card,
   CardContent,
@@ -56,9 +57,28 @@ export default function BillingPage() {
     });
   };
 
+  // Al volver de Stripe, refrescar suscripción para que el layout desbloquee si el webhook ya procesó el pago
+  useEffect(() => {
+    subscriptionQuery.refetch();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- solo al montar la página de facturación
+
+  // Si sigue pendiente de pago, reintentar cada 2s hasta 4 veces para dar tiempo al webhook
+  const pollCount = useRef(0);
+  useEffect(() => {
+    if (subscriptionQuery.data?.requiresPayment !== true) return;
+    const POLL_MAX = 4;
+    const POLL_INTERVAL_MS = 2000;
+    const id = setInterval(() => {
+      pollCount.current += 1;
+      if (pollCount.current > POLL_MAX) return;
+      subscriptionQuery.refetch();
+    }, POLL_INTERVAL_MS);
+    return () => clearInterval(id);
+  }, [subscriptionQuery.data?.requiresPayment, subscriptionQuery.refetch]);
+
   if (isPlatformAdmin) {
     return (
-      <div className="space-y-8 max-w-2xl mx-auto">
+      <div className="space-y-8 max-w-5xl mx-auto px-4 sm:px-6">
         <div className="flex flex-col gap-1">
           <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
             Plan
@@ -89,7 +109,7 @@ export default function BillingPage() {
 
   if (subscriptionQuery.isLoading || subscriptionQuery.isPending) {
     return (
-      <div className="space-y-8 max-w-2xl mx-auto">
+      <div className="space-y-8 max-w-5xl mx-auto px-4 sm:px-6">
         <div className="flex flex-col gap-1">
           <Skeleton className="h-8 w-24" />
           <Skeleton className="h-4 w-64" />
@@ -110,7 +130,7 @@ export default function BillingPage() {
 
   if (subscriptionQuery.isError) {
     return (
-      <div className="space-y-8 max-w-2xl mx-auto">
+      <div className="space-y-8 max-w-5xl mx-auto px-4 sm:px-6">
         <div className="flex flex-col gap-1">
           <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
             Plan
@@ -140,7 +160,7 @@ export default function BillingPage() {
   const isActive = subscription?.status === 'ACTIVE';
 
   return (
-    <div className="space-y-8 max-w-3xl mx-auto pb-8">
+    <div className="space-y-8 max-w-5xl mx-auto px-4 sm:px-6 pb-8">
       {/* Hero */}
       <header className="space-y-1">
         <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
@@ -158,10 +178,18 @@ export default function BillingPage() {
         <Card className="overflow-hidden rounded-2xl border-amber-500/30 bg-gradient-to-br from-amber-500/10 to-amber-600/5 shadow-sm">
           <CardContent className="p-5 sm:p-6">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-sm text-foreground flex items-start gap-3 font-medium">
-                <AlertCircle className="h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
-                Pago pendiente. Completa el pago para desbloquear tu cuenta y acceder a todos los módulos.
-              </p>
+              <div className="flex flex-col gap-2">
+                <p className="text-sm text-foreground flex items-start gap-3 font-medium">
+                  <AlertCircle className="h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
+                  Pago pendiente. Completa el pago para desbloquear tu cuenta y acceder a todos los módulos.
+                </p>
+                {subscriptionQuery.isFetching && (
+                  <p className="text-xs text-muted-foreground flex items-center gap-2">
+                    <RefreshCw className="h-3.5 w-3.5 animate-spin shrink-0" aria-hidden />
+                    Comprobando pago…
+                  </p>
+                )}
+              </div>
               {canManageBilling && (
                 <Button
                   onClick={handleOpenPortal}
