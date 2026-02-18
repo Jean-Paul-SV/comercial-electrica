@@ -92,8 +92,8 @@ export class BillingService {
       where: { stripeSubscriptionId: subscriptionId },
     });
     if (!subscription) {
-      this.logger.debug(
-        `No se encontró Subscription con stripeSubscriptionId=${subscriptionId}`,
+      this.logger.warn(
+        `invoice.paid: no se encontró Subscription con stripeSubscriptionId=${subscriptionId}. ¿Webhook apuntando al entorno correcto?`,
       );
       return;
     }
@@ -356,10 +356,46 @@ export class BillingService {
   }
 
   /**
+   * Si nuestra BD tiene PENDING_PAYMENT pero Stripe ya tiene la suscripción activa
+   * (p. ej. el webhook falló o llegó después), actualiza la BD para desbloquear al usuario.
+   */
+  private async syncSubscriptionStatusFromStripe(
+    subscription: { id: string; tenantId: string; status: string; stripeSubscriptionId: string | null },
+  ): Promise<void> {
+    if (String(subscription.status) !== 'PENDING_PAYMENT' || !this.stripe || !subscription.stripeSubscriptionId) {
+      return;
+    }
+    try {
+      const stripeSub = await this.stripe.subscriptions.retrieve(subscription.stripeSubscriptionId);
+      if (stripeSub.status !== 'active') return;
+      const periodEnd = stripeSub.current_period_end
+        ? new Date(stripeSub.current_period_end * 1000)
+        : new Date();
+      await this.prisma.subscription.update({
+        where: { id: subscription.id },
+        data: {
+          status: 'ACTIVE',
+          currentPeriodEnd: periodEnd,
+          lastPaymentFailedAt: null,
+          updatedAt: new Date(),
+        },
+      });
+      this.logger.log(
+        `Suscripción ${subscription.id} (tenant ${subscription.tenantId}) actualizada a ACTIVE por sincronización con Stripe (webhook posiblemente no procesado).`,
+      );
+    } catch (err) {
+      this.logger.warn(
+        `No se pudo sincronizar estado con Stripe para suscripción ${subscription.id}: ${(err as Error).message}`,
+      );
+    }
+  }
+
+  /**
    * Devuelve la información de plan y suscripción del tenant para mostrar en la UI de facturación.
+   * Si está PENDING_PAYMENT, consulta Stripe y actualiza la BD si el pago ya se completó (fallback al webhook).
    */
   async getSubscriptionForTenant(tenantId: string): Promise<SubscriptionInfoDto> {
-    const subscription = await this.prisma.subscription.findUnique({
+    let subscription = await this.prisma.subscription.findUnique({
       where: { tenantId },
       include: {
         plan: { select: { id: true, name: true, slug: true } },
@@ -367,6 +403,15 @@ export class BillingService {
     });
     if (!subscription) {
       throw new NotFoundException('No hay suscripción para esta cuenta.');
+    }
+    await this.syncSubscriptionStatusFromStripe(subscription);
+    if (String(subscription.status) === 'PENDING_PAYMENT') {
+      subscription = await this.prisma.subscription.findUnique({
+        where: { tenantId },
+        include: {
+          plan: { select: { id: true, name: true, slug: true } },
+        },
+      }) ?? subscription;
     }
     const canManageBilling =
       !!this.stripe && !!subscription.stripeSubscriptionId;
