@@ -49,17 +49,27 @@ export class CreateSaleUseCase {
     createdByUserId: string | undefined,
     tenantId: string,
   ) {
-    const dianStatus = await this.dianService.getConfigStatusForTenant(tenantId);
-    if (!dianStatus.readyForSend) {
-      const msg =
-        dianStatus.status === 'not_configured'
-          ? 'Configure la facturación electrónica en Cuenta → Facturación electrónica antes de registrar ventas.'
-          : dianStatus.status === 'cert_expired'
-            ? 'El certificado de firma electrónica está vencido. Renuévelo en Cuenta → Facturación electrónica.'
-            : dianStatus.status === 'range_exhausted'
-              ? 'El rango de numeración DIAN está agotado. Solicite un nuevo rango y actualice la configuración.'
-              : 'Complete la configuración de facturación electrónica en Cuenta → Facturación electrónica para poder registrar ventas.';
-      throw new BadRequestException(msg);
+    // Asegurar que el valor se interprete correctamente: si es explícitamente false, usar false; de lo contrario, true
+    // Esto maneja correctamente undefined, null, y cualquier otro valor que no sea explícitamente false
+    const requireElectronicInvoice = dto.requireElectronicInvoice === false ? false : true;
+    
+    // Log para depuración (usar log en lugar de debug para asegurar que se vea)
+    this.logger.log(
+      `[CreateSale] requireElectronicInvoice recibido: ${JSON.stringify(dto.requireElectronicInvoice)} (tipo: ${typeof dto.requireElectronicInvoice}), procesado como: ${requireElectronicInvoice}`,
+    );
+    if (requireElectronicInvoice) {
+      const dianStatus = await this.dianService.getConfigStatusForTenant(tenantId);
+      if (!dianStatus.readyForSend) {
+        const msg =
+          dianStatus.status === 'not_configured'
+            ? 'Configure la facturación electrónica en Cuenta → Facturación electrónica antes de registrar ventas.'
+            : dianStatus.status === 'cert_expired'
+              ? 'El certificado de firma electrónica está vencido. Renuévelo en Cuenta → Facturación electrónica.'
+              : dianStatus.status === 'range_exhausted'
+                ? 'El rango de numeración DIAN está agotado. Solicite un nuevo rango y actualice la configuración.'
+                : 'Complete la configuración de facturación electrónica en Cuenta → Facturación electrónica para poder registrar ventas.';
+        throw new BadRequestException(msg);
+      }
     }
 
     this.logger.log(
@@ -169,6 +179,7 @@ export class CreateSaleUseCase {
               customerId: dto.customerId ?? null,
               createdByUserId: createdByUserId ?? null,
               status: SaleStatus.PAID,
+              requireElectronicInvoice, // Guardar explícitamente el valor calculado
               subtotal,
               taxTotal,
               discountTotal,
@@ -177,6 +188,11 @@ export class CreateSaleUseCase {
             },
             include: { items: true },
           });
+          
+          // Log para verificar que se guardó correctamente
+          this.logger.log(
+            `[CreateSale] Venta creada con ID: ${sale.id}, requireElectronicInvoice guardado: ${sale.requireElectronicInvoice}`,
+          );
 
           await tx.cashMovement.create({
             data: {
@@ -203,13 +219,16 @@ export class CreateSaleUseCase {
             },
           });
 
-          const dianDoc = await tx.dianDocument.create({
-            data: {
-              invoiceId: invoice.id,
-              type: DianDocumentType.FE,
-              status: DianDocumentStatus.DRAFT,
-            },
-          });
+          let dianDoc: { id: string } | null = null;
+          if (requireElectronicInvoice) {
+            dianDoc = await tx.dianDocument.create({
+              data: {
+                invoiceId: invoice.id,
+                type: DianDocumentType.FE,
+                status: DianDocumentStatus.DRAFT,
+              },
+            });
+          }
 
           await tx.inventoryMovement.create({
             data: {
@@ -226,8 +245,16 @@ export class CreateSaleUseCase {
           });
 
           this.logger.log(
-            `Venta creada exitosamente: ${sale.id}, Total: ${Number(sale.grandTotal)}, Factura: ${invoice.number}`,
+            `Venta creada exitosamente: ${sale.id}, Total: ${Number(sale.grandTotal)}, Factura: ${invoice.number}, requireElectronicInvoice: ${sale.requireElectronicInvoice}${requireElectronicInvoice ? ', DIAN encolado' : ' (sin factura electrónica)'}`,
           );
+          
+          // Verificar que el valor se guardó correctamente
+          if (sale.requireElectronicInvoice !== requireElectronicInvoice) {
+            this.logger.warn(
+              `[CreateSale] ADVERTENCIA: requireElectronicInvoice no coincide. Esperado: ${requireElectronicInvoice}, Guardado: ${sale.requireElectronicInvoice}`,
+            );
+          }
+          
           return { sale, invoice, dianDocument: dianDoc };
         },
         { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
@@ -239,7 +266,7 @@ export class CreateSaleUseCase {
       createdByUserId,
       {
         invoiceId: result.invoice.id,
-        dianDocumentId: result.dianDocument.id,
+        ...(result.dianDocument && { dianDocumentId: result.dianDocument.id }),
         customerId: result.sale.customerId,
         grandTotal: Number(result.sale.grandTotal),
         itemsCount: result.sale.items.length,
@@ -249,21 +276,23 @@ export class CreateSaleUseCase {
           result.sale.grandTotal,
         ).toLocaleString('es-CO')} (${
           result.sale.items.length
-        } producto${result.sale.items.length !== 1 ? 's' : ''})`,
+        } producto${result.sale.items.length !== 1 ? 's' : ''})${result.dianDocument ? '' : ' (sin factura electrónica)'}`,
       },
     );
-    this.logger.log(
-      `Encolando procesamiento DIAN para documento ${result.dianDocument.id}`,
-    );
-    await this.dianQueue.add(
-      'send',
-      { dianDocumentId: result.dianDocument.id },
-      {
-        jobId: `dian-${result.dianDocument.id}`,
-        attempts: 10,
-        backoff: { type: 'exponential', delay: 5000 },
-      },
-    );
+    if (result.dianDocument) {
+      this.logger.log(
+        `Encolando procesamiento DIAN para documento ${result.dianDocument.id}`,
+      );
+      await this.dianQueue.add(
+        'send',
+        { dianDocumentId: result.dianDocument.id },
+        {
+          jobId: `dian-${result.dianDocument.id}`,
+          attempts: 10,
+          backoff: { type: 'exponential', delay: 5000 },
+        },
+      );
+    }
     await this.cache.deletePattern('cache:sales:*');
     return result;
   }

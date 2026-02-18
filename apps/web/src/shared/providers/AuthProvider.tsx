@@ -83,16 +83,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     const claims = decodeJwtClaims(token);
     const id = claims?.sub;
-    const email = claims?.email;
     const role = claims?.role;
-    if (!id || !email || !role) {
+    // La API no incluye email en el JWT por seguridad; getMe() lo rellenará.
+    if (!id || !role) {
       setUser(null);
       setPermissions([]);
       setEnabledModules([]);
       return;
     }
-    setUser({ id, email, role });
-    setIsPlatformAdmin(Boolean(claims?.isPlatformAdmin || email === PLATFORM_ADMIN_EMAIL));
+    const emailFromToken = claims?.email ?? '';
+    setUser({ id, email: emailFromToken, role });
+    setIsPlatformAdmin(Boolean(claims?.isPlatformAdmin || emailFromToken === PLATFORM_ADMIN_EMAIL));
     getMe(token)
       .then((res) => {
         setUser(res.user);

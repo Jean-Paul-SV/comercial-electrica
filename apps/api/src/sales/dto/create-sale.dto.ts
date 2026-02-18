@@ -2,6 +2,7 @@ import { Type } from 'class-transformer';
 import {
   ArrayMinSize,
   IsArray,
+  IsBoolean,
   IsEnum,
   IsInt,
   IsNumber,
@@ -78,4 +79,14 @@ export class CreateSaleDto {
   @IsNumber()
   @Min(0)
   discountTotal?: number;
+
+  @ApiPropertyOptional({
+    example: true,
+    description:
+      'Si false, la venta genera solo documento interno (factura en Orion) sin envío a DIAN/facturación electrónica.',
+    default: true,
+  })
+  @IsOptional()
+  @IsBoolean()
+  requireElectronicInvoice?: boolean;
 }

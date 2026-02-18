@@ -16,9 +16,13 @@ import {
 import { Button } from '@shared/components/ui/button';
 import { Input } from '@shared/components/ui/input';
 import { Label } from '@shared/components/ui/label';
-import { Select } from '@shared/components/ui/select';
-import { ArrowLeft, Building2 } from 'lucide-react';
+import { ArrowLeft, Building2, UserPlus, FileText } from 'lucide-react';
 import { useCreateTenant, usePlans } from '@features/provider/hooks';
+
+const formInputClass =
+  'rounded-xl border border-input bg-background h-10 px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 transition-colors';
+const formSelectClass =
+  'flex h-10 w-full items-center rounded-xl border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 transition-colors';
 
 const schema = z.object({
   name: z.string().min(1, 'Nombre requerido').max(200),
@@ -39,6 +43,7 @@ const schema = z.object({
     .min(8, 'Mínimo 8 caracteres si se define')
     .optional()
     .or(z.literal('')),
+  issuerName: z.string().max(200).optional().or(z.literal('')),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -57,6 +62,7 @@ export default function ProviderNewTenantPage() {
       adminEmail: '',
       adminName: '',
       adminPassword: '',
+      issuerName: '',
     },
   });
 
@@ -69,6 +75,7 @@ export default function ProviderNewTenantPage() {
         adminEmail: values.adminEmail.trim(),
         adminName: values.adminName?.trim() || undefined,
         adminPassword: values.adminPassword?.trim() || undefined,
+        issuerName: values.issuerName?.trim() || undefined,
       });
       toast.success(`Empresa "${res.tenant.name}" creada.`);
       if (res.tempAdminPassword) {
@@ -85,47 +92,50 @@ export default function ProviderNewTenantPage() {
   });
 
   return (
-    <div className="p-4 md:p-6 space-y-6">
+    <div className="p-4 md:p-6 space-y-6 max-w-3xl mx-auto">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" asChild>
+        <Button variant="ghost" size="icon" asChild className="rounded-xl shrink-0">
           <Link href="/provider">
             <ArrowLeft className="h-4 w-4" />
             <span className="sr-only">Volver</span>
           </Link>
         </Button>
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight flex items-center gap-2">
-            <Building2 className="h-6 w-6" />
+          <h1 className="text-2xl font-semibold tracking-tight flex items-center gap-2 text-foreground">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary shrink-0">
+              <Building2 className="h-5 w-5" />
+            </span>
             Nueva empresa
           </h1>
-          <p className="text-muted-foreground text-sm">
-            Crear tenant y primer usuario administrador.
+          <p className="text-muted-foreground text-sm mt-0.5">
+            Crear la empresa (tenant) y su primer usuario administrador en un solo paso.
           </p>
         </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Datos de la empresa</CardTitle>
-          <CardDescription>
-            Crea la empresa (tenant) y su primer administrador en un solo paso. El identificador (slug) no se puede cambiar después.
+      <Card className="rounded-2xl border-border/80 shadow-sm overflow-hidden">
+        <CardHeader className="border-b border-border/60 pb-6">
+          <CardTitle className="text-lg font-semibold text-foreground">Datos de la empresa</CardTitle>
+          <CardDescription className="text-muted-foreground">
+            El identificador (slug) no se puede cambiar después. La razón social solo se define aquí.
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <form onSubmit={onSubmit} className="space-y-8 max-w-xl">
+        <CardContent className="pt-6">
+          <form onSubmit={onSubmit} className="space-y-8">
             {/* Datos de la empresa */}
-            <div className="space-y-4">
-              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            <div className="space-y-5">
+              <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                <span className="h-1.5 w-1.5 rounded-full bg-primary shrink-0"></span>
                 Datos de la empresa
-              </p>
+              </h3>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="name">Nombre (como aparecerá en la app)</Label>
+                  <Label htmlFor="name" className="text-foreground font-medium">Nombre (como aparecerá en la app) *</Label>
                   <Input
                     id="name"
                     {...form.register('name')}
                     placeholder="Ej. Mi Comercio S.A.S."
-                    className="rounded-lg"
+                    className={formInputClass}
                   />
                   {form.formState.errors.name && (
                     <p className="text-sm text-destructive">
@@ -134,12 +144,12 @@ export default function ProviderNewTenantPage() {
                   )}
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="slug">Slug (identificador único)</Label>
+                  <Label htmlFor="slug" className="text-foreground font-medium">Slug (identificador único) *</Label>
                   <Input
                     id="slug"
                     {...form.register('slug')}
                     placeholder="mi-empresa"
-                    className="rounded-lg font-mono"
+                    className={formInputClass + ' font-mono text-sm'}
                   />
                   <p className="text-xs text-muted-foreground">
                     Solo minúsculas, números y guiones. Debe ser único en el sistema.
@@ -153,33 +163,32 @@ export default function ProviderNewTenantPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="planId">Plan para esta empresa (opcional)</Label>
-                <Select
+                <Label htmlFor="planId" className="text-foreground font-medium">Plan para esta empresa (opcional)</Label>
+                <select
                   id="planId"
                   {...form.register('planId')}
                   disabled={plansLoading}
+                  className={formSelectClass}
                 >
                   <option value="">
                     {plansLoading ? 'Cargando planes…' : 'Sin plan (acceso por defecto)'}
                   </option>
                   {plans.map((p) => (
                     <option key={p.id} value={p.id}>
-                      {p.name}
-                      {p.priceMonthly != null ? ` — $${p.priceMonthly.toLocaleString('es-CO')} / mes` : ''}
+                      {p.name} — {p.includesDian ? 'Con DIAN' : 'Sin DIAN'}
+                      {p.priceMonthly != null ? ` · $${p.priceMonthly.toLocaleString('es-CO')}/mes` : ''}
                     </option>
                   ))}
-                </Select>
+                </select>
                 {plansLoading ? (
                   <p className="text-xs text-muted-foreground">Obteniendo planes disponibles…</p>
                 ) : plans.length === 0 ? (
-                  <p className="text-xs text-amber-400">
-                    Aún no hay planes creados. Ve a <span className="font-medium">Panel proveedor → Planes</span>{' '}
-                    para definirlos y poder asignarlos a las nuevas empresas.
+                  <p className="text-xs text-amber-600 dark:text-amber-500">
+                    Aún no hay planes. Ve a <span className="font-medium">Panel proveedor → Planes</span> para definirlos.
                   </p>
                 ) : (
                   <p className="text-xs text-muted-foreground">
-                    Si eliges un plan, la empresa tendrá acceso a los módulos incluidos y podrás controlar límites
-                    como usuarios máximos.
+                    Si eliges un plan, la empresa tendrá acceso a los módulos incluidos y límites (ej. usuarios máximos).
                   </p>
                 )}
                 {form.formState.errors.planId && (
@@ -190,25 +199,53 @@ export default function ProviderNewTenantPage() {
               </div>
             </div>
 
+            {/* Razón social para facturas */}
+            <div className="space-y-4 rounded-xl border border-border/60 bg-muted/5 p-4">
+              <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                <FileText className="h-4 w-4 text-primary shrink-0" />
+                Razón social para facturas
+              </h3>
+              <div className="space-y-2">
+                <Label htmlFor="issuerName" className="text-foreground font-medium">Razón social (opcional)</Label>
+                <Input
+                  id="issuerName"
+                  {...form.register('issuerName')}
+                  placeholder="Ej. Mi Empresa S.A.S."
+                  className={formInputClass}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Este nombre aparecerá en las facturas. Si no lo indicas, se mostrará &quot;Mi Empresa&quot;. No se puede cambiar después desde la app.
+                </p>
+                <p className="text-xs text-amber-600 dark:text-amber-500 flex items-start gap-1.5">
+                  <span className="mt-0.5 shrink-0">⚠</span>
+                  <span>Debe ser la <strong>razón social legal</strong> registrada ante la DIAN. El cliente es responsable de que coincida con su registro tributario.</span>
+                </p>
+                {form.formState.errors.issuerName && (
+                  <p className="text-sm text-destructive">
+                    {form.formState.errors.issuerName.message}
+                  </p>
+                )}
+              </div>
+            </div>
+
             {/* Primer usuario administrador */}
-            <div className="space-y-4 rounded-lg border border-border/60 bg-muted/10 p-4">
-              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            <div className="space-y-5 rounded-xl border border-border/60 bg-muted/5 p-4 border-l-4 border-l-primary/50">
+              <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                <UserPlus className="h-4 w-4 text-primary shrink-0" />
                 Primer usuario administrador
+              </h3>
+              <p className="text-sm text-muted-foreground -mt-1">
+                Este usuario podrá gestionar la empresa desde el primer momento. Solo el correo es obligatorio.
               </p>
-              <p className="text-sm text-muted-foreground">
-                Este usuario podrá gestionar la empresa desde el primer momento. Obligatorio indicar correo; el resto es opcional.
-              </p>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="adminEmail">
-                    Correo del admin <span className="text-destructive">*</span>
-                  </Label>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2 sm:col-span-2">
+                  <Label htmlFor="adminEmail" className="text-foreground font-medium">Correo del admin *</Label>
                   <Input
                     id="adminEmail"
                     type="email"
                     {...form.register('adminEmail')}
                     placeholder="admin@empresa.com"
-                    className="rounded-lg"
+                    className={formInputClass}
                   />
                   {form.formState.errors.adminEmail && (
                     <p className="text-sm text-destructive">
@@ -217,25 +254,25 @@ export default function ProviderNewTenantPage() {
                   )}
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="adminName">Nombre del admin (opcional)</Label>
+                  <Label htmlFor="adminName" className="text-foreground font-medium">Nombre del admin (opcional)</Label>
                   <Input
                     id="adminName"
                     {...form.register('adminName')}
                     placeholder="Ej. Juan Pérez"
-                    className="rounded-lg"
+                    className={formInputClass}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="adminPassword">Contraseña inicial (opcional)</Label>
+                  <Label htmlFor="adminPassword" className="text-foreground font-medium">Contraseña inicial (opcional)</Label>
                   <Input
                     id="adminPassword"
                     type="password"
                     {...form.register('adminPassword')}
-                    placeholder="Dejar vacío para generar una temporal"
-                    className="rounded-lg"
+                    placeholder="Vacío = se genera temporal"
+                    className={formInputClass}
                   />
                   <p className="text-xs text-muted-foreground">
-                    Mínimo 8 caracteres. Si la dejas vacía, se generará una contraseña temporal que el admin deberá cambiar en el primer acceso.
+                    Mín. 8 caracteres. Si se deja vacío, se genera una temporal que el admin debe cambiar al entrar.
                   </p>
                   {form.formState.errors.adminPassword && (
                     <p className="text-sm text-destructive">
@@ -246,11 +283,11 @@ export default function ProviderNewTenantPage() {
               </div>
             </div>
 
-            <div className="flex flex-wrap gap-2 pt-2">
-              <Button type="submit" disabled={createTenant.isPending}>
+            <div className="flex flex-wrap gap-3 pt-2 border-t border-border/60">
+              <Button type="submit" disabled={createTenant.isPending} className="rounded-xl font-medium">
                 {createTenant.isPending ? 'Creando…' : 'Crear empresa y admin'}
               </Button>
-              <Button type="button" variant="outline" asChild>
+              <Button type="button" variant="outline" asChild className="rounded-xl">
                 <Link href="/provider">Cancelar</Link>
               </Button>
             </div>

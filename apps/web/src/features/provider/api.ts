@@ -14,6 +14,8 @@ export type ListTenantsQuery = {
   limit?: number;
   offset?: number;
   isActive?: string;
+  searchName?: string;
+  searchNumber?: string;
 };
 
 export function listPlans(
@@ -47,6 +49,8 @@ export function listTenants(
   if (query?.limit != null) params.set('limit', String(query.limit));
   if (query?.offset != null) params.set('offset', String(query.offset));
   if (query?.isActive != null) params.set('isActive', query.isActive);
+  if (query?.searchName?.trim()) params.set('searchName', query.searchName.trim());
+  if (query?.searchNumber?.trim()) params.set('searchNumber', query.searchNumber.trim());
   const qs = params.toString();
   return apiClient.get(`/provider/tenants${qs ? `?${qs}` : ''}`, {
     authToken,

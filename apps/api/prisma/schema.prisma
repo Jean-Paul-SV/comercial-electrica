@@ -102,6 +102,18 @@ enum SubscriptionStatus {
   CANCELLED
 }
 
+enum PaymentProvider {
+  STRIPE
+  PAYU
+}
+
+enum PaymentStatus {
+  PENDING
+  APPROVED
+  DECLINED
+  REFUNDED
+}
+
 // ---------- Multi-tenant (RBAC + Plan/módulos, ver docs/ROLES_Y_PERMISOS_DISEÑO.md y ARQUITECTURA_MODULAR_SAAS.md) ----------
 model Plan {
   id              String    @id @default(uuid()) @db.Uuid
@@ -166,6 +178,7 @@ model Tenant {
   dianConfigs        DianConfig[]
   auditLogs          AuditLog[]
   backupRuns         BackupRun[]
+  payments           Payment[]
 }
 
 model TenantModule {
@@ -244,6 +257,28 @@ model StripeEvent {
   @@index([eventId])
   @@index([processedAt])
   @@index([type])
+}
+
+/// Pagos externos (Stripe, PayU, etc.) asociados a un tenant.
+model Payment {
+  id          String          @id @default(uuid()) @db.Uuid
+  tenantId    String          @db.Uuid
+  provider    PaymentProvider
+  status      PaymentStatus   @default(PENDING)
+  amount      Decimal         @db.Decimal(18, 2)
+  currency    String          @db.VarChar(8)
+  externalId  String?         @db.VarChar(255) // ID de la transacción en el proveedor
+  purpose     String?         @db.VarChar(100) // Ej: ADDON, ONE_TIME, etc.
+  metadata    Json?
+  createdById String?         @db.Uuid
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  tenant Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([provider, status])
+  @@index([externalId])
 }
 
 model Permission {
@@ -592,6 +627,8 @@ model Sale {
   customerId    String?    @db.Uuid
   createdByUserId String?  @db.Uuid
   status        SaleStatus @default(DRAFT)
+  /// Si false, no se crea documento DIAN ni se envía a facturación electrónica (solo documento interno).
+  requireElectronicInvoice Boolean @default(true)
   soldAt        DateTime   @default(now())
   subtotal      Decimal    @db.Decimal(18, 2) @default(0)
   taxTotal      Decimal    @db.Decimal(18, 2) @default(0)

@@ -464,71 +464,96 @@ export default function SuppliersPage() {
           </DialogHeader>
           <form
             onSubmit={editForm.handleSubmit(onEditSupplier)}
-            className="space-y-5 pt-1"
+            className="space-y-6 pt-1"
           >
-            <div className="grid gap-5 sm:grid-cols-2">
+            {/* Datos básicos */}
+            <div className="space-y-4">
+              <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                <span className="h-1 w-1 rounded-full bg-primary"></span>
+                Datos básicos
+              </h3>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-nit" className="text-foreground font-medium">NIT *</Label>
+                  <Input
+                    id="edit-nit"
+                    {...editForm.register('nit')}
+                    placeholder="Ej: 900123456-7"
+                    className={formInputClass}
+                  />
+                  {editForm.formState.errors.nit && (
+                    <p className="text-sm text-destructive">
+                      {editForm.formState.errors.nit.message}
+                    </p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-name" className="text-foreground font-medium">Razón social *</Label>
+                  <Input
+                    id="edit-name"
+                    {...editForm.register('name')}
+                    placeholder="Ej: Distribuidora Eléctrica S.A.S."
+                    className={formInputClass}
+                  />
+                  {editForm.formState.errors.name && (
+                    <p className="text-sm text-destructive">
+                      {editForm.formState.errors.name.message}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Información de contacto */}
+            <div className="space-y-4">
+              <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                <span className="h-1 w-1 rounded-full bg-primary"></span>
+                Información de contacto
+              </h3>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-email" className="text-foreground font-medium">Email</Label>
+                  <Input
+                    id="edit-email"
+                    type="email"
+                    {...editForm.register('email')}
+                    placeholder="Ej: contacto@proveedor.com"
+                    className={formInputClass}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-phone" className="text-foreground font-medium">Teléfono</Label>
+                  <Input
+                    id="edit-phone"
+                    {...editForm.register('phone')}
+                    placeholder="Ej: 300 123 4567"
+                    className={formInputClass}
+                  />
+                </div>
+                <div className="space-y-2 sm:col-span-2">
+                  <Label htmlFor="edit-contactPerson" className="text-foreground font-medium">Persona de contacto</Label>
+                  <Input
+                    id="edit-contactPerson"
+                    {...editForm.register('contactPerson')}
+                    placeholder="Ej: Juan Pérez — Ventas"
+                    className={formInputClass}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Dirección */}
+            <div className="space-y-4">
+              <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                <span className="h-1 w-1 rounded-full bg-primary"></span>
+                Ubicación
+              </h3>
               <div className="space-y-2">
-                <Label htmlFor="edit-nit" className="text-foreground font-medium">NIT</Label>
-                <Input
-                  id="edit-nit"
-                  {...editForm.register('nit')}
-                  placeholder="Ej: 900123456-7"
-                  className={formInputClass}
-                />
-                {editForm.formState.errors.nit && (
-                  <p className="text-sm text-destructive">
-                    {editForm.formState.errors.nit.message}
-                  </p>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit-name" className="text-foreground font-medium">Razón social</Label>
-                <Input
-                  id="edit-name"
-                  {...editForm.register('name')}
-                  placeholder="Ej: Distribuidora Eléctrica S.A.S."
-                  className={formInputClass}
-                />
-                {editForm.formState.errors.name && (
-                  <p className="text-sm text-destructive">
-                    {editForm.formState.errors.name.message}
-                  </p>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit-email" className="text-foreground font-medium">Email</Label>
-                <Input
-                  id="edit-email"
-                  type="email"
-                  {...editForm.register('email')}
-                  placeholder="Ej: contacto@proveedor.com"
-                  className={formInputClass}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit-phone" className="text-foreground font-medium">Teléfono</Label>
-                <Input
-                  id="edit-phone"
-                  {...editForm.register('phone')}
-                  placeholder="Ej: 300 123 4567"
-                  className={formInputClass}
-                />
-              </div>
-              <div className="space-y-2 sm:col-span-2">
-                <Label htmlFor="edit-contactPerson" className="text-foreground font-medium">Persona de contacto</Label>
-                <Input
-                  id="edit-contactPerson"
-                  {...editForm.register('contactPerson')}
-                  placeholder="Ej: Juan Pérez — Ventas"
-                  className={formInputClass}
-                />
-              </div>
-              <div className="space-y-2 sm:col-span-2">
                 <Label htmlFor="edit-address" className="text-foreground font-medium">Dirección</Label>
                 <Input
                   id="edit-address"
                   {...editForm.register('address')}
-                  placeholder="Ej: Carrera 54 #15"
+                  placeholder="Ej: Carrera 54 #15-20, Bogotá"
                   className={formInputClass}
                 />
               </div>
@@ -567,103 +592,128 @@ export default function SuppliersPage() {
           </DialogHeader>
           <form
             onSubmit={form.handleSubmit(onNewSupplier)}
-            className="space-y-5 pt-1"
+            className="space-y-6 pt-1"
           >
-            <div className="grid gap-5 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="nit" className="text-foreground font-medium">NIT</Label>
-                <Input
-                  id="nit"
-                  {...form.register('nit')}
-                  placeholder="Ej: 900123456-7"
-                  className={formInputClass}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Número de identificación tributaria del proveedor. Se usa en facturas y reportes.
-                </p>
-                {form.formState.errors.nit && (
-                  <p className="text-sm text-destructive">
-                    {form.formState.errors.nit.message}
+            {/* Datos básicos */}
+            <div className="space-y-4">
+              <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                <span className="h-1 w-1 rounded-full bg-primary"></span>
+                Datos básicos
+              </h3>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="nit" className="text-foreground font-medium">NIT *</Label>
+                  <Input
+                    id="nit"
+                    {...form.register('nit')}
+                    placeholder="Ej: 900123456-7"
+                    className={formInputClass}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Número de identificación tributaria. Se usa en facturas y reportes.
                   </p>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="name" className="text-foreground font-medium">Razón social</Label>
-                <Input
-                  id="name"
-                  {...form.register('name')}
-                  placeholder="Ej: Distribuidora Eléctrica S.A.S."
-                  className={formInputClass}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Nombre legal de la empresa. Aparecerá en pedidos de compra y facturas.
-                </p>
-                {form.formState.errors.name && (
-                  <p className="text-sm text-destructive">
-                    {form.formState.errors.name.message}
+                  {form.formState.errors.nit && (
+                    <p className="text-sm text-destructive">
+                      {form.formState.errors.nit.message}
+                    </p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="name" className="text-foreground font-medium">Razón social *</Label>
+                  <Input
+                    id="name"
+                    {...form.register('name')}
+                    placeholder="Ej: Distribuidora Eléctrica S.A.S."
+                    className={formInputClass}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Nombre legal de la empresa. Aparecerá en pedidos y facturas.
                   </p>
-                )}
+                  {form.formState.errors.name && (
+                    <p className="text-sm text-destructive">
+                      {form.formState.errors.name.message}
+                    </p>
+                  )}
+                </div>
+                <div className="space-y-2 sm:col-span-2">
+                  <Label htmlFor="description" className="text-foreground font-medium">Descripción (opcional)</Label>
+                  <textarea
+                    id="description"
+                    {...form.register('description')}
+                    placeholder="Ej: Proveedor de cables y materiales eléctricos. Horario de atención: 8am-5pm."
+                    rows={3}
+                    className={formTextareaClass}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Notas internas sobre el proveedor: productos que vende, condiciones, etc.
+                  </p>
+                </div>
               </div>
-              <div className="space-y-2 sm:col-span-2">
-                <Label htmlFor="description" className="text-foreground font-medium">Descripción del proveedor</Label>
-                <textarea
-                  id="description"
-                  {...form.register('description')}
-                  placeholder="Ej: Proveedor de cables y materiales eléctricos. Horario de atención: 8am-5pm."
-                  rows={3}
-                  className={formTextareaClass}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Opcional. Notas internas sobre el proveedor: productos que vende, condiciones, etc.
-                </p>
+            </div>
+
+            {/* Información de contacto */}
+            <div className="space-y-4">
+              <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                <span className="h-1 w-1 rounded-full bg-primary"></span>
+                Información de contacto
+              </h3>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="email" className="text-foreground font-medium">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    {...form.register('email')}
+                    placeholder="Ej: contacto@proveedor.com"
+                    className={formInputClass}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Opcional. Correo para pedidos o consultas.
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="phone" className="text-foreground font-medium">Teléfono</Label>
+                  <Input
+                    id="phone"
+                    {...form.register('phone')}
+                    placeholder="Ej: 300 123 4567"
+                    className={formInputClass}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Opcional. Número de contacto del proveedor.
+                  </p>
+                </div>
+                <div className="space-y-2 sm:col-span-2">
+                  <Label htmlFor="contactPerson" className="text-foreground font-medium">Persona de contacto</Label>
+                  <Input
+                    id="contactPerson"
+                    {...form.register('contactPerson')}
+                    placeholder="Ej: Juan Pérez — Ventas"
+                    className={formInputClass}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Opcional. Nombre de quien atiende pedidos o facturación.
+                  </p>
+                </div>
               </div>
+            </div>
+
+            {/* Ubicación */}
+            <div className="space-y-4">
+              <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                <span className="h-1 w-1 rounded-full bg-primary"></span>
+                Ubicación
+              </h3>
               <div className="space-y-2">
-                <Label htmlFor="email" className="text-foreground font-medium">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  {...form.register('email')}
-                  placeholder="Ej: contacto@proveedor.com"
-                  className={formInputClass}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Opcional. Correo para pedidos o consultas.
-                </p>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="phone" className="text-foreground font-medium">Teléfono</Label>
-                <Input
-                  id="phone"
-                  {...form.register('phone')}
-                  placeholder="Ej: 300 123 4567"
-                  className={formInputClass}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Opcional. Número de contacto del proveedor.
-                </p>
-              </div>
-              <div className="space-y-2 sm:col-span-2">
-                <Label htmlFor="contactPerson" className="text-foreground font-medium">Persona de contacto</Label>
-                <Input
-                  id="contactPerson"
-                  {...form.register('contactPerson')}
-                  placeholder="Ej: Juan Pérez — Ventas"
-                  className={formInputClass}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Opcional. Nombre de quien atiende pedidos o facturación.
-                </p>
-              </div>
-              <div className="space-y-2 sm:col-span-2">
                 <Label htmlFor="address" className="text-foreground font-medium">Dirección</Label>
                 <Input
                   id="address"
                   {...form.register('address')}
-                  placeholder="Ej: Carrera 54 #15"
+                  placeholder="Ej: Carrera 54 #15-20, Bogotá"
                   className={formInputClass}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Opcional. Dirección del proveedor.
+                  Opcional. Dirección física del proveedor.
                 </p>
               </div>
             </div>

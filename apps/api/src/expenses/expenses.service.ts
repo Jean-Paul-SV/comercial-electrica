@@ -178,7 +178,9 @@ export class ExpensesService {
     const [data, total] = await Promise.all([
       this.expenseDelegate.findMany({
         where,
-        orderBy: { expenseDate: 'desc' },
+        // Orden de llegada: más recientes primero
+        // (si varios tienen misma fecha de gasto, el desempate lo hace createdAt/id)
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
         skip,
         take: limit,
         include: { cashSession: true },

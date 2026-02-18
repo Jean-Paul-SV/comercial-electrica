@@ -197,7 +197,13 @@ export class SalesService {
           saleId: true,
           customerId: true,
           customer: { select: { id: true, name: true } },
-          sale: { select: { id: true, soldAt: true } },
+          sale: {
+            select: {
+              id: true,
+              soldAt: true,
+              requireElectronicInvoice: true, // Asegurar que este campo se devuelva explícitamente
+            },
+          },
           dianDocument: {
             select: { status: true, lastError: true },
           },
@@ -208,10 +214,112 @@ export class SalesService {
       this.prisma.invoice.count({ where }),
     ]);
 
-    return {
-      data,
-      meta: buildPaginationMeta(total, page, limit),
-    };
+    // Log temporal simplificado para depuración - solo log básico para evitar problemas
+    if (data.length > 0 && process.env.NODE_ENV === 'development') {
+      try {
+        const firstInvoiceWithSale = data.find((inv) => inv.sale != null);
+        if (firstInvoiceWithSale) {
+          // eslint-disable-next-line no-console
+          console.log('[SalesService.listInvoices] Primera factura con venta:', {
+            invoiceNumber: firstInvoiceWithSale.number,
+            saleRequireElectronicInvoice: firstInvoiceWithSale.sale?.requireElectronicInvoice,
+          });
+        }
+      } catch (logError) {
+        // Ignorar errores de logging para no afectar la respuesta
+      }
+    }
+
+    // Normalizar los datos para asegurar que requireElectronicInvoice siempre tenga un valor
+    // Si es undefined o null, asumir true (comportamiento por defecto)
+    // También asegurar que las fechas se serialicen correctamente
+    const normalizedData = data.map((inv) => {
+      try {
+        // Solo normalizar si sale existe y requireElectronicInvoice necesita normalización
+        if (inv.sale && inv.sale != null) {
+          const currentValue = inv.sale.requireElectronicInvoice;
+          const needsNormalization = currentValue === null || currentValue === undefined;
+          
+          if (needsNormalization) {
+            const requireElectronicInvoice = true; // Valor por defecto
+            
+            // Log solo si el valor necesita normalización
+            if (process.env.NODE_ENV === 'development') {
+              // eslint-disable-next-line no-console
+              console.log('[SalesService.listInvoices] Normalizando requireElectronicInvoice para factura:', inv.number);
+            }
+            
+            // Construir el objeto de retorno solo con los campos necesarios, asegurando serialización correcta
+            const saleSoldAt = inv.sale.soldAt instanceof Date 
+              ? inv.sale.soldAt.toISOString() 
+              : typeof inv.sale.soldAt === 'string' 
+                ? inv.sale.soldAt 
+                : String(inv.sale.soldAt);
+            
+            return {
+              id: inv.id,
+              number: inv.number,
+              issuedAt: inv.issuedAt instanceof Date ? inv.issuedAt.toISOString() : inv.issuedAt,
+              status: inv.status,
+              subtotal: Number(inv.subtotal),
+              taxTotal: Number(inv.taxTotal),
+              discountTotal: Number(inv.discountTotal),
+              grandTotal: Number(inv.grandTotal),
+              saleId: inv.saleId,
+              customerId: inv.customerId,
+              customer: inv.customer,
+              sale: {
+                id: inv.sale.id,
+                soldAt: saleSoldAt,
+                requireElectronicInvoice,
+              },
+              dianDocument: inv.dianDocument,
+            };
+          }
+          
+          // Si el valor ya está definido, asegurar que soldAt esté serializado correctamente
+          if (inv.sale.soldAt instanceof Date) {
+            return {
+              ...inv,
+              sale: {
+                ...inv.sale,
+                soldAt: inv.sale.soldAt.toISOString(),
+              },
+            };
+          }
+        }
+        
+        // Asegurar que issuedAt esté serializado correctamente si es Date
+        if (inv.issuedAt instanceof Date) {
+          return {
+            ...inv,
+            issuedAt: inv.issuedAt.toISOString(),
+          };
+        }
+        
+        return inv;
+      } catch (error) {
+        // Si hay un error al procesar, devolver el objeto original
+        // eslint-disable-next-line no-console
+        console.error('[SalesService.listInvoices] Error al procesar factura:', inv.number, error);
+        return inv;
+      }
+    });
+
+    try {
+      return {
+        data: normalizedData,
+        meta: buildPaginationMeta(total, page, limit),
+      };
+    } catch (error) {
+      // Si hay un error al construir la respuesta, loggear y devolver datos sin normalizar
+      // eslint-disable-next-line no-console
+      console.error('[SalesService.listInvoices] Error al construir respuesta:', error);
+      return {
+        data,
+        meta: buildPaginationMeta(total, page, limit),
+      };
+    }
   }
 
   /**

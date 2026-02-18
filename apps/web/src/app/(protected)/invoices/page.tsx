@@ -32,8 +32,9 @@ import {
 import { Skeleton } from '@shared/components/ui/skeleton';
 import { Pagination } from '@shared/components/Pagination';
 import { formatMoney, formatDate } from '@shared/utils/format';
-import { FileText, Search, ExternalLink, Ban } from 'lucide-react';
+import { FileText, Search, ExternalLink, Ban, RotateCw } from 'lucide-react';
 import { useInvoicesList, useVoidInvoice } from '@features/invoices/hooks';
+import { useRetryPendingDianDocuments } from '@features/dian/hooks';
 import type { InvoiceStatus, InvoiceListItem } from '@features/invoices/types';
 
 const SEARCH_DEBOUNCE_MS = 300;
@@ -52,18 +53,49 @@ function getInvoiceDisplayStatus(inv: InvoiceListItem): { label: string; classNa
   if (inv.status === 'DRAFT') {
     return { label: 'Borrador', className: 'bg-muted text-muted-foreground' };
   }
-  const dianStatus = inv.dianDocument?.status;
+  
+  // PRIORIDAD 1: Si la venta NO requiere factura electrónica, siempre es Local
+  // (independientemente de si hay o no documento DIAN)
+  // Verificar explícitamente que requireElectronicInvoice sea false (no undefined, null, ni true)
+  if (inv.sale && inv.sale.requireElectronicInvoice === false) {
+    return {
+      label: 'Local',
+      className: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
+      title: 'Documento interno (no requiere factura electrónica DIAN)',
+    };
+  }
+  
+  // PRIORIDAD 2: Si no hay documento DIAN pero la venta SÍ requería factura electrónica,
+  // está pendiente de creación/envío (en cola)
+  // También si no hay venta asociada o requireElectronicInvoice es undefined/null (asumimos true por defecto)
+  if (!inv.dianDocument) {
+    return {
+      label: 'En cola DIAN',
+      className: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400',
+      title: 'Pendiente de envío a DIAN',
+    };
+  }
+  
+  // PRIORIDAD 3: Si hay documento DIAN, mostrar estado según DIAN
+  const dianStatus = inv.dianDocument.status;
   if (dianStatus === 'DRAFT') {
     return { label: 'En cola DIAN', className: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400' };
   }
   if (dianStatus === 'REJECTED') {
-    const err = inv.dianDocument?.lastError ?? '';
+    const err = inv.dianDocument.lastError ?? '';
     return {
       label: 'Rechazada por DIAN',
       className: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
       title: err ? `DIAN: ${err}` : undefined,
     };
   }
+  if (dianStatus === 'SENT') {
+    return { label: 'Enviada a DIAN', className: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400' };
+  }
+  if (dianStatus === 'ACCEPTED') {
+    return { label: 'Emitida', className: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' };
+  }
+  // Por defecto, si tiene documento DIAN pero estado desconocido
   return { label: 'Emitida', className: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' };
 }
 
@@ -109,6 +141,7 @@ export default function InvoicesPage() {
 
   const [invoiceToVoid, setInvoiceToVoid] = useState<InvoiceListItem | null>(null);
   const voidMutation = useVoidInvoice();
+  const retryDianMutation = useRetryPendingDianDocuments();
 
   const limit = 20;
   const listParams = useMemo(
@@ -187,6 +220,26 @@ export default function InvoicesPage() {
                   {s === 'all' ? 'Todas' : STATUS_LABELS[s]}
                 </button>
               ))}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="gap-1.5 ml-auto"
+                onClick={() => {
+                  retryDianMutation.mutate(undefined, {
+                    onSuccess: (res) => {
+                      toast.success(res.enqueued > 0 ? `Se encolaron ${res.enqueued} documento(s) para reenvío a DIAN.` : res.message);
+                    },
+                    onError: (e: { message?: string }) => {
+                      toast.error(e?.message ?? 'Error al reintentar envíos DIAN');
+                    },
+                  });
+                }}
+                disabled={retryDianMutation.isPending}
+              >
+                <RotateCw className={`h-4 w-4 ${retryDianMutation.isPending ? 'animate-spin' : ''}`} />
+                Reintentar envíos DIAN pendientes
+              </Button>
             </div>
           </div>
 

@@ -1,12 +1,12 @@
 /**
- * Seed: Plan "Todo incluido", Tenant por defecto, Permission, Role (admin, user), UserRole,
- * usuario Panel proveedor (platform) y usuario administrador del tenant (admin negocio).
+ * Seed: permisos, roles, plan "Todo incluido" y usuarios.
  * Ejecutar tras migración: npx prisma db seed
  *
- * Correos de prueba por defecto (sin PLATFORM_ADMIN_* / TENANT_ADMIN_* en env):
- *   - Panel proveedor: platform@proveedor.local / PlatformProveedor1!
- *   - Admin tenant:    admin@negocio.local / AdminNegocio1!
- * Ver docs/ROLES_Y_PERMISOS_DISEÑO.md y docs/historico/RENDER_SOLO_3_USUARIOS.md
+ * Si defines PLATFORM_ADMIN_EMAIL y PLATFORM_ADMIN_PASSWORD en .env (mín. 8 caracteres):
+ *   - Modo "todo vacío": solo se crea tu usuario (Panel proveedor). 0 empresas, sin datos de prueba.
+ * Si no los defines:
+ *   - Se crean usuario Panel proveedor (platform@proveedor.local) y admin de negocio (admin@negocio.local).
+ * Ver docs/PASO_A_PASO_SEED_MI_CORREO.md
  */
 
 import { PrismaClient, RoleName } from '@prisma/client';
@@ -34,6 +34,13 @@ const PLATFORM_ADMIN_PASSWORD =
 /** Administrador del tenant por defecto (correos de prueba si no se definen en env). */
 const TENANT_ADMIN_EMAIL = process.env.TENANT_ADMIN_EMAIL?.trim() || 'admin@negocio.local';
 const TENANT_ADMIN_PASSWORD = process.env.TENANT_ADMIN_PASSWORD?.trim() || 'AdminNegocio1!';
+
+/** Si true, solo se crea plan mínimo, permisos, roles y tu usuario (PLATFORM_ADMIN_EMAIL). Sin empresas ni usuarios de prueba.
+ *  Se activa automáticamente cuando tienes PLATFORM_ADMIN_EMAIL y PLATFORM_ADMIN_PASSWORD en .env (todo vacío, solo tu acceso). */
+const SEED_ONLY_PLATFORM_ADMIN =
+  process.env.SEED_ONLY_PLATFORM_ADMIN === 'true' ||
+  process.env.SEED_ONLY_PLATFORM_ADMIN === '1' ||
+  (Boolean(envPlatformEmail && envPlatformPassword && envPlatformPassword.length >= 8));
 
 /** Módulos del producto (alineado con ARQUITECTURA_MODULAR_SAAS). Plan "Todo incluido" los tiene todos. */
 const MODULE_CODES = [
@@ -67,14 +74,14 @@ function buildPermissionSlugs(): { resource: string; action: string }[] {
 async function main() {
   const slugList = buildPermissionSlugs();
 
-  // 1. Plan "Todo incluido" (todos los módulos) — compatibilidad con tenant por defecto
+  // 1. Plan "Todo incluido" (todos los módulos, con DIAN) — compatibilidad con tenant por defecto
   let plan = await prisma.plan.findFirst({ where: { slug: 'all' } });
   if (!plan) {
     plan = await prisma.plan.create({
       data: {
         name: 'Todo incluido',
         slug: 'all',
-        description: 'Todos los módulos activos (comportamiento por defecto)',
+        description: 'Todos los módulos activos, incluye facturación electrónica DIAN.',
         maxUsers: 50,
         isActive: true,
       },
@@ -84,15 +91,18 @@ async function main() {
         data: { planId: plan.id, moduleCode: code },
       });
     }
-    console.log('Plan "Todo incluido" creado con', MODULE_CODES.length, 'módulos');
+    console.log('Plan "Todo incluido" creado con', MODULE_CODES.length, 'módulos (con DIAN)');
   }
 
-  // 1.1 Planes de ejemplo: Básico, Premium, Empresarial
+  // 1.1 Planes de ejemplo: sin DIAN y con DIAN (se omiten si SEED_ONLY_PLATFORM_ADMIN=true)
+  if (!SEED_ONLY_PLATFORM_ADMIN) {
   const examplePlans = [
+    { slug: 'sin-dian', name: 'Plan sin DIAN', description: 'Ventas, inventario y clientes. Sin facturación electrónica DIAN.', priceMonthly: 79_000, priceYearly: 790_000, maxUsers: 5, moduleCodes: ['core', 'inventory'] as const },
+    { slug: 'con-dian', name: 'Plan con DIAN', description: 'Incluye facturación electrónica DIAN, proveedores y reportes.', priceMonthly: 179_000, priceYearly: 1_790_000, maxUsers: 25, moduleCodes: ['core', 'inventory', 'suppliers', 'electronic_invoicing', 'advanced_reports'] as const },
     {
       slug: 'basico',
-      name: 'Plan Básico',
-      description: 'Ideal para empezar: ventas, inventario y clientes.',
+      name: 'Plan Básico (sin DIAN)',
+      description: 'Ideal para empezar: ventas, inventario y clientes. Sin facturación electrónica.',
       priceMonthly: 99_000,
       priceYearly: 990_000,
       maxUsers: 5,
@@ -100,8 +110,8 @@ async function main() {
     },
     {
       slug: 'premium',
-      name: 'Plan Premium',
-      description: 'Incluye proveedores, facturación electrónica y reportes avanzados.',
+      name: 'Plan Premium (con DIAN)',
+      description: 'Incluye facturación electrónica DIAN, proveedores y reportes avanzados.',
       priceMonthly: 199_000,
       priceYearly: 1_990_000,
       maxUsers: 25,
@@ -109,8 +119,8 @@ async function main() {
     },
     {
       slug: 'empresarial',
-      name: 'Plan Empresarial',
-      description: 'Todo: auditoría, backups y soporte completo.',
+      name: 'Plan Empresarial (con DIAN)',
+      description: 'Todo: DIAN, auditoría, backups y soporte completo.',
       priceMonthly: 399_000,
       priceYearly: 3_990_000,
       maxUsers: 50,
@@ -145,6 +155,7 @@ async function main() {
       console.log('Plan ejemplo actualizado con maxUsers:', p.name, '->', p.maxUsers);
     }
   }
+  }
   // Backfill maxUsers para plan "Todo incluido" si existe sin límite
   const allPlan = await prisma.plan.findFirst({ where: { slug: 'all' } });
   if (allPlan != null && allPlan.maxUsers == null) {
@@ -155,40 +166,48 @@ async function main() {
     console.log('Plan "Todo incluido" actualizado con maxUsers: 50');
   }
 
-  // 2. Tenant por defecto (con plan "Todo incluido")
-  let tenant = await prisma.tenant.findFirst({ where: { slug: 'default' } });
-  if (!tenant) {
-    tenant = await prisma.tenant.create({
-      data: { name: 'Negocio principal', slug: 'default', planId: plan.id, isActive: true },
-    });
-    console.log('Tenant por defecto creado:', tenant.id);
-  } else if (!tenant.planId) {
-    tenant = await prisma.tenant.update({
-      where: { id: tenant.id },
-      data: { planId: plan.id },
-    });
-    console.log('Tenant por defecto actualizado con planId:', plan.id);
-  }
+  // 2. Tenant por defecto (con plan "Todo incluido") — se omite si SEED_ONLY_PLATFORM_ADMIN=true
+  let tenant: { id: string; planId: string | null } | null = null;
+  if (!SEED_ONLY_PLATFORM_ADMIN) {
+    tenant = await prisma.tenant.findFirst({ where: { slug: 'default' } });
+    if (!tenant) {
+      tenant = await prisma.tenant.create({
+        data: { name: 'Negocio principal', slug: 'default', planId: plan.id, isActive: true },
+      });
+      console.log('Tenant por defecto creado:', tenant.id);
+    } else {
+      // Unificar nombre si la migración lo creó como "Default"; asegurar planId
+      const update: { planId: string; name?: string } = { planId: plan.id };
+      const current = await prisma.tenant.findUnique({ where: { id: tenant.id }, select: { name: true } });
+      if (current?.name === 'Default') update.name = 'Negocio principal';
+      tenant = await prisma.tenant.update({
+        where: { id: tenant.id },
+        data: update,
+      });
+      if (update.name) console.log('Tenant por defecto renombrado a "Negocio principal"');
+      else if (!tenant.planId) console.log('Tenant por defecto actualizado con planId:', plan.id);
+    }
 
-  // 2.1 Suscripción para tenants que no tengan (backfill para BD existentes)
-  const tenantsWithoutSub = await prisma.tenant.findMany({
-    where: { subscription: null },
-    select: { id: true, planId: true },
-  });
-  const now = new Date();
-  const periodEnd = new Date(now);
-  periodEnd.setDate(periodEnd.getDate() + 30);
-  for (const t of tenantsWithoutSub) {
-    await prisma.subscription.create({
-      data: {
-        tenantId: t.id,
-        planId: t.planId,
-        status: 'ACTIVE',
-        currentPeriodStart: now,
-        currentPeriodEnd: periodEnd,
-      },
+    // 2.1 Suscripción para tenants que no tengan (backfill para BD existentes)
+    const tenantsWithoutSub = await prisma.tenant.findMany({
+      where: { subscription: null },
+      select: { id: true, planId: true },
     });
-    console.log('Subscription creada para tenant:', t.id);
+    const now = new Date();
+    const periodEnd = new Date(now);
+    periodEnd.setDate(periodEnd.getDate() + 30);
+    for (const t of tenantsWithoutSub) {
+      await prisma.subscription.create({
+        data: {
+          tenantId: t.id,
+          planId: t.planId,
+          status: 'ACTIVE',
+          currentPeriodStart: now,
+          currentPeriodEnd: periodEnd,
+        },
+      });
+      console.log('Subscription creada para tenant:', t.id);
+    }
   }
 
   // 3. Permisos (upsert por resource+action)
@@ -271,28 +290,30 @@ async function main() {
     console.log('Rol user creado con', userPermIds.length, 'permisos');
   }
 
-  // 5. Asignar tenant a usuarios existentes y UserRole según role legacy
-  const users = await prisma.user.findMany({
-    select: { id: true, email: true, role: true },
-  });
-  for (const u of users) {
-    await prisma.user.update({
-      where: { id: u.id },
-      data: { tenantId: tenant.id },
+  // 5. Asignar tenant a usuarios existentes y UserRole según role legacy (solo si hay tenant)
+  if (tenant) {
+    const users = await prisma.user.findMany({
+      select: { id: true, email: true, role: true },
     });
-    const existingUserRole = await prisma.userRole.findFirst({
-      where: { userId: u.id },
-    });
-    if (!existingUserRole) {
-      const roleId = u.role === RoleName.ADMIN ? adminRole!.id : userRole!.id;
-      await prisma.userRole.create({
-        data: {
-          userId: u.id,
-          roleId,
-          tenantId: tenant.id,
-        },
+    for (const u of users) {
+      await prisma.user.update({
+        where: { id: u.id },
+        data: { tenantId: tenant.id },
       });
-      console.log('UserRole asignado:', u.email, '->', u.role === RoleName.ADMIN ? 'admin' : 'user');
+      const existingUserRole = await prisma.userRole.findFirst({
+        where: { userId: u.id },
+      });
+      if (!existingUserRole) {
+        const roleId = u.role === RoleName.ADMIN ? adminRole!.id : userRole!.id;
+        await prisma.userRole.create({
+          data: {
+            userId: u.id,
+            roleId,
+            tenantId: tenant.id,
+          },
+        });
+        console.log('UserRole asignado:', u.email, '->', u.role === RoleName.ADMIN ? 'admin' : 'user');
+      }
     }
   }
 
@@ -333,30 +354,47 @@ async function main() {
     console.log('Admin de plataforma corregido (tenantId = null):', PLATFORM_ADMIN_EMAIL);
   }
 
-  // 7. Usuario administrador del tenant por defecto (acceso a todo el negocio)
-  let tenantAdmin = await prisma.user.findFirst({
-    where: { email: TENANT_ADMIN_EMAIL },
-    select: { id: true },
-  });
-  if (!tenantAdmin && TENANT_ADMIN_PASSWORD.length >= 8) {
-    const tenantAdminHash = await argon2.hash(TENANT_ADMIN_PASSWORD);
-    tenantAdmin = await prisma.user.create({
-      data: {
-        email: TENANT_ADMIN_EMAIL,
-        passwordHash: tenantAdminHash,
-        role: RoleName.ADMIN,
-        tenantId: tenant.id,
-      },
+  // 7. Usuario administrador del tenant por defecto (acceso a todo el negocio) — solo si hay tenant
+  if (tenant) {
+    let tenantAdmin = await prisma.user.findFirst({
+      where: { email: TENANT_ADMIN_EMAIL },
       select: { id: true },
     });
-    await prisma.userRole.create({
-      data: {
-        userId: tenantAdmin.id,
-        roleId: adminRole!.id,
-        tenantId: tenant.id,
-      },
+    if (!tenantAdmin && TENANT_ADMIN_PASSWORD.length >= 8) {
+      const tenantAdminHash = await argon2.hash(TENANT_ADMIN_PASSWORD);
+      tenantAdmin = await prisma.user.create({
+        data: {
+          email: TENANT_ADMIN_EMAIL,
+          passwordHash: tenantAdminHash,
+          role: RoleName.ADMIN,
+          tenantId: tenant.id,
+        },
+        select: { id: true },
+      });
+      await prisma.userRole.create({
+        data: {
+          userId: tenantAdmin.id,
+          roleId: adminRole!.id,
+          tenantId: tenant.id,
+        },
+      });
+      console.log('Admin de tenant creado:', TENANT_ADMIN_EMAIL);
+    }
+  }
+
+  // 8. Modo vacío: quitar tenant por defecto (creado por migración) y cualquier usuario que no sea el tuyo
+  if (SEED_ONLY_PLATFORM_ADMIN) {
+    const defaultTenant = await prisma.tenant.findFirst({ where: { slug: 'default' }, select: { id: true } });
+    if (defaultTenant) {
+      await prisma.tenant.delete({ where: { id: defaultTenant.id } });
+      console.log('Tenant por defecto eliminado (panel quedará con 0 empresas).');
+    }
+    const deleted = await prisma.user.deleteMany({
+      where: { email: { not: PLATFORM_ADMIN_EMAIL } },
     });
-    console.log('Admin de tenant creado:', TENANT_ADMIN_EMAIL);
+    if (deleted.count > 0) {
+      console.log('Usuarios de prueba eliminados; solo queda:', PLATFORM_ADMIN_EMAIL);
+    }
   }
 }
 

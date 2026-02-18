@@ -31,6 +31,21 @@ export default function SaleDetailPage() {
   const id = typeof params?.id === 'string' ? params.id : null;
   const { data: sale, isLoading, isError, error } = useSale(id);
 
+  // Calcular dianDocumentId ANTES de cualquier return condicional
+  // para que el hook siempre se llame en el mismo orden
+  const soldAt = sale?.soldAt ? new Date(sale.soldAt).toLocaleString() : '—';
+  const items = sale?.items ?? [];
+  type InvoiceLike = { id?: string; number?: string; dianDocument?: { id: string } | null } | string;
+  const invoices: InvoiceLike[] = (sale?.invoices ?? []) as InvoiceLike[];
+  const firstInvoiceWithDian = invoices.find(
+    (inv): inv is { id: string; number: string; dianDocument?: { id: string } | null } =>
+      typeof inv === 'object' && inv !== null && 'dianDocument' in inv && inv.dianDocument?.id != null,
+  );
+  const dianDocumentId = firstInvoiceWithDian?.dianDocument?.id ?? null;
+  
+  // Hook siempre se llama, pero la query solo se ejecuta si hay dianDocumentId
+  const { data: dianStatus } = useDianDocumentStatus(dianDocumentId);
+
   if (!id) {
     router.replace('/sales');
     return null;
@@ -72,17 +87,6 @@ export default function SaleDetailPage() {
       </div>
     );
   }
-
-  const soldAt = sale.soldAt ? new Date(sale.soldAt).toLocaleString() : '—';
-  const items = sale.items ?? [];
-  type InvoiceLike = { id?: string; number?: string; dianDocument?: { id: string } | null } | string;
-  const invoices: InvoiceLike[] = (sale.invoices ?? []) as InvoiceLike[];
-  const firstInvoiceWithDian = invoices.find(
-    (inv): inv is { id: string; number: string; dianDocument?: { id: string } | null } =>
-      typeof inv === 'object' && inv !== null && 'dianDocument' in inv && inv.dianDocument?.id != null,
-  );
-  const dianDocumentId = firstInvoiceWithDian?.dianDocument?.id ?? null;
-  const { data: dianStatus } = useDianDocumentStatus(dianDocumentId);
 
   return (
     <div className="space-y-6">

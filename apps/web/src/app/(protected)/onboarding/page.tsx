@@ -26,6 +26,17 @@ export default function OnboardingPage() {
   const [skippedStep2, setSkippedStep2] = useState(false);
   const [openingAmount, setOpeningAmount] = useState('0');
 
+  /** Formatea número con punto como separador de miles (ej: 20000 → "20.000"). */
+  const formatMonto = (value: string) => {
+    const digits = value.replace(/\D/g, '');
+    if (digits.length === 0) return '';
+    return digits.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  };
+
+  const handleMontoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setOpeningAmount(formatMonto(e.target.value));
+  };
+
   const data = status.data;
   const apiStep = data?.step ?? 1;
   const onboardingStatus = data?.status ?? 'not_started';
@@ -56,7 +67,7 @@ export default function OnboardingPage() {
   };
 
   const handleAbrirCaja = async () => {
-    const amount = Number(openingAmount) || 0;
+    const amount = Number(openingAmount.replace(/\./g, '')) || 0;
     await openSession.mutateAsync({ openingAmount: amount });
     await status.refetch();
   };
@@ -155,12 +166,12 @@ export default function OnboardingPage() {
               <Label htmlFor="monto">Monto inicial</Label>
               <Input
                 id="monto"
-                type="number"
-                min="0"
-                step="1"
+                type="text"
+                inputMode="numeric"
                 value={openingAmount}
-                onChange={(e) => setOpeningAmount(e.target.value)}
+                onChange={handleMontoChange}
                 placeholder="0"
+                aria-label="Monto inicial con formato de miles (ej: 20.000)"
               />
             </div>
             <div className="flex flex-col gap-2">

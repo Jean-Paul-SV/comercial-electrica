@@ -7,6 +7,11 @@ import {
   getDianConfigStatus,
   updateDianConfig,
   uploadCertificate,
+  retryPendingDianDocuments,
+  getDianConfigForTenant,
+  getDianConfigStatusForTenant,
+  updateDianConfigForTenant,
+  uploadCertificateForTenant,
 } from './api';
 import { useAuth } from '@shared/providers/AuthProvider';
 import type {
@@ -17,6 +22,13 @@ import type {
 const DIAN_CONFIG_KEY = ['dian', 'config'] as const;
 const DIAN_CONFIG_STATUS_KEY = ['dian', 'config-status'] as const;
 
+function providerDianConfigKey(tenantId: string) {
+  return ['provider', 'tenants', tenantId, 'dian-config'] as const;
+}
+function providerDianConfigStatusKey(tenantId: string) {
+  return ['provider', 'tenants', tenantId, 'dian-config-status'] as const;
+}
+
 export function useDianDocumentStatus(documentId: string | null) {
   const { token } = useAuth();
 
@@ -24,6 +36,19 @@ export function useDianDocumentStatus(documentId: string | null) {
     queryKey: ['dian', 'document', documentId],
     enabled: Boolean(token && documentId),
     queryFn: () => getDocumentStatus(documentId!, token!),
+  });
+}
+
+export function useRetryPendingDianDocuments() {
+  const { token } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: () => retryPendingDianDocuments(token!),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['dian'] });
+    },
   });
 }
 
@@ -71,6 +96,59 @@ export function useUploadCertificate() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: DIAN_CONFIG_KEY });
       queryClient.invalidateQueries({ queryKey: DIAN_CONFIG_STATUS_KEY });
+    },
+  });
+}
+
+/** Panel proveedor: configuración DIAN de una empresa por tenantId */
+export function useDianConfigForTenant(tenantId: string | null) {
+  const { token } = useAuth();
+
+  return useQuery({
+    queryKey: providerDianConfigKey(tenantId ?? ''),
+    enabled: Boolean(token && tenantId),
+    queryFn: () => getDianConfigForTenant(tenantId!, token!),
+  });
+}
+
+export function useDianConfigStatusForTenant(tenantId: string | null) {
+  const { token } = useAuth();
+
+  return useQuery({
+    queryKey: providerDianConfigStatusKey(tenantId ?? ''),
+    enabled: Boolean(token && tenantId),
+    queryFn: () => getDianConfigStatusForTenant(tenantId!, token!),
+  });
+}
+
+export function useUpdateDianConfigForTenant(tenantId: string | null) {
+  const { token } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: UpdateDianConfigPayload) =>
+      updateDianConfigForTenant(tenantId!, token!, payload),
+    onSuccess: (_, __, context) => {
+      if (tenantId) {
+        queryClient.invalidateQueries({ queryKey: providerDianConfigKey(tenantId) });
+        queryClient.invalidateQueries({ queryKey: providerDianConfigStatusKey(tenantId) });
+      }
+    },
+  });
+}
+
+export function useUploadCertificateForTenant(tenantId: string | null) {
+  const { token } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: UploadCertificatePayload) =>
+      uploadCertificateForTenant(tenantId!, token!, payload),
+    onSuccess: () => {
+      if (tenantId) {
+        queryClient.invalidateQueries({ queryKey: providerDianConfigKey(tenantId) });
+        queryClient.invalidateQueries({ queryKey: providerDianConfigStatusKey(tenantId) });
+      }
     },
   });
 }

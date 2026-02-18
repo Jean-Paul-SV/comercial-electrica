@@ -468,23 +468,40 @@ export class AuthService {
       }
       throw new UnauthorizedException('Credenciales inválidas.');
     }
-    // En producción: restringir login solo a correos permitidos (ej. 3 usuarios)
+    // Restringir login: ALLOWED_LOGIN_EMAILS (lista) o, si no está definida, solo PLATFORM_ADMIN_EMAIL
     const allowedEmailsRaw = process.env.ALLOWED_LOGIN_EMAILS?.trim();
+    let allowed: string[] = [];
     if (allowedEmailsRaw) {
-      const allowed = allowedEmailsRaw
+      allowed = allowedEmailsRaw
         .split(',')
         .map((e) => e.trim().toLowerCase())
         .filter(Boolean);
-      if (allowed.length > 0 && !allowed.includes(user.email.toLowerCase())) {
-        try {
-          await this.audit.logAuth('login_failed', user.id, { email, reason: 'not_allowed' });
-        } catch (auditErr) {
-          console.error('Error al registrar auditoría login_failed:', auditErr);
-        }
-        throw new UnauthorizedException('Credenciales inválidas.');
+    } else {
+      const platformEmail = process.env.PLATFORM_ADMIN_EMAIL?.trim();
+      if (platformEmail) {
+        allowed = [platformEmail.toLowerCase()];
       }
     }
-    const ok = await argon2.verify(user.passwordHash, dto.password);
+    if (allowed.length > 0 && !allowed.includes(user.email.toLowerCase())) {
+      try {
+        await this.audit.logAuth('login_failed', user.id, { email, reason: 'not_allowed' });
+      } catch (auditErr) {
+        console.error('Error al registrar auditoría login_failed:', auditErr);
+      }
+      throw new UnauthorizedException('Credenciales inválidas.');
+    }
+    let ok = false;
+    try {
+      ok = await argon2.verify(user.passwordHash, dto.password);
+    } catch (hashErr) {
+      console.warn('[AuthService.login] Error al verificar contraseña (hash inválido o corrupto):', hashErr);
+      try {
+        await this.audit.logAuth('login_failed', user.id, { email });
+      } catch (auditErr) {
+        console.error('Error al registrar auditoría login_failed:', auditErr);
+      }
+      throw new UnauthorizedException('Credenciales inválidas.');
+    }
     if (!ok) {
       try {
         await this.audit.logAuth('login_failed', user.id, { email });
@@ -509,8 +526,7 @@ export class AuthService {
     }
     const payload: JwtPayload = {
       sub: user.id,
-      // email removido del payload por seguridad
-      role: user.role,
+      role: user.role ?? RoleName.USER,
       tenantId: effectiveTenantId ?? undefined,
       isPlatformAdmin: user.tenantId === null,
     };

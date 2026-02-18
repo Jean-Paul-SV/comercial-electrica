@@ -46,6 +46,9 @@
 
 ## Parte 2: Pendiente / siguientes pasos
 
+> **Nota (2026-02-16):** A nivel de **código y documentación**, todo lo necesario para producción ya se completó (ver `ESTADO_PROYECTO.md` y `IMPLEMENTACIONES_PRODUCCION.md`).  
+> Lo que queda en esta sección debe interpretarse como **checklist operativo** para cada despliegue/cliente (validar envs reales, ejecutar pruebas manuales en el entorno, auditoría externa, etc.).
+
 ### Inmediato (esta semana)
 - [ ] **Probar correcciones de seguridad** (guía: [PRUEBAS_MANUALES_SEGURIDAD.md](./PRUEBAS_MANUALES_SEGURIDAD.md)):
   - [x] API sin `DATABASE_URL` / `JWT_ACCESS_SECRET` → falla con mensaje claro (test automático en `config-validation.module.spec.ts`)

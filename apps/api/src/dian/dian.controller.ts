@@ -10,6 +10,8 @@ import {
   UseGuards,
   ForbiddenException,
 } from '@nestjs/common';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 import {
   ApiTags,
   ApiOperation,
@@ -39,6 +41,7 @@ export class DianController {
   constructor(
     private readonly dianService: DianService,
     private readonly permissions: PermissionsService,
+    @InjectQueue('dian') private readonly dianQueue: Queue,
   ) {}
 
   private getTenantId(req: { user?: { tenantId?: string } }): string {
@@ -247,6 +250,43 @@ export class DianController {
     return {
       message: 'Documento procesado.',
       dianDocumentId: id,
+    };
+  }
+
+  @Post('documents/retry-pending')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Reintentar envíos DIAN pendientes',
+    description:
+      'Reencola todos los documentos del tenant en estado DRAFT o REJECTED para que el worker los procese de nuevo.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Documentos encolados',
+    schema: {
+      type: 'object',
+      properties: {
+        enqueued: { type: 'number', description: 'Cantidad de documentos encolados' },
+        message: { type: 'string' },
+      },
+    },
+  })
+  async retryPendingDocuments(@Req() req: { user?: { tenantId?: string } }) {
+    const tenantId = this.getTenantId(req);
+    const ids = await this.dianService.getPendingDocumentIds(tenantId);
+    for (const dianDocumentId of ids) {
+      await this.dianQueue.add(
+        'send',
+        { dianDocumentId },
+        { attempts: 10, backoff: { type: 'exponential', delay: 5000 } },
+      );
+    }
+    return {
+      enqueued: ids.length,
+      message:
+        ids.length === 0
+          ? 'No hay documentos pendientes de reenvío.'
+          : `Se encolaron ${ids.length} documento(s) para reenvío.`,
     };
   }
 }

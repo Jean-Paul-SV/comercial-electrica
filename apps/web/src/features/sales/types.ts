@@ -60,6 +60,8 @@ export type CreateSalePayload = {
   items: CreateSaleItemPayload[];
   /** Descuento total en COP (opcional). Se resta del total. */
   discountTotal?: number;
+  /** Si false, la venta genera solo documento interno (sin envío a DIAN). Por defecto true. */
+  requireElectronicInvoice?: boolean;
 };
 
 /** Respuesta al crear una venta (sale, invoice, dianDocument) */
@@ -84,8 +86,9 @@ export type CreateSaleResponse = {
     issuedAt: string;
     subtotal: number;
     taxTotal: number;
+    discountTotal?: number;
     grandTotal: number;
   };
-  dianDocument: { id: string };
+  dianDocument: { id: string } | null;
 };
 

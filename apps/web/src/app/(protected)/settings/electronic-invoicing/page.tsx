@@ -104,7 +104,6 @@ export default function ElectronicInvoicingPage() {
   const [form, setForm] = useState<UpdateDianConfigPayload & { certPassword?: string }>({
     env: 'HABILITACION',
     issuerNit: '',
-    issuerName: '',
     softwareId: '',
     softwarePin: '',
     resolutionNumber: '',
@@ -132,7 +131,6 @@ export default function ElectronicInvoicingPage() {
       ...prev,
       env: config.env ?? 'HABILITACION',
       issuerNit: config.issuerNit ?? '',
-      issuerName: config.issuerName ?? '',
       softwareId: config.softwareId ?? '',
       softwarePin: '', // never prefill
       resolutionNumber: config.resolutionNumber ?? '',
@@ -146,7 +144,6 @@ export default function ElectronicInvoicingPage() {
     const payload: UpdateDianConfigPayload = {
       env: form.env,
       issuerNit: form.issuerNit || undefined,
-      issuerName: form.issuerName || undefined,
       softwareId: form.softwareId || undefined,
       softwarePin: form.softwarePin || undefined,
       resolutionNumber: form.resolutionNumber || undefined,
@@ -154,6 +151,7 @@ export default function ElectronicInvoicingPage() {
       rangeFrom: form.rangeFrom,
       rangeTo: form.rangeTo,
     };
+    // issuerName no se envía: solo se establece al crear la empresa (tenant).
     updateMutation.mutate(payload, {
       onSuccess: () => {
         toast.success('Configuración guardada.');
@@ -327,7 +325,7 @@ export default function ElectronicInvoicingPage() {
             <ul className="list-disc list-inside space-y-2 text-sm text-foreground">
               {status === 'not_configured' && (
                 <>
-                  <li>Complete <strong>Datos del emisor</strong> (NIT y razón social) más abajo.</li>
+                  <li>Complete <strong>Datos del emisor</strong> (NIT; la razón social se define al crear la empresa) más abajo.</li>
                   <li>Ingrese <strong>Software ID</strong> y <strong>PIN</strong> asignados por la DIAN.</li>
                   <li>Suba su <strong>certificado .p12</strong> y contraseña.</li>
                   <li>Configure <strong>Numeración y ambiente</strong> (resolución, prefijo, rango).</li>
@@ -337,7 +335,7 @@ export default function ElectronicInvoicingPage() {
               {status === 'incomplete' && (
                 <>
                   {missing.includes('issuer_nit') && <li>Complete el <strong>NIT</strong> del emisor.</li>}
-                  {missing.includes('issuer_name') && <li>Complete la <strong>Razón social</strong>.</li>}
+                  {missing.includes('issuer_name') && <li>La <strong>razón social</strong> se establece al crear la empresa; contacte al administrador de la plataforma si debe corregirla.</li>}
                   {missing.includes('software_id') && <li>Ingrese el <strong>Software ID</strong> que le asignó la DIAN.</li>}
                   {missing.includes('software_pin') && <li>Ingrese el <strong>PIN</strong> del software.</li>}
                   {missing.includes('certificate') && <li>Suba el archivo <strong>.p12</strong> y la contraseña, luego pulse <strong>Subir certificado</strong>.</li>}
@@ -406,6 +404,9 @@ export default function ElectronicInvoicingPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          <p className="text-xs text-amber-600 dark:text-amber-500 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md px-3 py-2">
+            <strong>Importante (obligación legal):</strong> La razón social y el NIT deben coincidir exactamente con los datos del contribuyente registrado ante la DIAN y la Cámara de Comercio. Usar datos distintos puede invalidar las facturas y generar responsabilidad tributaria.
+          </p>
           <div className="grid gap-2">
             <Label htmlFor="issuerNit">NIT</Label>
             <Input
@@ -416,13 +417,17 @@ export default function ElectronicInvoicingPage() {
             />
           </div>
           <div className="grid gap-2">
-            <Label htmlFor="issuerName">Razón social</Label>
-            <Input
-              id="issuerName"
-              placeholder="Mi Empresa S.A.S."
-              value={form.issuerName}
-              onChange={(e) => setForm((p) => ({ ...p, issuerName: e.target.value }))}
-            />
+            <Label>Razón social</Label>
+            <p className="text-sm text-muted-foreground py-2 px-3 rounded-md bg-muted/50 border border-border">
+              {config?.issuerName ? (
+                <span className="font-medium text-foreground">{config.issuerName}</span>
+              ) : (
+                <span className="italic">No definida (aparecerá &quot;Mi Empresa&quot; en facturas)</span>
+              )}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              La razón social se establece únicamente al crear la empresa. Para cambiarla contacte al administrador de la plataforma.
+            </p>
           </div>
         </CardContent>
       </Card>

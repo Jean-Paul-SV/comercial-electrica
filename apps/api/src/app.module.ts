@@ -36,6 +36,7 @@ import { AuditContextInterceptor } from './common/interceptors/audit-context.int
 import { IdempotencyInterceptor } from './common/interceptors/idempotency.interceptor';
 import { TenantContextInterceptor } from './auth/tenant-context.interceptor';
 import { MailerModule } from './mailer/mailer.module';
+import { PayuModule } from './payu/payu.module';
 import { ConfigValidationModule } from './common/config/config-validation.module';
 
 @Module({
@@ -92,6 +93,7 @@ import { ConfigValidationModule } from './common/config/config-validation.module
     ]),
     ScheduleModule.forRoot(),
     MailerModule,
+    PayuModule,
     CommonModule,
     MetricsModule,
     PrismaModule,

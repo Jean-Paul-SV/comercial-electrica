@@ -170,6 +170,22 @@ export class DianService {
     await this.processDocument(dianDocumentId);
   }
 
+  /**
+   * Devuelve los IDs de documentos DIAN del tenant que están en DRAFT o REJECTED,
+   * para poder reencolarlos (reintentar envío).
+   */
+  async getPendingDocumentIds(tenantId: string): Promise<string[]> {
+    const docs = await this.prisma.dianDocument.findMany({
+      where: {
+        invoice: { tenantId },
+        status: { in: [DianDocumentStatus.DRAFT, DianDocumentStatus.REJECTED] },
+      },
+      select: { id: true },
+      orderBy: { createdAt: 'asc' },
+    });
+    return docs.map((d) => d.id);
+  }
+
   private async runProcessDocument(
     dianDoc: Prisma.DianDocumentGetPayload<{
       include: {
@@ -1616,7 +1632,7 @@ export class DianService {
       update: {
         ...(data.env !== undefined && { env: data.env }),
         ...(data.issuerNit !== undefined && { issuerNit: data.issuerNit }),
-        ...(data.issuerName !== undefined && { issuerName: data.issuerName }),
+        // issuerName no se actualiza por aquí: solo se establece al crear el tenant.
         ...(data.softwareId !== undefined && { softwareId: data.softwareId }),
         ...(data.softwarePin !== undefined && { softwarePin: data.softwarePin }),
         ...(data.resolutionNumber !== undefined && {

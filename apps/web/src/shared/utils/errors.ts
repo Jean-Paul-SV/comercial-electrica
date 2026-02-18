@@ -2,13 +2,23 @@
  * Obtiene un mensaje de error legible para mostrar al usuario.
  * Prioriza el mensaje que devuelve la API; si no hay, usa mensajes genéricos por código HTTP.
  */
+const NETWORK_ERROR_PHRASES = ['failed to fetch', 'network error', 'networkrequestfailed', 'load failed'];
+function isNetworkErrorMessage(msg: string): boolean {
+  const lower = msg.toLowerCase();
+  return NETWORK_ERROR_PHRASES.some((p) => lower.includes(p));
+}
+
 export function getErrorMessage(error: unknown, fallback = 'No se pudo completar la acción.'): string {
   if (error == null) return fallback;
 
   // Error con propiedad message (API client, Error)
   const obj = error as Record<string, unknown>;
-  if (typeof obj.message === 'string' && obj.message.trim()) {
-    return obj.message.trim();
+  const msg = typeof obj.message === 'string' ? obj.message.trim() : '';
+  if (msg) {
+    if (isNetworkErrorMessage(msg)) {
+      return 'No se pudo conectar con el servidor. Comprueba que la API esté en marcha (por ejemplo en http://localhost:3000).';
+    }
+    return msg;
   }
 
   // Códigos HTTP genéricos (solo si no había message)

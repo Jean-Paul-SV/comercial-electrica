@@ -1,4 +1,4 @@
-import { IsOptional, IsBooleanString, IsInt, Min, Max } from 'class-validator';
+import { IsOptional, IsBooleanString, IsInt, Min, Max, IsString } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class ListTenantsQueryDto {
@@ -19,4 +19,14 @@ export class ListTenantsQueryDto {
   @IsOptional()
   @IsBooleanString()
   isActive?: string;
+
+  /** Buscar por nombre de la empresa (coincidencia parcial, case insensitive) */
+  @IsOptional()
+  @IsString()
+  searchName?: string;
+
+  /** Buscar por número/identificador: slug o ID de la empresa */
+  @IsOptional()
+  @IsString()
+  searchNumber?: string;
 }

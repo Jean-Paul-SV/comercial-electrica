@@ -12,9 +12,60 @@ Sistema de gestión integral para ferretería eléctrica: inventario, ventas, ca
 |------------|--------|
 | **API**    | ✅ Operativa (auth, catálogo, ventas, caja, cotizaciones, inventario, proveedores, reportes, auditoría, backups, billing, provider) |
 | **Frontend** | ✅ Next.js operativo (dashboard, ventas, productos, clientes, caja, gastos, cotizaciones, proveedores, compras, reportes, auditoría, configuración, billing) |
-| **DIAN**   | 🔴 Pendiente integración real (XML UBL, firma, envío, PDF/QR) |
+| **DIAN**   | ✅ Implementado a nivel de código (XML UBL 2.1, firma digital, envío, CUFE, PDF/QR); falta solo validar en habilitación/producción con credenciales reales de DIAN. |
 
-Documento de referencia: [`docs/QUE_FALTA_HASTA_LA_FECHA.md`](./docs/QUE_FALTA_HASTA_LA_FECHA.md)
+Documentos de referencia: [`docs/ESTADO_PROYECTO.md`](./docs/ESTADO_PROYECTO.md) y [`docs/IMPLEMENTACIONES_PRODUCCION.md`](./docs/IMPLEMENTACIONES_PRODUCCION.md)
+
+---
+
+## Qué tengo que hacer yo (checklist)
+
+Este checklist es para **ti como usuario/propietario del proyecto** (sin tocar código).  
+Marca cada punto cuando lo tengas listo en tu entorno real.
+
+### 1. Preparar entorno y despliegue
+
+- [ ] Elegir proveedor para **API + PostgreSQL + Redis** y para la **web** (por ejemplo Render + Vercel).
+- [ ] Configurar las variables de entorno base en producción (`DATABASE_URL`, `REDIS_URL`, `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET`, `ALERT_WEBHOOK_SECRET`, `FRONTEND_URL`, `ALLOWED_ORIGINS`, `NEXT_PUBLIC_API_BASE_URL`).
+- [ ] Seguir `docs/DEPLOY.md` para hacer el primer despliegue y comprobar:
+  - [ ] `GET /health` OK en la API.
+  - [ ] La web carga y puedes iniciar sesión.
+
+### 2. DIAN (solo si vas a facturar electrónicamente en Colombia)
+
+- [ ] Conseguir con tu contable/DIAN:
+  - Certificado `.p12` de firma.
+  - Software ID, PIN, NIT emisor y usuario DIAN.
+- [ ] Configurar las variables `DIAN_*` en el entorno de **habilitación**.
+- [ ] Emitir al menos **una factura de prueba** desde Orion en habilitación y verificar:
+  - [ ] Respuesta “aceptada” de DIAN.
+  - [ ] CUFE correcto.
+  - [ ] PDF con QR generado.
+- [ ] Repetir el proceso con credenciales de **producción DIAN**.
+
+### 3. Seguridad, backups y monitoreo
+
+- [ ] Configurar **backups automáticos** de la base de datos (según tu proveedor).
+- [ ] Probar una **restauración** en un entorno de pruebas siguiendo `docs/BACKUP_RESTORE_ESTRATEGIA.md`.
+- [ ] Configurar Redis de producción y `REDIS_URL`.
+- [ ] Configurar canales de **alertas** (Slack, email, webhook) siguiendo `docs/ALERTAS_CONFIGURACION.md` y enviar una alerta de prueba.
+- [ ] Ejecutar las **pruebas manuales de seguridad** de `docs/PRUEBAS_MANUALES_SEGURIDAD.md` en tu entorno (logs sin datos sensibles, errores sin UUIDs, etc.).
+- [ ] Verificar que `/metrics` y `/health` están integrados en tu sistema de monitoreo/dashboards.
+
+### 4. Negocio y soporte
+
+- [ ] Definir el **canal de soporte** (WhatsApp/email/teléfono) y los **tiempos de respuesta** que vas a ofrecer a tus clientes.
+- [ ] Configurar el botón de soporte en la web (`NEXT_PUBLIC_SUPPORT_WHATSAPP_NUMBER` y mensaje opcional).
+- [ ] Definir **planes y precios** y configurarlos en Stripe y en el panel proveedor.
+- [ ] Redactar el **contrato/licencia** de uso del servicio (alcance, SLA, cancelación, etc.).
+- [ ] (Opcional) Configurar dominio propio (`app.tuempresa.com`, `api.tuempresa.com`) y actualizar `ALLOWED_ORIGINS` / `FRONTEND_URL`.
+
+### 5. Alta de clientes y operación día a día
+
+- [ ] Seguir `docs/RUNBOOK_ALTA_CLIENTE.md` cada vez que des de alta una nueva empresa (tenant).
+- [ ] Revisar mensualmente que los **backups** se están generando y que puedes restaurar.
+- [ ] Revisar que las **alertas** siguen llegando (hacer prueba cada cierto tiempo).
+- [ ] Revisar métricas y uso real para ajustar planes, precios y umbrales de alertas.
 
 ---
 
@@ -43,9 +94,6 @@ npm run prisma:migrate -w api
 # Seed: roles/permisos y tenant por defecto
 npm run prisma:seed -w api
 
-# Opcional: solo 2 usuarios (admin + vendedor), sin productos ni ventas
-# npm run db:seed
-
 # Levantar API + Web
 npm run dev
 ```
@@ -54,39 +102,24 @@ npm run dev
 - **Web:** http://localhost:3001  
 - **Swagger:** http://localhost:3000/api/docs  
 
-Login por defecto (tras seed): `admin@example.com` / `Admin123!`
+Login: el correo que configures en `PLATFORM_ADMIN_EMAIL` (Panel proveedor) o, si usas seed completo, `admin@negocio.local` / `AdminNegocio1!`. Ver `docs/PASO_A_PASO_SEED_MI_CORREO.md`.
 
 Guía detallada y solución de problemas: [docs/LEVANTAR_PROYECTO.md](./docs/LEVANTAR_PROYECTO.md).
 
 ---
 
-## Cargar datos para ver todas las funcionalidades
+## Después del seed
 
-Para probar la app con **productos, clientes, ventas, cotizaciones, caja, reportes**, etc., carga el seed de datos reales (500+ registros). Desde la **raíz del proyecto**:
+El único seed del proyecto es el de Prisma (`npm run prisma:seed -w api`): crea plan, permisos, roles y tu usuario de Panel proveedor (si defines `PLATFORM_ADMIN_EMAIL` y `PLATFORM_ADMIN_PASSWORD` en `.env`). Con `SEED_ONLY_PLATFORM_ADMIN=true` la base queda vacía excepto tu usuario. Ver `docs/PASO_A_PASO_SEED_MI_CORREO.md`.
 
-```bash
-# 1. Infra y esquema (si aún no lo hiciste)
-npm run db:up
-npm run prisma:generate -w api
-npm run prisma:migrate -w api
-npm run prisma:seed -w api
-
-# 2. Cargar 500+ datos (categorías, productos, clientes, ventas, cotizaciones, caja, gastos…)
-npm run db:seed:500
-
-# 3. Levantar app
-npm run dev
-```
-
-Luego abre **http://localhost:3001** e inicia sesión con:
+Luego abre **http://localhost:3001** e inicia sesión con tu correo (Panel proveedor) o con el admin del tenant si creaste uno:
 
 | Rol   | Email                | Contraseña |
 |-------|----------------------|------------|
-| Admin | admin@example.com    | Admin123!  |
-| User  | vendedor@example.com | User123!  |
+| Panel proveedor | el de `PLATFORM_ADMIN_EMAIL` | la de `PLATFORM_ADMIN_PASSWORD` |
+| Admin tenant | admin@negocio.local (si no usaste SEED_ONLY_PLATFORM_ADMIN) | AdminNegocio1! |
 
-Con eso podrás ver y usar: Dashboard, Ventas, Productos, Clientes, Caja, Gastos, Cotizaciones, Proveedores, Compras, Reportes, Auditoría, etc.  
-Más detalle: [docs/SEED_500_DATOS_REALES.md](./docs/SEED_500_DATOS_REALES.md).
+Con tu usuario de Panel proveedor podrás dar de alta empresas y gestionar planes; con el admin del tenant, operar dentro de cada negocio (Dashboard, Ventas, Productos, Clientes, Caja, etc.).
 
 ---
 
@@ -193,8 +226,9 @@ Redis se usa para:
 - [Levantar el proyecto](./docs/LEVANTAR_PROYECTO.md) — Primera vez, errores frecuentes
 - [**Primer usuario en producción**](./docs/PRIMER_USUARIO_PRODUCCION.md) — Cómo crear el primer admin cuando subes a producción (sin BD en el repo)
 - [**Datos reales en Vercel (producción)**](./docs/DATOS_REALES_VERCEL_PRODUCCION.md) — Cargar productos, ventas, clientes en la BD de Render para que la web en Vercel muestre datos
-- [Qué falta hasta la fecha](./docs/QUE_FALTA_HASTA_LA_FECHA.md) — Pendientes y prioridades
-- [**Cómo empezar con DIAN**](./docs/COMO_EMPEZAR_CON_DIAN.md) — Orden práctico para integrar facturación electrónica (envío real, CUFE, PDF, consulta)
+- [Estado del proyecto](./docs/ESTADO_PROYECTO.md) — Resumen ejecutivo y estado final
+- [Checklist seguridad y siguientes pasos](./docs/CHECKLIST_SEGURIDAD_Y_SIGUIENTES_PASOS.md) — Qué revisar antes de producción
+- [Qué sigue / roadmap](./docs/QUE_SIGUE.md) — Visión de siguientes pasos
 - [Índice de documentación](./docs/README.md) — Toda la documentación en `docs/`
 - [Solución error EPERM (Prisma)](./docs/SOLUCION_ERROR_EPERM_PRISMA.md) — Común en Windows
 
@@ -202,9 +236,9 @@ Redis se usa para:
 
 ## Próximos pasos
 
-1. **DIAN real** — XML UBL 2.1, firma digital, envío a DIAN, PDF/QR (crítico para facturación en Colombia).
-2. Ajustes y mejoras de UX en el frontend.
-3. Endurecimiento y despliegue en producción (ver `docs/HARDENING_TECNICO_PRODUCCION.md`).
+1. Completar el checklist de la sección **“Qué tengo que hacer yo”** en tu entorno real (especialmente DIAN si facturas en Colombia).
+2. Configurar backups, monitoreo y alertas siguiendo la documentación enlazada.
+3. Para cualquier cambio futuro en el código, usar `docs/CHECKLIST_SEGURIDAD_Y_SIGUIENTES_PASOS.md` y `.github/SECURITY_CHECKLIST.md` como guía.
 
 ---
 

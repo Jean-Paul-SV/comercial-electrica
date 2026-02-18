@@ -52,6 +52,7 @@ export type CreateTenantPayload = {
   adminEmail: string;
   adminName?: string;
   adminPassword?: string;
+  issuerName?: string;
 };
 
 export type CreateTenantResponse = {
@@ -69,6 +70,8 @@ export type PlanListItem = {
   maxUsers: number | null;
   stripePriceId: string | null;
   isActive: boolean;
+  /** Si el plan incluye facturación electrónica DIAN. */
+  includesDian: boolean;
 };
 
 export type CreatePlanPayload = {
@@ -107,4 +110,16 @@ export type ProviderTenantsSummary = {
     moduleCode: string;
     tenantsCount: number;
   }[];
+};
+
+/** Alerta del panel proveedor (planes, empresas, Stripe). */
+export type ProviderAlert = {
+  code: string;
+  severity: 'critical' | 'high' | 'medium' | 'low' | 'info';
+  priority: number;
+  title: string;
+  message: string;
+  count: number;
+  actionLabel: string;
+  actionHref: string;
 };

@@ -1,7 +1,11 @@
 # Qué falta: resumen completo (plan de negocio, técnico, operación)
 
-> **Objetivo:** Una sola lista de **todo** lo que falta por hacer, teniendo en cuenta lo ya implementado (DIAN real, SaaS, panel proveedor, 3 usuarios/seed, móvil, etc.).  
-> **Fecha:** Febrero 2026.  
+> **Estado actual (2026-02-16):** Todo lo identificado en este documento como pendiente en su momento ya fue abordado en el proyecto.  
+> El estado consolidado y actualizado está en `ESTADO_PROYECTO.md` y `IMPLEMENTACIONES_PRODUCCION.md`.  
+> Este archivo se mantiene como **histórico** para entender cómo fuimos cerrando los huecos.
+
+> **Objetivo original:** Una sola lista de **todo** lo que falta por hacer, teniendo en cuenta lo ya implementado (DIAN real, SaaS, panel proveedor, 3 usuarios/seed, móvil, etc.).  
+> **Fecha (histórica):** Febrero 2026.  
 > **Referencias:** `TRAZABILIDAD_FALTA_IMPLEMENTAR.md`, `QUE_FALTA_HASTA_LA_FECHA.md`, `PARA_PRODUCCION_Y_VENTA_COMERCIAL.md`, `SAAS_MODELO_NEGOCIO_Y_OPERACION.md`.
 
 ---

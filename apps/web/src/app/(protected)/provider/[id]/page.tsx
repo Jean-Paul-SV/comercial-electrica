@@ -15,7 +15,7 @@ import { Button } from '@shared/components/ui/button';
 import { Badge } from '@shared/components/ui/badge';
 import { Select } from '@shared/components/ui/select';
 import { Skeleton } from '@shared/components/ui/skeleton';
-import { ArrowLeft, Building2, PauseCircle, PlayCircle } from 'lucide-react';
+import { ArrowLeft, Building2, FileCheck, PauseCircle, PlayCircle } from 'lucide-react';
 import { useTenant, useUpdateTenantStatus, useUpdateTenant, usePlans, useRenewSubscription } from '@features/provider/hooks';
 
 export default function ProviderTenantDetailPage() {
@@ -148,6 +148,29 @@ export default function ProviderTenantDetailPage() {
         </Button>
       </div>
 
+      {/* Facturación electrónica (DIAN) — acceso directo */}
+      <Card className="border-primary/20 bg-primary/5">
+        <CardContent className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pt-6">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <FileCheck className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="font-semibold text-foreground">Facturación electrónica (DIAN)</p>
+              <p className="text-sm text-muted-foreground">
+                NIT, certificado, Software ID y numeración para esta empresa.
+              </p>
+            </div>
+          </div>
+          <Button asChild className="shrink-0">
+            <Link href={`/provider/${tenant.id}/electronic-invoicing`} className="gap-2">
+              <FileCheck className="h-4 w-4" />
+              Configurar DIAN
+            </Link>
+          </Button>
+        </CardContent>
+      </Card>
+
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <CardHeader>
@@ -175,7 +198,7 @@ export default function ProviderTenantDetailPage() {
                   <option value="">Sin plan</option>
                   {plans.map((p) => (
                     <option key={p.id} value={p.id}>
-                      {p.name}
+                      {p.name} — {p.includesDian ? 'Con DIAN' : 'Sin DIAN'}
                     </option>
                   ))}
                 </Select>

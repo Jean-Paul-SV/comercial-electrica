@@ -42,6 +42,8 @@ import { useSalesList, useCreateSale } from '@features/sales/hooks';
 import { useCashSessionsList } from '@features/cash/hooks';
 import { useCustomersList, useCustomerSalesStats } from '@features/customers/hooks';
 import { useProductsList } from '@features/products/hooks';
+import { useDianConfig } from '@features/dian/hooks';
+import { useAuth } from '@shared/providers/AuthProvider';
 import type { CreateSaleItemPayload, CreateSaleResponse } from '@features/sales/types';
 
 const PAYMENT_METHODS = [
@@ -54,8 +56,10 @@ const PAYMENT_METHODS = [
 type SaleLine = { productId: string; qty: number; unitPrice?: number };
 
 export default function SalesPage() {
+  const { token } = useAuth();
   const hasSalesCreate = useHasPermission('sales:create');
   const hasSalesUpdate = useHasPermission('sales:update');
+  const dianConfigQuery = useDianConfig();
   const [page, setPage] = useState(1);
   const [openNewSale, setOpenNewSale] = useState(false);
   const [customerId, setCustomerId] = useState<string>('');
@@ -73,6 +77,7 @@ export default function SalesPage() {
   const [saleCustomerSearch, setSaleCustomerSearch] = useState('');
   const [discountPercent, setDiscountPercent] = useState<number>(0);
   const [applyTax, setApplyTax] = useState<boolean>(true);
+  const [requireElectronicInvoice, setRequireElectronicInvoice] = useState<boolean>(true);
 
   const limit = 20;
   const salesQuery = useSalesList({
@@ -365,6 +370,7 @@ export default function SalesPage() {
     setSaleProductSearch('');
     setSaleCustomerSearch('');
     setDiscountPercent(0);
+    setRequireElectronicInvoice(true);
   };
 
   const submitNewSale = () => {
@@ -390,7 +396,10 @@ export default function SalesPage() {
       paymentMethod,
       items,
       discountTotal: discountCapped > 0 ? discountCapped : undefined,
+      requireElectronicInvoice: requireElectronicInvoice,
     };
+    // Log temporal para depuración
+    console.log('[SalesPage] Creando venta con requireElectronicInvoice:', requireElectronicInvoice, 'payload:', payload);
     createSaleMutation.mutate(
       {
         payload,
@@ -403,14 +412,51 @@ export default function SalesPage() {
           resetForm();
           setLastCreatedSale(data);
         },
-        onError: (e: { message?: string; missingProductIds?: string[] }) => {
+        onError: (e: unknown, variables, context) => {
+          // Log completo del error para depuración - incluir variables y context también
+          try {
+            console.error('[SalesPage] Error completo al crear venta:', {
+              error: e,
+              errorType: typeof e,
+              errorConstructor: e?.constructor?.name,
+              errorKeys: e && typeof e === 'object' ? Object.keys(e) : [],
+              errorString: String(e),
+              errorJSON: JSON.stringify(e, Object.getOwnPropertyNames(e), 2),
+              errorToString: e?.toString(),
+              variables,
+              context,
+              errorMessage: (e as any)?.message,
+              errorStatus: (e as any)?.status,
+              errorResponse: (e as any)?.response,
+            });
+          } catch (logError) {
+            console.error('[SalesPage] Error al loggear el error:', logError);
+            console.error('[SalesPage] Error original (raw):', e);
+          }
+          
           if (isNetworkError(e)) {
             toast.info(
               'Venta guardada localmente. Se enviará al servidor cuando haya conexión.'
             );
             return;
           }
-          const missingIds = e?.missingProductIds;
+          
+          // Intentar extraer información del error de múltiples formas
+          let errorObj: { message?: string | string[]; missingProductIds?: string[]; status?: number; response?: any } = {};
+          
+          // Intentar acceder al error de diferentes formas
+          if (e && typeof e === 'object') {
+            errorObj = e as typeof errorObj;
+            // También intentar acceder a propiedades anidadas
+            if ((e as any).response) {
+              errorObj = { ...errorObj, ...((e as any).response as typeof errorObj) };
+            }
+            if ((e as any).data) {
+              errorObj = { ...errorObj, ...((e as any).data as typeof errorObj) };
+            }
+          }
+          
+          const missingIds = errorObj?.missingProductIds;
           if (missingIds?.length) {
             const lineNumbers = lines
               .map((l, i) => (missingIds.includes(l.productId) ? i + 1 : null))
@@ -423,7 +469,33 @@ export default function SalesPage() {
               `Productos no encontrados o inactivos${lineStr}. Elimine esas líneas o elija otro producto.`
             );
           } else {
-            toast.error(getErrorMessage(e, 'No se pudo registrar la venta'));
+            // Mostrar el mensaje de error del backend si está disponible
+            let errorMessage = 'No se pudo registrar la venta';
+            
+            // Intentar múltiples formas de obtener el mensaje
+            if (errorObj?.message) {
+              errorMessage = Array.isArray(errorObj.message) 
+                ? errorObj.message.join(', ') 
+                : String(errorObj.message);
+            } else if ((e as any)?.message) {
+              errorMessage = Array.isArray((e as any).message)
+                ? (e as any).message.join(', ')
+                : String((e as any).message);
+            } else if (e instanceof Error && e.message) {
+              errorMessage = e.message;
+            } else if (typeof e === 'string') {
+              errorMessage = e;
+            } else if (errorObj?.status === 400 || (e as any)?.status === 400) {
+              errorMessage = 'Error de validación. Verifica los datos ingresados. Revisa la consola para más detalles.';
+            } else if (errorObj?.status === 403 || (e as any)?.status === 403) {
+              errorMessage = 'No tienes permisos para realizar esta acción.';
+            } else if (errorObj?.status === 404 || (e as any)?.status === 404) {
+              errorMessage = 'Recurso no encontrado.';
+            } else if (errorObj?.status === 500 || (e as any)?.status === 500) {
+              errorMessage = 'Error del servidor. Intenta nuevamente más tarde.';
+            }
+            
+            toast.error(errorMessage);
           }
         },
       }
@@ -744,6 +816,31 @@ export default function SalesPage() {
                   <p className="text-xs text-muted-foreground leading-snug">
                     Efectivo, tarjeta, transferencia u otro. En efectivo podrás indicar el monto recibido y el vuelto.
                   </p>
+                </div>
+                <div className="flex items-center gap-2 sm:col-span-2">
+                  <input
+                    type="checkbox"
+                    id="new-sale-require-electronic-invoice"
+                    checked={requireElectronicInvoice}
+                    onChange={(e) => setRequireElectronicInvoice(e.target.checked)}
+                    className="h-4 w-4 rounded border-border"
+                  />
+                  <Label
+                    htmlFor="new-sale-require-electronic-invoice"
+                    className="text-sm text-muted-foreground cursor-pointer"
+                  >
+                    {requireElectronicInvoice ? (
+                      <>
+                        <span className="font-medium text-foreground">Enviar factura electrónica a DIAN</span>
+                        <span className="text-xs block mt-0.5">La factura se enviará a la DIAN y tendrá validez fiscal.</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="font-medium text-foreground">Documento Local</span>
+                        <span className="text-xs block mt-0.5">Solo se genera documento interno (no se envía a DIAN).</span>
+                      </>
+                    )}
+                  </Label>
                 </div>
               </div>
             </div>
@@ -1146,30 +1243,67 @@ export default function SalesPage() {
           </DialogHeader>
           {lastCreatedSale && (
             <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
-              <div id="invoice-print-content" className="space-y-4 rounded-lg border border-border bg-muted/20 p-4 min-w-0">
-                <div className="flex flex-wrap justify-between gap-2 text-sm">
-                  <div className="min-w-0">
-                    <span className="font-medium text-muted-foreground">Factura N° </span>
-                    <span className="font-semibold break-all">{lastCreatedSale.invoice.number}</span>
-                  </div>
-                  <div className="text-muted-foreground shrink-0">
-                    {formatDateTime(lastCreatedSale.invoice.issuedAt)}
+              <div id="invoice-print-content" className="space-y-5 rounded-lg border border-border bg-background p-6 min-w-0 print:p-6 print:border-0 print:rounded-none print:bg-white">
+                {/* Header con información de empresa */}
+                <div className="border-b-2 border-border pb-4 space-y-3">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="space-y-2 flex-1">
+                      <div>
+                        <h1 className="text-2xl font-bold text-foreground tracking-tight">
+                          {(dianConfigQuery.data?.issuerName) || 'Mi Empresa'}
+                        </h1>
+                        {dianConfigQuery.data?.issuerNit && (
+                          <p className="text-sm text-muted-foreground mt-0.5">
+                            NIT: {dianConfigQuery.data.issuerNit}
+                          </p>
+                        )}
+                      </div>
+                      <div className="text-xs text-muted-foreground space-y-0.5">
+                        <p className="font-medium text-foreground">FACTURA DE VENTA</p>
+                        <p>Documento de venta</p>
+                      </div>
+                    </div>
+                    <div className="text-right space-y-1 shrink-0">
+                      <div className="text-lg font-bold text-foreground">N° {lastCreatedSale.invoice.number}</div>
+                      <div className="text-xs text-muted-foreground">{formatDateTime(lastCreatedSale.invoice.issuedAt)}</div>
+                    </div>
                   </div>
                 </div>
-                {(lastCreatedSale.sale.customer?.name ?? (lastCreatedSale.sale.customerId && customers.find((c) => c.id === lastCreatedSale.sale.customerId)?.name)) && (
-                  <p className="text-sm break-words">
-                    <span className="text-muted-foreground">Cliente: </span>
-                    {lastCreatedSale.sale.customer?.name ?? customers.find((c) => c.id === lastCreatedSale.sale.customerId)?.name}
-                  </p>
-                )}
+
+                {/* Información del cliente y empresa lado a lado */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Información del cliente */}
+                  {(lastCreatedSale.sale.customer?.name ?? (lastCreatedSale.sale.customerId && customers.find((c) => c.id === lastCreatedSale.sale.customerId)?.name)) && (
+                    <div className="bg-muted/30 rounded-lg p-4 border border-border/50">
+                      <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">Cliente</p>
+                      <p className="text-sm font-semibold text-foreground break-words">
+                        {lastCreatedSale.sale.customer?.name ?? customers.find((c) => c.id === lastCreatedSale.sale.customerId)?.name}
+                      </p>
+                    </div>
+                  )}
+                  {/* Información de la empresa (si hay datos DIAN) */}
+                  {dianConfigQuery.data && (dianConfigQuery.data.issuerName || dianConfigQuery.data.issuerNit) && (
+                    <div className="bg-muted/30 rounded-lg p-4 border border-border/50">
+                      <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">Vendedor</p>
+                      <p className="text-sm font-semibold text-foreground break-words">
+                        {dianConfigQuery.data.issuerName || 'Mi Empresa'}
+                      </p>
+                      {dianConfigQuery.data.issuerNit && (
+                        <p className="text-xs text-muted-foreground mt-1">NIT: {dianConfigQuery.data.issuerNit}</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Tabla de productos */}
                 <div className="overflow-x-auto -mx-1">
                   <Table>
                     <TableHeader>
-                      <TableRow className="bg-muted/40">
-                        <TableHead className="text-xs min-w-0">Producto</TableHead>
-                        <TableHead className="text-xs text-right w-14 shrink-0">Cant.</TableHead>
-                        <TableHead className="text-xs text-right w-20 shrink-0">P. unit.</TableHead>
-                        <TableHead className="text-xs text-right w-20 shrink-0">Total</TableHead>
+                      <TableRow className="bg-muted/50 border-b-2 border-border">
+                        <TableHead className="text-xs font-semibold min-w-0 py-3">Producto</TableHead>
+                        <TableHead className="text-xs font-semibold text-right w-16 shrink-0 py-3">Cant.</TableHead>
+                        <TableHead className="text-xs font-semibold text-right w-24 shrink-0 py-3">P. unit.</TableHead>
+                        <TableHead className="text-xs font-semibold text-right w-28 shrink-0 py-3">Total</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1178,31 +1312,55 @@ export default function SalesPage() {
                         const unitPrice = Number(item.unitPrice ?? 0);
                         const lineTotal = item.lineTotal != null ? Number(item.lineTotal) : unitPrice * item.qty;
                         return (
-                          <TableRow key={idx}>
-                            <TableCell className="text-sm py-1.5 min-w-0 max-w-[180px] truncate" title={String(name)}>{name}</TableCell>
-                            <TableCell className="text-sm text-right tabular-nums py-1.5 w-14 shrink-0">{item.qty}</TableCell>
-                            <TableCell className="text-sm text-right tabular-nums py-1.5 w-20 shrink-0">{formatMoney(unitPrice)}</TableCell>
-                            <TableCell className="text-sm text-right tabular-nums py-1.5 w-20 shrink-0">{formatMoney(lineTotal)}</TableCell>
+                          <TableRow key={idx} className="border-b border-border/50">
+                            <TableCell className="text-sm py-3 min-w-0 max-w-[200px]" title={String(name)}>{name}</TableCell>
+                            <TableCell className="text-sm text-right tabular-nums py-3 w-16 shrink-0">{item.qty}</TableCell>
+                            <TableCell className="text-sm text-right tabular-nums py-3 w-24 shrink-0">{formatMoney(unitPrice)}</TableCell>
+                            <TableCell className="text-sm text-right tabular-nums font-medium py-3 w-28 shrink-0">{formatMoney(lineTotal)}</TableCell>
                           </TableRow>
                         );
                       })}
                     </TableBody>
                   </Table>
                 </div>
-                <div className="text-sm space-y-1 border-t border-border pt-2">
-                  <div className="flex justify-between gap-2">
+
+                {/* Totales */}
+                <div className="space-y-2 border-t-2 border-border pt-3">
+                  <div className="flex justify-between gap-4 text-sm">
                     <span className="text-muted-foreground">Subtotal</span>
-                    <span className="tabular-nums shrink-0">{formatMoney(lastCreatedSale.invoice.subtotal)}</span>
+                    <span className="tabular-nums font-medium shrink-0">{formatMoney(lastCreatedSale.invoice.subtotal)}</span>
                   </div>
-                  <div className="flex justify-between gap-2">
-                    <span className="text-muted-foreground">IVA</span>
-                    <span className="tabular-nums shrink-0">{formatMoney(lastCreatedSale.invoice.taxTotal)}</span>
-                  </div>
-                  <div className="flex justify-between gap-2 font-semibold text-base pt-1">
-                    <span>Total</span>
+                  {Number(lastCreatedSale.invoice.taxTotal) > 0 && (
+                    <div className="flex justify-between gap-4 text-sm">
+                      <span className="text-muted-foreground">IVA (19%)</span>
+                      <span className="tabular-nums font-medium shrink-0">{formatMoney(lastCreatedSale.invoice.taxTotal)}</span>
+                    </div>
+                  )}
+                  {lastCreatedSale.invoice.discountTotal != null && Number(lastCreatedSale.invoice.discountTotal) > 0 && (
+                    <div className="flex justify-between gap-4 text-sm text-muted-foreground">
+                      <span>Descuento</span>
+                      <span className="tabular-nums shrink-0">-{formatMoney(lastCreatedSale.invoice.discountTotal)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between gap-4 text-base font-bold pt-2 border-t border-border">
+                    <span>TOTAL</span>
                     <span className="tabular-nums shrink-0">{formatMoney(lastCreatedSale.invoice.grandTotal)}</span>
                   </div>
                 </div>
+
+                {/* Nota sobre factura electrónica si aplica */}
+                {lastCreatedSale.dianDocument && (
+                  <div className="text-xs text-muted-foreground border-t-2 border-border pt-4 mt-4 bg-muted/20 rounded-lg p-3">
+                    <p className="font-semibold text-foreground mb-1.5">Facturación electrónica</p>
+                    <p>Este documento corresponde a una factura electrónica válida ante la DIAN. El documento oficial con CUFE y código QR está disponible en el sistema para su consulta y validación.</p>
+                  </div>
+                )}
+                {!lastCreatedSale.dianDocument && (
+                  <div className="text-xs text-muted-foreground border-t border-border pt-3 mt-4">
+                    <p className="font-medium text-foreground mb-1">Documento interno</p>
+                    <p>Este es un documento interno de referencia. No corresponde a una factura electrónica enviada a la DIAN.</p>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -1221,11 +1379,180 @@ export default function SalesPage() {
                   toast.error('Permite ventanas emergentes para imprimir');
                   return;
                 }
+                const companyName = dianConfigQuery.data?.issuerName || 'Mi Empresa';
+                const companyNit = dianConfigQuery.data?.issuerNit || '';
                 win.document.write(`
                   <!DOCTYPE html><html><head><meta charset="utf-8"><title>Factura ${lastCreatedSale.invoice.number}</title>
-                  <style>body{font-family:system-ui,sans-serif;padding:24px;max-width:480px;margin:0 auto}
-                  table{width:100%;border-collapse:collapse} th,td{text-align:left;padding:6px 8px;border-bottom:1px solid #eee}
-                  th{font-weight:600}.text-right{text-align:right}.total{font-weight:700;font-size:1.1em;margin-top:8px}
+                  <style>
+                    @media print {
+                      @page { margin: 1.5cm; size: A4; }
+                      body { margin: 0; padding: 0; }
+                      .no-print { display: none !important; }
+                    }
+                    * { box-sizing: border-box; }
+                    body {
+                      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+                      padding: 0;
+                      max-width: 210mm;
+                      margin: 0 auto;
+                      color: #1a1a1a;
+                      background: white;
+                      line-height: 1.6;
+                      font-size: 14px;
+                    }
+                    .invoice-header {
+                      border-bottom: 3px solid #1a1a1a;
+                      padding-bottom: 1.25rem;
+                      margin-bottom: 1.5rem;
+                    }
+                    .invoice-header > div {
+                      display: flex;
+                      justify-content: space-between;
+                      align-items: flex-start;
+                      gap: 2rem;
+                    }
+                    .company-info h1 {
+                      font-size: 1.75rem;
+                      font-weight: 700;
+                      margin: 0 0 0.5rem 0;
+                      color: #1a1a1a;
+                      letter-spacing: -0.02em;
+                    }
+                    .company-info .nit {
+                      font-size: 0.875rem;
+                      color: #666;
+                      margin-bottom: 1rem;
+                    }
+                    .invoice-title-section {
+                      display: flex;
+                      justify-content: space-between;
+                      align-items: center;
+                      padding-top: 1rem;
+                      margin-top: 1rem;
+                      border-top: 1px solid #e5e7eb;
+                    }
+                    .invoice-title-section h2 {
+                      font-size: 1.125rem;
+                      font-weight: 600;
+                      color: #1a1a1a;
+                      text-transform: uppercase;
+                      letter-spacing: 0.05em;
+                      margin: 0;
+                    }
+                    .invoice-title-section p {
+                      font-size: 0.75rem;
+                      color: #666;
+                      margin: 0.25rem 0 0 0;
+                    }
+                    .invoice-number-section {
+                      text-align: right;
+                    }
+                    .invoice-number-label {
+                      font-size: 0.75rem;
+                      font-weight: 600;
+                      color: #666;
+                      margin-bottom: 0.25rem;
+                    }
+                    .invoice-number-value {
+                      font-size: 1.5rem;
+                      font-weight: 700;
+                      color: #1a1a1a;
+                      letter-spacing: -0.02em;
+                    }
+                    .invoice-date {
+                      font-size: 0.875rem;
+                      color: #666;
+                    }
+                    .info-grid {
+                      display: grid;
+                      grid-template-columns: 1fr 1fr;
+                      gap: 1rem;
+                      margin-bottom: 1.5rem;
+                    }
+                    .info-box {
+                      background: #f8f9fa;
+                      border: 1px solid #e5e7eb;
+                      border-radius: 0.5rem;
+                      padding: 1rem;
+                    }
+                    .info-label {
+                      font-size: 0.75rem;
+                      font-weight: 600;
+                      color: #666;
+                      text-transform: uppercase;
+                      letter-spacing: 0.05em;
+                      margin-bottom: 0.5rem;
+                    }
+                    .info-value {
+                      font-size: 0.9375rem;
+                      font-weight: 600;
+                      color: #1a1a1a;
+                    }
+                    table {
+                      width: 100%;
+                      border-collapse: collapse;
+                      margin: 1.5rem 0;
+                    }
+                    thead {
+                      background: #f8f9fa;
+                    }
+                    th {
+                      text-align: left;
+                      padding: 0.875rem 0.75rem;
+                      font-size: 0.75rem;
+                      font-weight: 600;
+                      color: #666;
+                      text-transform: uppercase;
+                      letter-spacing: 0.05em;
+                      border-bottom: 2px solid #e5e7eb;
+                    }
+                    th.text-right { text-align: right; }
+                    td {
+                      padding: 0.875rem 0.75rem;
+                      font-size: 0.875rem;
+                      border-bottom: 1px solid #e5e7eb;
+                      color: #1a1a1a;
+                    }
+                    td.text-right {
+                      text-align: right;
+                      font-variant-numeric: tabular-nums;
+                    }
+                    tbody tr:last-child td { border-bottom: none; }
+                    .totals {
+                      margin-top: 1.5rem;
+                      padding-top: 1rem;
+                      border-top: 2px solid #e5e7eb;
+                    }
+                    .totals-row {
+                      display: flex;
+                      justify-content: space-between;
+                      padding: 0.5rem 0;
+                      font-size: 0.9375rem;
+                    }
+                    .totals-row.total {
+                      font-weight: 700;
+                      font-size: 1.125rem;
+                      padding-top: 0.75rem;
+                      margin-top: 0.5rem;
+                      border-top: 2px solid #1a1a1a;
+                      color: #1a1a1a;
+                    }
+                    .note-box {
+                      margin-top: 1.5rem;
+                      padding-top: 1rem;
+                      border-top: 2px solid #e5e7eb;
+                      font-size: 0.75rem;
+                      color: #666;
+                      background: #f8f9fa;
+                      padding: 1rem;
+                      border-radius: 0.5rem;
+                    }
+                    .note-box strong {
+                      font-weight: 600;
+                      color: #1a1a1a;
+                      display: block;
+                      margin-bottom: 0.5rem;
+                    }
                   </style></head><body>${el.innerHTML}</body></html>`);
                 win.document.close();
                 win.focus();

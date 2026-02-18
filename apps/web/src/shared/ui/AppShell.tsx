@@ -9,6 +9,7 @@ import { cn } from '@lib/utils';
 import { Menu, X, LogOut, WifiOff, LayoutDashboard, ShoppingCart, Wallet, MoreHorizontal } from 'lucide-react';
 import Link from 'next/link';
 import { AlertsBell } from '@shared/components/AlertsBell';
+import { ProviderAlertsBell } from '@shared/components/ProviderAlertsBell';
 import { OfflineQueueBell } from '@shared/components/OfflineQueueBell';
 import { DianAlertsBanner } from '@shared/components/DianAlertsBanner';
 import { SupportWhatsAppButton } from '@shared/components/SupportWhatsAppButton';
@@ -184,7 +185,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </div>
             <div className="flex items-center gap-1">
               <OfflineQueueBell />
-              <AlertsBell />
+              {/* Alertas operativas (caja, ventas, inventario) solo en rutas del negocio */}
+              {!pathname?.startsWith('/provider') && <AlertsBell />}
+              {/* Alertas del panel (planes, empresas, Stripe) solo en panel proveedor */}
+              {pathname?.startsWith('/provider') && <ProviderAlertsBell />}
             </div>
           </div>
         </header>
@@ -195,8 +199,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </main>
 
-        {/* Barra inferior móvil: acceso rápido a Inicio, Ventas, Caja y Menú (solo usuarios de tenant) */}
-        <SupportWhatsAppButton />
+        {/* Botón WhatsApp solo para administradores de empresa (no en panel proveedor) */}
+        {!isPlatformAdmin && <SupportWhatsAppButton />}
         {!isPlatformAdmin && (
           <nav
             className="lg:hidden fixed bottom-0 left-0 right-0 z-30 border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 pb-[env(safe-area-inset-bottom)]"

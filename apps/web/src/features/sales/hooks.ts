@@ -43,8 +43,18 @@ export function useCreateSale() {
       queryClient.invalidateQueries({ queryKey: ['sales'] });
       queryClient.invalidateQueries({ queryKey: ['cash'] });
       queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
     },
     onError: (err, variables) => {
+      // Log del error en el hook para depuración
+      console.error('[useCreateSale] Error capturado en hook:', {
+        error: err,
+        errorType: typeof err,
+        errorKeys: err && typeof err === 'object' ? Object.keys(err) : [],
+        errorMessage: (err as any)?.message,
+        errorStatus: (err as any)?.status,
+      });
+      
       if (isNetworkError(err) && variables) {
         addToQueue({
           id: variables.idempotencyKey,
@@ -55,6 +65,7 @@ export function useCreateSale() {
           label: 'Venta',
         });
       }
+      // No hacer throw aquí - dejar que React Query propague el error al componente
     },
   });
 }

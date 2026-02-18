@@ -1,6 +1,5 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import {
   Card,
   CardContent,
@@ -15,22 +14,42 @@ import Link from 'next/link';
 const DEFAULT_MESSAGE = 'Hola, necesito ayuda con Orion.';
 
 export default function SupportPage() {
-  const [redirected, setRedirected] = useState(false);
   const number = process.env.NEXT_PUBLIC_SUPPORT_WHATSAPP_NUMBER ?? '';
   const defaultMessage = process.env.NEXT_PUBLIC_SUPPORT_WHATSAPP_MESSAGE ?? DEFAULT_MESSAGE;
+  const cleanNumber = number.replace(/\D/g, '');
+  const whatsappUrl =
+    number.trim() &&
+    `https://wa.me/${cleanNumber}?text=${encodeURIComponent(defaultMessage)}`;
 
-  useEffect(() => {
-    if (!number.trim() || redirected) return;
-    const cleanNumber = number.replace(/\D/g, '');
-    const url = `https://wa.me/${cleanNumber}?text=${encodeURIComponent(defaultMessage)}`;
-    setRedirected(true);
-    window.location.href = url;
-  }, [number, defaultMessage, redirected]);
-
-  if (number.trim()) {
+  if (whatsappUrl) {
     return (
-      <div className="flex min-h-[40vh] items-center justify-center">
-        <p className="text-muted-foreground text-sm">Redirigiendo a WhatsApp…</p>
+      <div className="mx-auto max-w-lg">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <MessageCircle className="h-5 w-5" />
+              Soporte
+            </CardTitle>
+            <CardDescription>
+              Abre WhatsApp en una nueva pestaña para contactar a soporte. La app seguirá abierta aquí.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Button asChild size="lg" className="w-full bg-[#25D366] hover:bg-[#20BD5A]">
+              <a
+                href={whatsappUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Abrir WhatsApp en nueva pestaña"
+              >
+                Abrir WhatsApp
+              </a>
+            </Button>
+            <Button asChild variant="secondary" className="w-full">
+              <Link href="/app">Volver al inicio</Link>
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }

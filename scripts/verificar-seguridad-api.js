@@ -4,14 +4,25 @@
  * Script de verificación de correcciones de seguridad (pruebas manuales automatizadas).
  * Requiere: API corriendo (npm run start o dev en apps/api) y credenciales válidas.
  *
- * Uso:
+ * Comprueba:
+ *   1. Login con email/password.
+ *   2. Que el JWT no incluya el campo "email" en el payload.
+ *   3. Que las respuestas de error (ej. venta con cliente inexistente) no expongan UUIDs en el mensaje.
+ *
+ * Uso (desde la raíz del proyecto):
  *   node scripts/verificar-seguridad-api.js
- *   API_URL=http://localhost:3000 API_EMAIL=test@example.com API_PASSWORD=Test123! node scripts/verificar-seguridad-api.js
+ *
+ * Con API en otro host/puerto o usuario distinto:
+ *   API_URL=http://localhost:3000 API_EMAIL=admin@negocio.local API_PASSWORD=AdminNegocio1! node scripts/verificar-seguridad-api.js
+ *
+ * Usuarios por defecto del seed (prisma:seed):
+ *   - Admin tenant:  API_EMAIL=admin@negocio.local  API_PASSWORD=AdminNegocio1!
+ *   - Panel proveedor: API_EMAIL=platform@proveedor.local API_PASSWORD=PlatformProveedor1!
  */
 
 const BASE_URL = process.env.API_URL || 'http://localhost:3000';
-const EMAIL = process.env.API_EMAIL || 'test@example.com';
-const PASSWORD = process.env.API_PASSWORD || 'Test123!';
+const EMAIL = process.env.API_EMAIL || 'admin@negocio.local';
+const PASSWORD = process.env.API_PASSWORD || 'AdminNegocio1!';
 
 const UUID_REGEX =
   /[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/i;
@@ -54,7 +65,7 @@ async function main() {
   const login = await request('POST', '/auth/login', { email: EMAIL, password: PASSWORD });
   if (!login.ok) {
     console.log('   ❌ Login falló:', login.data?.message || login.error);
-    console.log('   Asegúrate de que la API está corriendo y de tener un usuario (ej. bootstrap-admin).');
+    console.log('   Asegúrate de que la API está corriendo y de tener un usuario (ej. admin@negocio.local tras npm run prisma:seed -w api).');
     process.exit(1);
   }
   const token = login.data.accessToken;

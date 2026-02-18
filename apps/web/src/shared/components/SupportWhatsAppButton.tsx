@@ -3,6 +3,7 @@
 /**
  * Botón flotante que abre WhatsApp con el número de soporte configurado.
  * Solo se muestra si NEXT_PUBLIC_SUPPORT_WHATSAPP_NUMBER está definido.
+ * Se renderiza solo para administradores de empresa (no en panel proveedor); ver AppShell.
  */
 const DEFAULT_MESSAGE = 'Hola, necesito ayuda con Orion.';
 
@@ -20,10 +21,10 @@ export function SupportWhatsAppButton() {
       href={url}
       target="_blank"
       rel="noopener noreferrer"
-      className="fixed bottom-20 right-4 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-[#25D366] text-white shadow-lg transition-transform hover:scale-105 hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#25D366] focus:ring-offset-2 focus:ring-offset-background lg:bottom-8"
+      className="fixed bottom-20 right-4 z-50 flex h-11 w-11 items-center justify-center rounded-xl border border-border bg-background/95 text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background lg:bottom-6 lg:right-6"
       aria-label="Contactar soporte por WhatsApp"
     >
-      <WhatsAppIcon className="h-7 w-7" />
+      <WhatsAppIcon className="h-5 w-5 text-[#25D366]" />
     </a>
   );
 }

@@ -110,6 +110,7 @@ export default function ProviderPlansPage() {
       maxUsers: null,
       stripePriceId: null,
       isActive: true,
+      includesDian: false,
     } as PlanListItem),
   });
 
@@ -232,7 +233,7 @@ export default function ProviderPlansPage() {
           Planes
         </h1>
         <p className="text-sm text-muted-foreground">
-          Gestiona planes y precios. Asigna un <strong>Stripe Price ID</strong> para que al crear una empresa se cree la suscripción en Stripe.
+          Gestiona planes y precios: <strong>plan sin DIAN</strong> (solo documento interno) y <strong>plan con DIAN</strong> (facturación electrónica). Asigna un Stripe Price ID para suscripciones automáticas.
         </p>
       </div>
 
@@ -243,7 +244,7 @@ export default function ProviderPlansPage() {
             Listado de planes
           </CardTitle>
           <CardDescription>
-            Solo los planes activos aparecen en el selector al crear o cambiar plan de una empresa.
+            La columna Facturación indica si el plan incluye DIAN. Solo los planes activos aparecen al asignar plan a una empresa.
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
@@ -259,6 +260,7 @@ export default function ProviderPlansPage() {
                 <TableRow className="hover:bg-transparent border-b border-border/80">
                   <TableHead className="font-medium text-muted-foreground">Nombre</TableHead>
                   <TableHead className="font-medium text-muted-foreground">Slug</TableHead>
+                  <TableHead className="font-medium text-muted-foreground">Facturación</TableHead>
                   <TableHead className="text-right font-medium text-muted-foreground">Lím. usuarios</TableHead>
                   <TableHead className="text-right font-medium text-muted-foreground">P. mensual</TableHead>
                   <TableHead className="text-right font-medium text-muted-foreground">P. anual</TableHead>
@@ -272,6 +274,11 @@ export default function ProviderPlansPage() {
                   <TableRow key={plan.id} className="hover:bg-muted/40">
                     <TableCell className="font-medium text-foreground">{plan.name}</TableCell>
                     <TableCell className="font-mono text-sm text-muted-foreground">{plan.slug}</TableCell>
+                    <TableCell>
+                      <Badge variant={plan.includesDian ? 'default' : 'outline'} className="font-normal">
+                        {plan.includesDian ? 'Con DIAN' : 'Sin DIAN'}
+                      </Badge>
+                    </TableCell>
                     <TableCell className="text-right tabular-nums">
                       {plan.maxUsers != null ? plan.maxUsers : '—'}
                     </TableCell>

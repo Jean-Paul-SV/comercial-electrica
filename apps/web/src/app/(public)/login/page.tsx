@@ -1,5 +1,6 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
@@ -12,6 +13,11 @@ import { Input } from '@shared/components/ui/input';
 import { Label } from '@shared/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@shared/components/ui/card';
 import { OrionLogo } from '@shared/ui/OrionLogo';
+
+const LoginVideoBackground = dynamic(
+  () => import('./LoginVideoBackground').then((m) => ({ default: m.LoginVideoBackground })),
+  { ssr: false }
+);
 
 const loginSchema = z.object({
   email: z.string().email('Email inválido'),
@@ -47,14 +53,12 @@ export default function LoginPage() {
   };
 
   return (
-    <main className="min-h-screen flex items-center justify-center p-6 bg-gradient-to-br from-slate-50 via-white to-blue-50/30">
-      {/* Detalle decorativo sutil */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden>
-        <div className="absolute -top-40 -right-40 h-80 w-80 rounded-full bg-primary/5 blur-3xl" />
-        <div className="absolute -bottom-40 -left-40 h-80 w-80 rounded-full bg-primary/[0.07] blur-3xl" />
-      </div>
+    <main className="relative min-h-screen flex items-center justify-center p-6 overflow-hidden">
+      {/* Fondo por defecto oscuro (sin blanco); el video se monta solo en cliente */}
+      <div className="absolute inset-0 z-0 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900" aria-hidden />
+      <LoginVideoBackground />
 
-      <Card className="relative z-10 w-full max-w-md border-0 shadow-xl shadow-slate-200/50 rounded-2xl overflow-hidden">
+      <Card className="relative z-10 w-full max-w-md border border-border/50 rounded-2xl overflow-hidden shadow-none">
         {/* Línea de acento superior */}
         <div className="h-1 bg-gradient-to-r from-primary to-primary/80" />
 

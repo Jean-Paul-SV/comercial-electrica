@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { BillingService } from '../billing/billing.service';
-import { RoleName } from '@prisma/client';
+import { RoleName, DianEnvironment } from '@prisma/client';
 import * as argon2 from 'argon2';
 import { randomBytes } from 'crypto';
 import { CreateTenantDto } from './dto/create-tenant.dto';
@@ -33,6 +33,9 @@ type PlanDecimalFields = Pick<
   'priceMonthly' | 'priceYearly'
 >;
 
+/** Módulo que habilita facturación electrónica DIAN en un plan. */
+const DIAN_MODULE_CODE = 'electronic_invoicing';
+
 type PlanDto = {
   id: string;
   name: string;
@@ -43,6 +46,8 @@ type PlanDto = {
   maxUsers: number | null;
   stripePriceId: string | null;
   isActive: boolean;
+  /** Si el plan incluye facturación electrónica DIAN (módulo electronic_invoicing). */
+  includesDian: boolean;
 };
 
 @Injectable()
@@ -114,6 +119,7 @@ export class ProviderService {
         maxUsers: true,
         stripePriceId: true,
         isActive: true,
+        features: { select: { moduleCode: true } },
       },
       orderBy: { name: 'asc' },
     });
@@ -151,6 +157,7 @@ export class ProviderService {
         maxUsers: true,
         stripePriceId: true,
         isActive: true,
+        features: { select: { moduleCode: true } },
       },
     });
     return this.mapPlanToDto(plan);
@@ -163,11 +170,26 @@ export class ProviderService {
     }
     const data = this.buildPlanUpdateData(dto);
 
-    const updated = await this.prisma.plan.update({
+    await this.prisma.plan.update({
       where: { id },
       data,
     });
-    return this.mapPlanToDto(updated);
+    const updated = await this.prisma.plan.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        description: true,
+        priceMonthly: true,
+        priceYearly: true,
+        maxUsers: true,
+        stripePriceId: true,
+        isActive: true,
+        features: { select: { moduleCode: true } },
+      },
+    });
+    return this.mapPlanToDto(updated!);
   }
 
   async listTenants(query: ListTenantsQueryDto) {
@@ -175,10 +197,24 @@ export class ProviderService {
     const offset = query.offset ?? 0;
     const isActiveFilter =
       query.isActive === undefined ? undefined : query.isActive === 'true';
+    const searchName = query.searchName?.trim();
+    const searchNumber = query.searchNumber?.trim();
+
+    const where: Prisma.TenantWhereInput = {};
+    if (isActiveFilter !== undefined) where.isActive = isActiveFilter;
+    if (searchName && searchName.length > 0) {
+      where.name = { contains: searchName, mode: 'insensitive' };
+    }
+    if (searchNumber && searchNumber.length > 0) {
+      where.OR = [
+        { slug: { contains: searchNumber, mode: 'insensitive' } },
+        { id: searchNumber },
+      ];
+    }
 
     const [tenants, total] = await Promise.all([
       this.prisma.tenant.findMany({
-        where: isActiveFilter !== undefined ? { isActive: isActiveFilter } : {},
+        where: Object.keys(where).length > 0 ? where : {},
         select: {
           id: true,
           name: true,
@@ -204,7 +240,7 @@ export class ProviderService {
         skip: offset,
       }),
       this.prisma.tenant.count({
-        where: isActiveFilter !== undefined ? { isActive: isActiveFilter } : {},
+        where: Object.keys(where).length > 0 ? where : {},
       }),
     ]);
 
@@ -397,6 +433,18 @@ export class ProviderService {
           mustChangePassword: generateTempPassword,
         },
       });
+      
+      // Crear configuración DIAN inicial si se proporciona el nombre de la empresa
+      if (dto.issuerName?.trim()) {
+        await tx.dianConfig.create({
+          data: {
+            tenantId: createdTenant.id,
+            env: DianEnvironment.HABILITACION,
+            issuerName: dto.issuerName.trim(),
+          },
+        });
+      }
+      
       return createdTenant;
     });
 
@@ -444,8 +492,11 @@ export class ProviderService {
       maxUsers: number | null;
       stripePriceId: string | null;
       isActive: boolean;
+      features?: { moduleCode: string }[];
     },
   ): PlanDto {
+    const features = plan.features ?? [];
+    const includesDian = features.some((f) => f.moduleCode === DIAN_MODULE_CODE);
     return {
       id: plan.id,
       name: plan.name,
@@ -456,6 +507,7 @@ export class ProviderService {
       maxUsers: plan.maxUsers,
       stripePriceId: plan.stripePriceId ?? null,
       isActive: plan.isActive,
+      includesDian,
     };
   }
 

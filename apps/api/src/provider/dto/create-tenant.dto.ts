@@ -41,4 +41,10 @@ export class CreateTenantDto {
   @IsString()
   @MinLength(8, { message: 'La contraseña debe tener al menos 8 caracteres.' })
   adminPassword?: string;
+
+  /** Nombre de la empresa para facturación (razón social). Se usará en las facturas. Opcional. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  issuerName?: string;
 }

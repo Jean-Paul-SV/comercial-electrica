@@ -6,6 +6,7 @@ import {
   Patch,
   Post,
   Query,
+  Req,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -13,10 +14,13 @@ import {
   ApiOperation,
   ApiResponse,
   ApiBearerAuth,
+  ApiBody,
+  ApiParam,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PlatformAdminGuard } from './platform-admin.guard';
 import { ProviderService } from './provider.service';
+import { DianService } from '../dian/dian.service';
 import { CreateTenantDto } from './dto/create-tenant.dto';
 import { ListTenantsQueryDto } from './dto/list-tenants-query.dto';
 import { UpdateTenantDto } from './dto/update-tenant.dto';
@@ -24,13 +28,20 @@ import { UpdateTenantStatusDto } from './dto/update-tenant-status.dto';
 import { RenewSubscriptionDto } from './dto/renew-subscription.dto';
 import { CreatePlanDto } from './dto/create-plan.dto';
 import { UpdatePlanDto } from './dto/update-plan.dto';
+import {
+  UpdateDianConfigDto,
+  UploadCertificateDto,
+} from '../dian/dto/dian-config.dto';
 
 @ApiTags('provider')
 @ApiBearerAuth()
 @Controller('provider')
 @UseGuards(JwtAuthGuard, PlatformAdminGuard)
 export class ProviderController {
-  constructor(private readonly provider: ProviderService) {}
+  constructor(
+    private readonly provider: ProviderService,
+    private readonly dianService: DianService,
+  ) {}
 
   @Get('tenants/summary')
   @ApiOperation({
@@ -152,5 +163,61 @@ export class ProviderController {
   @ApiResponse({ status: 409, description: 'Slug o email ya existente.' })
   createTenant(@Body() dto: CreateTenantDto) {
     return this.provider.createTenant(dto);
+  }
+
+  @Get('tenants/:tenantId/dian-config')
+  @ApiOperation({
+    summary: 'Configuración DIAN de una empresa (proveedor)',
+    description: 'Obtiene la configuración de facturación electrónica de la empresa indicada. Solo administrador de plataforma.',
+  })
+  @ApiParam({ name: 'tenantId', description: 'ID del tenant (empresa)' })
+  @ApiResponse({ status: 200, description: 'Configuración o null.' })
+  getTenantDianConfig(@Param('tenantId') tenantId: string) {
+    return this.dianService.getDianConfigForTenant(tenantId);
+  }
+
+  @Get('tenants/:tenantId/dian-config-status')
+  @ApiOperation({
+    summary: 'Estado de configuración DIAN de una empresa (proveedor)',
+    description: 'Indica si está lista para facturar y qué falta. Solo administrador de plataforma.',
+  })
+  @ApiParam({ name: 'tenantId', description: 'ID del tenant (empresa)' })
+  @ApiResponse({ status: 200, description: 'Estado de la configuración.' })
+  getTenantDianConfigStatus(@Param('tenantId') tenantId: string) {
+    return this.dianService.getConfigStatusForTenant(tenantId);
+  }
+
+  @Patch('tenants/:tenantId/dian-config')
+  @ApiOperation({
+    summary: 'Actualizar configuración DIAN de una empresa (proveedor)',
+    description: 'Crea o actualiza datos de facturación electrónica de la empresa. Solo administrador de plataforma.',
+  })
+  @ApiParam({ name: 'tenantId', description: 'ID del tenant (empresa)' })
+  @ApiBody({ type: UpdateDianConfigDto })
+  @ApiResponse({ status: 200, description: 'Configuración actualizada.' })
+  updateTenantDianConfig(
+    @Param('tenantId') tenantId: string,
+    @Body() dto: UpdateDianConfigDto,
+    @Req() req: { user?: { sub?: string } },
+  ) {
+    return this.dianService.upsertDianConfig(tenantId, dto, req.user?.sub ?? null);
+  }
+
+  @Post('tenants/:tenantId/dian-config/certificate')
+  @ApiOperation({
+    summary: 'Subir certificado .p12 de una empresa (proveedor)',
+    description: 'Sube el certificado de firma electrónica de la empresa. Solo administrador de plataforma.',
+  })
+  @ApiParam({ name: 'tenantId', description: 'ID del tenant (empresa)' })
+  @ApiBody({ type: UploadCertificateDto })
+  @ApiResponse({ status: 201, description: 'Certificado guardado.' })
+  uploadTenantDianCertificate(
+    @Param('tenantId') tenantId: string,
+    @Body() dto: UploadCertificateDto,
+    @Req() req: { user?: { sub?: string } },
+  ) {
+    return this.dianService
+      .saveCertificate(tenantId, dto.certBase64, dto.password, req.user?.sub ?? null)
+      .then(() => ({ ok: true, message: 'Certificado guardado correctamente.' }));
   }
 }

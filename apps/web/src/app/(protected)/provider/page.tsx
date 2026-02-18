@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import {
   Card,
@@ -10,6 +10,7 @@ import {
   CardTitle,
 } from '@shared/components/ui/card';
 import { Button } from '@shared/components/ui/button';
+import { Input } from '@shared/components/ui/input';
 import {
   Table,
   TableBody,
@@ -19,8 +20,9 @@ import {
   TableRow,
 } from '@shared/components/ui/table';
 import { Badge } from '@shared/components/ui/badge';
+import { Label } from '@shared/components/ui/label';
 import { Skeleton } from '@shared/components/ui/skeleton';
-import { Building2, PlusCircle, Eye, ChevronLeft, BarChart3 } from 'lucide-react';
+import { Building2, PlusCircle, Eye, ChevronLeft, ChevronRight, BarChart3, Search, Filter } from 'lucide-react';
 import { useListTenants, useTenantsSummary } from '@features/provider/hooks';
 
 const PAGE_SIZE = 20;
@@ -28,12 +30,27 @@ const PAGE_SIZE = 20;
 export default function ProviderTenantsPage() {
   const [page, setPage] = useState(0);
   const [activeFilter, setActiveFilter] = useState<string | undefined>(undefined);
+  const [searchName, setSearchName] = useState('');
+  const [searchNumber, setSearchNumber] = useState('');
+  const [debouncedName, setDebouncedName] = useState('');
+  const [debouncedNumber, setDebouncedNumber] = useState('');
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setDebouncedName(searchName);
+      setDebouncedNumber(searchNumber);
+      setPage(0);
+    }, 400);
+    return () => clearTimeout(t);
+  }, [searchName, searchNumber]);
 
   const { data: summary, isLoading: isLoadingSummary } = useTenantsSummary();
   const { data, isLoading, error } = useListTenants({
     limit: PAGE_SIZE,
     offset: page * PAGE_SIZE,
     isActive: activeFilter,
+    searchName: debouncedName || undefined,
+    searchNumber: debouncedNumber || undefined,
   });
 
   const items = data?.items ?? [];
@@ -115,118 +132,165 @@ export default function ProviderTenantsPage() {
         </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Building2 className="h-5 w-5" />
-            Panel proveedor
-          </CardTitle>
-          <CardDescription>
-            Filtrar por estado y ver última actividad.
-          </CardDescription>
-          <div className="flex gap-2 pt-2">
-            <Button
-              variant={activeFilter === undefined ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => {
-                setActiveFilter(undefined);
-                setPage(0);
-              }}
-            >
-              Todas
-            </Button>
-            <Button
-              variant={activeFilter === 'true' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => {
-                setActiveFilter('true');
-                setPage(0);
-              }}
-            >
-              Activas
-            </Button>
-            <Button
-              variant={activeFilter === 'false' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => {
-                setActiveFilter('false');
-                setPage(0);
-              }}
-            >
-              Suspendidas
-            </Button>
+      <Card className="overflow-hidden border-border/60 bg-card/50">
+        <CardHeader className="space-y-4 pb-4">
+          <div>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Building2 className="h-5 w-5 text-primary/90" />
+              Panel proveedor
+            </CardTitle>
+            <CardDescription className="mt-1">
+              Filtrar por estado y ver última actividad.
+            </CardDescription>
+          </div>
+
+          <div className="rounded-xl border border-border/50 bg-muted/20 p-4 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-end gap-4 flex-wrap">
+              <div className="flex-1 min-w-[200px] space-y-1.5">
+                <Label htmlFor="search-name" className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  Nombre
+                </Label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                  <Input
+                    id="search-name"
+                    placeholder="Buscar por nombre..."
+                    value={searchName}
+                    onChange={(e) => setSearchName(e.target.value)}
+                    className="pl-9 h-9 bg-background/80 border-border/70 focus-visible:ring-primary/50"
+                  />
+                </div>
+              </div>
+              <div className="flex-1 min-w-[200px] space-y-1.5">
+                <Label htmlFor="search-number" className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  Número / Slug
+                </Label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                  <Input
+                    id="search-number"
+                    placeholder="ID o slug de la empresa"
+                    value={searchNumber}
+                    onChange={(e) => setSearchNumber(e.target.value)}
+                    className="pl-9 h-9 bg-background/80 border-border/70 focus-visible:ring-primary/50"
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              <Filter className="h-4 w-4 text-muted-foreground shrink-0" />
+              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider mr-1">Estado:</span>
+              <div className="inline-flex rounded-lg border border-border/50 bg-muted/30 p-0.5" role="group">
+                <Button
+                  variant={activeFilter === undefined ? 'default' : 'ghost'}
+                  size="sm"
+                  className="rounded-md h-8 px-3"
+                  onClick={() => {
+                    setActiveFilter(undefined);
+                    setPage(0);
+                  }}
+                >
+                  Todas
+                </Button>
+                <Button
+                  variant={activeFilter === 'true' ? 'default' : 'ghost'}
+                  size="sm"
+                  className="rounded-md h-8 px-3"
+                  onClick={() => {
+                    setActiveFilter('true');
+                    setPage(0);
+                  }}
+                >
+                  Activas
+                </Button>
+                <Button
+                  variant={activeFilter === 'false' ? 'default' : 'ghost'}
+                  size="sm"
+                  className="rounded-md h-8 px-3"
+                  onClick={() => {
+                    setActiveFilter('false');
+                    setPage(0);
+                  }}
+                >
+                  Suspendidas
+                </Button>
+              </div>
+            </div>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-0">
           {error && (
             <p className="text-destructive text-sm py-4">
               {(error as { message?: string })?.message ?? 'Error al cargar empresas.'}
             </p>
           )}
           {isLoading ? (
-            <Skeleton className="h-64 w-full" />
+            <Skeleton className="h-64 w-full rounded-lg" />
           ) : (
             <>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Nombre</TableHead>
-                    <TableHead>Slug</TableHead>
-                    <TableHead>Estado</TableHead>
-                    <TableHead>Plan</TableHead>
-                    <TableHead>Usuarios</TableHead>
-                    <TableHead>Última actividad</TableHead>
-                    <TableHead className="w-[80px]"></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {items.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                        No hay empresas registradas.
-                      </TableCell>
+              <div className="rounded-lg border border-border/50 overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-border/50 hover:bg-transparent">
+                      <TableHead className="font-semibold text-muted-foreground">Nombre</TableHead>
+                      <TableHead className="font-semibold text-muted-foreground">Slug</TableHead>
+                      <TableHead className="font-semibold text-muted-foreground">Estado</TableHead>
+                      <TableHead className="font-semibold text-muted-foreground">Plan</TableHead>
+                      <TableHead className="font-semibold text-muted-foreground">Usuarios</TableHead>
+                      <TableHead className="font-semibold text-muted-foreground">Última actividad</TableHead>
+                      <TableHead className="w-[72px] font-semibold text-muted-foreground"></TableHead>
                     </TableRow>
-                  ) : (
-                    items.map((t) => (
-                      <TableRow key={t.id}>
-                        <TableCell className="font-medium">{t.name}</TableCell>
-                        <TableCell className="text-muted-foreground">{t.slug}</TableCell>
-                        <TableCell>
-                          <Badge variant={t.isActive ? 'default' : 'secondary'}>
-                            {t.isActive ? 'Activa' : 'Suspendida'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>{t.plan?.name ?? '—'}</TableCell>
-                        <TableCell>{t.usersCount}</TableCell>
-                        <TableCell className="text-muted-foreground text-sm">
-                          {t.lastActivityAt
-                            ? new Date(t.lastActivityAt).toLocaleString()
-                            : '—'}
-                        </TableCell>
-                        <TableCell>
-                          <Button variant="ghost" size="icon" asChild>
-                            <Link href={`/provider/${t.id}`}>
-                              <Eye className="h-4 w-4" />
-                              <span className="sr-only">Ver detalle</span>
-                            </Link>
-                          </Button>
+                  </TableHeader>
+                  <TableBody>
+                    {items.length === 0 ? (
+                      <TableRow className="hover:bg-transparent">
+                        <TableCell colSpan={7} className="text-center text-muted-foreground py-12">
+                          No hay empresas que coincidan con los filtros.
                         </TableCell>
                       </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
+                    ) : (
+                      items.map((t) => (
+                        <TableRow key={t.id} className="border-border/50 transition-colors">
+                          <TableCell className="font-medium">{t.name}</TableCell>
+                          <TableCell className="text-muted-foreground font-mono text-sm">{t.slug}</TableCell>
+                          <TableCell>
+                            <Badge variant={t.isActive ? 'default' : 'secondary'} className="font-medium">
+                              {t.isActive ? 'Activa' : 'Suspendida'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>{t.plan?.name ?? '—'}</TableCell>
+                          <TableCell className="tabular-nums">{t.usersCount}</TableCell>
+                          <TableCell className="text-muted-foreground text-sm tabular-nums">
+                            {t.lastActivityAt
+                              ? new Date(t.lastActivityAt).toLocaleString()
+                              : '—'}
+                          </TableCell>
+                          <TableCell>
+                            <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
+                              <Link href={`/provider/${t.id}`}>
+                                <Eye className="h-4 w-4" />
+                                <span className="sr-only">Ver detalle</span>
+                              </Link>
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
               {totalPages > 1 && (
-                <div className="flex items-center justify-between pt-4">
-                  <p className="text-sm text-muted-foreground">
-                    {total} empresa(s) · página {page + 1} de {totalPages}
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 mt-4 border-t border-border/50">
+                  <p className="text-sm text-muted-foreground order-2 sm:order-1">
+                    <span className="font-medium text-foreground">{total}</span> empresa(s) · página {page + 1} de {totalPages}
                   </p>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 order-1 sm:order-2">
                     <Button
                       variant="outline"
                       size="sm"
                       disabled={page === 0}
                       onClick={() => setPage((p) => Math.max(0, p - 1))}
+                      className="gap-1"
                     >
                       <ChevronLeft className="h-4 w-4" />
                       Anterior
@@ -236,8 +300,10 @@ export default function ProviderTenantsPage() {
                       size="sm"
                       disabled={page >= totalPages - 1}
                       onClick={() => setPage((p) => p + 1)}
+                      className="gap-1"
                     >
                       Siguiente
+                      <ChevronRight className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>
