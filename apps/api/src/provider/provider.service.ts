@@ -133,6 +133,10 @@ export class ProviderService {
     if (existing) {
       throw new ConflictException(`Ya existe un plan con el slug "${dto.slug}".`);
     }
+    const includesDian = dto.includesDian !== false;
+    const moduleCodes = includesDian
+      ? [...DEFAULT_MODULE_CODES]
+      : DEFAULT_MODULE_CODES.filter((c) => c !== DIAN_MODULE_CODE);
     const plan = await this.prisma.plan.create({
       data: {
         name: dto.name,
@@ -144,7 +148,7 @@ export class ProviderService {
         stripePriceId: dto.stripePriceId ?? null,
         isActive: dto.isActive ?? true,
         features: {
-          create: DEFAULT_MODULE_CODES.map((moduleCode) => ({ moduleCode })),
+          create: moduleCodes.map((moduleCode) => ({ moduleCode })),
         },
       },
       select: {

@@ -83,6 +83,8 @@ export type CreatePlanPayload = {
   maxUsers?: number | null;
   stripePriceId?: string | null;
   isActive?: boolean;
+  /** Incluir facturación electrónica DIAN. Si false, el plan es "sin DIAN". */
+  includesDian?: boolean;
 };
 
 export type UpdatePlanPayload = {

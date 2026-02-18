@@ -68,4 +68,13 @@ export class CreatePlanDto {
   @IsBoolean()
   @Type(() => Boolean)
   isActive?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Incluir facturación electrónica DIAN (módulo electronic_invoicing). Si false, el plan es "sin DIAN".',
+    default: true,
+  })
+  @IsOptional()
+  @IsBoolean()
+  @Type(() => Boolean)
+  includesDian?: boolean;
 }

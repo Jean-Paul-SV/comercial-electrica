@@ -66,6 +66,7 @@ const newPlanSchema = z.object({
     .transform((v) => (v === '' ? undefined : v)),
   stripePriceId: z.string().max(255).optional().or(z.literal('')),
   isActive: z.boolean(),
+  includesDian: z.boolean(),
 });
 type NewPlanFormValues = z.infer<typeof newPlanSchema>;
 
@@ -125,6 +126,7 @@ export default function ProviderPlansPage() {
       maxUsers: undefined,
       stripePriceId: '',
       isActive: true,
+      includesDian: true,
     },
   });
 
@@ -139,6 +141,7 @@ export default function ProviderPlansPage() {
         maxUsers: undefined,
         stripePriceId: '',
         isActive: true,
+        includesDian: true,
       });
     }
   }, [openNewPlan, newPlanForm]);
@@ -163,6 +166,7 @@ export default function ProviderPlansPage() {
         maxUsers: values.maxUsers ?? null,
         stripePriceId: values.stripePriceId || null,
         isActive: values.isActive,
+        includesDian: values.includesDian,
       },
       {
         onSuccess: () => {
@@ -177,6 +181,7 @@ export default function ProviderPlansPage() {
             maxUsers: undefined,
             stripePriceId: '',
             isActive: true,
+            includesDian: true,
           });
         },
         onError: (e: { message?: string }) => {
@@ -326,10 +331,29 @@ export default function ProviderPlansPage() {
           <DialogHeader>
             <DialogTitle>Nuevo plan</DialogTitle>
             <p className="text-sm text-muted-foreground">
-              El plan incluirá todos los módulos (inventario, ventas, facturación electrónica, etc.). Solo define nombre y, si quieres cobrar por Stripe, el ID del precio.
+              Elige si el plan incluye facturación electrónica DIAN o no. Define nombre, precios y, si cobras por Stripe, el ID del precio.
             </p>
           </DialogHeader>
           <form onSubmit={newPlanForm.handleSubmit(onSubmitNew)} className="space-y-6">
+            {/* Facturación DIAN */}
+            <div className="space-y-4 rounded-lg border border-border/60 bg-muted/10 p-4">
+              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Facturación electrónica</p>
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  id="new-includesDian"
+                  {...newPlanForm.register('includesDian')}
+                  className="h-4 w-4 rounded border-input"
+                />
+                <Label htmlFor="new-includesDian" className="cursor-pointer text-sm font-medium">
+                  Incluir facturación electrónica DIAN (plan con DIAN)
+                </Label>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Si lo marcas, la empresa podrá configurar certificado y emitir facturas electrónicas a la DIAN. Si no, solo tendrá documentos internos.
+              </p>
+            </div>
+
             {/* Datos del plan */}
             <div className="space-y-4">
               <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Datos del plan</p>
