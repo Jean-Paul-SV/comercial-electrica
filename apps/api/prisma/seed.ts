@@ -94,40 +94,18 @@ async function main() {
     console.log('Plan "Todo incluido" creado con', MODULE_CODES.length, 'módulos (con DIAN)');
   }
 
-  // 1.1 Planes de ejemplo: sin DIAN y con DIAN (se omiten si SEED_ONLY_PLATFORM_ADMIN=true)
+  // 1.1 Planes estándar: Básico/Premium sin DIAN, Básico/Premium con DIAN, Enterprise (se omiten si SEED_ONLY_PLATFORM_ADMIN=true)
+  // Lógica: Básico = sin reportes; Premium = con reportes; con DIAN añade facturación electrónica; Enterprise = todo.
   if (!SEED_ONLY_PLATFORM_ADMIN) {
-  const examplePlans = [
-    { slug: 'sin-dian', name: 'Plan sin DIAN', description: 'Ventas, inventario y clientes. Sin facturación electrónica DIAN.', priceMonthly: 79_000, priceYearly: 790_000, maxUsers: 5, moduleCodes: ['core', 'inventory'] as const },
-    { slug: 'con-dian', name: 'Plan con DIAN', description: 'Incluye facturación electrónica DIAN, proveedores y reportes.', priceMonthly: 179_000, priceYearly: 1_790_000, maxUsers: 25, moduleCodes: ['core', 'inventory', 'suppliers', 'electronic_invoicing', 'advanced_reports'] as const },
-    {
-      slug: 'basico',
-      name: 'Plan Básico (sin DIAN)',
-      description: 'Ideal para empezar: ventas, inventario y clientes. Sin facturación electrónica.',
-      priceMonthly: 99_000,
-      priceYearly: 990_000,
-      maxUsers: 5,
-      moduleCodes: ['core', 'inventory'] as const,
-    },
-    {
-      slug: 'premium',
-      name: 'Plan Premium (con DIAN)',
-      description: 'Incluye facturación electrónica DIAN, proveedores y reportes avanzados.',
-      priceMonthly: 199_000,
-      priceYearly: 1_990_000,
-      maxUsers: 25,
-      moduleCodes: ['core', 'inventory', 'suppliers', 'electronic_invoicing', 'advanced_reports'] as const,
-    },
-    {
-      slug: 'empresarial',
-      name: 'Plan Empresarial (con DIAN)',
-      description: 'Todo: DIAN, auditoría, backups y soporte completo.',
-      priceMonthly: 399_000,
-      priceYearly: 3_990_000,
-      maxUsers: 50,
-      moduleCodes: [...MODULE_CODES],
-    },
+  const standardPlans = [
+    { slug: 'basico-sin-dian', name: 'Plan Básico sin DIAN', description: 'Ventas, inventario y clientes. Sin facturación electrónica ni reportes.', priceMonthly: 89_000, priceYearly: 890_000, maxUsers: 3, moduleCodes: ['core', 'inventory'] as const },
+    { slug: 'premium-sin-dian', name: 'Plan Premium sin DIAN', description: 'Todo lo del Básico más reportes. Sin facturación electrónica DIAN.', priceMonthly: 120_000, priceYearly: 1_150_000, maxUsers: 5, moduleCodes: ['core', 'inventory', 'advanced_reports'] as const },
+    { slug: 'premium-con-dian', name: 'Plan Premium con DIAN (Recomendado)', description: 'DIAN, reportes y proveedores. Para equipos que facturan electrónicamente.', priceMonthly: 200_000, priceYearly: 1_920_000, maxUsers: 8, moduleCodes: ['core', 'inventory', 'suppliers', 'electronic_invoicing', 'advanced_reports'] as const },
+    { slug: 'basico-con-dian', name: 'Plan Básico con DIAN', description: 'Facturación electrónica DIAN, ventas e inventario. Sin reportes.', priceMonthly: 169_000, priceYearly: 1_620_000, maxUsers: 3, moduleCodes: ['core', 'inventory', 'electronic_invoicing'] as const },
+    { slug: 'enterprise', name: 'Plan Enterprise', description: 'Todo: DIAN, reportes, proveedores, auditoría y backups.', priceMonthly: 299_000, priceYearly: 2_890_000, maxUsers: 25, moduleCodes: [...MODULE_CODES] },
   ];
-  for (const p of examplePlans) {
+  for (const p of standardPlans) {
+    const moduleCodes = [...p.moduleCodes];
     let existing = await prisma.plan.findFirst({ where: { slug: p.slug } });
     if (!existing) {
       existing = await prisma.plan.create({
@@ -141,18 +119,30 @@ async function main() {
           isActive: true,
         },
       });
-      for (const code of p.moduleCodes) {
+      for (const code of moduleCodes) {
         await prisma.planFeature.create({
           data: { planId: existing.id, moduleCode: code },
         });
       }
-      console.log('Plan ejemplo creado:', p.name, 'con', p.moduleCodes.length, 'módulos');
-    } else if (existing.maxUsers == null) {
+      console.log('Plan creado:', p.name, 'con', moduleCodes.length, 'módulos');
+    } else {
       await prisma.plan.update({
         where: { id: existing.id },
-        data: { maxUsers: p.maxUsers },
+        data: {
+          name: p.name,
+          description: p.description,
+          priceMonthly: p.priceMonthly,
+          priceYearly: p.priceYearly,
+          maxUsers: p.maxUsers,
+        },
       });
-      console.log('Plan ejemplo actualizado con maxUsers:', p.name, '->', p.maxUsers);
+      await prisma.planFeature.deleteMany({ where: { planId: existing.id } });
+      for (const code of moduleCodes) {
+        await prisma.planFeature.create({
+          data: { planId: existing.id, moduleCode: code },
+        });
+      }
+      console.log('Plan actualizado:', p.name, 'con', moduleCodes.length, 'módulos');
     }
   }
   }
