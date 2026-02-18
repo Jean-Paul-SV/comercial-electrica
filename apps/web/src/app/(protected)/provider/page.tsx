@@ -346,9 +346,9 @@ export default function ProviderTenantsPage() {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2 sm:gap-0">
-            <DialogClose asChild>
-              <Button variant="outline">Cancelar</Button>
-            </DialogClose>
+            <Button variant="outline" onClick={() => setTenantToDelete(null)}>
+              Cancelar
+            </Button>
             <Button
               variant="destructive"
               disabled={deleteTenant.isPending}
