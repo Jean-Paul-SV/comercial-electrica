@@ -266,19 +266,28 @@ export class BillingService {
   }
 
   /**
-   * Cambia el plan del tenant (y su suscripción). Solo para el tenant del usuario autenticado.
+   * Cambia el plan del tenant (y su suscripción). Actualiza también la suscripción en Stripe
+   * para que el precio cobrado coincida con el plan elegido.
    */
   async changeTenantPlan(tenantId: string, planId: string): Promise<{ success: boolean }> {
     const tenant = await this.prisma.tenant.findUnique({
       where: { id: tenantId },
-      select: { id: true, subscription: { select: { id: true } } },
+      select: {
+        id: true,
+        subscription: {
+          select: {
+            id: true,
+            stripeSubscriptionId: true,
+          },
+        },
+      },
     });
     if (!tenant) {
       throw new NotFoundException('Empresa no encontrada.');
     }
     const plan = await this.prisma.plan.findUnique({
       where: { id: planId },
-      select: { id: true },
+      select: { id: true, stripePriceId: true },
     });
     if (!plan) {
       throw new NotFoundException('Plan no encontrado.');
@@ -308,6 +317,41 @@ export class BillingService {
         });
       }
     });
+
+    // Actualizar el precio en Stripe para que coincida con el plan elegido
+    const subscription = await this.prisma.subscription.findUnique({
+      where: { tenantId },
+      select: { stripeSubscriptionId: true },
+    });
+    if (
+      this.stripe &&
+      subscription?.stripeSubscriptionId &&
+      plan.stripePriceId
+    ) {
+      try {
+        const stripeSub = await this.stripe.subscriptions.retrieve(
+          subscription.stripeSubscriptionId,
+          { expand: ['items.data'] },
+        );
+        const itemId = stripeSub.items.data[0]?.id;
+        if (itemId) {
+          await this.stripe.subscriptions.update(subscription.stripeSubscriptionId, {
+            items: [
+              { id: itemId, price: plan.stripePriceId },
+            ],
+            proration_behavior: 'create_prorations',
+          });
+          this.logger.log(
+            `Suscripción Stripe ${subscription.stripeSubscriptionId} actualizada al plan ${planId} (price ${plan.stripePriceId})`,
+          );
+        }
+      } catch (err) {
+        this.logger.warn(
+          `No se pudo actualizar el precio en Stripe al cambiar de plan: ${(err as Error).message}`,
+        );
+      }
+    }
+
     return { success: true };
   }
 
