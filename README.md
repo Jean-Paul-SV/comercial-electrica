@@ -166,7 +166,7 @@ comercial-electrica/
 - **Reportes** — Ventas, inventario, caja, clientes
 - **Auditoría** — Log de operaciones críticas
 - **Backups** — Respaldos programados y bajo demanda
-- **Billing (SaaS)** — Suscripciones Stripe, portal de facturación
+- **Billing (SaaS)** — Suscripciones Stripe, portal de facturación; pagos locales PayU (Colombia)
 - **Provider (multi-tenant)** — Gestión de tenants y planes (admin plataforma)
 
 ---
@@ -223,14 +223,15 @@ Redis se usa para:
 
 ## Documentación
 
-- [Levantar el proyecto](./docs/LEVANTAR_PROYECTO.md) — Primera vez, errores frecuentes
-- [**Primer usuario en producción**](./docs/PRIMER_USUARIO_PRODUCCION.md) — Cómo crear el primer admin cuando subes a producción (sin BD en el repo)
-- [**Datos reales en Vercel (producción)**](./docs/DATOS_REALES_VERCEL_PRODUCCION.md) — Cargar productos, ventas, clientes en la BD de Render para que la web en Vercel muestre datos
+- [**Pasos para subir a producción**](./docs/PASOS_SUBIR_PRODUCCION.md) — Checklist y orden recomendado para desplegar
+- [**Paso a paso: seed con mi correo**](./docs/PASO_A_PASO_SEED_MI_CORREO.md) — Configurar el primer usuario (plataforma y tenant)
+- [Despliegue](./docs/DEPLOY.md) — Cómo desplegar API y web
+- [Migrar a mi dominio (Hostinger)](./docs/MIGRAR_A_MI_DOMINIO_HOSTINGER.md) — Dominio propio y panel proveedor
 - [Estado del proyecto](./docs/ESTADO_PROYECTO.md) — Resumen ejecutivo y estado final
 - [Checklist seguridad y siguientes pasos](./docs/CHECKLIST_SEGURIDAD_Y_SIGUIENTES_PASOS.md) — Qué revisar antes de producción
 - [Qué sigue / roadmap](./docs/QUE_SIGUE.md) — Visión de siguientes pasos
-- [Índice de documentación](./docs/README.md) — Toda la documentación en `docs/`
-- [Solución error EPERM (Prisma)](./docs/SOLUCION_ERROR_EPERM_PRISMA.md) — Común en Windows
+- [Troubleshooting](./docs/TROUBLESHOOTING.md) — Errores frecuentes y soluciones
+- [Índice de documentación](./docs/historico/README.md) — Más documentación en `docs/` y `docs/historico/`
 
 ---
 
