@@ -276,9 +276,19 @@ export default function ProviderTenantsPage() {
                           <TableCell className="font-medium">{t.name}</TableCell>
                           <TableCell className="text-muted-foreground font-mono text-sm">{t.slug}</TableCell>
                           <TableCell>
-                            <Badge variant={t.isActive ? 'default' : 'secondary'} className="font-medium">
-                              {t.isActive ? 'Activa' : 'Suspendida'}
-                            </Badge>
+                            {t.subscription?.status === 'PENDING_PAYMENT' ? (
+                              <Badge className="font-medium bg-amber-600 hover:bg-amber-600 dark:bg-amber-500 text-white border-0">
+                                Pago pendiente
+                              </Badge>
+                            ) : !t.isActive ? (
+                              <Badge variant="secondary" className="font-medium">
+                                Suspendida
+                              </Badge>
+                            ) : (
+                              <Badge variant="default" className="font-medium bg-emerald-600 hover:bg-emerald-600 dark:bg-emerald-700 border-0">
+                                Activa
+                              </Badge>
+                            )}
                           </TableCell>
                           <TableCell>{t.plan?.name ?? '—'}</TableCell>
                           <TableCell className="tabular-nums">{t.usersCount}</TableCell>

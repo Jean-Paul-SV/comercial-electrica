@@ -66,10 +66,26 @@ export class ProviderService {
     const [totalTenants, activeTenants, suspendedTenants, totalUsers] =
       await Promise.all([
         this.prisma.tenant.count(),
-        this.prisma.tenant.count({ where: { isActive: true } }),
-        this.prisma.tenant.count({ where: { isActive: false } }),
+        // Solo cuentan como activas las que están activas Y con suscripción al día (ACTIVE)
+        this.prisma.tenant.count({
+          where: {
+            isActive: true,
+            OR: [
+              { subscription: { is: null } },
+              { subscription: { status: 'ACTIVE' } },
+            ],
+          },
+        }),
+        // Suspendidas = desactivadas manualmente O con pago pendiente / cancelada
+        this.prisma.tenant.count({
+          where: {
+            OR: [
+              { isActive: false },
+              { subscription: { status: { not: 'ACTIVE' } } },
+            ],
+          },
+        }),
         this.prisma.user.count({
-          // Excluye admins de plataforma (tenantId null)
           where: { tenantId: { not: null } },
         }),
       ]);
@@ -205,17 +221,38 @@ export class ProviderService {
     const searchName = query.searchName?.trim();
     const searchNumber = query.searchNumber?.trim();
 
-    const where: Prisma.TenantWhereInput = {};
-    if (isActiveFilter !== undefined) where.isActive = isActiveFilter;
+    const andParts: Prisma.TenantWhereInput[] = [];
+    if (isActiveFilter !== undefined) {
+      if (isActiveFilter) {
+        andParts.push({
+          isActive: true,
+          OR: [
+            { subscription: { is: null } },
+            { subscription: { status: 'ACTIVE' } },
+          ],
+        });
+      } else {
+        andParts.push({
+          OR: [
+            { isActive: false },
+            { subscription: { status: { not: 'ACTIVE' } } },
+          ],
+        });
+      }
+    }
     if (searchName && searchName.length > 0) {
-      where.name = { contains: searchName, mode: 'insensitive' };
+      andParts.push({ name: { contains: searchName, mode: 'insensitive' } });
     }
     if (searchNumber && searchNumber.length > 0) {
-      where.OR = [
-        { slug: { contains: searchNumber, mode: 'insensitive' } },
-        { id: searchNumber },
-      ];
+      andParts.push({
+        OR: [
+          { slug: { contains: searchNumber, mode: 'insensitive' } },
+          { id: searchNumber },
+        ],
+      });
     }
+    const where: Prisma.TenantWhereInput =
+      andParts.length > 0 ? { AND: andParts } : {};
 
     const [tenants, total] = await Promise.all([
       this.prisma.tenant.findMany({

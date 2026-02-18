@@ -140,69 +140,90 @@ export default function BillingPage() {
   const isActive = subscription?.status === 'ACTIVE';
 
   return (
-    <div className="space-y-8 max-w-2xl mx-auto">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+    <div className="space-y-8 max-w-3xl mx-auto pb-8">
+      {/* Hero */}
+      <header className="space-y-1">
+        <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
           {requiresPayment ? 'Completa tu pago' : 'Plan'}
         </h1>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-sm text-muted-foreground max-w-xl">
           {requiresPayment
             ? 'Tu empresa está creada. Activa tu acceso completando el pago de tu suscripción.'
             : 'Información de tu suscripción, renovación y opciones de pago.'}
         </p>
-      </div>
+      </header>
 
+      {/* Aviso pago pendiente + CTA */}
       {requiresPayment && (
-        <Card className="border-amber-500/40 bg-amber-500/5 shadow-sm">
-          <CardContent className="pt-6">
-            <p className="text-sm text-foreground flex items-center gap-2 font-medium mb-4">
-              <AlertCircle className="h-5 w-5 shrink-0 text-amber-600 dark:text-amber-500" />
-              Pago pendiente. Completa el pago para desbloquear tu cuenta y acceder a todos los módulos.
-            </p>
+        <Card className="overflow-hidden rounded-2xl border-amber-500/30 bg-gradient-to-br from-amber-500/10 to-amber-600/5 shadow-sm">
+          <CardContent className="p-5 sm:p-6">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm text-foreground flex items-start gap-3 font-medium">
+                <AlertCircle className="h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
+                Pago pendiente. Completa el pago para desbloquear tu cuenta y acceder a todos los módulos.
+              </p>
+              {canManageBilling && (
+                <Button
+                  onClick={handleOpenPortal}
+                  disabled={createPortalMutation.isPending}
+                  className="shrink-0 gap-2 bg-amber-600 hover:bg-amber-700 text-white border-0"
+                >
+                  <CreditCard className="h-4 w-4 shrink-0" />
+                  {createPortalMutation.isPending ? 'Abriendo…' : 'Completar pago'}
+                </Button>
+              )}
+            </div>
           </CardContent>
         </Card>
       )}
 
-      <Card className="border border-border/80 shadow-sm rounded-xl overflow-hidden">
-        <CardHeader className="pb-4 border-b border-border/60 bg-muted/20">
-          <CardTitle className="text-lg font-medium flex items-center gap-2 text-foreground">
-            <Package className="h-5 w-5 shrink-0 text-primary" aria-hidden />
+      {/* Plan actual + Estado */}
+      <Card className="overflow-hidden rounded-2xl border border-border/70 shadow-sm bg-card">
+        <CardHeader className="pb-5 border-b border-border/50 bg-muted/10">
+          <CardTitle className="text-base font-semibold flex items-center gap-2 text-foreground">
+            <Package className="h-5 w-5 shrink-0 text-primary/80" aria-hidden />
             Plan actual
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="text-sm mt-0.5">
             Tu plan incluye los módulos activos para tu empresa.
           </CardDescription>
-          <DianActivationDisclaimer variant="card" className="mt-3" />
+          <DianActivationDisclaimer variant="card" className="mt-4" />
         </CardHeader>
-        <CardContent className="pt-6 space-y-6">
+        <CardContent className="pt-6 space-y-5">
           {plan ? (
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-xl border border-border/80 bg-card p-4 sm:p-5">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                  <Sparkles className="h-5 w-5" />
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-xl border border-border/60 bg-muted/5 p-4 sm:p-5">
+              <div className="flex items-center gap-4">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <Sparkles className="h-6 w-6" />
                 </div>
                 <div>
                   <p className="font-semibold text-foreground">{plan.name}</p>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wider">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider font-mono mt-0.5">
                     {plan.slug}
                   </p>
                 </div>
               </div>
-              <Badge variant="secondary" className="w-fit font-medium">
+              <Badge variant="secondary" className="w-fit font-medium rounded-full px-3">
                 Plan vigente
               </Badge>
             </div>
           ) : (
-            <p className="text-muted-foreground text-sm rounded-xl border border-dashed border-border/70 bg-muted/10 px-4 py-3">
+            <p className="text-muted-foreground text-sm rounded-xl border border-dashed border-border/60 bg-muted/10 px-4 py-3">
               No hay plan asignado. Contacte a soporte.
             </p>
           )}
 
           {subscription && (
-            <div className="flex items-start gap-4 rounded-xl border border-border/80 bg-muted/10 p-4 sm:p-5">
+            <div
+              className={`flex items-start gap-4 rounded-xl border p-4 sm:p-5 ${
+                isActive
+                  ? 'border-emerald-500/20 bg-emerald-500/5'
+                  : 'border-amber-500/20 bg-amber-500/5'
+              }`}
+            >
               <div
-                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${
-                  isActive ? 'bg-green-500/10 text-green-600 dark:text-green-400' : 'bg-muted text-muted-foreground'
+                className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${
+                  isActive ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' : 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
                 }`}
               >
                 {isActive ? (
@@ -211,12 +232,16 @@ export default function BillingPage() {
                   <Calendar className="h-5 w-5" />
                 )}
               </div>
-              <div className="flex-1 min-w-0 space-y-1">
+              <div className="flex-1 min-w-0 space-y-2">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-sm font-medium text-foreground">Estado</span>
                   <Badge
                     variant={isActive ? 'default' : 'secondary'}
-                    className={isActive ? 'bg-green-600 hover:bg-green-600 dark:bg-green-700' : ''}
+                    className={
+                      isActive
+                        ? 'rounded-full bg-emerald-600 hover:bg-emerald-600 dark:bg-emerald-700'
+                        : 'rounded-full bg-amber-600/90 text-white hover:bg-amber-600 dark:bg-amber-500'
+                    }
                   >
                     {statusLabel}
                   </Badge>
@@ -237,74 +262,79 @@ export default function BillingPage() {
             </div>
           )}
 
+          {/* Cambiar de plan */}
           {plan && (
-            <div className="space-y-4 rounded-xl border border-primary/20 bg-primary/5 p-4 sm:p-5">
-              <p className="text-sm font-semibold text-foreground flex items-center gap-2">
-                <RefreshCw className="h-4 w-4" />
-                Cambiar de plan
-              </p>
+            <section className="space-y-4 rounded-2xl border border-border/60 bg-muted/5 p-5 sm:p-6">
+              <div className="flex items-center gap-2">
+                <RefreshCw className="h-5 w-5 shrink-0 text-primary/80" />
+                <h2 className="text-base font-semibold text-foreground">Cambiar de plan</h2>
+              </div>
               <p className="text-sm text-muted-foreground leading-relaxed">
                 Elige plan mensual o anual. El cambio se aplica de inmediato; el periodo actual se mantiene.
               </p>
-              <p className="text-xs text-muted-foreground/90 leading-relaxed">
+              <p className="text-xs text-muted-foreground leading-relaxed">
                 Los planes &quot;con DIAN&quot; te dan acceso a facturación electrónica. Hasta que actives el servicio podrás usar documentos internos.
               </p>
               <DianActivationDisclaimer variant="inline" className="text-xs mt-2" />
               {plansQuery.isLoading ? (
-                <div className="grid gap-3 sm:grid-cols-2">
+                <div className="grid gap-4 sm:grid-cols-2 mt-4">
                   {[1, 2, 3].map((i) => (
-                    <Skeleton key={i} className="h-28 rounded-lg" />
+                    <Skeleton key={i} className="h-36 rounded-xl" />
                   ))}
                 </div>
               ) : plansQuery.data && plansQuery.data.length > 0 ? (
-                <div className="grid gap-3 sm:grid-cols-2">
+                <div className="grid gap-4 sm:grid-cols-2 mt-4">
                   {plansQuery.data.map((p) => {
                     const isCurrent = plan.id === p.id;
+                    const price = p.priceMonthly ?? p.priceYearly;
                     return (
                       <div
                         key={p.id}
-                        className={`rounded-lg border p-4 transition-colors ${
+                        className={`rounded-xl border p-5 transition-all ${
                           isCurrent
-                            ? 'border-primary/50 bg-primary/10'
-                            : 'border-border/80 bg-card hover:border-primary/30'
+                            ? 'border-primary/40 bg-primary/10 shadow-sm ring-1 ring-primary/20'
+                            : 'border-border/70 bg-card hover:border-primary/30 hover:shadow-md'
                         }`}
                       >
-                        <div className="flex flex-col gap-3">
+                        <div className="flex flex-col gap-4">
                           <div className="flex items-start justify-between gap-2">
                             <div>
                               <p className="font-semibold text-foreground">{p.name}</p>
                               {p.maxUsers != null && (
-                                <p className="text-xs text-muted-foreground">
+                                <p className="text-xs text-muted-foreground mt-0.5">
                                   hasta {p.maxUsers} usuarios
                                 </p>
                               )}
                             </div>
                             {isCurrent && (
-                              <Badge variant="secondary" className="shrink-0">
+                              <Badge variant="secondary" className="shrink-0 rounded-full px-2.5">
                                 Vigente
                               </Badge>
                             )}
                           </div>
-                          <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
-                            {p.priceMonthly != null && (
-                              <span className="text-muted-foreground">
-                                Mensual: <span className="font-medium text-foreground">{formatPrice(p.priceMonthly)}</span>
+                          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                            {price != null && (
+                              <span className="text-lg font-bold text-foreground">
+                                {formatPrice(price)}
+                                <span className="text-xs font-normal text-muted-foreground ml-1">
+                                  {p.priceMonthly != null ? '/mes' : '/año'}
+                                </span>
                               </span>
                             )}
-                            {p.priceYearly != null && (
-                              <span className="text-muted-foreground">
-                                Anual: <span className="font-medium text-foreground">{formatPrice(p.priceYearly)}</span>
+                            {p.priceMonthly != null && p.priceYearly != null && (
+                              <span className="text-xs text-muted-foreground">
+                                Anual: {formatPrice(p.priceYearly)}
                               </span>
                             )}
                             {p.priceMonthly == null && p.priceYearly == null && (
-                              <span className="text-muted-foreground text-xs">Consultar precio</span>
+                              <span className="text-muted-foreground text-sm">Consultar precio</span>
                             )}
                           </div>
                           {!isCurrent && (
                             <Button
                               size="sm"
                               variant="outline"
-                              className="w-full sm:w-auto border-primary/40 text-primary hover:bg-primary/10"
+                              className="w-full sm:w-auto rounded-lg border-primary/40 text-primary hover:bg-primary/10"
                               disabled={changePlanMutation.isPending}
                               onClick={() => {
                                 changePlanMutation.mutate(p.id, {
@@ -322,23 +352,23 @@ export default function BillingPage() {
                   })}
                 </div>
               ) : (
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-muted-foreground mt-2">
                   No hay planes disponibles. Contacte a soporte para cambiar su plan.
                 </p>
               )}
-            </div>
+            </section>
           )}
 
-          {canManageBilling && (
-            <div className="space-y-3 rounded-xl border border-border/80 bg-muted/5 p-4 sm:p-5">
+          {/* Portal Stripe (cuando no es pago pendiente) */}
+          {canManageBilling && !requiresPayment && (
+            <div className="space-y-3 rounded-xl border border-border/60 bg-muted/5 p-4 sm:p-5">
               <p className="text-sm text-muted-foreground">
-                Actualiza tu método de pago, descarga facturas o gestiona tu
-                suscripción en el portal seguro de Stripe.
+                Actualiza tu método de pago, descarga facturas o gestiona tu suscripción en el portal seguro de Stripe.
               </p>
               <Button
                 onClick={handleOpenPortal}
                 disabled={createPortalMutation.isPending}
-                className="gap-2"
+                className="gap-2 rounded-lg"
               >
                 <CreditCard className="h-4 w-4 shrink-0" />
                 {createPortalMutation.isPending
@@ -349,7 +379,7 @@ export default function BillingPage() {
           )}
 
           {!canManageBilling && plan && (
-            <p className="text-sm text-muted-foreground rounded-lg bg-muted/20 px-3 py-2 border border-border/60">
+            <p className="text-sm text-muted-foreground rounded-xl bg-muted/20 px-4 py-3 border border-border/50">
               Para cambiar el método de pago o ver facturas, contacte a soporte.
             </p>
           )}
