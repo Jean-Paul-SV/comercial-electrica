@@ -663,7 +663,7 @@ export class ReportsService {
           FROM "Product" p
           INNER JOIN "StockBalance" s ON p.id = s."productId"
           LEFT JOIN "Category" c ON p."categoryId" = c.id
-          WHERE p."tenantId" = ${tenantId}
+          WHERE p."tenantId" = ${tenantId}::uuid
             AND p."isActive" = true
             AND s."qtyOnHand" <= COALESCE(p."minStock", ${threshold})
           ORDER BY s."qtyOnHand" ASC
@@ -672,7 +672,7 @@ export class ReportsService {
         const lowStockCountResult = await this.prisma.$queryRaw<[{ count: bigint }]>`
           SELECT COUNT(*)::bigint as count FROM "Product" p
           INNER JOIN "StockBalance" s ON p.id = s."productId"
-          WHERE p."tenantId" = ${tenantId}
+          WHERE p."tenantId" = ${tenantId}::uuid
             AND p."isActive" = true
             AND s."qtyOnHand" <= COALESCE(p."minStock", ${threshold})
         `;
@@ -850,7 +850,7 @@ export class ReportsService {
             const rows = await this.prisma.$queryRaw<{ id: string }[]>`
               SELECT p.id FROM "Product" p
               INNER JOIN "StockBalance" s ON p.id = s."productId"
-              WHERE p."tenantId" = ${tenantId}
+              WHERE p."tenantId" = ${tenantId}::uuid
                 AND p."isActive" = true
                 AND s."qtyOnHand" <= COALESCE(p."minStock", ${LOW_STOCK_THRESHOLD})
             `;

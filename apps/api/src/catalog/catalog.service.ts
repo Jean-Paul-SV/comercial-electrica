@@ -83,7 +83,7 @@ export class CatalogService {
           this.prisma.$queryRaw<{ id: string }[]>`
             SELECT p.id FROM "Product" p
             INNER JOIN "StockBalance" s ON p.id = s."productId"
-            WHERE p."tenantId" = ${currentTenantId}
+            WHERE p."tenantId" = ${currentTenantId}::uuid
               AND p."isActive" = true
               AND s."qtyOnHand" <= COALESCE(p."minStock", ${threshold})
             ORDER BY s."qtyOnHand" ASC
@@ -92,7 +92,7 @@ export class CatalogService {
           this.prisma.$queryRaw<[{ count: bigint }]>`
             SELECT COUNT(*)::bigint as count FROM "Product" p
             INNER JOIN "StockBalance" s ON p.id = s."productId"
-            WHERE p."tenantId" = ${currentTenantId}
+            WHERE p."tenantId" = ${currentTenantId}::uuid
               AND p."isActive" = true
               AND s."qtyOnHand" <= COALESCE(p."minStock", ${threshold})
           `,
