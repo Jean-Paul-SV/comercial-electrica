@@ -65,7 +65,8 @@ export class CreateProductDto {
 
   @ApiPropertyOptional({
     example: 5,
-    description: 'Stock mínimo por producto para alertas; si no se envía, se usa el umbral global.',
+    description:
+      'Stock mínimo por producto para alertas; si no se envía, se usa el umbral global.',
   })
   @IsOptional()
   @Type(() => Number)

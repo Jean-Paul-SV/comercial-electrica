@@ -102,7 +102,9 @@ export class AppService {
 
   async getStats(tenantId: string | null) {
     if (!tenantId) {
-      throw new BadRequestException('Tenant requerido para obtener estadísticas');
+      throw new BadRequestException(
+        'Tenant requerido para obtener estadísticas',
+      );
     }
 
     const [

@@ -68,7 +68,9 @@ export class CatalogService {
         1,
         20,
       );
-      const cached = await this.cache.get<{ data: unknown[]; meta: unknown }>(listCacheKey);
+      const cached = await this.cache.get<{ data: unknown[]; meta: unknown }>(
+        listCacheKey,
+      );
       if (cached) return cached;
     }
 
@@ -111,7 +113,9 @@ export class CatalogService {
           include: { category: true, stock: true },
         });
         const orderMap = new Map(ids.map((id, i) => [id, i]));
-        data.sort((a, b) => (orderMap.get(a.id) ?? 0) - (orderMap.get(b.id) ?? 0));
+        data.sort(
+          (a, b) => (orderMap.get(a.id) ?? 0) - (orderMap.get(b.id) ?? 0),
+        );
         return {
           data,
           meta,
@@ -286,7 +290,9 @@ export class CatalogService {
     );
 
     // Invalidar caché del producto y listados
-    await this.cache.delete(this.cache.buildKey('product', id, currentTenantId));
+    await this.cache.delete(
+      this.cache.buildKey('product', id, currentTenantId),
+    );
     await this.cache.deletePattern('cache:products:*');
 
     return updated;
@@ -337,7 +343,9 @@ export class CatalogService {
     );
 
     // Invalidar caché del producto y listados
-    await this.cache.delete(this.cache.buildKey('product', id, currentTenantId));
+    await this.cache.delete(
+      this.cache.buildKey('product', id, currentTenantId),
+    );
     await this.cache.deletePattern('cache:products:*');
 
     return updated;
@@ -380,7 +388,9 @@ export class CatalogService {
     });
 
     // Invalidar caché de categorías
-    await this.cache.delete(this.cache.buildKey('categories', 'list', currentTenantId));
+    await this.cache.delete(
+      this.cache.buildKey('categories', 'list', currentTenantId),
+    );
 
     return created;
   }
@@ -413,7 +423,9 @@ export class CatalogService {
       { name: updated.name },
     );
 
-    await this.cache.delete(this.cache.buildKey('categories', 'list', currentTenantId));
+    await this.cache.delete(
+      this.cache.buildKey('categories', 'list', currentTenantId),
+    );
 
     return updated;
   }
@@ -443,7 +455,9 @@ export class CatalogService {
       name: existing.name,
     });
 
-    await this.cache.delete(this.cache.buildKey('categories', 'list', currentTenantId));
+    await this.cache.delete(
+      this.cache.buildKey('categories', 'list', currentTenantId),
+    );
 
     return { deleted: true };
   }
@@ -456,7 +470,9 @@ export class CatalogService {
   ) {
     const currentTenantId = this.tenantContext.ensureTenant(tenantId);
 
-    const where: Prisma.ProductDictionaryEntryWhereInput = { tenantId: currentTenantId };
+    const where: Prisma.ProductDictionaryEntryWhereInput = {
+      tenantId: currentTenantId,
+    };
     if (query?.search?.trim()) {
       where.term = { contains: query.search.trim(), mode: 'insensitive' };
     }
@@ -502,7 +518,8 @@ export class CatalogService {
   ) {
     const currentTenantId = this.tenantContext.ensureTenant(tenantId);
     const term = dto.term.trim();
-    if (!term) throw new BadRequestException('El término no puede estar vacío.');
+    if (!term)
+      throw new BadRequestException('El término no puede estar vacío.');
 
     if (dto.productId) {
       const product = await this.prisma.product.findFirst({
@@ -543,7 +560,8 @@ export class CatalogService {
     const existing = await this.prisma.productDictionaryEntry.findFirst({
       where: { id, tenantId: currentTenantId },
     });
-    if (!existing) throw new NotFoundException('Entrada del diccionario no encontrada.');
+    if (!existing)
+      throw new NotFoundException('Entrada del diccionario no encontrada.');
 
     if (dto.productId !== undefined && dto.productId !== null) {
       const product = await this.prisma.product.findFirst({
@@ -561,8 +579,10 @@ export class CatalogService {
     const updated = await this.prisma.productDictionaryEntry.update({
       where: { id },
       data: {
-        productId: dto.productId === undefined ? undefined : (dto.productId || null),
-        categoryId: dto.categoryId === undefined ? undefined : (dto.categoryId || null),
+        productId:
+          dto.productId === undefined ? undefined : dto.productId || null,
+        categoryId:
+          dto.categoryId === undefined ? undefined : dto.categoryId || null,
       },
       include: {
         product: { select: { id: true, name: true, internalCode: true } },
@@ -579,7 +599,8 @@ export class CatalogService {
     const existing = await this.prisma.productDictionaryEntry.findFirst({
       where: { id, tenantId: currentTenantId },
     });
-    if (!existing) throw new NotFoundException('Entrada del diccionario no encontrada.');
+    if (!existing)
+      throw new NotFoundException('Entrada del diccionario no encontrada.');
 
     await this.prisma.productDictionaryEntry.delete({ where: { id } });
     await this.audit.logDelete('productDictionaryEntry', id, null, {
@@ -587,5 +608,4 @@ export class CatalogService {
     });
     return { deleted: true };
   }
-
 }

@@ -6,7 +6,7 @@ import { PrismaService } from '../prisma/prisma.service';
  * Servicio para archivado de datos históricos.
  * - AuditLog: archiva registros antiguos (configurable, default: 2 años)
  * - Sales: archiva ventas antiguas (default: 2 años)
- * 
+ *
  * Los datos archivados se pueden mover a una tabla de archivo o exportar a archivos.
  * Por ahora, se marcan con un flag o se eliminan según política de retención.
  */

@@ -66,11 +66,15 @@ export default function BillingPage() {
   const pollCount = useRef(0);
   useEffect(() => {
     if (subscriptionQuery.data?.requiresPayment !== true) return;
+    pollCount.current = 0;
     const POLL_MAX = 4;
     const POLL_INTERVAL_MS = 2000;
     const id = setInterval(() => {
       pollCount.current += 1;
-      if (pollCount.current > POLL_MAX) return;
+      if (pollCount.current > POLL_MAX) {
+        clearInterval(id);
+        return;
+      }
       subscriptionQuery.refetch();
     }, POLL_INTERVAL_MS);
     return () => clearInterval(id);

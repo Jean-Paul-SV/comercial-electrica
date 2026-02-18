@@ -17,7 +17,9 @@ import { runWithAuditContext } from '../audit/audit-context';
 @Injectable()
 export class AuditContextInterceptor implements NestInterceptor {
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
-    const req = context.switchToHttp().getRequest<Request & { user?: { tenantId?: string | null } }>();
+    const req = context
+      .switchToHttp()
+      .getRequest<Request & { user?: { tenantId?: string | null } }>();
     const requestId = (req.headers['x-request-id'] as string) || randomUUID();
     const ip =
       (req.ip as string) ||

@@ -83,7 +83,10 @@ export class CashController {
   })
   @ApiResponse({ status: 201, description: 'Sesión abierta exitosamente' })
   @ApiResponse({ status: 401, description: 'No autenticado' })
-  @ApiResponse({ status: 403, description: 'No autorizado (requiere permiso cash:create)' })
+  @ApiResponse({
+    status: 403,
+    description: 'No autorizado (requiere permiso cash:create)',
+  })
   async open(
     @Body() dto: OpenSessionDto,
     @Req() req: { user?: { sub?: string; tenantId?: string } },
@@ -107,7 +110,10 @@ export class CashController {
   @ApiResponse({ status: 200, description: 'Sesión cerrada exitosamente' })
   @ApiResponse({ status: 404, description: 'Sesión no encontrada' })
   @ApiResponse({ status: 401, description: 'No autenticado' })
-  @ApiResponse({ status: 403, description: 'No autorizado (requiere permiso cash:update)' })
+  @ApiResponse({
+    status: 403,
+    description: 'No autorizado (requiere permiso cash:update)',
+  })
   close(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Body() dto: CloseSessionDto,
@@ -154,7 +160,10 @@ export class CashController {
     },
   })
   @ApiResponse({ status: 401, description: 'No autenticado' })
-  @ApiResponse({ status: 403, description: 'Sin tenant o sin acceso a la sesión' })
+  @ApiResponse({
+    status: 403,
+    description: 'Sin tenant o sin acceso a la sesión',
+  })
   movements(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Query() pagination?: PaginationDto,

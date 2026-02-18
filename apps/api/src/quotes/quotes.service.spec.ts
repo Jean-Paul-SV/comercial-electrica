@@ -152,7 +152,9 @@ describe('QuotesService', () => {
         {
           provide: DianService,
           useValue: {
-            getConfigStatusForTenant: jest.fn().mockResolvedValue({ readyForSend: true, status: 'ready' }),
+            getConfigStatusForTenant: jest
+              .fn()
+              .mockResolvedValue({ readyForSend: true, status: 'ready' }),
           },
         },
       ],
@@ -164,7 +166,9 @@ describe('QuotesService', () => {
 
     // Mocks por defecto (el servicio usa findFirst para tenant)
     prisma.cashSession.findFirst = jest.fn().mockResolvedValue(mockCashSession);
-    prisma.cashSession.findUnique = jest.fn().mockResolvedValue(mockCashSession);
+    prisma.cashSession.findUnique = jest
+      .fn()
+      .mockResolvedValue(mockCashSession);
     prisma.customer.findFirst = jest.fn().mockResolvedValue(mockCustomer);
     prisma.customer.findUnique = jest.fn().mockResolvedValue(mockCustomer);
     prisma.product.findMany = jest.fn().mockResolvedValue([mockProduct]);

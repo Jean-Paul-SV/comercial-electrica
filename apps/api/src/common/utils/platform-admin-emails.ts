@@ -6,7 +6,10 @@
 function getPlatformAdminEmails(): string[] {
   const list = process.env.PLATFORM_ADMIN_EMAILS?.trim();
   if (!list) return [];
-  return list.split(',').map((e) => e.trim().toLowerCase()).filter(Boolean);
+  return list
+    .split(',')
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
 }
 
 /** true si el email está en PLATFORM_ADMIN_EMAILS (nunca debe tener tenant). */

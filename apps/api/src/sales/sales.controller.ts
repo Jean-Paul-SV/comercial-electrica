@@ -140,10 +140,16 @@ export class SalesController {
       'Anula una factura emitida: estado VOIDED, venta CANCELLED, devuelve stock y registra movimiento de caja de reversión.',
   })
   @ApiResponse({ status: 200, description: 'Factura anulada' })
-  @ApiResponse({ status: 400, description: 'Factura ya anulada o no es emitida' })
+  @ApiResponse({
+    status: 400,
+    description: 'Factura ya anulada o no es emitida',
+  })
   @ApiResponse({ status: 404, description: 'Factura no encontrada' })
   @ApiResponse({ status: 401, description: 'No autenticado' })
-  @ApiResponse({ status: 403, description: 'No autorizado (requiere permiso sales:update)' })
+  @ApiResponse({
+    status: 403,
+    description: 'No autorizado (requiere permiso sales:update)',
+  })
   voidInvoice(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Req() req: { user?: { sub?: string; tenantId?: string } },
@@ -186,7 +192,10 @@ export class SalesController {
       'Error de validación (stock insuficiente, productos inexistentes, etc.)',
   })
   @ApiResponse({ status: 401, description: 'No autenticado' })
-  @ApiResponse({ status: 403, description: 'No autorizado (requiere permiso sales:create)' })
+  @ApiResponse({
+    status: 403,
+    description: 'No autorizado (requiere permiso sales:create)',
+  })
   create(
     @Body() dto: CreateSaleDto,
     @Req() req: { user?: { sub?: string; tenantId?: string } },

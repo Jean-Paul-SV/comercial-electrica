@@ -18,7 +18,8 @@ import { ConfigService } from '@nestjs/config';
 const DIAN_DEFAULT_BASE_URL_HAB = 'https://vpfe-hab.dian.gov.co';
 const DIAN_DEFAULT_BASE_URL_PROD = 'https://vpfe.dian.gov.co';
 const DIAN_SEND_PATH = '/WcfDianCustomerServices.svc';
-const DIAN_SOAP_ACTION_RECEIVE = 'http://wcf.dian.colombia/IWcfDianCustomerServices/ReceiveInvoice';
+const DIAN_SOAP_ACTION_RECEIVE =
+  'http://wcf.dian.colombia/IWcfDianCustomerServices/ReceiveInvoice';
 /** Ruta para consulta de estado (mismo servicio WCF, operación GetStatus). */
 const DIAN_QUERY_STATUS_PATH = '/WcfDianCustomerServices.svc';
 const DIAN_HTTP_TIMEOUT_MS = 30_000;
@@ -84,7 +85,8 @@ export class DianService {
     this.softwareId = this.config.get<string>('DIAN_SOFTWARE_ID', '') || '';
     this.softwarePin = this.config.get<string>('DIAN_SOFTWARE_PIN', '') || '';
     this.certPath = this.config.get<string>('DIAN_CERT_PATH', '') || '';
-    this.certBase64 = this.config.get<string>('DIAN_CERT_BASE64', '')?.trim() || '';
+    this.certBase64 =
+      this.config.get<string>('DIAN_CERT_BASE64', '')?.trim() || '';
     this.certPassword = this.config.get<string>('DIAN_CERT_PASSWORD', '') || '';
 
     if (!this.softwareId || !this.softwarePin) {
@@ -92,7 +94,8 @@ export class DianService {
         '⚠️ DIAN_SOFTWARE_ID o DIAN_SOFTWARE_PIN no configurados. El procesamiento DIAN no funcionará.',
       );
     }
-    const hasCert = (this.certPath?.trim() || this.certBase64) && this.certPassword;
+    const hasCert =
+      (this.certPath?.trim() || this.certBase64) && this.certPassword;
     if (!hasCert) {
       this.logger.warn(
         '⚠️ Certificado no configurado (DIAN_CERT_PATH o DIAN_CERT_BASE64, y DIAN_CERT_PASSWORD). Los documentos se enviarán sin firma digital.',
@@ -246,8 +249,8 @@ export class DianService {
     }
 
     const contingencyMode =
-      this.config.get<string>('DIAN_CONTINGENCY_MODE', '')?.toLowerCase() === 'true' ||
-      this.config.get<string>('DIAN_CONTINGENCY_MODE') === '1';
+      this.config.get<string>('DIAN_CONTINGENCY_MODE', '')?.toLowerCase() ===
+        'true' || this.config.get<string>('DIAN_CONTINGENCY_MODE') === '1';
     if (contingencyMode) {
       this.logger.warn(
         `Modo contingencia DIAN activo: documento ${dianDocumentId} no se envía. Queda en DRAFT para reintento posterior.`,
@@ -456,7 +459,8 @@ export class DianService {
       );
     }
 
-    const expectedGrandTotal = Math.round((subtotal + taxTotal - discountTotal) * 100) / 100;
+    const expectedGrandTotal =
+      Math.round((subtotal + taxTotal - discountTotal) * 100) / 100;
     if (Math.abs(grandTotal - expectedGrandTotal) > 0.02) {
       throw new BadRequestException(
         `Total de la factura incoherente: subtotal + impuestos - descuento debe coincidir con el total (esperado ${expectedGrandTotal}, actual ${grandTotal}).`,
@@ -476,7 +480,11 @@ export class DianService {
           'Factura electrónica requiere cliente con documento (NIT/CC). Asocia la venta a un cliente con tipo y número de documento.',
         );
       }
-      if (!customer.docType || !customer.docNumber || String(customer.docNumber).trim() === '') {
+      if (
+        !customer.docType ||
+        !customer.docNumber ||
+        String(customer.docNumber).trim() === ''
+      ) {
         throw new BadRequestException(
           'El cliente debe tener tipo de documento (docType) y número de documento (docNumber) para factura electrónica DIAN.',
         );
@@ -499,9 +507,12 @@ export class DianService {
   }): string {
     const normalizeNit = (v: string) => String(v || '').replace(/\D/g, '');
     const date = params.issueDate;
-    const time = params.issueTime.includes('Z') || params.issueTime.includes('-') || params.issueTime.includes('+')
-      ? params.issueTime
-      : `${params.issueTime}-05:00`;
+    const time =
+      params.issueTime.includes('Z') ||
+      params.issueTime.includes('-') ||
+      params.issueTime.includes('+')
+        ? params.issueTime
+        : `${params.issueTime}-05:00`;
     const nitEmisor = normalizeNit(params.issuerNit);
     const nitCliente = normalizeNit(params.customerDocNumber);
     const totalFormatted = Math.round(params.grandTotal * 100).toString();
@@ -594,8 +605,13 @@ export class DianService {
         .join('') || '';
 
     const issueDate = invoice.issuedAt.toISOString().split('T')[0];
-    const issueTime = invoice.issuedAt.toISOString().split('T')[1].split('.')[0];
-    const customerDocNumber = customer?.docNumber ? String(customer.docNumber).trim() : '';
+    const issueTime = invoice.issuedAt
+      .toISOString()
+      .split('T')[1]
+      .split('.')[0];
+    const customerDocNumber = customer?.docNumber
+      ? String(customer.docNumber).trim()
+      : '';
     const cufe = this.computeCufe({
       invoiceNumber: invoice.number,
       issueDate,
@@ -753,7 +769,9 @@ export class DianService {
           `dian-cert-${process.pid}-${Date.now()}.p12`,
         );
         writeFileSync(this.certTempPath, buf, { mode: 0o600 });
-        this.logger.log('Certificado DIAN cargado desde DIAN_CERT_BASE64 (archivo temporal).');
+        this.logger.log(
+          'Certificado DIAN cargado desde DIAN_CERT_BASE64 (archivo temporal).',
+        );
       }
       pathToUse = this.certTempPath;
     } else {
@@ -972,9 +990,7 @@ export class DianService {
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        this.logger.log(
-          `Envío DIAN intento ${attempt}/${maxRetries} a ${url}`,
-        );
+        this.logger.log(`Envío DIAN intento ${attempt}/${maxRetries} a ${url}`);
         const res = await fetch(url, {
           method: 'POST',
           headers,
@@ -1052,7 +1068,9 @@ export class DianService {
           success: !!isValid,
           cufe: typeof cufe === 'string' ? cufe : undefined,
           message: typeof msg === 'string' ? msg : undefined,
-          errors: Array.isArray(json.errors) ? (json.errors as string[]) : undefined,
+          errors: Array.isArray(json.errors)
+            ? (json.errors as string[])
+            : undefined,
           timestamp,
         };
       } catch {
@@ -1068,7 +1086,9 @@ export class DianService {
     const cufeMatch = body.match(
       /<CUFE[^>]*>([^<]+)<\/CUFE>|<Cufe[^>]*>([^<]+)<\/Cufe>/i,
     );
-    const cufe = cufeMatch ? (cufeMatch[1] || cufeMatch[2] || '').trim() : undefined;
+    const cufe = cufeMatch
+      ? (cufeMatch[1] || cufeMatch[2] || '').trim()
+      : undefined;
     const descMatch = body.match(
       /<Description[^>]*>([^<]*)<\/Description>|<ResponseMessage[^>]*>([^<]*)<\/ResponseMessage>|<Message[^>]*>([^<]*)<\/Message>/i,
     );
@@ -1125,7 +1145,8 @@ export class DianService {
       }
 
       try {
-        const useSoap = this.config.get<string>('DIAN_USE_SOAP', 'true') !== 'false';
+        const useSoap =
+          this.config.get<string>('DIAN_USE_SOAP', 'true') !== 'false';
         const fileName = `factura-${dianDocumentId}.xml`;
         const body = useSoap
           ? this.buildSoapEnvelopeReceiveInvoice(
@@ -1342,23 +1363,38 @@ export class DianService {
 
       docPdf.fontSize(11).text('Cliente:', { continued: false });
       docPdf.fontSize(10).text(customer?.name ?? 'Cliente', { indent: 10 });
-      docPdf.text(`Doc: ${customer?.docType ?? ''} ${customer?.docNumber ?? ''}`, {
-        indent: 10,
-      });
+      docPdf.text(
+        `Doc: ${customer?.docType ?? ''} ${customer?.docNumber ?? ''}`,
+        {
+          indent: 10,
+        },
+      );
       docPdf.moveDown(1);
 
       docPdf.fontSize(10).text('Ítems', { underline: true });
       docPdf.moveDown(0.3);
-      (sale?.items ?? []).forEach((item: { product?: { name?: string }; qty: number; unitPrice: unknown }, i: number) => {
-        const name = item.product?.name ?? 'Producto';
-        const qty = item.qty;
-        const unitPrice = Number(item.unitPrice);
-        const total = qty * unitPrice;
-        docPdf.text(`${i + 1}. ${name}`, { indent: 10 });
-        docPdf.text(`   Cant: ${qty} × ${unitPrice.toFixed(2)} = ${total.toFixed(2)} COP`, {
-          indent: 10,
-        });
-      });
+      (sale?.items ?? []).forEach(
+        (
+          item: {
+            product?: { name?: string };
+            qty: number;
+            unitPrice: unknown;
+          },
+          i: number,
+        ) => {
+          const name = item.product?.name ?? 'Producto';
+          const qty = item.qty;
+          const unitPrice = Number(item.unitPrice);
+          const total = qty * unitPrice;
+          docPdf.text(`${i + 1}. ${name}`, { indent: 10 });
+          docPdf.text(
+            `   Cant: ${qty} × ${unitPrice.toFixed(2)} = ${total.toFixed(2)} COP`,
+            {
+              indent: 10,
+            },
+          );
+        },
+      );
       docPdf.moveDown(0.5);
       docPdf.text(`Subtotal: ${Number(invoice.subtotal).toFixed(2)} COP`, {
         align: 'right',
@@ -1413,7 +1449,9 @@ export class DianService {
       /** NIT del emisor (empresa). Si no se define, se usa softwareId en el XML (puede causar 400). */
       issuerNit: issuerNit || this.softwareId,
       /** Razón social del emisor. Si no se define, se usa un nombre por defecto. */
-      issuerName: issuerName || (this.softwareId ? 'EMPRESA COMERCIAL ELECTRICA' : 'Emisor'),
+      issuerName:
+        issuerName ||
+        (this.softwareId ? 'EMPRESA COMERCIAL ELECTRICA' : 'Emisor'),
       resolutionNumber: this.config.get<string>('DIAN_RESOLUTION_NUMBER'),
       prefix: this.config.get<string>('DIAN_PREFIX', 'FAC'),
       rangeFrom: this.config.get<number>('DIAN_RANGE_FROM', 1),
@@ -1441,8 +1479,14 @@ export class DianService {
     const issuerName = this.config.get<string>('DIAN_ISSUER_NAME', '')?.trim();
     if (!issuerNit) missing.push('DIAN_ISSUER_NIT');
     if (!issuerName) missing.push('DIAN_ISSUER_NAME');
-    const hasCert = !!((this.certPath?.trim() || this.certBase64) && this.certPassword);
-    if (!hasCert) missing.push('DIAN_CERT_PATH o DIAN_CERT_BASE64, y DIAN_CERT_PASSWORD (firma digital)');
+    const hasCert = !!(
+      (this.certPath?.trim() || this.certBase64) &&
+      this.certPassword
+    );
+    if (!hasCert)
+      missing.push(
+        'DIAN_CERT_PATH o DIAN_CERT_BASE64, y DIAN_CERT_PASSWORD (firma digital)',
+      );
 
     return {
       env: this.dianEnv,
@@ -1454,7 +1498,9 @@ export class DianService {
   }
 
   /** Configuración DIAN pública por tenant (sin secretos). */
-  async getDianConfigForTenant(tenantId: string): Promise<DianConfigPublic | null> {
+  async getDianConfigForTenant(
+    tenantId: string,
+  ): Promise<DianConfigPublic | null> {
     const row = await this.prisma.dianConfig.findUnique({
       where: { tenantId },
     });
@@ -1522,7 +1568,10 @@ export class DianService {
     }
 
     const rangeTo = config.rangeTo ?? 999999;
-    const nextNumber = await this.getNextInvoiceNumberForTenant(tenantId, config);
+    const nextNumber = await this.getNextInvoiceNumberForTenant(
+      tenantId,
+      config,
+    );
     if (nextNumber > rangeTo) {
       return {
         status: 'range_exhausted',
@@ -1542,7 +1591,9 @@ export class DianService {
     const rangeToNum = config.rangeTo ?? 999999;
     const certExpiresInDays =
       certValidUntil != null
-        ? Math.ceil((certValidUntil.getTime() - Date.now()) / (24 * 60 * 60 * 1000))
+        ? Math.ceil(
+            (certValidUntil.getTime() - Date.now()) / (24 * 60 * 60 * 1000),
+          )
         : undefined;
     const rangeRemaining =
       nextNumber != null && rangeToNum != null
@@ -1634,7 +1685,9 @@ export class DianService {
         ...(data.issuerNit !== undefined && { issuerNit: data.issuerNit }),
         // issuerName no se actualiza por aquí: solo se establece al crear el tenant.
         ...(data.softwareId !== undefined && { softwareId: data.softwareId }),
-        ...(data.softwarePin !== undefined && { softwarePin: data.softwarePin }),
+        ...(data.softwarePin !== undefined && {
+          softwarePin: data.softwarePin,
+        }),
         ...(data.resolutionNumber !== undefined && {
           resolutionNumber: data.resolutionNumber,
         }),
@@ -1667,17 +1720,13 @@ export class DianService {
             },
           }
         : { created: true };
-    await this.audit.log(
-      'dian_config',
-      row.id,
-      action,
-      userId ?? null,
-      diff,
-      {
-        tenantId,
-        summary: action === 'create' ? 'Configuración DIAN creada' : 'Configuración DIAN actualizada',
-      },
-    );
+    await this.audit.log('dian_config', row.id, action, userId ?? null, diff, {
+      tenantId,
+      summary:
+        action === 'create'
+          ? 'Configuración DIAN creada'
+          : 'Configuración DIAN actualizada',
+    });
     return {
       id: row.id,
       tenantId: row.tenantId,
@@ -1723,7 +1772,9 @@ export class DianService {
     password: string,
     userId?: string | null,
   ): Promise<void> {
-    const encKey = this.config.get<string>('DIAN_CERT_ENCRYPTION_KEY', '')?.trim();
+    const encKey = this.config
+      .get<string>('DIAN_CERT_ENCRYPTION_KEY', '')
+      ?.trim();
     if (!encKey) {
       throw new BadRequestException(
         'DIAN_CERT_ENCRYPTION_KEY no configurada. No se puede almacenar el certificado de forma segura.',
@@ -1735,7 +1786,7 @@ export class DianService {
         'certBase64 no es un base64 válido del archivo .p12.',
       );
     }
-    
+
     // Validar formato del certificado antes de procesar
     try {
       const binary = certBuffer.toString('binary');
@@ -1746,21 +1797,21 @@ export class DianService {
         `Certificado .p12 inválido o contraseña incorrecta: ${err instanceof Error ? err.message : String(err)}`,
       );
     }
-    
+
     const validUntil = this.getCertValidUntilFromP12(certBuffer, password);
     if (!validUntil) {
       throw new BadRequestException(
         'No se pudo leer la fecha de vencimiento del certificado .p12.',
       );
     }
-    
+
     // Validar que el certificado no esté vencido
     if (validUntil < new Date()) {
       throw new BadRequestException(
         `El certificado está vencido desde ${validUntil.toISOString().split('T')[0]}. Suba un certificado vigente.`,
       );
     }
-    
+
     // Validar que el certificado corresponde al NIT del tenant (si está configurado)
     const config = await this.prisma.dianConfig.findUnique({
       where: { tenantId },
@@ -1828,14 +1879,12 @@ export class DianService {
       where: { tenantId },
     });
     if (!row) return null;
-    const encKey = this.config.get<string>('DIAN_CERT_ENCRYPTION_KEY', '')?.trim();
+    const encKey = this.config
+      .get<string>('DIAN_CERT_ENCRYPTION_KEY', '')
+      ?.trim();
     let certBuffer: Buffer | null = null;
     let certPassword: string | null = null;
-    if (
-      row.certEncrypted &&
-      row.certPasswordEncrypted &&
-      encKey
-    ) {
+    if (row.certEncrypted && row.certPasswordEncrypted && encKey) {
       try {
         certBuffer = decryptCertPayload(row.certEncrypted, encKey);
         certPassword = decryptCertPayload(
@@ -1967,7 +2016,11 @@ export class DianService {
     const useSoap =
       this.config.get<string>('DIAN_USE_SOAP', 'true') !== 'false';
     const body = useSoap
-      ? this.buildSoapEnvelopeGetStatus(doc.cufe.trim(), softwareId, softwarePin)
+      ? this.buildSoapEnvelopeGetStatus(
+          doc.cufe.trim(),
+          softwareId,
+          softwarePin,
+        )
       : JSON.stringify({ cufe: doc.cufe.trim() });
 
     const controller = new AbortController();
@@ -1980,7 +2033,8 @@ export class DianService {
     const headers: Record<string, string> = useSoap
       ? {
           'Content-Type': 'application/soap+xml; charset=utf-8',
-          SOAPAction: '"http://wcf.dian.colombia/IWcfDianCustomerServices/GetStatus"',
+          SOAPAction:
+            '"http://wcf.dian.colombia/IWcfDianCustomerServices/GetStatus"',
           Accept: 'text/xml, application/xml, */*',
         }
       : {
@@ -2019,7 +2073,7 @@ export class DianService {
           status: newStatus,
           lastError:
             newStatus === DianDocumentStatus.REJECTED
-              ? parsed.message ?? null
+              ? (parsed.message ?? null)
               : null,
         },
       });
@@ -2065,7 +2119,10 @@ export class DianService {
           (j.StatusDescription as string) ??
           (j.Message as string) ??
           (j.message as string);
-        return { isValid: !!valid, message: typeof msg === 'string' ? msg : undefined };
+        return {
+          isValid: !!valid,
+          message: typeof msg === 'string' ? msg : undefined,
+        };
       } catch {
         return null;
       }
@@ -2138,7 +2195,9 @@ export class DianService {
   async sendDianAlertsForTenants(): Promise<void> {
     if (this.isTestEnv || !this.mailer.isConfigured()) {
       if (this.isTestEnv) return;
-      this.logger.debug('Alertas DIAN por email: SMTP no configurado, omitiendo.');
+      this.logger.debug(
+        'Alertas DIAN por email: SMTP no configurado, omitiendo.',
+      );
       return;
     }
     const configs = await this.prisma.dianConfig.findMany({
@@ -2147,7 +2206,10 @@ export class DianService {
     const tenantIds = [...new Set(configs.map((c) => c.tenantId))];
     const dianPermIds = await this.prisma.permission
       .findMany({
-        where: { resource: 'dian', action: { in: ['manage', 'manage_certificate'] } },
+        where: {
+          resource: 'dian',
+          action: { in: ['manage', 'manage_certificate'] },
+        },
         select: { id: true },
       })
       .then((p) => p.map((x) => x.id));
@@ -2163,15 +2225,19 @@ export class DianService {
     for (const tenantId of tenantIds) {
       const status = await this.getConfigStatusForTenant(tenantId);
       if (!status.readyForSend) continue;
-      const certWarn = status.certExpiresInDays != null && status.certExpiresInDays < 30;
-      const rangeWarn = status.rangeRemaining != null && status.rangeRemaining < 500;
+      const certWarn =
+        status.certExpiresInDays != null && status.certExpiresInDays < 30;
+      const rangeWarn =
+        status.rangeRemaining != null && status.rangeRemaining < 500;
       if (!certWarn && !rangeWarn) continue;
 
       const userRoles = await this.prisma.userRole.findMany({
         where: { tenantId, roleId: { in: roleIdsWithDian } },
         include: { user: { select: { email: true } } },
       });
-      const emails = [...new Set(userRoles.map((ur) => ur.user?.email).filter(Boolean))] as string[];
+      const emails = [
+        ...new Set(userRoles.map((ur) => ur.user?.email).filter(Boolean)),
+      ] as string[];
       if (emails.length === 0) continue;
 
       const lines: string[] = [];
@@ -2195,7 +2261,9 @@ export class DianService {
           text: body,
         });
       }
-      this.logger.log(`Alertas DIAN enviadas a ${emails.length} destinatario(s) del tenant ${tenantId}`);
+      this.logger.log(
+        `Alertas DIAN enviadas a ${emails.length} destinatario(s) del tenant ${tenantId}`,
+      );
     }
   }
 }
@@ -2233,7 +2301,12 @@ export interface DianConfigPublic {
 
 /** Estado de configuración DIAN por tenant. */
 export type DianConfigStatus = {
-  status: 'not_configured' | 'incomplete' | 'cert_expired' | 'range_exhausted' | 'ready';
+  status:
+    | 'not_configured'
+    | 'incomplete'
+    | 'cert_expired'
+    | 'range_exhausted'
+    | 'ready';
   readyForSend: boolean;
   missing: string[];
   hasCert: boolean;

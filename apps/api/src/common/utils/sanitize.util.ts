@@ -8,7 +8,10 @@
  * @param visibleChars Número de caracteres visibles al final (default: 4)
  * @returns Valor enmascarado (ej: "***1234")
  */
-export function maskSensitive(value: string | null | undefined, visibleChars = 4): string {
+export function maskSensitive(
+  value: string | null | undefined,
+  visibleChars = 4,
+): string {
   if (!value || value.length === 0) {
     return '***';
   }

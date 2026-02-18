@@ -20,7 +20,9 @@ export class PayuController {
     @Body() body: CreatePayuPaymentInput,
     @Req() req: { user?: { sub?: string; tenantId?: string | null } },
   ) {
-    const tenantId = this.tenantContext.ensureTenant(req.user?.tenantId ?? null);
+    const tenantId = this.tenantContext.ensureTenant(
+      req.user?.tenantId ?? null,
+    );
     const userId = req.user?.sub ?? null;
     return this.payu.createPaymentForTenant(body, tenantId, userId);
   }

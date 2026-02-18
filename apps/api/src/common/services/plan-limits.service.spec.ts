@@ -100,14 +100,18 @@ describe('PlanLimitsService', () => {
     it('no debe lanzar error si no hay límite definido', async () => {
       jest.spyOn(service, 'getMaxUsersForTenant').mockResolvedValue(null);
 
-      await expect(service.validateUserLimit('tenant-123')).resolves.not.toThrow();
+      await expect(
+        service.validateUserLimit('tenant-123'),
+      ).resolves.not.toThrow();
     });
 
     it('no debe lanzar error si está por debajo del límite', async () => {
       jest.spyOn(service, 'getMaxUsersForTenant').mockResolvedValue(10);
       jest.spyOn(service, 'getCurrentUserCount').mockResolvedValue(5);
 
-      await expect(service.validateUserLimit('tenant-123')).resolves.not.toThrow();
+      await expect(
+        service.validateUserLimit('tenant-123'),
+      ).resolves.not.toThrow();
     });
 
     it('debe lanzar BadRequestException si se excede el límite', async () => {
@@ -165,7 +169,9 @@ describe('PlanLimitsService', () => {
     });
 
     it('debe retornar límite para plan básico', async () => {
-      jest.spyOn(service, 'getPlanSlugForTenant').mockResolvedValue('plan-basico');
+      jest
+        .spyOn(service, 'getPlanSlugForTenant')
+        .mockResolvedValue('plan-basico');
 
       const result = await service.getRateLimitForTenant('tenant-123');
       expect(result).toBe(100);
@@ -179,7 +185,9 @@ describe('PlanLimitsService', () => {
     });
 
     it('debe retornar límite para plan enterprise', async () => {
-      jest.spyOn(service, 'getPlanSlugForTenant').mockResolvedValue('plan-enterprise');
+      jest
+        .spyOn(service, 'getPlanSlugForTenant')
+        .mockResolvedValue('plan-enterprise');
 
       const result = await service.getRateLimitForTenant('tenant-123');
       expect(result).toBe(5000);

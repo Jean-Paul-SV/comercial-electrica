@@ -26,7 +26,9 @@ describe('Plan Limits (e2e)', () => {
       where: { email: 'platform@admin.local' },
     });
     if (!admin) {
-      throw new Error('Admin de plataforma no encontrado. Ejecuta seed primero.');
+      throw new Error(
+        'Admin de plataforma no encontrado. Ejecuta seed primero.',
+      );
     }
 
     // Login como admin de plataforma

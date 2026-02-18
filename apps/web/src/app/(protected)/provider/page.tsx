@@ -31,8 +31,9 @@ import {
 import { Badge } from '@shared/components/ui/badge';
 import { Label } from '@shared/components/ui/label';
 import { Skeleton } from '@shared/components/ui/skeleton';
-import { Building2, PlusCircle, Eye, ChevronLeft, ChevronRight, BarChart3, Search, Filter } from 'lucide-react';
-import { useListTenants, useTenantsSummary, useDeleteTenant } from '@features/provider/hooks';
+import { Building2, PlusCircle, Eye, ChevronLeft, ChevronRight, BarChart3, Search, Filter, FileCheck, CheckCircle } from 'lucide-react';
+import { useListTenants, useTenantsSummary, useDeleteTenant, useDianActivationRequests, useMarkDianActivationAsCompleted } from '@features/provider/hooks';
+import { toast } from 'sonner';
 
 const PAGE_SIZE = 20;
 
@@ -56,6 +57,8 @@ export default function ProviderTenantsPage() {
   const [tenantToDelete, setTenantToDelete] = useState<TenantRow | null>(null);
 
   const deleteTenant = useDeleteTenant();
+  const { data: dianActivations = [], isLoading: isLoadingDian } = useDianActivationRequests();
+  const markDianComplete = useMarkDianActivationAsCompleted();
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -153,6 +156,86 @@ export default function ProviderTenantsPage() {
           </CardContent>
         </Card>
       </div>
+
+      {dianActivations.length > 0 && (
+        <Card className="overflow-hidden border-amber-500/30 bg-amber-500/5">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <FileCheck className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+              Activaciones DIAN pendientes
+            </CardTitle>
+            <CardDescription>
+              Empresas que cambiaron a un plan con DIAN. Cobra el costo de activación ($300.000), configura el servicio y marca como completada.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoadingDian ? (
+              <p className="text-sm text-muted-foreground">Cargando…</p>
+            ) : (
+              <div className="rounded-lg border border-border/60 overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-border/50">
+                      <TableHead className="font-medium">Empresa</TableHead>
+                      <TableHead className="font-medium">Plan</TableHead>
+                      <TableHead className="font-medium text-muted-foreground">Solicitado</TableHead>
+                      <TableHead className="w-[140px]" />
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {dianActivations.map((req) => (
+                      <TableRow key={req.id} className="border-border/50">
+                        <TableCell>
+                          <div className="font-medium">{req.tenantName}</div>
+                          <div className="text-xs text-muted-foreground font-mono">{req.tenantSlug}</div>
+                        </TableCell>
+                        <TableCell>{req.planName}</TableCell>
+                        <TableCell className="text-muted-foreground text-sm">
+                          {new Date(req.requestedAt).toLocaleDateString('es-CO', {
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric',
+                          })}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="gap-1"
+                              asChild
+                            >
+                              <Link href={`/provider/${req.tenantId}`}>
+                                <Eye className="h-3.5 w-3.5" />
+                                Ver
+                              </Link>
+                            </Button>
+                            <Button
+                              size="sm"
+                              className="gap-1 bg-emerald-600 hover:bg-emerald-700"
+                              disabled={markDianComplete.isPending}
+                              onClick={() => {
+                                markDianComplete.mutate(req.tenantId, {
+                                  onSuccess: () => toast.success('Activación DIAN marcada como completada.'),
+                                  onError: (e: unknown) =>
+                                    toast.error((e as { message?: string })?.message ?? 'Error al marcar.'),
+                                });
+                              }}
+                            >
+                              <CheckCircle className="h-3.5 w-3.5" />
+                              {markDianComplete.isPending ? '…' : 'Completada'}
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <Card className="overflow-hidden border-border/60 bg-card/50">
         <CardHeader className="space-y-4 pb-4">

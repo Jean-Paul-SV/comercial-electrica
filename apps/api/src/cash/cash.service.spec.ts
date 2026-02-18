@@ -142,7 +142,12 @@ describe('CashService', () => {
       prisma.sale.count = jest.fn().mockResolvedValue(0);
       prisma.cashSession.update = jest.fn().mockResolvedValue(sessionCerrada);
 
-      const result = await service.closeSession('session-1', 61900, undefined, 'tenant-1');
+      const result = await service.closeSession(
+        'session-1',
+        61900,
+        undefined,
+        'tenant-1',
+      );
 
       expect(result.closedAt).toBeDefined();
       expect(result.closingAmount).toBe(61900);
@@ -159,10 +164,20 @@ describe('CashService', () => {
       prisma.cashSession.findFirst = jest.fn().mockResolvedValue(null);
 
       await expect(
-        service.closeSession('session-inexistente', 50000, undefined, 'tenant-1'),
+        service.closeSession(
+          'session-inexistente',
+          50000,
+          undefined,
+          'tenant-1',
+        ),
       ).rejects.toThrow(NotFoundException);
       await expect(
-        service.closeSession('session-inexistente', 50000, undefined, 'tenant-1'),
+        service.closeSession(
+          'session-inexistente',
+          50000,
+          undefined,
+          'tenant-1',
+        ),
       ).rejects.toThrow('Caja no encontrada.');
     });
 
@@ -177,12 +192,12 @@ describe('CashService', () => {
         .fn()
         .mockResolvedValue(sessionCerrada);
 
-      await expect(service.closeSession('session-1', 61900, undefined, 'tenant-1')).rejects.toThrow(
-        BadRequestException,
-      );
-      await expect(service.closeSession('session-1', 61900, undefined, 'tenant-1')).rejects.toThrow(
-        'ya está cerrada',
-      );
+      await expect(
+        service.closeSession('session-1', 61900, undefined, 'tenant-1'),
+      ).rejects.toThrow(BadRequestException);
+      await expect(
+        service.closeSession('session-1', 61900, undefined, 'tenant-1'),
+      ).rejects.toThrow('ya está cerrada');
     });
 
     it('debe lanzar error si hay ventas pendientes de facturar en la sesión', async () => {
@@ -191,12 +206,12 @@ describe('CashService', () => {
         .mockResolvedValue(mockCashSession);
       prisma.sale.count = jest.fn().mockResolvedValue(2);
 
-      await expect(service.closeSession('session-1', 61900, undefined, 'tenant-1')).rejects.toThrow(
-        BadRequestException,
-      );
-      await expect(service.closeSession('session-1', 61900, undefined, 'tenant-1')).rejects.toThrow(
-        'pendiente',
-      );
+      await expect(
+        service.closeSession('session-1', 61900, undefined, 'tenant-1'),
+      ).rejects.toThrow(BadRequestException);
+      await expect(
+        service.closeSession('session-1', 61900, undefined, 'tenant-1'),
+      ).rejects.toThrow('pendiente');
     });
   });
 
@@ -270,7 +285,9 @@ describe('CashService', () => {
       ];
 
       // Mock getSession (llama a findFirst)
-      prisma.cashSession.findFirst = jest.fn().mockResolvedValue(mockCashSession);
+      prisma.cashSession.findFirst = jest
+        .fn()
+        .mockResolvedValue(mockCashSession);
       prisma.cashMovement.findMany = jest.fn().mockResolvedValue(mockMovements);
       prisma.cashMovement.count = jest.fn().mockResolvedValue(2);
 

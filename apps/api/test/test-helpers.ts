@@ -68,6 +68,7 @@ export async function cleanDatabase(prisma: PrismaService): Promise<void> {
     () => prisma.customer.deleteMany(),
     () => prisma.supplier.deleteMany(),
     () => prisma.userRole.deleteMany(),
+    () => prisma.tenantFeedback.deleteMany(),
     () => prisma.user.deleteMany(),
     () => prisma.subscription.deleteMany(),
     () => prisma.tenantAddOn.deleteMany(),
@@ -82,15 +83,20 @@ export async function cleanDatabase(prisma: PrismaService): Promise<void> {
       await operation();
     } catch (error) {
       // Ignorar errores de FK violations - pueden ocurrir si hay datos residuales
-      // que serán limpiados en la siguiente iteración
       if (
         error instanceof Error &&
         error.message.includes('Foreign key constraint')
       ) {
-        // Continuar con la siguiente operación
         continue;
       }
-      // Re-lanzar otros errores
+      // Ignorar si la tabla no existe (migración no aplicada en esta BD)
+      if (
+        error instanceof Error &&
+        (error.message.includes('does not exist in the current database') ||
+          (error as { code?: string }).code === 'P2021')
+      ) {
+        continue;
+      }
       throw error;
     }
   }
@@ -329,10 +335,14 @@ export async function closeTestQueues(app: INestApplication): Promise<void> {
 }
 
 export async function shutdownTestApp(setup: {
-  app: INestApplication;
-  prisma: PrismaService;
+  app?: INestApplication;
+  prisma?: PrismaService;
 }): Promise<void> {
-  await closeTestQueues(setup.app);
-  await setup.prisma.$disconnect();
-  await setup.app.close();
+  if (setup.app) {
+    await closeTestQueues(setup.app);
+    await setup.app.close();
+  }
+  if (setup.prisma) {
+    await setup.prisma.$disconnect();
+  }
 }

@@ -74,7 +74,8 @@ export class DianController {
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Actualizar configuración DIAN del tenant',
-    description: 'Crea o actualiza los datos de facturación electrónica (emisor, software ID/PIN, numeración).',
+    description:
+      'Crea o actualiza los datos de facturación electrónica (emisor, software ID/PIN, numeración).',
   })
   @ApiBody({ type: UpdateDianConfigDto })
   @ApiResponse({ status: 200, description: 'Configuración actualizada' })
@@ -90,16 +91,21 @@ export class DianController {
       dto.rangeTo !== undefined ||
       dto.softwarePin !== undefined;
     if (sensitive && req.user?.sub) {
-      const canManageCert = await this.permissions.userHasAnyPermission(req.user.sub, [
-        'dian:manage_certificate',
-      ]);
+      const canManageCert = await this.permissions.userHasAnyPermission(
+        req.user.sub,
+        ['dian:manage_certificate'],
+      );
       if (!canManageCert) {
         throw new ForbiddenException(
           'Se requiere permiso de gestión de certificado (dian:manage_certificate) para modificar numeración o PIN.',
         );
       }
     }
-    return this.dianService.upsertDianConfig(tenantId, dto, req.user?.sub ?? null);
+    return this.dianService.upsertDianConfig(
+      tenantId,
+      dto,
+      req.user?.sub ?? null,
+    );
   }
 
   @Post('config/certificate')
@@ -112,8 +118,14 @@ export class DianController {
   })
   @ApiBody({ type: UploadCertificateDto })
   @ApiResponse({ status: 201, description: 'Certificado guardado' })
-  @ApiResponse({ status: 400, description: 'certBase64 o contraseña inválidos' })
-  @ApiResponse({ status: 403, description: 'Sin permiso dian:manage_certificate' })
+  @ApiResponse({
+    status: 400,
+    description: 'certBase64 o contraseña inválidos',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Sin permiso dian:manage_certificate',
+  })
   async uploadCertificate(
     @Req() req: { user?: { tenantId?: string; sub?: string } },
     @Body() dto: UploadCertificateDto,
@@ -159,8 +171,18 @@ export class DianController {
         certValidUntil: { type: 'string', format: 'date-time', nullable: true },
         nextNumber: { type: 'number', nullable: true },
         rangeTo: { type: 'number', nullable: true },
-        certExpiresInDays: { type: 'number', nullable: true, description: 'Días hasta vencimiento del certificado (solo cuando ready)' },
-        rangeRemaining: { type: 'number', nullable: true, description: 'Números restantes en el rango autorizado (solo cuando ready)' },
+        certExpiresInDays: {
+          type: 'number',
+          nullable: true,
+          description:
+            'Días hasta vencimiento del certificado (solo cuando ready)',
+        },
+        rangeRemaining: {
+          type: 'number',
+          nullable: true,
+          description:
+            'Números restantes en el rango autorizado (solo cuando ready)',
+        },
       },
     },
   })
@@ -235,8 +257,14 @@ export class DianController {
       'Ejecuta el procesamiento completo del documento: XML con CUFE, firma, envío a DIAN (o simulado), generación de PDF. Útil para probar sin esperar al worker de la cola.',
   })
   @ApiParam({ name: 'id', description: 'UUID del documento DIAN' })
-  @ApiResponse({ status: 200, description: 'Procesamiento iniciado/completado' })
-  @ApiResponse({ status: 403, description: 'No autorizado para este documento' })
+  @ApiResponse({
+    status: 200,
+    description: 'Procesamiento iniciado/completado',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'No autorizado para este documento',
+  })
   @ApiResponse({ status: 404, description: 'Documento no encontrado' })
   async processDocument(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
@@ -266,7 +294,10 @@ export class DianController {
     schema: {
       type: 'object',
       properties: {
-        enqueued: { type: 'number', description: 'Cantidad de documentos encolados' },
+        enqueued: {
+          type: 'number',
+          description: 'Cantidad de documentos encolados',
+        },
         message: { type: 'string' },
       },
     },

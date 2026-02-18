@@ -515,12 +515,16 @@ export class ReportsService {
       since = new Date(dto.startDate);
       end = new Date(dto.endDate);
       end.setHours(23, 59, 59, 999);
-      periodDays = Math.ceil((end.getTime() - since.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      periodDays =
+        Math.ceil((end.getTime() - since.getTime()) / (1000 * 60 * 60 * 24)) +
+        1;
     } else if (period === 'current_month') {
       const now = new Date();
       since = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
       end = new Date();
-      periodDays = Math.ceil((end.getTime() - since.getTime()) / (1000 * 60 * 60 * 24));
+      periodDays = Math.ceil(
+        (end.getTime() - since.getTime()) / (1000 * 60 * 60 * 24),
+      );
     } else {
       const days = Math.min(Math.max(dto.days ?? 30, 1), 365);
       since = new Date();
@@ -592,7 +596,7 @@ export class ReportsService {
       .sort((a, b) =>
         sortBy === 'qty'
           ? b.totalQty - a.totalQty
-          : b.totalRevenue - a.totalRevenue
+          : b.totalRevenue - a.totalRevenue,
       )
       .slice(0, top);
 
@@ -612,7 +616,11 @@ export class ReportsService {
   async getDashboard(tenantId: string, lowStockThreshold?: number) {
     const threshold = lowStockThreshold ?? 10;
     return this.wrapReport(async () => {
-      const cacheKey = this.cache.buildKey('dashboard', tenantId, String(threshold));
+      const cacheKey = this.cache.buildKey(
+        'dashboard',
+        tenantId,
+        String(threshold),
+      );
       let cached: unknown = null;
       try {
         cached = await this.cache.get(cacheKey);
@@ -654,10 +662,20 @@ export class ReportsService {
 
       // Productos con stock bajo: por producto (minStock) o umbral global. Si la columna minStock no existe (migración pendiente), se usa solo el umbral.
       let lowStockCount: number;
-      let lowStockProducts: Array<{ id: string; name: string; stock: number; category?: string }>;
+      let lowStockProducts: Array<{
+        id: string;
+        name: string;
+        stock: number;
+        category?: string;
+      }>;
       try {
         const lowStockRows = await this.prisma.$queryRaw<
-          Array<{ id: string; name: string; qtyOnHand: number; categoryName: string | null }>
+          Array<{
+            id: string;
+            name: string;
+            qtyOnHand: number;
+            categoryName: string | null;
+          }>
         >`
           SELECT p.id, p.name, s."qtyOnHand", c.name as "categoryName"
           FROM "Product" p
@@ -669,7 +687,9 @@ export class ReportsService {
           ORDER BY s."qtyOnHand" ASC
           LIMIT 10
         `;
-        const lowStockCountResult = await this.prisma.$queryRaw<[{ count: bigint }]>`
+        const lowStockCountResult = await this.prisma.$queryRaw<
+          [{ count: bigint }]
+        >`
           SELECT COUNT(*)::bigint as count FROM "Product" p
           INNER JOIN "StockBalance" s ON p.id = s."productId"
           WHERE p."tenantId" = ${tenantId}::uuid
@@ -810,7 +830,9 @@ export class ReportsService {
    * Estado operativo del negocio: indicadores por área y alertas con acción sugerida.
    * Ver docs/ESTADOS_OPERATIVOS_Y_ALERTAS.md
    */
-  async getOperationalState(tenantId: string): Promise<OperationalStateResponse> {
+  async getOperationalState(
+    tenantId: string,
+  ): Promise<OperationalStateResponse> {
     return this.wrapReport(async () => {
       const now = new Date();
       const todayStart = new Date(
@@ -1982,7 +2004,10 @@ export class ReportsService {
    * Resumen del dashboard en lenguaje natural (IA Fase 3).
    * Si OPENAI_API_KEY está configurado, usa LLM para una o dos frases; si no, devuelve fallback (primeros insights).
    */
-  async getDashboardSummary(dto: ActionableIndicatorsDto = {}, tenantId: string): Promise<{
+  async getDashboardSummary(
+    dto: ActionableIndicatorsDto = {},
+    tenantId: string,
+  ): Promise<{
     summary: string;
     source: 'llm' | 'fallback';
   }> {
@@ -2052,7 +2077,10 @@ export class ReportsService {
    * Segmenta por: monto total en periodo, días desde última compra, cantidad de compras.
    * Devuelve k clusters con lista de clientes por segmento.
    */
-  async getCustomerClusters(dto: CustomerClustersDto = {}, tenantId: string): Promise<{
+  async getCustomerClusters(
+    dto: CustomerClustersDto = {},
+    tenantId: string,
+  ): Promise<{
     periodDays: number;
     k: number;
     clusters: Array<{

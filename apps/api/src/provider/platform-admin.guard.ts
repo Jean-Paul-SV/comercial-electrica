@@ -27,7 +27,6 @@ export class PlatformAdminGuard implements CanActivate {
     // Log mínimo para depuración en desarrollo (no incluye datos sensibles como contraseña).
     // Ayuda a entender por qué se rechaza el acceso al panel proveedor.
     if (process.env.NODE_ENV !== 'production') {
-      // eslint-disable-next-line no-console
       console.log('[PlatformAdminGuard] payload', {
         sub: authUser.sub,
         email: authUser.email,
@@ -68,7 +67,6 @@ export class PlatformAdminGuard implements CanActivate {
     if (user.tenantId === null) return true;
     if (emailIsPlatformAdminOnly(user.email)) return true;
     if (process.env.NODE_ENV !== 'production') {
-      // eslint-disable-next-line no-console
       console.log('[PlatformAdminGuard] dbUser', {
         tenantId: user.tenantId ?? null,
       });

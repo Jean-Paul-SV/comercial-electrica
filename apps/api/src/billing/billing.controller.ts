@@ -48,7 +48,8 @@ export class BillingController {
     }
 
     const signature = req.headers['stripe-signature'] as string | undefined;
-    const rawBody = req.rawBody ?? (Buffer.isBuffer(req.body) ? req.body : undefined);
+    const rawBody =
+      req.rawBody ?? (Buffer.isBuffer(req.body) ? req.body : undefined);
 
     if (!rawBody || !Buffer.isBuffer(rawBody)) {
       this.logger.warn('Webhook Stripe recibido sin body');
@@ -69,7 +70,7 @@ export class BillingController {
       this.logger.error(
         `Error procesando evento ${event.id} (${event.type}): ${(err as Error).message}`,
       );
-      
+
       // Encolar para reintento automático (máximo 3 intentos con backoff exponencial)
       try {
         await this.webhookQueue.add(
@@ -97,7 +98,7 @@ export class BillingController {
           `Error encolando evento Stripe ${event.id} para reintento: ${(queueErr as Error).message}`,
         );
       }
-      
+
       // Responder 200 a Stripe para evitar reenvíos inmediatos
       // El evento se procesará en segundo plano
       return { received: true };

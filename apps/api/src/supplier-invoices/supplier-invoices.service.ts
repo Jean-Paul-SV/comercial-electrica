@@ -86,7 +86,10 @@ export class SupplierInvoicesService {
         async (tx) => {
           // Verificar que el número de factura no existe en este tenant
           const existing = await tx.supplierInvoice.findFirst({
-            where: { tenantId: currentTenantId, invoiceNumber: dto.invoiceNumber },
+            where: {
+              tenantId: currentTenantId,
+              invoiceNumber: dto.invoiceNumber,
+            },
           });
           if (existing) {
             throw new BadRequestException(
@@ -235,7 +238,9 @@ export class SupplierInvoicesService {
     const searchTrim =
       typeof pagination?.search === 'string' ? pagination.search.trim() : '';
 
-    const where: Prisma.SupplierInvoiceWhereInput = { tenantId: currentTenantId };
+    const where: Prisma.SupplierInvoiceWhereInput = {
+      tenantId: currentTenantId,
+    };
     const validStatuses = Object.values(SupplierInvoiceStatus);
     if (
       pagination?.status &&
@@ -245,7 +250,11 @@ export class SupplierInvoicesService {
       // Coincidir con la definición de "vencidas" de reportes/alertas: PENDING con dueDate pasada O ya marcadas OVERDUE
       if (pagination.status === SupplierInvoiceStatus.OVERDUE) {
         const now = new Date();
-        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const todayStart = new Date(
+          now.getFullYear(),
+          now.getMonth(),
+          now.getDate(),
+        );
         where.OR = [
           { status: SupplierInvoiceStatus.OVERDUE },
           {
@@ -335,7 +344,11 @@ export class SupplierInvoicesService {
 
   async getSupplierInvoice(id: string, tenantId?: string | null) {
     const currentTenantId = this.tenantContext.ensureTenant(tenantId);
-    const cacheKey = this.cache.buildKey('supplierInvoice', id, currentTenantId);
+    const cacheKey = this.cache.buildKey(
+      'supplierInvoice',
+      id,
+      currentTenantId,
+    );
     const cached = await this.cache.get(cacheKey);
     if (cached) {
       this.logger.debug(`SupplierInvoice ${id} retrieved from cache`);

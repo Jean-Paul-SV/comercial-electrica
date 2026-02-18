@@ -11,11 +11,7 @@ import { CommonModule } from '../common/common.module';
 @Module({
   imports: [ConfigModule, AuthModule, PrismaModule, CommonModule],
   controllers: [MetricsController],
-  providers: [
-    MetricsService,
-    MetricsAlertsService,
-    MetricsAlertsScheduler,
-  ],
+  providers: [MetricsService, MetricsAlertsService, MetricsAlertsScheduler],
   exports: [MetricsService, MetricsAlertsService],
 })
 export class MetricsModule {}

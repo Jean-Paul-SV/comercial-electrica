@@ -43,7 +43,10 @@ export class ExpensesController {
   @ApiResponse({ status: 201, description: 'Gasto creado' })
   @ApiResponse({ status: 400, description: 'Datos inválidos o sesión cerrada' })
   @ApiResponse({ status: 404, description: 'Sesión de caja no encontrada' })
-  @ApiResponse({ status: 403, description: 'No autorizado (requiere permiso expenses:create)' })
+  @ApiResponse({
+    status: 403,
+    description: 'No autorizado (requiere permiso expenses:create)',
+  })
   create(
     @Body() dto: CreateExpenseDto,
     @Req() req: { user?: { sub?: string; tenantId?: string } },
@@ -99,7 +102,10 @@ export class ExpensesController {
   @ApiResponse({ status: 200, description: 'Gasto eliminado' })
   @ApiResponse({ status: 400, description: 'Justificación requerida' })
   @ApiResponse({ status: 404, description: 'Gasto no encontrado' })
-  @ApiResponse({ status: 403, description: 'No autorizado (requiere permiso expenses:delete)' })
+  @ApiResponse({
+    status: 403,
+    description: 'No autorizado (requiere permiso expenses:delete)',
+  })
   remove(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Query('reason') reason: string | undefined,

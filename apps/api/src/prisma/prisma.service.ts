@@ -31,7 +31,7 @@ export class PrismaService
     // En desarrollo: connection_limit=5, pool_timeout=10
     const connectionLimit = isProd ? 20 : 5;
     const poolTimeout = isProd ? 20 : 10;
-    
+
     const urlWithPool = url.includes('?')
       ? `${url}&connection_limit=${connectionLimit}&pool_timeout=${poolTimeout}`
       : `${url}?connection_limit=${connectionLimit}&pool_timeout=${poolTimeout}`;

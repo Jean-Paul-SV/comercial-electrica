@@ -256,7 +256,10 @@ export class CatalogController {
     summary: 'Actualizar categoría',
     description: 'Actualiza el nombre de una categoría existente.',
   })
-  @ApiResponse({ status: 200, description: 'Categoría actualizada exitosamente' })
+  @ApiResponse({
+    status: 200,
+    description: 'Categoría actualizada exitosamente',
+  })
   @ApiResponse({ status: 400, description: 'Error de validación' })
   @ApiResponse({ status: 401, description: 'No autenticado' })
   @ApiResponse({ status: 404, description: 'Categoría no encontrada' })
@@ -265,7 +268,12 @@ export class CatalogController {
     @Body() dto: UpdateCategoryDto,
     @Req() req: { user?: { sub?: string; tenantId?: string } },
   ) {
-    return this.catalog.updateCategory(id, dto, req.user?.sub, req.user?.tenantId);
+    return this.catalog.updateCategory(
+      id,
+      dto,
+      req.user?.sub,
+      req.user?.tenantId,
+    );
   }
 
   @Delete('categories/:id')
@@ -276,7 +284,10 @@ export class CatalogController {
       'Elimina una categoría sin productos asociados. Si hay productos que la usan, devuelve un error.',
   })
   @ApiResponse({ status: 200, description: 'Categoría eliminada exitosamente' })
-  @ApiResponse({ status: 400, description: 'No se puede eliminar por tener productos asociados' })
+  @ApiResponse({
+    status: 400,
+    description: 'No se puede eliminar por tener productos asociados',
+  })
   @ApiResponse({ status: 401, description: 'No autenticado' })
   @ApiResponse({ status: 404, description: 'Categoría no encontrada' })
   deleteCategory(
@@ -295,9 +306,20 @@ export class CatalogController {
     description:
       'Términos o frases que los clientes escriben al preguntar por productos. Opcionalmente vinculados a un producto.',
   })
-  @ApiQuery({ name: 'search', required: false, description: 'Filtrar por texto en el término' })
-  @ApiQuery({ name: 'productId', required: false, description: 'Filtrar por producto asociado' })
-  @ApiResponse({ status: 200, description: 'Lista de entradas del diccionario' })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    description: 'Filtrar por texto en el término',
+  })
+  @ApiQuery({
+    name: 'productId',
+    required: false,
+    description: 'Filtrar por producto asociado',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Lista de entradas del diccionario',
+  })
   @ApiResponse({ status: 401, description: 'No autenticado' })
   listProductDictionary(
     @Query() query: ListProductDictionaryQueryDto,
@@ -310,7 +332,8 @@ export class CatalogController {
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Agregar término al diccionario',
-    description: 'Registra un término o frase que los clientes escriben al preguntar por productos.',
+    description:
+      'Registra un término o frase que los clientes escriben al preguntar por productos.',
   })
   @ApiResponse({ status: 201, description: 'Entrada creada' })
   @ApiResponse({ status: 400, description: 'Validación fallida' })
@@ -337,7 +360,11 @@ export class CatalogController {
     @Body() dto: UpdateProductDictionaryEntryDto,
     @Req() req?: { user?: { tenantId?: string } },
   ) {
-    return this.catalog.updateProductDictionaryEntry(id, dto, req?.user?.tenantId);
+    return this.catalog.updateProductDictionaryEntry(
+      id,
+      dto,
+      req?.user?.tenantId,
+    );
   }
 
   @Delete('product-dictionary/:id')

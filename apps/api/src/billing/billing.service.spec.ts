@@ -10,7 +10,9 @@ describe('BillingService', () => {
   let prisma: PrismaService;
 
   const mockPrismaService = {
-    $transaction: jest.fn((ops) => (Array.isArray(ops) ? Promise.all(ops) : ops)),
+    $transaction: jest.fn((ops) =>
+      Array.isArray(ops) ? Promise.all(ops) : ops,
+    ),
     stripeEvent: {
       findUnique: jest.fn(),
       create: jest.fn(),

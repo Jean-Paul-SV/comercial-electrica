@@ -113,7 +113,11 @@ describe('AuthService', () => {
           provide: PlanLimitsService,
           useValue: {
             validateUserLimit: jest.fn().mockResolvedValue(undefined),
-            getTenantLimits: jest.fn().mockResolvedValue({ maxUsers: null, currentUsers: 0, canAddUsers: true }),
+            getTenantLimits: jest.fn().mockResolvedValue({
+              maxUsers: null,
+              currentUsers: 0,
+              canAddUsers: true,
+            }),
           },
         },
       ],

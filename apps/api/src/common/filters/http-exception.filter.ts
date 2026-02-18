@@ -111,7 +111,9 @@ export class AllExceptionsFilter implements ExceptionFilter {
           status: HttpStatus.INTERNAL_SERVER_ERROR,
           error: 'Internal Server Error',
           message: 'Error interno del servidor (esquema de base de datos).',
-          details: isProd ? { prismaCode } : { prismaCode, meta: sanitizePrismaMeta(meta) },
+          details: isProd
+            ? { prismaCode }
+            : { prismaCode, meta: sanitizePrismaMeta(meta) },
         };
       }
 
@@ -120,7 +122,9 @@ export class AllExceptionsFilter implements ExceptionFilter {
         status: HttpStatus.BAD_REQUEST,
         error: 'Bad Request',
         message: 'Solicitud inválida (error de base de datos).',
-        details: isProd ? { prismaCode } : { prismaCode, meta: sanitizePrismaMeta(meta) },
+        details: isProd
+          ? { prismaCode }
+          : { prismaCode, meta: sanitizePrismaMeta(meta) },
       };
     }
 
@@ -266,9 +270,14 @@ export class AllExceptionsFilter implements ExceptionFilter {
     if (statusCode >= 500) {
       // Errores del servidor - log completo con stack trace (sanitizado en producción)
       const isProd = process.env.NODE_ENV === 'production';
-      const stackTrace = exception instanceof Error
-        ? (isProd ? '[Stack trace oculto en producción]' : exception.stack)
-        : (isProd ? '[Error details ocultos en producción]' : JSON.stringify(exception));
+      const stackTrace =
+        exception instanceof Error
+          ? isProd
+            ? '[Stack trace oculto en producción]'
+            : exception.stack
+          : isProd
+            ? '[Error details ocultos en producción]'
+            : JSON.stringify(exception);
       this.logger.error(
         `${request.method} ${request.url} - ${statusCode} - ${messageStr}`,
         stackTrace,

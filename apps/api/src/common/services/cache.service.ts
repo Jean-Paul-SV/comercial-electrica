@@ -19,10 +19,7 @@ export class CacheService {
   private lastErrorCode: string | null = null;
 
   constructor(private readonly config: ConfigService) {
-    const raw = this.config.get<string>(
-      'REDIS_URL',
-      'redis://localhost:6379',
-    );
+    const raw = this.config.get<string>('REDIS_URL', 'redis://localhost:6379');
     const redisUrl = normalizeRedisUrl(raw);
     this.defaultTtl = this.config.get<number>('CACHE_TTL_SECONDS', 300); // 5 minutos por defecto
 
@@ -43,7 +40,10 @@ export class CacheService {
         code === 'ETIMEDOUT' ||
         code === 'ECONNREFUSED'
       ) {
-        if (now - this.lastErrorLog < ERROR_LOG_THROTTLE_MS && this.lastErrorCode === code) {
+        if (
+          now - this.lastErrorLog < ERROR_LOG_THROTTLE_MS &&
+          this.lastErrorCode === code
+        ) {
           return;
         }
         this.lastErrorLog = now;

@@ -22,6 +22,8 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PlatformAdminGuard } from './platform-admin.guard';
 import { ProviderService } from './provider.service';
 import { DianService } from '../dian/dian.service';
+import { FeedbackService } from '../feedback/feedback.service';
+import { UpdateFeedbackStatusDto } from '../feedback/dto/update-feedback-status.dto';
 import { CreateTenantDto } from './dto/create-tenant.dto';
 import { ListTenantsQueryDto } from './dto/list-tenants-query.dto';
 import { UpdateTenantDto } from './dto/update-tenant.dto';
@@ -42,6 +44,7 @@ export class ProviderController {
   constructor(
     private readonly provider: ProviderService,
     private readonly dianService: DianService,
+    private readonly feedbackService: FeedbackService,
   ) {}
 
   @Get('tenants/summary')
@@ -181,7 +184,8 @@ export class ProviderController {
   @Get('tenants/:tenantId/dian-config')
   @ApiOperation({
     summary: 'Configuración DIAN de una empresa (proveedor)',
-    description: 'Obtiene la configuración de facturación electrónica de la empresa indicada. Solo administrador de plataforma.',
+    description:
+      'Obtiene la configuración de facturación electrónica de la empresa indicada. Solo administrador de plataforma.',
   })
   @ApiParam({ name: 'tenantId', description: 'ID del tenant (empresa)' })
   @ApiResponse({ status: 200, description: 'Configuración o null.' })
@@ -192,7 +196,8 @@ export class ProviderController {
   @Get('tenants/:tenantId/dian-config-status')
   @ApiOperation({
     summary: 'Estado de configuración DIAN de una empresa (proveedor)',
-    description: 'Indica si está lista para facturar y qué falta. Solo administrador de plataforma.',
+    description:
+      'Indica si está lista para facturar y qué falta. Solo administrador de plataforma.',
   })
   @ApiParam({ name: 'tenantId', description: 'ID del tenant (empresa)' })
   @ApiResponse({ status: 200, description: 'Estado de la configuración.' })
@@ -203,7 +208,8 @@ export class ProviderController {
   @Patch('tenants/:tenantId/dian-config')
   @ApiOperation({
     summary: 'Actualizar configuración DIAN de una empresa (proveedor)',
-    description: 'Crea o actualiza datos de facturación electrónica de la empresa. Solo administrador de plataforma.',
+    description:
+      'Crea o actualiza datos de facturación electrónica de la empresa. Solo administrador de plataforma.',
   })
   @ApiParam({ name: 'tenantId', description: 'ID del tenant (empresa)' })
   @ApiBody({ type: UpdateDianConfigDto })
@@ -213,13 +219,18 @@ export class ProviderController {
     @Body() dto: UpdateDianConfigDto,
     @Req() req: { user?: { sub?: string } },
   ) {
-    return this.dianService.upsertDianConfig(tenantId, dto, req.user?.sub ?? null);
+    return this.dianService.upsertDianConfig(
+      tenantId,
+      dto,
+      req.user?.sub ?? null,
+    );
   }
 
   @Post('tenants/:tenantId/dian-config/certificate')
   @ApiOperation({
     summary: 'Subir certificado .p12 de una empresa (proveedor)',
-    description: 'Sube el certificado de firma electrónica de la empresa. Solo administrador de plataforma.',
+    description:
+      'Sube el certificado de firma electrónica de la empresa. Solo administrador de plataforma.',
   })
   @ApiParam({ name: 'tenantId', description: 'ID del tenant (empresa)' })
   @ApiBody({ type: UploadCertificateDto })
@@ -230,7 +241,76 @@ export class ProviderController {
     @Req() req: { user?: { sub?: string } },
   ) {
     return this.dianService
-      .saveCertificate(tenantId, dto.certBase64, dto.password, req.user?.sub ?? null)
-      .then(() => ({ ok: true, message: 'Certificado guardado correctamente.' }));
+      .saveCertificate(
+        tenantId,
+        dto.certBase64,
+        dto.password,
+        req.user?.sub ?? null,
+      )
+      .then(() => ({
+        ok: true,
+        message: 'Certificado guardado correctamente.',
+      }));
+  }
+
+  @Get('feedback')
+  @ApiOperation({
+    summary: 'Listar sugerencias de mejoras de los clientes',
+    description:
+      'Todas las sugerencias enviadas por usuarios de los tenants. Opcional: ?tenantId=... y ?status=PENDING|READ|DONE.',
+  })
+  @ApiResponse({ status: 200, description: 'Lista de sugerencias.' })
+  listFeedback(
+    @Query('tenantId') tenantId?: string,
+    @Query('status') status?: 'PENDING' | 'READ' | 'DONE',
+  ) {
+    return this.feedbackService.findAll(tenantId, status);
+  }
+
+  @Patch('feedback/:id')
+  @ApiOperation({
+    summary: 'Actualizar estado de una sugerencia',
+    description: 'Marcar como leída o resuelta.',
+  })
+  @ApiResponse({ status: 200, description: 'Estado actualizado.' })
+  @ApiResponse({ status: 404, description: 'Sugerencia no encontrada.' })
+  updateFeedbackStatus(
+    @Param('id') id: string,
+    @Body() dto: UpdateFeedbackStatusDto,
+  ) {
+    return this.feedbackService.updateStatus(id, dto.status);
+  }
+
+  @Get('dian-activations')
+  @ApiOperation({
+    summary: 'Listar solicitudes de activación DIAN pendientes',
+    description:
+      'Empresas que cambiaron a un plan con DIAN pero aún no han activado el servicio (pendiente de pago y configuración).',
+  })
+  @ApiResponse({ status: 200, description: 'Lista de solicitudes pendientes.' })
+  listDianActivationRequests() {
+    return this.provider.listDianActivationRequests();
+  }
+
+  @Patch('tenants/:id/dian-activation/complete')
+  @ApiOperation({
+    summary: 'Marcar activación DIAN como completada',
+    description:
+      'Después de cobrar el costo de activación ($300.000) y configurar el servicio, marca la activación como completada.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Activación marcada como completada.',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Configuración DIAN no encontrada.',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'La activación ya está completada.',
+  })
+  markDianActivationAsCompleted(@Param('id') tenantId: string) {
+    return this.provider.markDianActivationAsCompleted(tenantId);
   }
 }

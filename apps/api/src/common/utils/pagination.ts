@@ -25,4 +25,3 @@ export function buildPaginationMeta(
     hasPreviousPage: page > 1,
   };
 }
-

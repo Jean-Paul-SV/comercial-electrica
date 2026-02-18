@@ -23,12 +23,22 @@ export class ConfigValidationModule implements OnModuleInit {
 
     // Variables críticas siempre requeridas
     const requiredVars = [
-      { key: 'DATABASE_URL', description: 'URL de conexión a la base de datos' },
-      { key: 'JWT_ACCESS_SECRET', description: 'Secret para firmar tokens JWT' },
+      {
+        key: 'DATABASE_URL',
+        description: 'URL de conexión a la base de datos',
+      },
+      {
+        key: 'JWT_ACCESS_SECRET',
+        description: 'Secret para firmar tokens JWT',
+      },
     ];
 
     // Variables requeridas solo en producción
-    const prodOnlyVars: Array<{ key: string; description: string; condition?: () => boolean }> = [
+    const prodOnlyVars: Array<{
+      key: string;
+      description: string;
+      condition?: () => boolean;
+    }> = [
       {
         key: 'STRIPE_WEBHOOK_SECRET',
         description: 'Secret para validar webhooks de Stripe',
@@ -60,7 +70,7 @@ export class ConfigValidationModule implements OnModuleInit {
 
     // Si hay errores, lanzar excepción
     if (errors.length > 0) {
-      const errorMessage = `Variables de entorno faltantes o vacías:\n${errors.map(e => `  - ${e}`).join('\n')}\n\nConfigura estas variables antes de iniciar la aplicación.`;
+      const errorMessage = `Variables de entorno faltantes o vacías:\n${errors.map((e) => `  - ${e}`).join('\n')}\n\nConfigura estas variables antes de iniciar la aplicación.`;
       this.logger.error(errorMessage);
       throw new Error(errorMessage);
     }

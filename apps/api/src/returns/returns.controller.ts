@@ -43,14 +43,19 @@ export class ReturnsController {
       'Venta no encontrada, producto no pertenece a la venta, cantidad excede lo vendido.',
   })
   @ApiResponse({ status: 401, description: 'No autenticado' })
-  @ApiResponse({ status: 403, description: 'Sin tenant (solo usuarios de empresa)' })
+  @ApiResponse({
+    status: 403,
+    description: 'Sin tenant (solo usuarios de empresa)',
+  })
   create(
     @Body() dto: CreateReturnDto,
     @Req() req: { user?: { sub?: string; tenantId?: string | null } },
   ) {
     const tenantId = req.user?.tenantId ?? null;
     if (tenantId == null) {
-      throw new ForbiddenException('Solo usuarios de una empresa pueden registrar devoluciones.');
+      throw new ForbiddenException(
+        'Solo usuarios de una empresa pueden registrar devoluciones.',
+      );
     }
     return this.returns.createReturn(dto, req.user?.sub, tenantId);
   }
@@ -71,7 +76,9 @@ export class ReturnsController {
   ) {
     const tenantId = req.user?.tenantId ?? null;
     if (tenantId == null) {
-      throw new ForbiddenException('Solo usuarios de una empresa pueden listar devoluciones.');
+      throw new ForbiddenException(
+        'Solo usuarios de una empresa pueden listar devoluciones.',
+      );
     }
     return this.returns.listReturns(tenantId, { page, limit });
   }
@@ -80,7 +87,8 @@ export class ReturnsController {
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Obtener devolución por ID',
-    description: 'Devuelve el detalle de una devolución del tenant del usuario.',
+    description:
+      'Devuelve el detalle de una devolución del tenant del usuario.',
   })
   @ApiParam({ name: 'id', description: 'ID de la devolución' })
   @ApiResponse({ status: 200, description: 'Devolución encontrada' })
@@ -92,7 +100,9 @@ export class ReturnsController {
   ) {
     const tenantId = req.user?.tenantId ?? null;
     if (tenantId == null) {
-      throw new ForbiddenException('Solo usuarios de una empresa pueden consultar devoluciones.');
+      throw new ForbiddenException(
+        'Solo usuarios de una empresa pueden consultar devoluciones.',
+      );
     }
     return this.returns.getReturnById(id, tenantId);
   }

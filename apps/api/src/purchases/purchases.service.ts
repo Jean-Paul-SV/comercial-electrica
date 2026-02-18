@@ -103,7 +103,10 @@ export class PurchasesService {
           const grandTotal = round2(subtotal + taxTotal);
 
           // Generar número de pedido único por tenant
-          const orderNumber = await this.generateOrderNumber(tx, currentTenantId);
+          const orderNumber = await this.generateOrderNumber(
+            tx,
+            currentTenantId,
+          );
 
           // Crear pedido (Decimal explícito para evitar PrismaClientValidationError)
           const purchaseOrder = await tx.purchaseOrder.create({

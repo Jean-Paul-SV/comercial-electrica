@@ -51,7 +51,8 @@ export class BillingPortalController {
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Cambiar plan del tenant',
-    description: 'Actualiza el plan de la empresa del usuario. El periodo de suscripci?n se mantiene.',
+    description:
+      'Actualiza el plan de la empresa del usuario. El periodo de suscripci?n se mantiene.',
   })
   @ApiResponse({ status: 200, description: 'Plan actualizado.' })
   @ApiResponse({ status: 404, description: 'Plan o empresa no encontrados.' })
@@ -92,15 +93,26 @@ export class BillingPortalController {
           nullable: true,
           properties: {
             status: { type: 'string' },
-            currentPeriodEnd: { type: 'string', format: 'date-time', nullable: true },
-            currentPeriodStart: { type: 'string', format: 'date-time', nullable: true },
+            currentPeriodEnd: {
+              type: 'string',
+              format: 'date-time',
+              nullable: true,
+            },
+            currentPeriodStart: {
+              type: 'string',
+              format: 'date-time',
+              nullable: true,
+            },
           },
         },
         canManageBilling: { type: 'boolean' },
       },
     },
   })
-  @ApiResponse({ status: 404, description: 'Usuario sin tenant o sin suscripci?n' })
+  @ApiResponse({
+    status: 404,
+    description: 'Usuario sin tenant o sin suscripci?n',
+  })
   getSubscription(@Req() req: { user?: { tenantId?: string | null } }) {
     const tenantId = req.user?.tenantId;
     if (!tenantId) {
@@ -127,7 +139,10 @@ export class BillingPortalController {
       properties: { url: { type: 'string', format: 'uri' } },
     },
   })
-  @ApiResponse({ status: 400, description: 'Sin suscripci?n Stripe o Stripe no configurado' })
+  @ApiResponse({
+    status: 400,
+    description: 'Sin suscripci?n Stripe o Stripe no configurado',
+  })
   async createPortalSession(
     @Req() req: { user?: { tenantId?: string | null } },
     @Body() dto: CreatePortalSessionDto,

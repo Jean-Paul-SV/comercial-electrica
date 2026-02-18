@@ -20,7 +20,8 @@ export class ActionableIndicatorsDto {
 
   @ApiPropertyOptional({
     example: '2026-01-01',
-    description: 'Inicio del período (usado con endDate para ventas por empleado por mes)',
+    description:
+      'Inicio del período (usado con endDate para ventas por empleado por mes)',
   })
   @IsOptional()
   @IsDateString()

@@ -8,8 +8,10 @@ type PaymentStatus = 'PENDING' | 'APPROVED' | 'DECLINED' | 'REFUNDED';
 
 const PAYU_PROVIDER: PaymentProvider = 'PAYU';
 
-const PAYU_GATEWAY_SANDBOX = 'https://sandbox.checkout.payulatam.com/ppp-web-gateway-payu/';
-const PAYU_GATEWAY_PROD = 'https://checkout.payulatam.com/ppp-web-gateway-payu/';
+const PAYU_GATEWAY_SANDBOX =
+  'https://sandbox.checkout.payulatam.com/ppp-web-gateway-payu/';
+const PAYU_GATEWAY_PROD =
+  'https://checkout.payulatam.com/ppp-web-gateway-payu/';
 
 export interface CreatePayuPaymentInput {
   amount: number;
@@ -52,7 +54,8 @@ export class PayuService {
     this.merchantId = this.config.get<string>('PAYU_MERCHANT_ID') ?? null;
     this.accountId = this.config.get<string>('PAYU_ACCOUNT_ID') ?? null;
     this.test = this.config.get<string>('PAYU_TEST', 'true') === 'true';
-    this.confirmationUrl = this.config.get<string>('PAYU_CONFIRMATION_URL') ?? null;
+    this.confirmationUrl =
+      this.config.get<string>('PAYU_CONFIRMATION_URL') ?? null;
     this.gatewayUrl = this.test ? PAYU_GATEWAY_SANDBOX : PAYU_GATEWAY_PROD;
   }
 
@@ -60,9 +63,15 @@ export class PayuService {
    * Firma para WebCheckout: MD5(apiKey~merchantId~referenceCode~amount~currency)
    * amount sin decimales o con dos decimales.
    */
-  private buildSignature(referenceCode: string, amount: number, currency: string): string {
+  private buildSignature(
+    referenceCode: string,
+    amount: number,
+    currency: string,
+  ): string {
     if (!this.apiKey || !this.merchantId) return '';
-    const amountStr = Number.isInteger(amount) ? String(amount) : amount.toFixed(2);
+    const amountStr = Number.isInteger(amount)
+      ? String(amount)
+      : amount.toFixed(2);
     const str = `${this.apiKey}~${this.merchantId}~${referenceCode}~${amountStr}~${currency}`;
     return crypto.createHash('md5').update(str).digest('hex');
   }
@@ -100,7 +109,9 @@ export class PayuService {
       },
     });
 
-    const amountForm = Number.isInteger(input.amount) ? input.amount : Math.round(input.amount * 100) / 100;
+    const amountForm = Number.isInteger(input.amount)
+      ? input.amount
+      : Math.round(input.amount * 100) / 100;
     const taxRate = 0.19;
     const taxReturnBase = Math.round((amountForm / (1 + taxRate)) * 100) / 100;
     const tax = Math.round((amountForm - taxReturnBase) * 100) / 100;
@@ -166,9 +177,15 @@ export class PayuService {
    * Estructura típica: state, referenceCode, transactionId, value, currency, etc.
    */
   async handleConfirmation(payload: Record<string, unknown>): Promise<void> {
-    const state = String(payload?.state ?? payload?.transactionState ?? '').toUpperCase();
-    const referenceCode = (payload?.referenceCode ?? payload?.reference_sale ?? '') as string;
-    const transactionId = (payload?.transactionId ?? payload?.transaction_id ?? '') as string;
+    const state = String(
+      payload?.state ?? payload?.transactionState ?? '',
+    ).toUpperCase();
+    const referenceCode = (payload?.referenceCode ??
+      payload?.reference_sale ??
+      '') as string;
+    const transactionId = (payload?.transactionId ??
+      payload?.transaction_id ??
+      '') as string;
 
     if (!referenceCode) {
       this.logger.warn('Confirmación PayU sin referenceCode, ignorando');
@@ -196,7 +213,9 @@ export class PayuService {
       }));
 
     if (!payment) {
-      this.logger.warn(`No se encontró Payment PayU con referenceCode=${referenceCode}`);
+      this.logger.warn(
+        `No se encontró Payment PayU con referenceCode=${referenceCode}`,
+      );
       return;
     }
 
@@ -212,7 +231,10 @@ export class PayuService {
     const mappedStatus = this.mapPayuStateToPaymentStatus(state);
 
     if (payment.status === mappedStatus) {
-      this.logger.log('Confirmación PayU idempotente', { paymentId: payment.id, state });
+      this.logger.log('Confirmación PayU idempotente', {
+        paymentId: payment.id,
+        state,
+      });
       return;
     }
 
@@ -243,13 +265,18 @@ export class PayuService {
 
   private mapPayuStateToPaymentStatus(state: string): PaymentStatus {
     const s = state.toUpperCase();
-    if (s === 'APPROVED' || s === 'PENDING') return s === 'APPROVED' ? 'APPROVED' : 'PENDING';
-    if (s === 'DECLINED' || s === 'REJECTED' || s === 'EXPIRED') return 'DECLINED';
+    if (s === 'APPROVED' || s === 'PENDING')
+      return s === 'APPROVED' ? 'APPROVED' : 'PENDING';
+    if (s === 'DECLINED' || s === 'REJECTED' || s === 'EXPIRED')
+      return 'DECLINED';
     if (s === 'REFUNDED' || s === 'VOIDED') return 'REFUNDED';
     return 'PENDING';
   }
 
-  private async activateAddOnIfNeeded(payment: any, prismaAny: any): Promise<void> {
+  private async activateAddOnIfNeeded(
+    payment: any,
+    prismaAny: any,
+  ): Promise<void> {
     const purpose: string | null = payment?.purpose ?? null;
     if (!purpose) return;
 
@@ -260,7 +287,9 @@ export class PayuService {
     const addOn = await prismaAny.addOn.findUnique({ where: { moduleCode } });
 
     if (!addOn) {
-      this.logger.warn(`Pago PayU aprobado con purpose=${purpose}, pero no existe AddOn con moduleCode=${moduleCode}`);
+      this.logger.warn(
+        `Pago PayU aprobado con purpose=${purpose}, pero no existe AddOn con moduleCode=${moduleCode}`,
+      );
       return;
     }
 

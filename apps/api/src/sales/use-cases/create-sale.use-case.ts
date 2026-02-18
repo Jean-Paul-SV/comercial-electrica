@@ -51,14 +51,16 @@ export class CreateSaleUseCase {
   ) {
     // Asegurar que el valor se interprete correctamente: si es explícitamente false, usar false; de lo contrario, true
     // Esto maneja correctamente undefined, null, y cualquier otro valor que no sea explícitamente false
-    const requireElectronicInvoice = dto.requireElectronicInvoice === false ? false : true;
-    
+    const requireElectronicInvoice =
+      dto.requireElectronicInvoice === false ? false : true;
+
     // Log para depuración (usar log en lugar de debug para asegurar que se vea)
     this.logger.log(
       `[CreateSale] requireElectronicInvoice recibido: ${JSON.stringify(dto.requireElectronicInvoice)} (tipo: ${typeof dto.requireElectronicInvoice}), procesado como: ${requireElectronicInvoice}`,
     );
     if (requireElectronicInvoice) {
-      const dianStatus = await this.dianService.getConfigStatusForTenant(tenantId);
+      const dianStatus =
+        await this.dianService.getConfigStatusForTenant(tenantId);
       if (!dianStatus.readyForSend) {
         const msg =
           dianStatus.status === 'not_configured'
@@ -113,152 +115,151 @@ export class CreateSaleUseCase {
       }
     }
 
-    const result = await this.prisma
-      .$transaction(
-        async (tx) => {
-          const products = await tx.product.findMany({
-            where: {
-              id: { in: dto.items.map((i) => i.productId) },
-              tenantId,
-            },
-            include: { stock: true },
+    const result = await this.prisma.$transaction(
+      async (tx) => {
+        const products = await tx.product.findMany({
+          where: {
+            id: { in: dto.items.map((i) => i.productId) },
+            tenantId,
+          },
+          include: { stock: true },
+        });
+        if (products.length !== dto.items.length) {
+          throw new BadRequestException(
+            'Uno o más productos no existen o están inactivos.',
+          );
+        }
+
+        let subtotal = 0;
+        let taxTotal = 0;
+        const saleItems = dto.items.map((i) => {
+          const p = products.find((pp) => pp.id === i.productId)!;
+          const unitPrice = i.unitPrice ?? Number(p.price);
+          const lineSubtotal = unitPrice * i.qty;
+          const lineTax = (lineSubtotal * Number(p.taxRate ?? 0)) / 100;
+          const lineTotal = lineSubtotal + lineTax;
+          subtotal += lineSubtotal;
+          taxTotal += lineTax;
+          return {
+            productId: p.id,
+            qty: i.qty,
+            unitPrice,
+            taxRate: Number(p.taxRate ?? 0),
+            lineTotal,
+          };
+        });
+
+        const discountTotal = Math.min(
+          Number(dto.discountTotal ?? 0),
+          subtotal + taxTotal,
+        );
+        const grandTotal = Math.max(0, subtotal + taxTotal - discountTotal);
+
+        for (const it of dto.items) {
+          const bal = await tx.stockBalance.upsert({
+            where: { productId: it.productId },
+            create: { productId: it.productId, qtyOnHand: 0, qtyReserved: 0 },
+            update: {},
           });
-          if (products.length !== dto.items.length) {
+          if (bal.qtyOnHand < it.qty) {
+            const product = products.find((p) => p.id === it.productId);
+            const name = product?.name ?? it.productId;
             throw new BadRequestException(
-              'Uno o más productos no existen o están inactivos.',
+              `Stock insuficiente para "${name}". Disponible: ${bal.qtyOnHand}, requerido: ${it.qty}.`,
             );
           }
-
-          let subtotal = 0;
-          let taxTotal = 0;
-          const saleItems = dto.items.map((i) => {
-            const p = products.find((pp) => pp.id === i.productId)!;
-            const unitPrice = i.unitPrice ?? Number(p.price);
-            const lineSubtotal = unitPrice * i.qty;
-            const lineTax = (lineSubtotal * Number(p.taxRate ?? 0)) / 100;
-            const lineTotal = lineSubtotal + lineTax;
-            subtotal += lineSubtotal;
-            taxTotal += lineTax;
-            return {
-              productId: p.id,
-              qty: i.qty,
-              unitPrice,
-              taxRate: Number(p.taxRate ?? 0),
-              lineTotal,
-            };
+          await tx.stockBalance.update({
+            where: { productId: it.productId },
+            data: { qtyOnHand: bal.qtyOnHand - it.qty },
           });
+        }
 
-          const discountTotal = Math.min(
-            Number(dto.discountTotal ?? 0),
-            subtotal + taxTotal,
+        const sale = await tx.sale.create({
+          data: {
+            tenantId,
+            customerId: dto.customerId ?? null,
+            createdByUserId: createdByUserId ?? null,
+            status: SaleStatus.PAID,
+            requireElectronicInvoice, // Guardar explícitamente el valor calculado
+            subtotal,
+            taxTotal,
+            discountTotal,
+            grandTotal,
+            items: { create: saleItems },
+          },
+          include: { items: true },
+        });
+
+        // Log para verificar que se guardó correctamente
+        this.logger.log(
+          `[CreateSale] Venta creada con ID: ${sale.id}, requireElectronicInvoice guardado: ${sale.requireElectronicInvoice}`,
+        );
+
+        await tx.cashMovement.create({
+          data: {
+            sessionId: dto.cashSessionId,
+            type: CashMovementType.IN,
+            method: dto.paymentMethod ?? PaymentMethod.CASH,
+            amount: grandTotal,
+            relatedSaleId: sale.id,
+          },
+        });
+
+        const invoice = await tx.invoice.create({
+          data: {
+            tenantId,
+            saleId: sale.id,
+            customerId: sale.customerId,
+            number: makeInvoiceNumber(),
+            issuedAt: new Date(),
+            status: InvoiceStatus.ISSUED,
+            subtotal,
+            taxTotal,
+            discountTotal,
+            grandTotal,
+          },
+        });
+
+        let dianDoc: { id: string } | null = null;
+        if (requireElectronicInvoice) {
+          dianDoc = await tx.dianDocument.create({
+            data: {
+              invoiceId: invoice.id,
+              type: DianDocumentType.FE,
+              status: DianDocumentStatus.DRAFT,
+            },
+          });
+        }
+
+        await tx.inventoryMovement.create({
+          data: {
+            tenantId,
+            type: InventoryMovementType.OUT,
+            reason: 'Venta',
+            items: {
+              create: dto.items.map((it) => ({
+                productId: it.productId,
+                qty: it.qty,
+              })),
+            },
+          },
+        });
+
+        this.logger.log(
+          `Venta creada exitosamente: ${sale.id}, Total: ${Number(sale.grandTotal)}, Factura: ${invoice.number}, requireElectronicInvoice: ${sale.requireElectronicInvoice}${requireElectronicInvoice ? ', DIAN encolado' : ' (sin factura electrónica)'}`,
+        );
+
+        // Verificar que el valor se guardó correctamente
+        if (sale.requireElectronicInvoice !== requireElectronicInvoice) {
+          this.logger.warn(
+            `[CreateSale] ADVERTENCIA: requireElectronicInvoice no coincide. Esperado: ${requireElectronicInvoice}, Guardado: ${sale.requireElectronicInvoice}`,
           );
-          const grandTotal = Math.max(0, subtotal + taxTotal - discountTotal);
+        }
 
-          for (const it of dto.items) {
-            const bal = await tx.stockBalance.upsert({
-              where: { productId: it.productId },
-              create: { productId: it.productId, qtyOnHand: 0, qtyReserved: 0 },
-              update: {},
-            });
-            if (bal.qtyOnHand < it.qty) {
-              const product = products.find((p) => p.id === it.productId);
-              const name = product?.name ?? it.productId;
-              throw new BadRequestException(
-                `Stock insuficiente para "${name}". Disponible: ${bal.qtyOnHand}, requerido: ${it.qty}.`,
-              );
-            }
-            await tx.stockBalance.update({
-              where: { productId: it.productId },
-              data: { qtyOnHand: bal.qtyOnHand - it.qty },
-            });
-          }
-
-          const sale = await tx.sale.create({
-            data: {
-              tenantId,
-              customerId: dto.customerId ?? null,
-              createdByUserId: createdByUserId ?? null,
-              status: SaleStatus.PAID,
-              requireElectronicInvoice, // Guardar explícitamente el valor calculado
-              subtotal,
-              taxTotal,
-              discountTotal,
-              grandTotal,
-              items: { create: saleItems },
-            },
-            include: { items: true },
-          });
-          
-          // Log para verificar que se guardó correctamente
-          this.logger.log(
-            `[CreateSale] Venta creada con ID: ${sale.id}, requireElectronicInvoice guardado: ${sale.requireElectronicInvoice}`,
-          );
-
-          await tx.cashMovement.create({
-            data: {
-              sessionId: dto.cashSessionId,
-              type: CashMovementType.IN,
-              method: dto.paymentMethod ?? PaymentMethod.CASH,
-              amount: grandTotal,
-              relatedSaleId: sale.id,
-            },
-          });
-
-          const invoice = await tx.invoice.create({
-            data: {
-              tenantId,
-              saleId: sale.id,
-              customerId: sale.customerId,
-              number: makeInvoiceNumber(),
-              issuedAt: new Date(),
-              status: InvoiceStatus.ISSUED,
-              subtotal,
-              taxTotal,
-              discountTotal,
-              grandTotal,
-            },
-          });
-
-          let dianDoc: { id: string } | null = null;
-          if (requireElectronicInvoice) {
-            dianDoc = await tx.dianDocument.create({
-              data: {
-                invoiceId: invoice.id,
-                type: DianDocumentType.FE,
-                status: DianDocumentStatus.DRAFT,
-              },
-            });
-          }
-
-          await tx.inventoryMovement.create({
-            data: {
-              tenantId,
-              type: InventoryMovementType.OUT,
-              reason: 'Venta',
-              items: {
-                create: dto.items.map((it) => ({
-                  productId: it.productId,
-                  qty: it.qty,
-                })),
-              },
-            },
-          });
-
-          this.logger.log(
-            `Venta creada exitosamente: ${sale.id}, Total: ${Number(sale.grandTotal)}, Factura: ${invoice.number}, requireElectronicInvoice: ${sale.requireElectronicInvoice}${requireElectronicInvoice ? ', DIAN encolado' : ' (sin factura electrónica)'}`,
-          );
-          
-          // Verificar que el valor se guardó correctamente
-          if (sale.requireElectronicInvoice !== requireElectronicInvoice) {
-            this.logger.warn(
-              `[CreateSale] ADVERTENCIA: requireElectronicInvoice no coincide. Esperado: ${requireElectronicInvoice}, Guardado: ${sale.requireElectronicInvoice}`,
-            );
-          }
-          
-          return { sale, invoice, dianDocument: dianDoc };
-        },
-        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
-      );
+        return { sale, invoice, dianDocument: dianDoc };
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
 
     await this.audit.logCreate(
       'sale',
@@ -297,4 +298,3 @@ export class CreateSaleUseCase {
     return result;
   }
 }
-

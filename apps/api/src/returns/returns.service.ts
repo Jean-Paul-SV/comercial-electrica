@@ -26,7 +26,9 @@ export class ReturnsService {
     tenantId?: string | null,
   ) {
     if (tenantId == null) {
-      throw new BadRequestException('Tenant requerido para registrar devolución.');
+      throw new BadRequestException(
+        'Tenant requerido para registrar devolución.',
+      );
     }
     const sale = await this.prisma.sale.findUnique({
       where: { id: dto.saleId },
@@ -158,7 +160,9 @@ export class ReturnsService {
     pagination?: { page?: number; limit?: number },
   ) {
     if (tenantId == null) {
-      throw new BadRequestException('Tenant requerido para listar devoluciones.');
+      throw new BadRequestException(
+        'Tenant requerido para listar devoluciones.',
+      );
     }
     const page = Math.max(1, Number(pagination?.page) || 1);
     const limit = Math.min(100, Math.max(1, Number(pagination?.limit) || 20));

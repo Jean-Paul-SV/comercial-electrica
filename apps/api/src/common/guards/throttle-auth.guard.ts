@@ -91,19 +91,22 @@ export class ThrottleAuthGuard extends ThrottlerGuard {
       req.method === 'GET' &&
       (normalizedPath.startsWith('reports/') ||
         normalizedPath === 'reports/export');
-    
+
     if (isExpensiveReport && req.user?.tenantId) {
       try {
         const planLimitsService = this.getPlanLimitsService();
         const planLimit = await planLimitsService.getRateLimitForTenant(
           req.user.tenantId,
         );
-      
+
         // Para exports, usar 1/3 del límite de reportes
-        if (normalizedPath === 'reports/export' || normalizedPath.includes('/export')) {
+        if (
+          normalizedPath === 'reports/export' ||
+          normalizedPath.includes('/export')
+        ) {
           return Math.max(1, Math.floor(planLimit / 3));
         }
-        
+
         // Para reportes normales, usar el límite del plan
         return planLimit;
       } catch (error) {
@@ -122,11 +125,10 @@ export class ThrottleAuthGuard extends ThrottlerGuard {
     const body = req.body as { email?: string } | undefined;
 
     // Login: por IP
-    if (
-      path.includes('auth/login') &&
-      (req.method as string) === 'POST'
-    ) {
-      const connection = req.connection as { remoteAddress?: string } | undefined;
+    if (path.includes('auth/login') && (req.method as string) === 'POST') {
+      const connection = req.connection as
+        | { remoteAddress?: string }
+        | undefined;
       return Promise.resolve(
         (req.ip as string) || connection?.remoteAddress || 'unknown',
       );
@@ -143,7 +145,9 @@ export class ThrottleAuthGuard extends ThrottlerGuard {
     }
 
     // Reportes: por userId
-    const user = req.user as { sub?: string; tenantId?: string | null } | undefined;
+    const user = req.user as
+      | { sub?: string; tenantId?: string | null }
+      | undefined;
     if (user?.sub && path.startsWith('reports/')) {
       const tenantKey = user.tenantId ?? user.sub;
       return Promise.resolve(`tenant:${tenantKey}`);

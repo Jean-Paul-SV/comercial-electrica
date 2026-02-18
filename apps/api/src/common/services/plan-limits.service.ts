@@ -115,7 +115,7 @@ export class PlanLimitsService {
    * - Plan básico (slug contiene "basico" o "basic"): 100 req/min
    * - Plan pro (slug contiene "pro"): 1000 req/min
    * - Plan enterprise (slug contiene "enterprise"): 5000 req/min
-   * 
+   *
    * Estos límites se pueden sobrescribir con variables de entorno:
    * - THROTTLE_LIMIT_BASIC (default: 100)
    * - THROTTLE_LIMIT_PRO (default: 1000)
@@ -124,14 +124,14 @@ export class PlanLimitsService {
    */
   async getRateLimitForTenant(tenantId: string | null): Promise<number> {
     const planSlug = await this.getPlanSlugForTenant(tenantId);
-    
+
     if (!planSlug) {
       // Sin plan: límite por defecto
       return parseInt(process.env.THROTTLE_LIMIT_DEFAULT || '100', 10);
     }
 
     const slugLower = planSlug.toLowerCase();
-    
+
     // Determinar límite según el slug del plan
     if (slugLower.includes('enterprise')) {
       return parseInt(process.env.THROTTLE_LIMIT_ENTERPRISE || '5000', 10);
@@ -142,7 +142,7 @@ export class PlanLimitsService {
     if (slugLower.includes('basico') || slugLower.includes('basic')) {
       return parseInt(process.env.THROTTLE_LIMIT_BASIC || '100', 10);
     }
-    
+
     // Plan desconocido: límite por defecto
     return parseInt(process.env.THROTTLE_LIMIT_DEFAULT || '100', 10);
   }

@@ -1,4 +1,9 @@
-import { ArgumentsHost, HttpStatus, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  ArgumentsHost,
+  HttpStatus,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { AllExceptionsFilter } from './http-exception.filter';
 
 /** UUID v4 pattern: no debe aparecer en mensajes de error al cliente (seguridad). */
@@ -14,7 +19,12 @@ function createMockHost(jsonCapture: { body: unknown }) {
   };
   const ctx = {
     getResponse: () => res,
-    getRequest: () => ({ url: '/test', method: 'GET', get: () => undefined, ip: '127.0.0.1' }),
+    getRequest: () => ({
+      url: '/test',
+      method: 'GET',
+      get: () => undefined,
+      ip: '127.0.0.1',
+    }),
     switchToHttp: () => ctx,
   };
   const host = {
@@ -36,27 +46,39 @@ describe('AllExceptionsFilter (seguridad: mensajes sin IDs)', () => {
     filter.catch(new NotFoundException('Cliente no encontrado.'), host);
 
     const body = jsonCapture.body as { message?: string | string[] };
-    const messageStr = Array.isArray(body.message) ? body.message.join(' ') : body.message || '';
+    const messageStr = Array.isArray(body.message)
+      ? body.message.join(' ')
+      : body.message || '';
     expect(messageStr).not.toMatch(UUID_REGEX);
     expect(body.message).toBe('Cliente no encontrado.');
   });
 
   it('las respuestas de BadRequestException no deben incluir UUIDs en el mensaje', () => {
     const host = createMockHost(jsonCapture);
-    filter.catch(new BadRequestException('Uno o más productos no existen o están inactivos.'), host);
+    filter.catch(
+      new BadRequestException(
+        'Uno o más productos no existen o están inactivos.',
+      ),
+      host,
+    );
 
     const body = jsonCapture.body as { message?: string | string[] };
-    const messageStr = Array.isArray(body.message) ? body.message.join(' ') : body.message || '';
+    const messageStr = Array.isArray(body.message)
+      ? body.message.join(' ')
+      : body.message || '';
     expect(messageStr).not.toMatch(UUID_REGEX);
   });
 
   it('si por error se incluyera un ID en el mensaje, el test fallaría (regresión)', () => {
     const host = createMockHost(jsonCapture);
-    const leakMessage = 'Cliente con id 550e8400-e29b-41d4-a716-446655440000 no encontrado.';
+    const leakMessage =
+      'Cliente con id 550e8400-e29b-41d4-a716-446655440000 no encontrado.';
     filter.catch(new NotFoundException(leakMessage), host);
 
     const body = jsonCapture.body as { message?: string | string[] };
-    const messageStr = Array.isArray(body.message) ? body.message.join(' ') : body.message || '';
+    const messageStr = Array.isArray(body.message)
+      ? body.message.join(' ')
+      : body.message || '';
     expect(messageStr).toMatch(UUID_REGEX);
   });
 });

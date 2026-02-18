@@ -1,5 +1,12 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString, IsNumber, IsBoolean, Min, ValidateIf } from 'class-validator';
+import {
+  IsOptional,
+  IsString,
+  IsNumber,
+  IsBoolean,
+  Min,
+  ValidateIf,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class UpdatePlanDto {
@@ -27,7 +34,9 @@ export class UpdatePlanDto {
   @Type(() => Number)
   priceYearly?: number;
 
-  @ApiPropertyOptional({ description: 'Límite de usuarios por tenant (null = sin límite)' })
+  @ApiPropertyOptional({
+    description: 'Límite de usuarios por tenant (null = sin límite)',
+  })
   @IsOptional()
   @ValidateIf((_, v) => v != null)
   @IsNumber()
@@ -35,7 +44,9 @@ export class UpdatePlanDto {
   @Type(() => Number)
   maxUsers?: number | null;
 
-  @ApiPropertyOptional({ description: 'ID del precio recurrente en Stripe (ej. price_xxx)' })
+  @ApiPropertyOptional({
+    description: 'ID del precio recurrente en Stripe (ej. price_xxx)',
+  })
   @IsOptional()
   @IsString()
   stripePriceId?: string | null;

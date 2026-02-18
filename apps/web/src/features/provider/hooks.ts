@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@shared/providers/AuthProvider';
 import * as api from './api';
-import type { ListTenantsQuery } from './api';
+import type { ListTenantsQuery, ListFeedbackQuery } from './api';
 import type { CreateTenantPayload, ProviderAlert } from './types';
 
 export function usePlans(activeOnly?: boolean) {
@@ -129,6 +129,54 @@ export function useDeleteTenant() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['provider', 'tenants'] });
       queryClient.invalidateQueries({ queryKey: ['provider', 'tenants', 'summary'] });
+    },
+  });
+}
+
+export function useDianActivationRequests() {
+  const { token } = useAuth();
+  return useQuery({
+    queryKey: ['provider', 'dian-activations'],
+    queryFn: () => api.listDianActivationRequests(token!),
+    enabled: Boolean(token),
+  });
+}
+
+export function useMarkDianActivationAsCompleted() {
+  const { token } = useAuth();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (tenantId: string) =>
+      api.markDianActivationAsCompleted(tenantId, token!),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['provider', 'dian-activations'] });
+      queryClient.invalidateQueries({ queryKey: ['provider', 'tenants'] });
+    },
+  });
+}
+
+export function useProviderFeedback(query?: ListFeedbackQuery) {
+  const { token } = useAuth();
+  return useQuery({
+    queryKey: ['provider', 'feedback', query],
+    queryFn: () => api.listFeedback(token!, query),
+    enabled: Boolean(token),
+  });
+}
+
+export function useUpdateFeedbackStatus() {
+  const { token } = useAuth();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      status,
+    }: {
+      id: string;
+      status: 'PENDING' | 'READ' | 'DONE';
+    }) => api.updateFeedbackStatus(id, status, token!),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['provider', 'feedback'] });
     },
   });
 }

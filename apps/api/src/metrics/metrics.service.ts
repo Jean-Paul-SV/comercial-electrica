@@ -171,10 +171,12 @@ export class MetricsService {
    * Útil para dashboards que muestran uso por plan.
    */
   async getMetricsByPlan() {
-    const tenantUsage = Object.entries(this.byTenant).map(([tenantId, metrics]) => ({
-      tenantId,
-      totalRequests: metrics.totalRequests,
-    }));
+    const tenantUsage = Object.entries(this.byTenant).map(
+      ([tenantId, metrics]) => ({
+        tenantId,
+        totalRequests: metrics.totalRequests,
+      }),
+    );
 
     if (tenantUsage.length === 0) {
       return {
@@ -290,10 +292,12 @@ export class MetricsService {
       status: 'ok' | 'warning' | 'critical';
     }>
   > {
-    const tenantUsage = Object.entries(this.byTenant).map(([tenantId, metrics]) => ({
-      tenantId,
-      totalRequests: metrics.totalRequests,
-    }));
+    const tenantUsage = Object.entries(this.byTenant).map(
+      ([tenantId, metrics]) => ({
+        tenantId,
+        totalRequests: metrics.totalRequests,
+      }),
+    );
 
     if (tenantUsage.length === 0) {
       return [];
@@ -334,7 +338,10 @@ export class MetricsService {
       const rateLimit = await this.planLimits.getRateLimitForTenant(tenant.id);
       // Las métricas son acumuladas desde el inicio; para comparar con límite por minuto,
       // necesitaríamos ventanas de tiempo. Por ahora, usamos un aproximado basado en uptime.
-      const uptimeMinutes = Math.max(1, Math.round((Date.now() - this.startedAt) / 60000));
+      const uptimeMinutes = Math.max(
+        1,
+        Math.round((Date.now() - this.startedAt) / 60000),
+      );
       const avgRequestsPerMinute = usage.totalRequests / uptimeMinutes;
       const usagePercent = (avgRequestsPerMinute / rateLimit) * 100;
 

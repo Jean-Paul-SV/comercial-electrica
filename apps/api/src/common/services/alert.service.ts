@@ -30,23 +30,29 @@ export class AlertService {
 
     // Slack
     if (this.isSlackEnabled()) {
-      promises.push(this.sendToSlack(payload).catch((err) => {
-        this.logger.error('Error enviando alerta a Slack:', err);
-      }));
+      promises.push(
+        this.sendToSlack(payload).catch((err) => {
+          this.logger.error('Error enviando alerta a Slack:', err);
+        }),
+      );
     }
 
     // Email (solo para críticas)
     if (payload.severity === 'critical' && this.mailer.isConfigured()) {
-      promises.push(this.sendToEmail(payload).catch((err) => {
-        this.logger.error('Error enviando alerta por email:', err);
-      }));
+      promises.push(
+        this.sendToEmail(payload).catch((err) => {
+          this.logger.error('Error enviando alerta por email:', err);
+        }),
+      );
     }
 
     // Webhook
     if (this.isWebhookEnabled()) {
-      promises.push(this.sendToWebhook(payload).catch((err) => {
-        this.logger.error('Error enviando alerta a webhook:', err);
-      }));
+      promises.push(
+        this.sendToWebhook(payload).catch((err) => {
+          this.logger.error('Error enviando alerta a webhook:', err);
+        }),
+      );
     }
 
     await Promise.allSettled(promises);
@@ -127,9 +133,11 @@ export class AlertService {
       <p><strong>Severidad:</strong> ${payload.severity.toUpperCase()}</p>
       <p>${payload.message}</p>
       ${payload.tenantName ? `<p><strong>Tenant:</strong> ${payload.tenantName}</p>` : ''}
-      ${payload.metadata
-        ? `<h3>Detalles:</h3><pre>${JSON.stringify(payload.metadata, null, 2)}</pre>`
-        : ''}
+      ${
+        payload.metadata
+          ? `<h3>Detalles:</h3><pre>${JSON.stringify(payload.metadata, null, 2)}</pre>`
+          : ''
+      }
       <hr>
       <p><small>Orion Alert System</small></p>
     `;
@@ -178,7 +186,9 @@ Orion Alert System
         'Content-Type': 'application/json',
         ...(this.config.get<string>('ALERT_WEBHOOK_SECRET')
           ? {
-              'X-Webhook-Secret': this.config.get<string>('ALERT_WEBHOOK_SECRET')!,
+              'X-Webhook-Secret': this.config.get<string>(
+                'ALERT_WEBHOOK_SECRET',
+              )!,
             }
           : {}),
       },

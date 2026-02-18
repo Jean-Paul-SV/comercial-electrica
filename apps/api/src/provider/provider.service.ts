@@ -148,7 +148,9 @@ export class ProviderService {
       where: { slug: dto.slug },
     });
     if (existing) {
-      throw new ConflictException(`Ya existe un plan con el slug "${dto.slug}".`);
+      throw new ConflictException(
+        `Ya existe un plan con el slug "${dto.slug}".`,
+      );
     }
     const includesDian = dto.includesDian !== false;
     const moduleCodes = includesDian
@@ -159,8 +161,12 @@ export class ProviderService {
         name: dto.name,
         slug: dto.slug,
         description: dto.description ?? null,
-        priceMonthly: dto.priceMonthly != null ? new Prisma.Decimal(dto.priceMonthly) : null,
-        priceYearly: dto.priceYearly != null ? new Prisma.Decimal(dto.priceYearly) : null,
+        priceMonthly:
+          dto.priceMonthly != null
+            ? new Prisma.Decimal(dto.priceMonthly)
+            : null,
+        priceYearly:
+          dto.priceYearly != null ? new Prisma.Decimal(dto.priceYearly) : null,
         maxUsers: dto.maxUsers ?? null,
         stripePriceId: dto.stripePriceId ?? null,
         isActive: dto.isActive ?? true,
@@ -455,9 +461,7 @@ export class ProviderService {
       this.prisma.user.findUnique({ where: { email: adminEmail } }),
     ]);
     if (existingSlug) {
-      throw new ConflictException(
-        `Ya existe un tenant con el slug "${slug}".`,
-      );
+      throw new ConflictException(`Ya existe un tenant con el slug "${slug}".`);
     }
     if (existingEmail) {
       throw new ConflictException(
@@ -500,7 +504,7 @@ export class ProviderService {
           mustChangePassword: generateTempPassword,
         },
       });
-      
+
       // Crear configuración DIAN inicial si se proporciona el nombre de la empresa
       if (dto.issuerName?.trim()) {
         await tx.dianConfig.create({
@@ -511,7 +515,7 @@ export class ProviderService {
           },
         });
       }
-      
+
       return createdTenant;
     });
 
@@ -521,12 +525,13 @@ export class ProviderService {
         select: { stripePriceId: true },
       });
       if (plan?.stripePriceId) {
-        const stripeSubscriptionId = await this.billing.createStripeSubscription(
-          tenant.id,
-          plan.stripePriceId,
-          adminEmail,
-          dto.name?.trim() ?? tenant.name,
-        );
+        const stripeSubscriptionId =
+          await this.billing.createStripeSubscription(
+            tenant.id,
+            plan.stripePriceId,
+            adminEmail,
+            dto.name?.trim() ?? tenant.name,
+          );
         if (stripeSubscriptionId) {
           await this.prisma.subscription.update({
             where: { tenantId: tenant.id },
@@ -546,15 +551,14 @@ export class ProviderService {
         name: tenant.name,
         slug: tenant.slug,
       },
-      ...(isDev && generateTempPassword ? { tempAdminPassword: adminPassword } : {}),
+      ...(isDev && generateTempPassword
+        ? { tempAdminPassword: adminPassword }
+        : {}),
     };
   }
 
   private mapPlanToDto(
-    plan: Pick<
-      PlanDecimalFields,
-      keyof PlanDecimalFields
-    > & {
+    plan: Pick<PlanDecimalFields, keyof PlanDecimalFields> & {
       id: string;
       name: string;
       slug: string;
@@ -566,13 +570,16 @@ export class ProviderService {
     },
   ): PlanDto {
     const features = plan.features ?? [];
-    const includesDian = features.some((f) => f.moduleCode === DIAN_MODULE_CODE);
+    const includesDian = features.some(
+      (f) => f.moduleCode === DIAN_MODULE_CODE,
+    );
     return {
       id: plan.id,
       name: plan.name,
       slug: plan.slug,
       description: plan.description ?? null,
-      priceMonthly: plan.priceMonthly != null ? Number(plan.priceMonthly) : null,
+      priceMonthly:
+        plan.priceMonthly != null ? Number(plan.priceMonthly) : null,
       priceYearly: plan.priceYearly != null ? Number(plan.priceYearly) : null,
       maxUsers: plan.maxUsers,
       stripePriceId: plan.stripePriceId ?? null,
@@ -610,5 +617,74 @@ export class ProviderService {
     const periodEnd = new Date(now);
     periodEnd.setDate(periodEnd.getDate() + 30);
     return { now, periodEnd };
+  }
+
+  /**
+   * Lista las solicitudes de activación DIAN pendientes (empresas que cambiaron a plan con DIAN pero aún no han activado).
+   */
+  async listDianActivationRequests() {
+    const configs = await this.prisma.dianConfig.findMany({
+      where: {
+        activationStatus: 'PENDING',
+      },
+      include: {
+        tenant: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            plan: {
+              select: {
+                id: true,
+                name: true,
+                slug: true,
+              },
+            },
+            createdAt: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    return configs.map((config) => ({
+      id: config.id,
+      tenantId: config.tenantId,
+      tenantName: config.tenant.name,
+      tenantSlug: config.tenant.slug,
+      planName: config.tenant.plan?.name ?? 'Sin plan',
+      planSlug: config.tenant.plan?.slug ?? null,
+      requestedAt: config.createdAt,
+    }));
+  }
+
+  /**
+   * Marca la activación DIAN como completada (después de que el admin cobró y configuró el servicio).
+   */
+  async markDianActivationAsCompleted(tenantId: string) {
+    const config = await this.prisma.dianConfig.findUnique({
+      where: { tenantId },
+    });
+
+    if (!config) {
+      throw new NotFoundException(
+        'Configuración DIAN no encontrada para esta empresa.',
+      );
+    }
+
+    if (config.activationStatus === 'ACTIVATED') {
+      throw new BadRequestException(
+        'La activación DIAN ya está marcada como completada.',
+      );
+    }
+
+    await this.prisma.dianConfig.update({
+      where: { tenantId },
+      data: { activationStatus: 'ACTIVATED' },
+    });
+
+    return { success: true };
   }
 }

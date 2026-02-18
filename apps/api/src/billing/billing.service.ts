@@ -33,7 +33,8 @@ export class BillingService {
     private readonly prisma: PrismaService,
   ) {
     const secretKey = this.config.get<string>('STRIPE_SECRET_KEY');
-    this.webhookSecret = this.config.get<string>('STRIPE_WEBHOOK_SECRET') ?? null;
+    this.webhookSecret =
+      this.config.get<string>('STRIPE_WEBHOOK_SECRET') ?? null;
     if (secretKey) {
       this.stripe = new Stripe(secretKey);
     } else {
@@ -241,7 +242,14 @@ export class BillingService {
    * Lista planes activos para que el cliente pueda cambiar (precios mensual y anual).
    */
   async getActivePlans(): Promise<
-    { id: string; name: string; slug: string; priceMonthly: number | null; priceYearly: number | null; maxUsers: number | null }[]
+    {
+      id: string;
+      name: string;
+      slug: string;
+      priceMonthly: number | null;
+      priceYearly: number | null;
+      maxUsers: number | null;
+    }[]
   > {
     const plans = await this.prisma.plan.findMany({
       where: { isActive: true },
@@ -269,7 +277,10 @@ export class BillingService {
    * Cambia el plan del tenant (y su suscripción). Actualiza también la suscripción en Stripe
    * para que el precio cobrado coincida con el plan elegido.
    */
-  async changeTenantPlan(tenantId: string, planId: string): Promise<{ success: boolean }> {
+  async changeTenantPlan(
+    tenantId: string,
+    planId: string,
+  ): Promise<{ success: boolean }> {
     const tenant = await this.prisma.tenant.findUnique({
       where: { id: tenantId },
       select: {
@@ -287,11 +298,20 @@ export class BillingService {
     }
     const plan = await this.prisma.plan.findUnique({
       where: { id: planId },
-      select: { id: true, stripePriceId: true },
+      select: {
+        id: true,
+        stripePriceId: true,
+        features: {
+          select: { moduleCode: true },
+        },
+      },
     });
     if (!plan) {
       throw new NotFoundException('Plan no encontrado.');
     }
+    const hasDianModule = plan.features.some(
+      (f) => f.moduleCode === 'electronic_invoicing',
+    );
     const now = new Date();
     const periodEnd = new Date(now);
     periodEnd.setDate(periodEnd.getDate() + 30);
@@ -316,6 +336,31 @@ export class BillingService {
           },
         });
       }
+
+      // Si el plan incluye DIAN, crear o actualizar DianConfig con estado PENDING
+      if (hasDianModule) {
+        const existingConfig = await tx.dianConfig.findUnique({
+          where: { tenantId },
+        });
+        if (existingConfig) {
+          // Si ya existe pero no está activado, mantener o poner en PENDING
+          if (existingConfig.activationStatus !== 'ACTIVATED') {
+            await tx.dianConfig.update({
+              where: { tenantId },
+              data: { activationStatus: 'PENDING' },
+            });
+          }
+        } else {
+          // Crear nueva configuración DIAN con estado PENDING
+          await tx.dianConfig.create({
+            data: {
+              tenantId,
+              env: 'HABILITACION',
+              activationStatus: 'PENDING',
+            },
+          });
+        }
+      }
     });
 
     // Actualizar el precio en Stripe para que coincida con el plan elegido
@@ -335,12 +380,13 @@ export class BillingService {
         );
         const itemId = stripeSub.items.data[0]?.id;
         if (itemId) {
-          await this.stripe.subscriptions.update(subscription.stripeSubscriptionId, {
-            items: [
-              { id: itemId, price: plan.stripePriceId },
-            ],
-            proration_behavior: 'create_prorations',
-          });
+          await this.stripe.subscriptions.update(
+            subscription.stripeSubscriptionId,
+            {
+              items: [{ id: itemId, price: plan.stripePriceId }],
+              proration_behavior: 'create_prorations',
+            },
+          );
           this.logger.log(
             `Suscripción Stripe ${subscription.stripeSubscriptionId} actualizada al plan ${planId} (price ${plan.stripePriceId})`,
           );
@@ -359,14 +405,23 @@ export class BillingService {
    * Si nuestra BD tiene PENDING_PAYMENT pero Stripe ya tiene la suscripción activa
    * (p. ej. el webhook falló o llegó después), actualiza la BD para desbloquear al usuario.
    */
-  private async syncSubscriptionStatusFromStripe(
-    subscription: { id: string; tenantId: string; status: string; stripeSubscriptionId: string | null },
-  ): Promise<void> {
-    if (String(subscription.status) !== 'PENDING_PAYMENT' || !this.stripe || !subscription.stripeSubscriptionId) {
+  private async syncSubscriptionStatusFromStripe(subscription: {
+    id: string;
+    tenantId: string;
+    status: string;
+    stripeSubscriptionId: string | null;
+  }): Promise<void> {
+    if (
+      String(subscription.status) !== 'PENDING_PAYMENT' ||
+      !this.stripe ||
+      !subscription.stripeSubscriptionId
+    ) {
       return;
     }
     try {
-      const stripeSub = await this.stripe.subscriptions.retrieve(subscription.stripeSubscriptionId);
+      const stripeSub = await this.stripe.subscriptions.retrieve(
+        subscription.stripeSubscriptionId,
+      );
       if (stripeSub.status !== 'active') return;
       const periodEnd = stripeSub.current_period_end
         ? new Date(stripeSub.current_period_end * 1000)
@@ -394,7 +449,9 @@ export class BillingService {
    * Devuelve la información de plan y suscripción del tenant para mostrar en la UI de facturación.
    * Si está PENDING_PAYMENT, consulta Stripe y actualiza la BD si el pago ya se completó (fallback al webhook).
    */
-  async getSubscriptionForTenant(tenantId: string): Promise<SubscriptionInfoDto> {
+  async getSubscriptionForTenant(
+    tenantId: string,
+  ): Promise<SubscriptionInfoDto> {
     let subscription = await this.prisma.subscription.findUnique({
       where: { tenantId },
       include: {
@@ -406,12 +463,13 @@ export class BillingService {
     }
     await this.syncSubscriptionStatusFromStripe(subscription);
     if (String(subscription.status) === 'PENDING_PAYMENT') {
-      subscription = await this.prisma.subscription.findUnique({
-        where: { tenantId },
-        include: {
-          plan: { select: { id: true, name: true, slug: true } },
-        },
-      }) ?? subscription;
+      subscription =
+        (await this.prisma.subscription.findUnique({
+          where: { tenantId },
+          include: {
+            plan: { select: { id: true, name: true, slug: true } },
+          },
+        })) ?? subscription;
     }
     const canManageBilling =
       !!this.stripe && !!subscription.stripeSubscriptionId;
@@ -458,10 +516,9 @@ export class BillingService {
     }
     let stripeCustomerId: string;
     try {
-      const stripeSubscription =
-        await this.stripe.subscriptions.retrieve(
-          subscription.stripeSubscriptionId,
-        );
+      const stripeSubscription = await this.stripe.subscriptions.retrieve(
+        subscription.stripeSubscriptionId,
+      );
       stripeCustomerId =
         typeof stripeSubscription.customer === 'string'
           ? stripeSubscription.customer
@@ -501,17 +558,17 @@ export class BillingService {
       // Procesar el evento según su tipo
       switch (event.type) {
         case 'invoice.paid': {
-          const invoice = event.data.object as Stripe.Invoice;
+          const invoice = event.data.object;
           await this.handleInvoicePaid(invoice);
           break;
         }
         case 'invoice.payment_failed': {
-          const invoice = event.data.object as Stripe.Invoice;
+          const invoice = event.data.object;
           await this.handleInvoicePaymentFailed(invoice);
           break;
         }
         case 'customer.subscription.deleted': {
-          const sub = event.data.object as Stripe.Subscription;
+          const sub = event.data.object;
           await this.handleSubscriptionDeleted(sub);
           break;
         }

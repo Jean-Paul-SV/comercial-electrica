@@ -19,7 +19,8 @@ export class CreatePlanDto {
   name!: string;
 
   @ApiProperty({
-    description: 'Identificador único (solo letras minúsculas, números y guiones)',
+    description:
+      'Identificador único (solo letras minúsculas, números y guiones)',
     example: 'plan-basico',
   })
   @IsString()
@@ -50,27 +51,35 @@ export class CreatePlanDto {
   @Type(() => Number)
   priceYearly?: number;
 
-  @ApiPropertyOptional({ description: 'Límite de usuarios por tenant (null = sin límite)' })
+  @ApiPropertyOptional({
+    description: 'Límite de usuarios por tenant (null = sin límite)',
+  })
   @IsOptional()
   @IsNumber()
   @Min(1)
   @Type(() => Number)
   maxUsers?: number | null;
 
-  @ApiPropertyOptional({ description: 'ID del precio recurrente en Stripe (ej. price_xxx)' })
+  @ApiPropertyOptional({
+    description: 'ID del precio recurrente en Stripe (ej. price_xxx)',
+  })
   @IsOptional()
   @IsString()
   @MaxLength(255)
   stripePriceId?: string | null;
 
-  @ApiPropertyOptional({ description: 'Plan activo (visible en selector)', default: true })
+  @ApiPropertyOptional({
+    description: 'Plan activo (visible en selector)',
+    default: true,
+  })
   @IsOptional()
   @IsBoolean()
   @Type(() => Boolean)
   isActive?: boolean;
 
   @ApiPropertyOptional({
-    description: 'Incluir facturación electrónica DIAN (módulo electronic_invoicing). Si false, el plan es "sin DIAN".',
+    description:
+      'Incluir facturación electrónica DIAN (módulo electronic_invoicing). Si false, el plan es "sin DIAN".',
     default: true,
   })
   @IsOptional()

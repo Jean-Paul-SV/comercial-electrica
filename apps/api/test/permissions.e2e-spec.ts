@@ -21,7 +21,10 @@ describe('Permissions Guard (e2e)', () => {
       }),
     ).compile();
 
-    const setup = await setupTestApp(moduleFixture, 'permissions-test@example.com');
+    const setup = await setupTestApp(
+      moduleFixture,
+      'permissions-test@example.com',
+    );
     ({ app, prisma, authToken, userId } = setup);
 
     const adminUser = await prisma.user.findUnique({ where: { id: userId } });
@@ -74,7 +77,9 @@ describe('Permissions Guard (e2e)', () => {
       expect([201, 403, 401]).toContain(response.status);
       if (response.status === 403) {
         expect(response.body).toHaveProperty('message');
-        expect(String(response.body.message).toLowerCase()).toMatch(/permiso|forbidden/);
+        expect(String(response.body.message).toLowerCase()).toMatch(
+          /permiso|forbidden/,
+        );
       }
     });
 

@@ -1,4 +1,9 @@
-import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from 'crypto';
+import {
+  createCipheriv,
+  createDecipheriv,
+  randomBytes,
+  scryptSync,
+} from 'crypto';
 
 const ALG = 'aes-256-gcm';
 const IV_LEN = 16;
@@ -37,10 +42,7 @@ export function encryptCertPayload(plaintext: Buffer, envKey: string): string {
   const key = getEncryptionKey(envKey);
   const iv = randomBytes(IV_LEN);
   const cipher = createCipheriv(ALG, key, iv, { authTagLength: AUTH_TAG_LEN });
-  const encrypted = Buffer.concat([
-    cipher.update(plaintext),
-    cipher.final(),
-  ]);
+  const encrypted = Buffer.concat([cipher.update(plaintext), cipher.final()]);
   const authTag = cipher.getAuthTag();
   return Buffer.concat([iv, authTag, encrypted]).toString('base64');
 }

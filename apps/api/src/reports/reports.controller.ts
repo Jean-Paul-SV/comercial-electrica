@@ -55,7 +55,9 @@ export class ReportsController {
   ) {
     const tenantId = req.user?.tenantId;
     if (!tenantId) {
-      throw new ForbiddenException('Tenant requerido para obtener el reporte de ventas');
+      throw new ForbiddenException(
+        'Tenant requerido para obtener el reporte de ventas',
+      );
     }
     return this.reportsService.getSalesReport(dto, tenantId);
   }
@@ -79,7 +81,9 @@ export class ReportsController {
   ) {
     const tenantId = req.user?.tenantId;
     if (!tenantId) {
-      throw new ForbiddenException('Tenant requerido para obtener el reporte de inventario');
+      throw new ForbiddenException(
+        'Tenant requerido para obtener el reporte de inventario',
+      );
     }
     return this.reportsService.getInventoryReport(dto, tenantId);
   }
@@ -103,7 +107,9 @@ export class ReportsController {
   ) {
     const tenantId = req.user?.tenantId;
     if (!tenantId) {
-      throw new ForbiddenException('Tenant requerido para obtener el reporte de caja');
+      throw new ForbiddenException(
+        'Tenant requerido para obtener el reporte de caja',
+      );
     }
     return this.reportsService.getCashReport(dto, tenantId);
   }
@@ -127,7 +133,9 @@ export class ReportsController {
   ) {
     const tenantId = req.user?.tenantId;
     if (!tenantId) {
-      throw new ForbiddenException('Tenant requerido para obtener el reporte de clientes');
+      throw new ForbiddenException(
+        'Tenant requerido para obtener el reporte de clientes',
+      );
     }
     return this.reportsService.getCustomersReport(dto, tenantId);
   }
@@ -163,13 +171,17 @@ export class ReportsController {
     if (!tenantId) {
       throw new ForbiddenException('Tenant requerido para exportar datos');
     }
-    const { csv, fileName } = await this.reportsService.exportAsCsv(dto, tenantId);
+    const { csv, fileName } = await this.reportsService.exportAsCsv(
+      dto,
+      tenantId,
+    );
     return new StreamableFile(Buffer.from(csv, 'utf-8'), {
       type: 'text/csv; charset=utf-8',
       disposition: `attachment; filename="${fileName}"`,
     });
   }
 
+  @RequireModule()
   @Get('actionable-indicators')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
@@ -223,11 +235,14 @@ export class ReportsController {
   ) {
     const tenantId = req.user?.tenantId;
     if (!tenantId) {
-      throw new ForbiddenException('Tenant requerido para indicadores accionables');
+      throw new ForbiddenException(
+        'Tenant requerido para indicadores accionables',
+      );
     }
     return this.reportsService.getActionableIndicators(dto, tenantId);
   }
 
+  @RequireModule()
   @Get('dashboard-summary')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
@@ -264,7 +279,9 @@ export class ReportsController {
   ) {
     const tenantId = req.user?.tenantId;
     if (!tenantId) {
-      throw new ForbiddenException('Tenant requerido para el resumen del dashboard');
+      throw new ForbiddenException(
+        'Tenant requerido para el resumen del dashboard',
+      );
     }
     return this.reportsService.getDashboardSummary(dto, tenantId);
   }
@@ -327,11 +344,14 @@ export class ReportsController {
   ) {
     const tenantId = req.user?.tenantId;
     if (!tenantId) {
-      throw new ForbiddenException('Tenant requerido para clustering de clientes');
+      throw new ForbiddenException(
+        'Tenant requerido para clustering de clientes',
+      );
     }
     return this.reportsService.getCustomerClusters(dto, tenantId);
   }
 
+  @RequireModule()
   @Get('trending-products')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
@@ -390,11 +410,14 @@ export class ReportsController {
   ) {
     const tenantId = req.user?.tenantId;
     if (!tenantId) {
-      throw new ForbiddenException('Tenant requerido para productos en tendencia');
+      throw new ForbiddenException(
+        'Tenant requerido para productos en tendencia',
+      );
     }
     return this.reportsService.getTrendingProducts(dto, tenantId);
   }
 
+  @RequireModule()
   @Get('operational-state')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
@@ -439,11 +462,14 @@ export class ReportsController {
   getOperationalState(@Req() req: { user?: { tenantId?: string | null } }) {
     const tenantId = req.user?.tenantId;
     if (!tenantId) {
-      throw new ForbiddenException('Tenant requerido para obtener el estado operativo');
+      throw new ForbiddenException(
+        'Tenant requerido para obtener el estado operativo',
+      );
     }
     return this.reportsService.getOperationalState(tenantId);
   }
 
+  @RequireModule()
   @Get('dashboard')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
@@ -463,7 +489,9 @@ export class ReportsController {
   ) {
     const tenantId = req.user?.tenantId;
     if (!tenantId) {
-      throw new ForbiddenException('Tenant requerido para obtener el dashboard');
+      throw new ForbiddenException(
+        'Tenant requerido para obtener el dashboard',
+      );
     }
     const threshold =
       lowStockThreshold != null && lowStockThreshold !== ''

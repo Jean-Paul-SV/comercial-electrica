@@ -1,4 +1,11 @@
-import { IsOptional, IsBooleanString, IsInt, Min, Max, IsString } from 'class-validator';
+import {
+  IsOptional,
+  IsBooleanString,
+  IsInt,
+  Min,
+  Max,
+  IsString,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class ListTenantsQueryDto {

@@ -8,6 +8,8 @@ import type {
   CreatePlanPayload,
   UpdatePlanPayload,
   ProviderTenantsSummary,
+  DianActivationRequest,
+  ProviderFeedbackItem,
 } from './types';
 
 export type ListTenantsQuery = {
@@ -109,4 +111,52 @@ export function deleteTenant(
   authToken: string
 ): Promise<{ success: boolean }> {
   return apiClient.delete(`/provider/tenants/${id}`, { authToken });
+}
+
+export function listDianActivationRequests(
+  authToken: string
+): Promise<DianActivationRequest[]> {
+  return apiClient.get('/provider/dian-activations', { authToken });
+}
+
+export function markDianActivationAsCompleted(
+  tenantId: string,
+  authToken: string
+): Promise<{ success: boolean }> {
+  return apiClient.patch(
+    `/provider/tenants/${tenantId}/dian-activation/complete`,
+    {},
+    { authToken }
+  );
+}
+
+export type ListFeedbackQuery = {
+  tenantId?: string;
+  status?: 'PENDING' | 'READ' | 'DONE';
+};
+
+export function listFeedback(
+  authToken: string,
+  query?: ListFeedbackQuery
+): Promise<ProviderFeedbackItem[]> {
+  const params = new URLSearchParams();
+  if (query?.tenantId) params.set('tenantId', query.tenantId);
+  if (query?.status) params.set('status', query.status);
+  const qs = params.toString();
+  return apiClient.get<ProviderFeedbackItem[]>(
+    `/provider/feedback${qs ? `?${qs}` : ''}`,
+    { authToken }
+  );
+}
+
+export function updateFeedbackStatus(
+  id: string,
+  status: 'PENDING' | 'READ' | 'DONE',
+  authToken: string
+): Promise<{ id: string; status: string; updatedAt: string }> {
+  return apiClient.patch(
+    `/provider/feedback/${id}`,
+    { status },
+    { authToken }
+  );
 }

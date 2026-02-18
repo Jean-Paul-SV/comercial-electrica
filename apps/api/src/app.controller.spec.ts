@@ -68,9 +68,7 @@ describe('AppController', () => {
 
   describe('root', () => {
     it('should return welcome message', () => {
-      expect(appController.getHello()).toBe(
-        'Orion API v1.0',
-      );
+      expect(appController.getHello()).toBe('Orion API v1.0');
     });
   });
 

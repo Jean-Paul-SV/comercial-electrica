@@ -57,10 +57,13 @@ export class BackupsService {
       this.config.get<string>('BACKUP_DIR') || join(process.cwd(), 'backups');
   }
 
-  private getBackupPolicyForPlanSlug(
-    planSlug: string | null | undefined,
-  ):
-    | { tier: 'basic'; daysPerWeek: 1 | 2 | 3; retentionDays: number; maxToKeep: number }
+  private getBackupPolicyForPlanSlug(planSlug: string | null | undefined):
+    | {
+        tier: 'basic';
+        daysPerWeek: 1 | 2 | 3;
+        retentionDays: number;
+        maxToKeep: number;
+      }
     | { tier: 'daily'; retentionDays: number; maxToKeep: number }
     | { tier: 'daily_retention'; retentionDays: number; maxToKeep: number } {
     const slug = (planSlug ?? '').trim().toLowerCase();
@@ -72,13 +75,28 @@ export class BackupsService {
     // Premium con DIAN -> daily
     // Enterprise       -> daily_retention
     if (slug === 'basico-sin-dian') {
-      return { tier: 'basic', daysPerWeek: 1, retentionDays: 30, maxToKeep: 12 };
+      return {
+        tier: 'basic',
+        daysPerWeek: 1,
+        retentionDays: 30,
+        maxToKeep: 12,
+      };
     }
     if (slug === 'premium-sin-dian') {
-      return { tier: 'basic', daysPerWeek: 2, retentionDays: 45, maxToKeep: 24 };
+      return {
+        tier: 'basic',
+        daysPerWeek: 2,
+        retentionDays: 45,
+        maxToKeep: 24,
+      };
     }
     if (slug === 'basico-con-dian') {
-      return { tier: 'basic', daysPerWeek: 3, retentionDays: 60, maxToKeep: 36 };
+      return {
+        tier: 'basic',
+        daysPerWeek: 3,
+        retentionDays: 60,
+        maxToKeep: 36,
+      };
     }
     if (slug === 'premium-con-dian') {
       return { tier: 'daily', retentionDays: 90, maxToKeep: 120 };
@@ -91,7 +109,10 @@ export class BackupsService {
     return { tier: 'basic', daysPerWeek: 1, retentionDays: 30, maxToKeep: 12 };
   }
 
-  private getStableWeekdays(tenantId: string, daysPerWeek: 1 | 2 | 3): number[] {
+  private getStableWeekdays(
+    tenantId: string,
+    daysPerWeek: 1 | 2 | 3,
+  ): number[] {
     // Distribución estable por tenant (evita que todos corran el mismo día).
     const base = createHash('sha256').update(tenantId).digest()[0] % 7; // 0..6
     if (daysPerWeek === 1) return [base];
@@ -147,7 +168,9 @@ export class BackupsService {
     }
 
     if (await this.hasTenantBackupToday(tenantId)) {
-      throw new BadRequestException('Ya existe un backup de hoy para tu empresa.');
+      throw new BadRequestException(
+        'Ya existe un backup de hoy para tu empresa.',
+      );
     }
   }
 
@@ -163,12 +186,13 @@ export class BackupsService {
     const isTenantBackup =
       typeof tenantId === 'string' && tenantId.trim() !== '';
     if (isTenantBackup) {
-      await this.assertTenantBackupAllowed(tenantId!);
+      await this.assertTenantBackupAllowed(tenantId);
     }
     const tidForRun = isTenantBackup
-      ? tenantId!
+      ? tenantId
       : (await this.prisma.tenant.findFirst({ select: { id: true } }))?.id;
-    if (!tidForRun) throw new BadRequestException('No hay tenant para el backup.');
+    if (!tidForRun)
+      throw new BadRequestException('No hay tenant para el backup.');
     const backupRun = await this.prisma.backupRun.create({
       data: {
         tenantId: tidForRun,
@@ -209,7 +233,9 @@ export class BackupsService {
         try {
           await execAsync('pg_dump --version', { timeout: 2000 });
           command = `pg_dump -h ${dbHost} -p ${dbPort} -U ${dbUser} -d ${dbName} -F c -f "${filepath}"`;
-          this.logger.log(`Usando pg_dump directamente para backup: ${backupRun.id}`);
+          this.logger.log(
+            `Usando pg_dump directamente para backup: ${backupRun.id}`,
+          );
         } catch {
           const dockerHost =
             process.platform === 'linux' ? dbHost : 'host.docker.internal';
@@ -268,8 +294,13 @@ export class BackupsService {
   /**
    * Exporta todos los datos del tenant a un ZIP con un CSV por tabla.
    */
-  private async createTenantCsvZip(tenantId: string, zipPath: string): Promise<void> {
-    const toRecord = (row: Record<string, unknown>): Record<string, unknown> => {
+  private async createTenantCsvZip(
+    tenantId: string,
+    zipPath: string,
+  ): Promise<void> {
+    const toRecord = (
+      row: Record<string, unknown>,
+    ): Record<string, unknown> => {
       const out: Record<string, unknown> = {};
       for (const [k, v] of Object.entries(row)) {
         if (v instanceof Date) {
@@ -291,31 +322,44 @@ export class BackupsService {
     });
     archive.pipe(out);
 
-    const tables: { name: string; getData: () => Promise<Record<string, unknown>[]> }[] = [
+    const tables: {
+      name: string;
+      getData: () => Promise<Record<string, unknown>[]>;
+    }[] = [
       {
         name: 'categories',
         getData: async () =>
-          (await this.prisma.category.findMany({ where: { tenantId } })).map(toRecord),
+          (await this.prisma.category.findMany({ where: { tenantId } })).map(
+            toRecord,
+          ),
       },
       {
         name: 'products',
         getData: async () =>
-          (await this.prisma.product.findMany({ where: { tenantId } })).map(toRecord),
+          (await this.prisma.product.findMany({ where: { tenantId } })).map(
+            toRecord,
+          ),
       },
       {
         name: 'customers',
         getData: async () =>
-          (await this.prisma.customer.findMany({ where: { tenantId } })).map(toRecord),
+          (await this.prisma.customer.findMany({ where: { tenantId } })).map(
+            toRecord,
+          ),
       },
       {
         name: 'suppliers',
         getData: async () =>
-          (await this.prisma.supplier.findMany({ where: { tenantId } })).map(toRecord),
+          (await this.prisma.supplier.findMany({ where: { tenantId } })).map(
+            toRecord,
+          ),
       },
       {
         name: 'sales',
         getData: async () =>
-          (await this.prisma.sale.findMany({ where: { tenantId } })).map(toRecord),
+          (await this.prisma.sale.findMany({ where: { tenantId } })).map(
+            toRecord,
+          ),
       },
       {
         name: 'sale_items',
@@ -334,7 +378,9 @@ export class BackupsService {
       {
         name: 'quotes',
         getData: async () =>
-          (await this.prisma.quote.findMany({ where: { tenantId } })).map(toRecord),
+          (await this.prisma.quote.findMany({ where: { tenantId } })).map(
+            toRecord,
+          ),
       },
       {
         name: 'quote_items',
@@ -352,12 +398,16 @@ export class BackupsService {
       {
         name: 'invoices',
         getData: async () =>
-          (await this.prisma.invoice.findMany({ where: { tenantId } })).map(toRecord),
+          (await this.prisma.invoice.findMany({ where: { tenantId } })).map(
+            toRecord,
+          ),
       },
       {
         name: 'purchase_orders',
         getData: async () =>
-          (await this.prisma.purchaseOrder.findMany({ where: { tenantId } })).map(toRecord),
+          (
+            await this.prisma.purchaseOrder.findMany({ where: { tenantId } })
+          ).map(toRecord),
       },
       {
         name: 'purchase_order_items',
@@ -375,22 +425,32 @@ export class BackupsService {
       {
         name: 'supplier_invoices',
         getData: async () =>
-          (await this.prisma.supplierInvoice.findMany({ where: { tenantId } })).map(toRecord),
+          (
+            await this.prisma.supplierInvoice.findMany({ where: { tenantId } })
+          ).map(toRecord),
       },
       {
         name: 'cash_sessions',
         getData: async () =>
-          (await this.prisma.cashSession.findMany({ where: { tenantId } })).map(toRecord),
+          (await this.prisma.cashSession.findMany({ where: { tenantId } })).map(
+            toRecord,
+          ),
       },
       {
         name: 'expenses',
         getData: async () =>
-          (await this.prisma.expense.findMany({ where: { tenantId } })).map(toRecord),
+          (await this.prisma.expense.findMany({ where: { tenantId } })).map(
+            toRecord,
+          ),
       },
       {
         name: 'inventory_movements',
         getData: async () =>
-          (await this.prisma.inventoryMovement.findMany({ where: { tenantId } })).map(toRecord),
+          (
+            await this.prisma.inventoryMovement.findMany({
+              where: { tenantId },
+            })
+          ).map(toRecord),
       },
       {
         name: 'inventory_movement_items',
@@ -408,7 +468,11 @@ export class BackupsService {
       {
         name: 'product_dictionary_entries',
         getData: async () =>
-          (await this.prisma.productDictionaryEntry.findMany({ where: { tenantId } })).map(toRecord),
+          (
+            await this.prisma.productDictionaryEntry.findMany({
+              where: { tenantId },
+            })
+          ).map(toRecord),
       },
     ];
 
@@ -427,10 +491,9 @@ export class BackupsService {
     const stocks = await this.prisma.stockBalance.findMany({
       where: { productId: { in: productIds } },
     });
-    archive.append(
-      Buffer.from(toCsv(stocks.map(toRecord)), 'utf8'),
-      { name: 'stock_balances.csv' },
-    );
+    archive.append(Buffer.from(toCsv(stocks.map(toRecord)), 'utf8'), {
+      name: 'stock_balances.csv',
+    });
 
     archive.finalize();
     await finished;
@@ -462,7 +525,9 @@ export class BackupsService {
     }
     if (typeof tenantId === 'string' && tenantId.trim() !== '') {
       if (backup.scope !== 'TENANT' || backup.tenantId !== tenantId) {
-        throw new ForbiddenException('No tienes permiso para acceder a este backup.');
+        throw new ForbiddenException(
+          'No tienes permiso para acceder a este backup.',
+        );
       }
     }
     return backup;
@@ -549,7 +614,9 @@ export class BackupsService {
     }
 
     try {
-      this.logger.log('Iniciando backups automáticos programados (tenants + plataforma)');
+      this.logger.log(
+        'Iniciando backups automáticos programados (tenants + plataforma)',
+      );
 
       await this.runScheduledTenantBackups();
       await this.cleanupScheduledTenantBackups();
@@ -560,7 +627,10 @@ export class BackupsService {
         `Backup plataforma completado: ${platformResult.id}, checksum: ${platformResult.checksum.substring(0, 8)}...`,
       );
 
-      const maxPlatformBackups = this.config.get<number>('MAX_PLATFORM_BACKUPS_TO_KEEP', 30);
+      const maxPlatformBackups = this.config.get<number>(
+        'MAX_PLATFORM_BACKUPS_TO_KEEP',
+        30,
+      );
       await this.cleanupPlatformBackups(maxPlatformBackups);
     } catch (error) {
       this.logger.error('Error en backup automático:', error);
@@ -667,7 +737,11 @@ export class BackupsService {
         if (!enabled.includes('backups')) continue;
 
         const policy = this.getBackupPolicyForPlanSlug(t.plan?.slug);
-        await this.cleanupTenantBackups(t.id, policy.retentionDays, policy.maxToKeep);
+        await this.cleanupTenantBackups(
+          t.id,
+          policy.retentionDays,
+          policy.maxToKeep,
+        );
       } catch (err) {
         this.logger.warn(
           `Cleanup tenant backups fallido (tenantId=${t.id}): ${err instanceof Error ? err.message : String(err)}`,
@@ -735,7 +809,10 @@ export class BackupsService {
         await this.deleteBackup(backup.id);
         this.logger.log(`Backup plataforma antiguo eliminado: ${backup.id}`);
       } catch (error) {
-        this.logger.warn(`Error al eliminar backup plataforma ${backup.id}:`, error);
+        this.logger.warn(
+          `Error al eliminar backup plataforma ${backup.id}:`,
+          error,
+        );
       }
     }
   }

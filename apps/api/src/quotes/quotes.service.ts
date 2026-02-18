@@ -431,7 +431,9 @@ export class QuotesService {
       );
     }
 
-    const dianStatus = await this.dianService.getConfigStatusForTenant(quote.tenantId);
+    const dianStatus = await this.dianService.getConfigStatusForTenant(
+      quote.tenantId,
+    );
     if (!dianStatus.readyForSend) {
       const msg =
         dianStatus.status === 'not_configured'

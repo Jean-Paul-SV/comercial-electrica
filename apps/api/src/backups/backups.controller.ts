@@ -52,7 +52,8 @@ export class BackupsController {
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Listar backups',
-    description: 'Lista los backups del tenant del usuario (o todos si es admin de plataforma).',
+    description:
+      'Lista los backups del tenant del usuario (o todos si es admin de plataforma).',
   })
   @ApiResponse({ status: 200, description: 'Lista de backups' })
   @ApiResponse({ status: 401, description: 'No autenticado' })
@@ -79,7 +80,10 @@ export class BackupsController {
     description: 'Backup no encontrado o no disponible',
   })
   @ApiResponse({ status: 401, description: 'No autenticado' })
-  @ApiResponse({ status: 403, description: 'Solo administradores de plataforma pueden descargar' })
+  @ApiResponse({
+    status: 403,
+    description: 'Solo administradores de plataforma pueden descargar',
+  })
   async download(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Req() req: { user?: { tenantId?: string | null } },
@@ -99,7 +103,8 @@ export class BackupsController {
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Obtener backup por ID',
-    description: 'Obtiene los detalles de un backup (del tenant del usuario o cualquiera si es plataforma).',
+    description:
+      'Obtiene los detalles de un backup (del tenant del usuario o cualquiera si es plataforma).',
   })
   @ApiParam({ name: 'id', description: 'ID del backup' })
   @ApiResponse({ status: 200, description: 'Backup encontrado' })
@@ -118,7 +123,8 @@ export class BackupsController {
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Verificar integridad de backup',
-    description: 'Verifica que el backup no esté corrupto (solo del propio tenant si no es plataforma).',
+    description:
+      'Verifica que el backup no esté corrupto (solo del propio tenant si no es plataforma).',
   })
   @ApiParam({ name: 'id', description: 'ID del backup' })
   @ApiResponse({ status: 200, description: 'Backup verificado' })
@@ -128,17 +134,20 @@ export class BackupsController {
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Req() req: { user?: { tenantId?: string | null } },
   ) {
-    return this.backups.verifyBackup(id, req.user?.tenantId ?? undefined).then((isValid: boolean) => ({
-      id,
-      isValid,
-    }));
+    return this.backups
+      .verifyBackup(id, req.user?.tenantId ?? undefined)
+      .then((isValid: boolean) => ({
+        id,
+        isValid,
+      }));
   }
 
   @Delete(':id')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Eliminar backup',
-    description: 'Elimina un backup (solo del propio tenant si no es plataforma).',
+    description:
+      'Elimina un backup (solo del propio tenant si no es plataforma).',
   })
   @ApiParam({ name: 'id', description: 'ID del backup' })
   @ApiResponse({ status: 200, description: 'Backup eliminado' })
@@ -149,6 +158,10 @@ export class BackupsController {
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Req() req: { user?: { sub?: string; tenantId?: string | null } },
   ) {
-    return this.backups.deleteBackup(id, req.user?.sub, req.user?.tenantId ?? undefined);
+    return this.backups.deleteBackup(
+      id,
+      req.user?.sub,
+      req.user?.tenantId ?? undefined,
+    );
   }
 }

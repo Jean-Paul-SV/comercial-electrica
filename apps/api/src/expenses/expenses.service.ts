@@ -42,11 +42,17 @@ export class ExpensesService {
 
     // Validación de negocio: la fecha del gasto no puede ser futura
     const now = new Date();
-    const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    const todayEnd = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate(),
+      23,
+      59,
+      59,
+      999,
+    );
     if (expenseDate > todayEnd) {
-      throw new BadRequestException(
-        'La fecha del gasto no puede ser futura.',
-      );
+      throw new BadRequestException('La fecha del gasto no puede ser futura.');
     }
 
     if (dto.cashSessionId) {

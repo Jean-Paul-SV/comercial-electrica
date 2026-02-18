@@ -130,7 +130,9 @@ describe('SalesService', () => {
         {
           provide: DianService,
           useValue: {
-            getConfigStatusForTenant: jest.fn().mockResolvedValue({ readyForSend: true, status: 'ready' }),
+            getConfigStatusForTenant: jest
+              .fn()
+              .mockResolvedValue({ readyForSend: true, status: 'ready' }),
           },
         },
         CreateSaleUseCase,
@@ -143,7 +145,9 @@ describe('SalesService', () => {
 
     // Mock por defecto para sesión de caja abierta (use case usa findFirst)
     prisma.cashSession.findFirst = jest.fn().mockResolvedValue(mockCashSession);
-    prisma.cashSession.findUnique = jest.fn().mockResolvedValue(mockCashSession);
+    prisma.cashSession.findUnique = jest
+      .fn()
+      .mockResolvedValue(mockCashSession);
   });
 
   afterEach(() => {
@@ -416,7 +420,9 @@ describe('SalesService', () => {
         closedAt: new Date(),
       };
 
-      prisma.cashSession.findFirst = jest.fn().mockResolvedValue(sessionCerrada);
+      prisma.cashSession.findFirst = jest
+        .fn()
+        .mockResolvedValue(sessionCerrada);
 
       await expect(service.createSale(createSaleDto)).rejects.toThrow(
         BadRequestException,

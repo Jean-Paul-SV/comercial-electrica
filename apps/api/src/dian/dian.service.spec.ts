@@ -102,7 +102,10 @@ describe('DianService', () => {
     };
 
     const mockAudit = { log: jest.fn() };
-    const mockMailer = { isConfigured: jest.fn().mockReturnValue(false), sendMail: jest.fn() };
+    const mockMailer = {
+      isConfigured: jest.fn().mockReturnValue(false),
+      sendMail: jest.fn(),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -211,7 +214,9 @@ describe('DianService', () => {
           },
         },
       };
-      prisma.dianDocument.findUnique = jest.fn().mockResolvedValue(docSinCliente);
+      prisma.dianDocument.findUnique = jest
+        .fn()
+        .mockResolvedValue(docSinCliente);
 
       await expect(service.processDocument('dian-doc-1')).rejects.toThrow(
         BadRequestException,

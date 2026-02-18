@@ -114,6 +114,28 @@ export type ProviderTenantsSummary = {
   }[];
 };
 
+/** Solicitud de activación DIAN pendiente (empresa con plan con DIAN que aún no ha activado el servicio). */
+export type DianActivationRequest = {
+  id: string;
+  tenantId: string;
+  tenantName: string;
+  tenantSlug: string;
+  planName: string;
+  planSlug: string | null;
+  requestedAt: string;
+};
+
+/** Sugerencia de mejora enviada por un cliente (tenant). */
+export type ProviderFeedbackItem = {
+  id: string;
+  message: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+  tenant: { id: string; name: string; slug: string };
+  user: { id: string; email: string; name: string | null };
+};
+
 /** Alerta del panel proveedor (planes, empresas, Stripe). */
 export type ProviderAlert = {
   code: string;

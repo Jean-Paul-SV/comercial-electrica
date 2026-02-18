@@ -75,6 +75,7 @@ export const navConfig: NavTreeConfig = {
       moduleCode: 'core',
       items: [
         { id: 'billing', href: '/settings/billing', label: 'Plan', icon: 'CreditCard', order: 0, moduleCode: 'core' },
+        { id: 'feedback', href: '/settings/feedback', label: 'Sugerencias', icon: 'Lightbulb', order: 1, moduleCode: 'core' },
         { id: 'support', href: '/support', label: 'Soporte', icon: 'MessageCircle', order: 2, moduleCode: 'core' },
       ],
     },
@@ -98,6 +99,7 @@ export const navConfig: NavTreeConfig = {
         { id: 'provider-tenants', href: '/provider', label: 'Empresas', icon: 'Building2', order: 0 },
         { id: 'provider-new', href: '/provider/new', label: 'Nueva empresa', icon: 'PlusCircle', order: 1 },
         { id: 'provider-plans', href: '/provider/plans', label: 'Planes', icon: 'CreditCard', order: 2 },
+        { id: 'provider-feedback', href: '/provider/feedback', label: 'Sugerencias', icon: 'Lightbulb', order: 3 },
       ],
     },
   ],

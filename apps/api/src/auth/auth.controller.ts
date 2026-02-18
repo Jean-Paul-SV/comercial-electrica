@@ -69,7 +69,11 @@ export class AuthController {
     schema: { type: 'object', properties: { accessToken: { type: 'string' } } },
   })
   @ApiResponse({ status: 401, description: 'Credenciales inválidas' })
-  @ApiResponse({ status: 429, description: 'Demasiados intentos. Espera 1 min o en Render pon THROTTLE_LOGIN_DISABLED=true y redepliega.' })
+  @ApiResponse({
+    status: 429,
+    description:
+      'Demasiados intentos. Espera 1 min o en Render pon THROTTLE_LOGIN_DISABLED=true y redepliega.',
+  })
   login(@Body() dto: LoginDto) {
     return this.auth.login(dto);
   }
@@ -319,11 +323,11 @@ export class AuthController {
     description: 'Usuario no encontrado o intento de eliminarse a sí mismo',
   })
   @ApiResponse({ status: 401, description: 'No autenticado' })
-  @ApiResponse({ status: 403, description: 'No autorizado (requiere permiso users:delete)' })
-  deleteUser(
-    @Param('id') id: string,
-    @Req() req: { user?: { sub?: string } },
-  ) {
+  @ApiResponse({
+    status: 403,
+    description: 'No autorizado (requiere permiso users:delete)',
+  })
+  deleteUser(@Param('id') id: string, @Req() req: { user?: { sub?: string } }) {
     return this.auth.deleteUser(id, req.user!.sub!);
   }
 
@@ -378,9 +382,15 @@ export class AuthController {
       },
     },
   })
-  @ApiResponse({ status: 400, description: 'Archivo inválido o empleado no encontrado' })
+  @ApiResponse({
+    status: 400,
+    description: 'Archivo inválido o empleado no encontrado',
+  })
   @ApiResponse({ status: 401, description: 'No autenticado' })
-  @ApiResponse({ status: 403, description: 'No autorizado (requiere permiso users:update)' })
+  @ApiResponse({
+    status: 403,
+    description: 'No autorizado (requiere permiso users:update)',
+  })
   uploadEmployeePicture(
     @Param('id') id: string,
     @UploadedFile() file: MulterFile,

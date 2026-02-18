@@ -7,10 +7,10 @@ import * as request from 'supertest';
 
 /**
  * Test de carga básico: Crear múltiples ventas concurrentes
- * 
+ *
  * Este test verifica que el sistema puede manejar múltiples
  * requests concurrentes sin errores de integridad de datos.
- * 
+ *
  * Nota: Este es un test básico. Para tests de carga más avanzados,
  * usar herramientas como k6, Artillery, o Apache Bench.
  */
@@ -225,8 +225,7 @@ describe('Load Test - Concurrent Sales (e2e)', () => {
         (r) => r.status === 'fulfilled' && r.value.status === 201,
       ).length;
       const rateLimited = responses.filter(
-        (r) =>
-          r.status === 'fulfilled' && r.value.status === 429,
+        (r) => r.status === 'fulfilled' && r.value.status === 429,
       ).length;
       const failed = responses.filter(
         (r) =>

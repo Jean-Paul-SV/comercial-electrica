@@ -61,7 +61,9 @@ describe('Provider (e2e)', () => {
         .set('Authorization', `Bearer ${authToken}`)
         .expect(200);
       expect(Array.isArray(res.body)).toBe(true);
-      expect(res.body.every((p: { isActive: boolean }) => p.isActive)).toBe(true);
+      expect(res.body.every((p: { isActive: boolean }) => p.isActive)).toBe(
+        true,
+      );
     });
   });
 

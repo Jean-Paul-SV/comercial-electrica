@@ -65,6 +65,17 @@ enum DianEnvironment {
   PRODUCCION
 }
 
+enum DianActivationStatus {
+  PENDING
+  ACTIVATED
+}
+
+enum FeedbackStatus {
+  PENDING
+  READ
+  DONE
+}
+
 enum DianDocumentType {
   FE
   NC
@@ -185,6 +196,7 @@ model Tenant {
   auditLogs          AuditLog[]
   backupRuns         BackupRun[]
   payments           Payment[]
+  feedbacks          TenantFeedback[]
 }
 
 model TenantModule {
@@ -287,6 +299,25 @@ model Payment {
   @@index([externalId])
 }
 
+/// Sugerencias de mejoras enviadas por usuarios de un tenant; visibles en el panel proveedor.
+model TenantFeedback {
+  id        String            @id @default(uuid()) @db.Uuid
+  tenantId  String            @db.Uuid
+  userId    String            @db.Uuid
+  message   String            @db.Text
+  status    FeedbackStatus    @default(PENDING)
+  createdAt DateTime          @default(now()) @db.Timestamptz
+  updatedAt DateTime          @updatedAt @db.Timestamptz
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+}
+
 model Permission {
   id          String   @id @default(uuid()) @db.Uuid
   resource    String
@@ -362,10 +393,11 @@ model User {
   createdAt              DateTime  @default(now())
   updatedAt              DateTime  @updatedAt
 
-  tenant    Tenant?    @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  tenant    Tenant?         @relation(fields: [tenantId], references: [id], onDelete: SetNull)
   userRoles UserRole[]
   auditLogs AuditLog[]
   sales     Sale[]
+  feedbacks TenantFeedback[]
 }
 
 model Category {
@@ -864,6 +896,8 @@ model DianConfig {
   certPasswordEncrypted String?          @db.Text
   /// Fecha de vencimiento del certificado (cacheada del .p12) para validaciones sin abrir el archivo.
   certValidUntil        DateTime?        @db.Timestamptz
+  /// Estado de activación del servicio DIAN. PENDING = cliente cambió a plan con DIAN pero aún no ha pagado/activado. ACTIVATED = servicio activado (certificado configurado).
+  activationStatus      DianActivationStatus? @default(PENDING)
   createdAt             DateTime         @default(now())
   updatedAt             DateTime         @updatedAt
 

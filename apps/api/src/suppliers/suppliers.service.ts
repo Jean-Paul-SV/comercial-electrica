@@ -215,9 +215,7 @@ export class SuppliersService {
       return updated;
     } catch (error: any) {
       if (error.code === 'P2002') {
-        throw new BadRequestException(
-          'Ya existe un proveedor con ese NIT.',
-        );
+        throw new BadRequestException('Ya existe un proveedor con ese NIT.');
       }
       throw error;
     }

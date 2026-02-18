@@ -50,10 +50,19 @@ export class CustomersService {
       ];
     }
 
-    const useListCache = !search && page === 1 && limit === 20 && currentTenantId;
+    const useListCache =
+      !search && page === 1 && limit === 20 && currentTenantId;
     if (useListCache && tenantId) {
-      const listCacheKey = this.cache.buildKey('customers', 'list', tenantId, 1, 20);
-      const cached = await this.cache.get<{ data: unknown[]; meta: unknown }>(listCacheKey);
+      const listCacheKey = this.cache.buildKey(
+        'customers',
+        'list',
+        tenantId,
+        1,
+        20,
+      );
+      const cached = await this.cache.get<{ data: unknown[]; meta: unknown }>(
+        listCacheKey,
+      );
       if (cached) return cached;
     }
 
@@ -73,7 +82,13 @@ export class CustomersService {
     };
 
     if (useListCache && tenantId) {
-      const listCacheKey = this.cache.buildKey('customers', 'list', tenantId, 1, 20);
+      const listCacheKey = this.cache.buildKey(
+        'customers',
+        'list',
+        tenantId,
+        1,
+        20,
+      );
       await this.cache.set(listCacheKey, result, 90);
     }
     return result;

@@ -22,7 +22,10 @@ describe('Stripe Webhooks - Eventos Completos (e2e)', () => {
       }),
     ).compile();
 
-    const setup = await setupTestApp(moduleFixture, 'stripe-webhook-test@example.com');
+    const setup = await setupTestApp(
+      moduleFixture,
+      'stripe-webhook-test@example.com',
+    );
     ({ app, prisma } = setup);
 
     billingService = moduleFixture.get<BillingService>(BillingService);
@@ -246,7 +249,9 @@ describe('Stripe Webhooks - Eventos Completos (e2e)', () => {
       };
 
       // No debe lanzar error
-      await expect(billingService.handleStripeEvent(event)).resolves.not.toThrow();
+      await expect(
+        billingService.handleStripeEvent(event),
+      ).resolves.not.toThrow();
 
       // Verificar que el evento fue guardado
       const savedEvent = await prisma.stripeEvent.findUnique({

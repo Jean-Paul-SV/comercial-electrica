@@ -12,7 +12,8 @@ export class CreateDianConfigDto {
   env: DianEnvironment;
 
   @ApiPropertyOptional({
-    description: 'NIT del emisor (empresa). Obligatorio para envío real a DIAN.',
+    description:
+      'NIT del emisor (empresa). Obligatorio para envío real a DIAN.',
     example: '900123456-7',
   })
   @IsOptional()

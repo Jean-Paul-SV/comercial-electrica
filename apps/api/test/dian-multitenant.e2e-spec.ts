@@ -2,10 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
-import {
-  setupTestModule,
-  shutdownTestApp,
-} from './test-helpers';
+import { setupTestModule, shutdownTestApp } from './test-helpers';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { App } from 'supertest/types';
 
@@ -225,4 +222,3 @@ describe('DIAN multi-tenant isolation (e2e)', () => {
       .expect(401);
   });
 });
-

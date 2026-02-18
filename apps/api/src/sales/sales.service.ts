@@ -38,7 +38,11 @@ export class SalesService {
     tenantId?: string | null,
   ) {
     const currentTenantId = this.tenantContext.ensureTenant(tenantId);
-    return this.createSaleUseCase.execute(dto, createdByUserId, currentTenantId);
+    return this.createSaleUseCase.execute(
+      dto,
+      createdByUserId,
+      currentTenantId,
+    );
   }
 
   async listSales(
@@ -64,7 +68,8 @@ export class SalesService {
       ];
     }
 
-    const useListCache = !search && page === 1 && limit === 20 && currentTenantId;
+    const useListCache =
+      !search && page === 1 && limit === 20 && currentTenantId;
     if (useListCache) {
       const listCacheKey = this.cache.buildKey(
         'sales',
@@ -73,7 +78,9 @@ export class SalesService {
         1,
         20,
       );
-      const cached = await this.cache.get<{ data: unknown[]; meta: unknown }>(listCacheKey);
+      const cached = await this.cache.get<{ data: unknown[]; meta: unknown }>(
+        listCacheKey,
+      );
       if (cached) return cached;
     }
 
@@ -163,7 +170,12 @@ export class SalesService {
    */
   async listInvoices(
     tenantId: string | null,
-    query?: { page?: number; limit?: number; search?: string; status?: InvoiceStatus },
+    query?: {
+      page?: number;
+      limit?: number;
+      search?: string;
+      status?: InvoiceStatus;
+    },
   ) {
     const currentTenantId = this.tenantContext.ensureTenant(tenantId);
     const page = query?.page ?? 1;
@@ -219,11 +231,14 @@ export class SalesService {
       try {
         const firstInvoiceWithSale = data.find((inv) => inv.sale != null);
         if (firstInvoiceWithSale) {
-          // eslint-disable-next-line no-console
-          console.log('[SalesService.listInvoices] Primera factura con venta:', {
-            invoiceNumber: firstInvoiceWithSale.number,
-            saleRequireElectronicInvoice: firstInvoiceWithSale.sale?.requireElectronicInvoice,
-          });
+          console.log(
+            '[SalesService.listInvoices] Primera factura con venta:',
+            {
+              invoiceNumber: firstInvoiceWithSale.number,
+              saleRequireElectronicInvoice:
+                firstInvoiceWithSale.sale?.requireElectronicInvoice,
+            },
+          );
         }
       } catch (logError) {
         // Ignorar errores de logging para no afectar la respuesta
@@ -238,28 +253,35 @@ export class SalesService {
         // Solo normalizar si sale existe y requireElectronicInvoice necesita normalización
         if (inv.sale && inv.sale != null) {
           const currentValue = inv.sale.requireElectronicInvoice;
-          const needsNormalization = currentValue === null || currentValue === undefined;
-          
+          const needsNormalization =
+            currentValue === null || currentValue === undefined;
+
           if (needsNormalization) {
             const requireElectronicInvoice = true; // Valor por defecto
-            
+
             // Log solo si el valor necesita normalización
             if (process.env.NODE_ENV === 'development') {
-              // eslint-disable-next-line no-console
-              console.log('[SalesService.listInvoices] Normalizando requireElectronicInvoice para factura:', inv.number);
+              console.log(
+                '[SalesService.listInvoices] Normalizando requireElectronicInvoice para factura:',
+                inv.number,
+              );
             }
-            
+
             // Construir el objeto de retorno solo con los campos necesarios, asegurando serialización correcta
-            const saleSoldAt = inv.sale.soldAt instanceof Date 
-              ? inv.sale.soldAt.toISOString() 
-              : typeof inv.sale.soldAt === 'string' 
-                ? inv.sale.soldAt 
-                : String(inv.sale.soldAt);
-            
+            const saleSoldAt =
+              inv.sale.soldAt instanceof Date
+                ? inv.sale.soldAt.toISOString()
+                : typeof inv.sale.soldAt === 'string'
+                  ? inv.sale.soldAt
+                  : String(inv.sale.soldAt);
+
             return {
               id: inv.id,
               number: inv.number,
-              issuedAt: inv.issuedAt instanceof Date ? inv.issuedAt.toISOString() : inv.issuedAt,
+              issuedAt:
+                inv.issuedAt instanceof Date
+                  ? inv.issuedAt.toISOString()
+                  : inv.issuedAt,
               status: inv.status,
               subtotal: Number(inv.subtotal),
               taxTotal: Number(inv.taxTotal),
@@ -276,7 +298,7 @@ export class SalesService {
               dianDocument: inv.dianDocument,
             };
           }
-          
+
           // Si el valor ya está definido, asegurar que soldAt esté serializado correctamente
           if (inv.sale.soldAt instanceof Date) {
             return {
@@ -288,7 +310,7 @@ export class SalesService {
             };
           }
         }
-        
+
         // Asegurar que issuedAt esté serializado correctamente si es Date
         if (inv.issuedAt instanceof Date) {
           return {
@@ -296,12 +318,16 @@ export class SalesService {
             issuedAt: inv.issuedAt.toISOString(),
           };
         }
-        
+
         return inv;
       } catch (error) {
         // Si hay un error al procesar, devolver el objeto original
-        // eslint-disable-next-line no-console
-        console.error('[SalesService.listInvoices] Error al procesar factura:', inv.number, error);
+
+        console.error(
+          '[SalesService.listInvoices] Error al procesar factura:',
+          inv.number,
+          error,
+        );
         return inv;
       }
     });
@@ -313,8 +339,11 @@ export class SalesService {
       };
     } catch (error) {
       // Si hay un error al construir la respuesta, loggear y devolver datos sin normalizar
-      // eslint-disable-next-line no-console
-      console.error('[SalesService.listInvoices] Error al construir respuesta:', error);
+
+      console.error(
+        '[SalesService.listInvoices] Error al construir respuesta:',
+        error,
+      );
       return {
         data,
         meta: buildPaginationMeta(total, page, limit),
@@ -326,7 +355,11 @@ export class SalesService {
    * Anula una factura (estado VOIDED): actualiza factura, venta a CANCELLED,
    * devuelve stock, registra movimiento de caja OUT y movimiento de inventario IN por anulación.
    */
-  async voidInvoice(invoiceId: string, tenantId: string | null, userId?: string) {
+  async voidInvoice(
+    invoiceId: string,
+    tenantId: string | null,
+    userId?: string,
+  ) {
     const currentTenantId = this.tenantContext.ensureTenant(tenantId);
     const invoice = await this.prisma.invoice.findFirst({
       where: { id: invoiceId, tenantId: currentTenantId },
@@ -364,7 +397,11 @@ export class SalesService {
         for (const item of invoice.sale.items) {
           await tx.stockBalance.upsert({
             where: { productId: item.productId },
-            create: { productId: item.productId, qtyOnHand: item.qty, qtyReserved: 0 },
+            create: {
+              productId: item.productId,
+              qtyOnHand: item.qty,
+              qtyReserved: 0,
+            },
             update: { qtyOnHand: { increment: item.qty } },
           });
         }
@@ -404,13 +441,10 @@ export class SalesService {
       return null;
     });
 
-    await this.audit.log(
-      'invoice',
-      invoiceId,
-      'void',
-      userId ?? null,
-      { number: invoice.number, saleId: invoice.saleId },
-    );
+    await this.audit.log('invoice', invoiceId, 'void', userId ?? null, {
+      number: invoice.number,
+      saleId: invoice.saleId,
+    });
     this.logger.log(`Factura ${invoice.number} anulada.`);
     await this.cache.deletePattern('cache:sales:*');
     return { success: true, message: 'Factura anulada.' };

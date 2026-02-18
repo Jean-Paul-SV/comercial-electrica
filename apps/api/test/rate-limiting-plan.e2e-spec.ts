@@ -30,7 +30,9 @@ describe('Rate Limiting por Plan (e2e)', () => {
       where: { email: 'platform@admin.local' },
     });
     if (!admin) {
-      throw new Error('Admin de plataforma no encontrado. Ejecuta seed primero.');
+      throw new Error(
+        'Admin de plataforma no encontrado. Ejecuta seed primero.',
+      );
     }
 
     const loginRes = await request(app.getHttpServer())

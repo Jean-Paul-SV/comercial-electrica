@@ -29,8 +29,7 @@ export class StripeWebhookProcessor extends WorkerHost {
         `Evento Stripe ${event.id} procesado exitosamente en reintento`,
       );
     } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : String(err);
+      const errorMessage = err instanceof Error ? err.message : String(err);
       this.logger.error(
         `Error en reintento de evento Stripe ${event.id}: ${errorMessage}`,
       );

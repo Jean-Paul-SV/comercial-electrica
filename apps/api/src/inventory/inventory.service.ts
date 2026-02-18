@@ -1,8 +1,4 @@
-import {
-  BadRequestException,
-  Injectable,
-  Logger,
-} from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { Prisma, InventoryMovementType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateInventoryMovementDto } from './dto/create-movement.dto';
@@ -218,7 +214,9 @@ export class InventoryService {
   /**
    * Valor total del inventario: suma de (stock × costo) de todos los productos del tenant.
    */
-  async getTotalInventoryValue(tenantId: string | null): Promise<{ totalValue: number }> {
+  async getTotalInventoryValue(
+    tenantId: string | null,
+  ): Promise<{ totalValue: number }> {
     const currentTenantId = this.tenantContext.ensureTenant(tenantId);
     const rows = await this.prisma.product.findMany({
       where: { tenantId: currentTenantId, isActive: true },

@@ -152,7 +152,9 @@ describe('Stripe Webhook Idempotency (e2e)', () => {
 
       // Si el evento se procesó dos veces, periodEndAfterSecond sería diferente de periodEndAfterFirst
       // Como es idempotente, deberían ser iguales (o el evento no debería procesarse)
-      expect(periodEndAfterSecond?.getTime()).toBe(periodEndAfterFirst?.getTime());
+      expect(periodEndAfterSecond?.getTime()).toBe(
+        periodEndAfterFirst?.getTime(),
+      );
     });
   });
 });

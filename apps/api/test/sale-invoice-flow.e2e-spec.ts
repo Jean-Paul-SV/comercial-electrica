@@ -43,9 +43,7 @@ describe('Flujo Venta → Factura (e2e)', () => {
     });
 
     // Crear usuario admin
-    const passwordHash = await (
-      await import('argon2')
-    ).hash('Admin123!');
+    const passwordHash = await (await import('argon2')).hash('Admin123!');
     const user = await prisma.user.create({
       data: {
         email: `admin-venta-factura@test.com`,
@@ -175,9 +173,7 @@ describe('Flujo Venta → Factura (e2e)', () => {
     });
 
     // Crear venta en otro tenant
-    const otherPasswordHash = await (
-      await import('argon2')
-    ).hash('Admin123!');
+    const otherPasswordHash = await (await import('argon2')).hash('Admin123!');
     const otherUser = await prisma.user.create({
       data: {
         email: `admin-otro@test.com`,
