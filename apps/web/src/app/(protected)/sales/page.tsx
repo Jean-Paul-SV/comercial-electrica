@@ -846,12 +846,16 @@ export default function SalesPage() {
                     {requireElectronicInvoice ? (
                       <>
                         <span className="font-medium text-foreground">Enviar factura electrónica a DIAN</span>
-                        <span className="text-xs block mt-0.5">La factura se enviará a la DIAN y tendrá validez fiscal.</span>
+                        <span className="text-xs block mt-0.5 text-muted-foreground">
+                          La factura será enviada automáticamente a la DIAN y tendrá validez fiscal completa. El cliente recibirá el documento con CUFE y podrá descargarlo desde su correo electrónico.
+                        </span>
                       </>
                     ) : (
                       <>
                         <span className="font-medium text-foreground">Documento Local</span>
-                        <span className="text-xs block mt-0.5">Solo se genera documento interno (no se envía a DIAN).</span>
+                        <span className="text-xs block mt-0.5 text-muted-foreground">
+                          Solo se genera un documento interno para registro. No se envía a la DIAN y no tiene validez fiscal. Útil para ventas informales o borradores.
+                        </span>
                       </>
                     )}
                   </Label>
