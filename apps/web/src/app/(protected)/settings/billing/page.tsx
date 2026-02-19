@@ -277,8 +277,9 @@ export default function BillingPage() {
 
   // Si sigue pendiente de pago, reintentar cada 2s hasta 4 veces para dar tiempo al webhook
   const pollCount = useRef(0);
+  const requiresPayment = subscriptionQuery.data?.requiresPayment === true;
   useEffect(() => {
-    if (subscriptionQuery.data?.requiresPayment !== true) return;
+    if (!requiresPayment) return;
     pollCount.current = 0;
     const POLL_MAX = 4;
     const POLL_INTERVAL_MS = 2000;
@@ -291,7 +292,7 @@ export default function BillingPage() {
       subscriptionQuery.refetch();
     }, POLL_INTERVAL_MS);
     return () => clearInterval(id);
-  }, [subscriptionQuery.data?.requiresPayment, subscriptionQuery.refetch]);
+  }, [requiresPayment]); // eslint-disable-line react-hooks/exhaustive-deps -- solo depende de requiresPayment
 
   if (isPlatformAdmin) {
     return (
