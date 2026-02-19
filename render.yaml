@@ -56,6 +56,13 @@ services:
       # Multi-tenant: obligatoria para que cada empresa suba su certificado desde Cuenta → Facturación electrónica (cifrado en BD).
       - key: DIAN_CERT_ENCRYPTION_KEY
         sync: false
+      # Stripe: configuración de facturación y suscripciones. Obtén las keys en https://dashboard.stripe.com
+      # STRIPE_SECRET_KEY: clave secreta de Stripe (sk_test_... para pruebas, sk_live_... para producción)
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      # STRIPE_WEBHOOK_SECRET: secret del webhook de Stripe (whsec_...). Configurar webhook en Stripe Dashboard apuntando a /billing/webhooks/stripe
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
       # Admin de plataforma (Panel proveedor): solo se usan si ejecutas el seed contra esta BD. El deploy NO ejecuta seed; ver docs/PRIMER_USUARIO_PRODUCCION.md.
       - key: PLATFORM_ADMIN_EMAIL
         sync: false
