@@ -1089,6 +1089,8 @@ export class BillingService {
       include: {
         plan: {
           select: {
+            id: true,
+            name: true,
             stripePriceId: true,
             stripePriceIdYearly: true,
           },
@@ -1140,12 +1142,11 @@ export class BillingService {
             mode: 'payment',
             line_items: [{
               price_data: {
-                currency: paymentIntent.currency,
+                currency: typeof paymentIntent === 'string' ? 'usd' : paymentIntent.currency,
                 product_data: {
-                  name: subscription.plan?.name || 'Suscripción',
+                  name: (subscription.plan as any)?.name || 'Suscripción',
                 },
-                unit_amount: paymentIntent.amount,
-                recurring: undefined,
+                unit_amount: typeof paymentIntent === 'string' ? 0 : paymentIntent.amount,
               },
               quantity: 1,
             }],
