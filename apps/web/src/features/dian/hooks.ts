@@ -63,12 +63,13 @@ export function useDianConfig() {
 }
 
 export function useDianConfigStatus() {
-  const { token } = useAuth();
+  const { token, isPlatformAdmin } = useAuth();
 
   return useQuery({
     queryKey: DIAN_CONFIG_STATUS_KEY,
-    enabled: Boolean(token),
+    enabled: Boolean(token) && !isPlatformAdmin, // Solo usuarios con tenant, no platform admins
     queryFn: () => getDianConfigStatus(token!),
+    retry: false, // No reintentar si falla con 403
   });
 }
 
