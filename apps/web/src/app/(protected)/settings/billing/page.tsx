@@ -217,7 +217,9 @@ export default function BillingPage() {
   const plansQuery = useBillingPlans();
   const changePlanMutation = useChangePlan();
   const submitFeedbackMutation = useSubmitFeedback();
-  const { data: dianStatus } = useDianConfigStatus();
+  const planSlug = subscriptionQuery.data?.plan?.slug;
+  const planIncludesDian = planSlug ? isPlanWithDian(planSlug) : false;
+  const { data: dianStatus } = useDianConfigStatus(planIncludesDian);
   const [dianPlanDialog, setDianPlanDialog] = useState<{ id: string; name: string; billingInterval: 'monthly' | 'yearly' } | null>(null);
   /** Plan pendiente de confirmación (sin DIAN): mostrar modal de prorrateo antes de cambiar. */
   const [changePlanConfirm, setChangePlanConfirm] = useState<{ id: string; name: string; billingInterval: 'monthly' | 'yearly' } | null>(null);

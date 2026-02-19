@@ -98,7 +98,7 @@ function fileToBase64(file: File): Promise<string> {
 
 export default function ElectronicInvoicingPage() {
   const configQuery = useDianConfig();
-  const statusQuery = useDianConfigStatus();
+  const statusQuery = useDianConfigStatus(true); // Página dedicada a DIAN; si están aquí tienen el módulo
   const updateMutation = useUpdateDianConfig();
   const uploadCertMutation = useUploadCertificate();
 

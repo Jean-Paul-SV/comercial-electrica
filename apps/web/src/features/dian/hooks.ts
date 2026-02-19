@@ -62,14 +62,15 @@ export function useDianConfig() {
   });
 }
 
-export function useDianConfigStatus() {
+/** Solo llamar cuando el plan incluye DIAN (evita 403 "Módulo no contratado"). */
+export function useDianConfigStatus(planIncludesDian = false) {
   const { token, isPlatformAdmin } = useAuth();
 
   return useQuery({
     queryKey: DIAN_CONFIG_STATUS_KEY,
-    enabled: Boolean(token) && !isPlatformAdmin, // Solo usuarios con tenant, no platform admins
+    enabled: Boolean(token) && !isPlatformAdmin && planIncludesDian,
     queryFn: () => getDianConfigStatus(token!),
-    retry: false, // No reintentar si falla con 403
+    retry: false,
   });
 }
 

@@ -8,7 +8,7 @@ import { AlertTriangle } from 'lucide-react';
 /** Banner in-app: certificado por vencer o rango bajo. Solo cuando el tenant tiene facturación electrónica lista. */
 export function DianAlertsBanner() {
   const pathname = usePathname();
-  const { data: status, isLoading } = useDianConfigStatus();
+  const { data: status, isLoading } = useDianConfigStatus(true); // Siempre true: el banner solo se muestra cuando enabledModules incluye electronic_invoicing
 
   if (isLoading || !status) return null;
   if (!status.readyForSend) return null;
