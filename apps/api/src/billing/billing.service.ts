@@ -602,6 +602,17 @@ export class BillingService {
     // Usar el billingInterval proporcionado o mantener el actual
     const effectiveBillingInterval = billingInterval ?? tenant.billingInterval;
     
+    // Bloquear cambio a mensual cuando el plan actual es anual
+    if (tenant.billingInterval === 'yearly' && effectiveBillingInterval === 'monthly' && tenant.plan?.id === planId) {
+      throw new BadRequestException({
+        message: 'No se puede cambiar a mensual cuando tienes un plan anual activo.',
+        errors: [
+          'Las suscripciones anuales no pueden cambiarse a mensual hasta el final del periodo contratado.',
+          'El cambio a mensual estará disponible al finalizar tu periodo anual actual.',
+        ],
+      });
+    }
+    
     const currentPrice = tenant.plan
       ? this.getPlanEffectivePrice(
           tenant.plan.priceMonthly != null ? Number(tenant.plan.priceMonthly) : null,

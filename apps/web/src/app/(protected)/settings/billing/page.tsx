@@ -71,26 +71,34 @@ const PLAN_FEATURES: Record<string, string[]> = {
 function PlanCard({
   p,
   currentPlanId,
+  currentBillingInterval,
   onSelectDian,
   onSelectChange,
   isChanging,
 }: {
   p: BillingPlanItem;
   currentPlanId: string;
+  currentBillingInterval: 'monthly' | 'yearly' | null;
   onSelectDian: (id: string, name: string, billingInterval: 'monthly' | 'yearly') => void;
   onSelectChange: (id: string, name: string, billingInterval: 'monthly' | 'yearly') => void;
   isChanging: boolean;
 }) {
-  const [billingInterval, setBillingInterval] = useState<'monthly' | 'yearly'>(
-    p.priceYearly != null ? 'yearly' : 'monthly'
-  );
   const isCurrent = currentPlanId === p.id;
+  const [billingInterval, setBillingInterval] = useState<'monthly' | 'yearly'>(() => {
+    if (isCurrent && currentBillingInterval) return currentBillingInterval;
+    return p.priceYearly != null ? 'yearly' : 'monthly';
+  });
+  useEffect(() => {
+    if (isCurrent && currentBillingInterval) setBillingInterval(currentBillingInterval);
+  }, [isCurrent, currentBillingInterval]);
   // Solo validar downgrade si hay un plan actual (currentPlanId no está vacío)
   const validation = useValidateDowngrade(isCurrent || !currentPlanId ? null : p.id);
   const downgradeBlocked = validation.data?.allowed === false;
   const firstError = validation.data?.errors?.[0];
   const highlights = PLAN_FEATURES[p.slug] ?? [];
   const hasBothPrices = p.priceMonthly != null && p.priceYearly != null;
+  // Bloquear cambio a mensual solo si es el mismo plan y es anual
+  const blockMonthlyChange = isCurrent && currentBillingInterval === 'yearly' && p.id === currentPlanId;
 
   return (
     <div
@@ -117,16 +125,18 @@ function PlanCard({
           )}
         </div>
         <div className="space-y-2">
-          {hasBothPrices && !isCurrent && (
+          {hasBothPrices && (
             <div className="flex items-center gap-2 rounded-lg border border-border/60 bg-muted/20 p-1.5">
               <button
                 type="button"
                 onClick={() => setBillingInterval('monthly')}
+                disabled={blockMonthlyChange}
                 className={`flex-1 rounded px-2 py-1 text-xs font-medium transition-colors ${
                   billingInterval === 'monthly'
                     ? 'bg-primary text-primary-foreground'
                     : 'text-muted-foreground hover:text-foreground'
-                }`}
+                } ${blockMonthlyChange ? 'opacity-50 cursor-not-allowed' : ''}`}
+                title={blockMonthlyChange ? 'No se puede cambiar a mensual cuando tienes un plan anual activo. Puedes cambiar a un plan más avanzado con facturación mensual.' : ''}
               >
                 Mensual
               </button>
@@ -182,29 +192,44 @@ function PlanCard({
             {highlights.join(' · ')}
           </p>
         )}
-        {!isCurrent && (
+        {(!isCurrent || (isCurrent && billingInterval !== currentBillingInterval)) && (
           <div className="space-y-1">
-            <Button
-              size="sm"
-              variant="outline"
-              className="w-full sm:w-auto rounded-lg border-primary/40 text-primary hover:bg-primary/10"
-              disabled={isChanging || downgradeBlocked}
-              onClick={() => {
-                if (isPlanWithDian(p.slug)) {
-                  onSelectDian(p.id, p.name, billingInterval);
-                } else {
-                  onSelectChange(p.id, p.name, billingInterval);
-                }
-              }}
-            >
-              {isChanging 
-                ? 'Cambiando…' 
-                : downgradeBlocked 
-                  ? 'No disponible' 
-                  : currentPlanId 
-                    ? 'Cambiar a este plan'
-                    : 'Seleccionar plan'}
-            </Button>
+            {blockMonthlyChange && billingInterval === 'monthly' ? (
+              <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2">
+                <p className="text-xs text-foreground font-medium">
+                  No se puede cambiar a mensual cuando tienes un plan anual activo
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  El cambio a mensual estará disponible al finalizar tu periodo anual actual. Puedes cambiar a un plan más avanzado con facturación mensual.
+                </p>
+              </div>
+            ) : (
+              <Button
+                size="sm"
+                variant="outline"
+                className="w-full sm:w-auto rounded-lg border-primary/40 text-primary hover:bg-primary/10"
+                disabled={isChanging || downgradeBlocked || blockMonthlyChange}
+                onClick={() => {
+                  if (isPlanWithDian(p.slug)) {
+                    onSelectDian(p.id, p.name, billingInterval);
+                  } else {
+                    onSelectChange(p.id, p.name, billingInterval);
+                  }
+                }}
+              >
+                {isChanging 
+                  ? 'Cambiando…' 
+                  : downgradeBlocked 
+                    ? 'No disponible' 
+                    : currentPlanId 
+                      ? isCurrent && billingInterval !== currentBillingInterval
+                        ? billingInterval === 'monthly'
+                          ? 'Cambiar a mensual'
+                          : 'Cambiar a anual'
+                        : 'Cambiar a este plan'
+                      : 'Seleccionar plan'}
+              </Button>
+            )}
             {downgradeBlocked && firstError && (
               <p className="text-xs text-destructive" title={validation.data?.errors?.join(' ')}>
                 {firstError}
@@ -784,6 +809,7 @@ export default function BillingPage() {
                     key={p.id}
                     p={p}
                     currentPlanId={plan?.id || ''}
+                    currentBillingInterval={billingInterval}
                     onSelectDian={(id, name, billingInterval) => setDianPlanDialog({ id, name, billingInterval })}
                     onSelectChange={(id, name, billingInterval) => setChangePlanConfirm({ id, name, billingInterval })}
                     isChanging={changePlanMutation.isPending || submitFeedbackMutation.isPending}
@@ -800,19 +826,42 @@ export default function BillingPage() {
           {/* Portal Stripe (cuando no es pago pendiente y la suscripción está activa) */}
           {canManageBilling && !requiresPayment && isActive && (
             <div className="space-y-3 rounded-xl border border-border/60 bg-muted/5 p-4 sm:p-5">
-              <p className="text-sm text-muted-foreground">
-                Actualiza tu método de pago, descarga facturas o gestiona tu suscripción en el portal seguro de Stripe.
-              </p>
-              <Button
-                onClick={handleOpenPortal}
-                disabled={createPortalMutation.isPending}
-                className="gap-2 rounded-lg"
-              >
-                <CreditCard className="h-4 w-4 shrink-0" />
-                {createPortalMutation.isPending
-                  ? 'Abriendo…'
-                  : 'Gestionar método de pago y facturas'}
-              </Button>
+              {billingInterval === 'yearly' ? (
+                <>
+                  <p className="text-sm text-muted-foreground">
+                    Actualiza tu método de pago y descarga facturas en el portal seguro de Stripe.
+                  </p>
+                  <p className="text-xs text-amber-600 dark:text-amber-500 font-medium">
+                    ⚠️ Las suscripciones anuales no pueden cancelarse hasta el final del periodo contratado.
+                  </p>
+                  <Button
+                    onClick={handleOpenPortal}
+                    disabled={createPortalMutation.isPending}
+                    className="gap-2 rounded-lg"
+                  >
+                    <CreditCard className="h-4 w-4 shrink-0" />
+                    {createPortalMutation.isPending
+                      ? 'Abriendo…'
+                      : 'Gestionar método de pago y facturas'}
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm text-muted-foreground">
+                    Actualiza tu método de pago, descarga facturas o gestiona tu suscripción en el portal seguro de Stripe.
+                  </p>
+                  <Button
+                    onClick={handleOpenPortal}
+                    disabled={createPortalMutation.isPending}
+                    className="gap-2 rounded-lg"
+                  >
+                    <CreditCard className="h-4 w-4 shrink-0" />
+                    {createPortalMutation.isPending
+                      ? 'Abriendo…'
+                      : 'Gestionar método de pago y facturas'}
+                  </Button>
+                </>
+              )}
             </div>
           )}
 
