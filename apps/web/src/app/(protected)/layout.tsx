@@ -54,19 +54,17 @@ function ProtectedLayoutContent({ children }: { children: React.ReactNode }) {
 
   const handleOpenPortal = () => {
     const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
-    createPortalMutation.mutate(
-      { returnUrl: `${baseUrl}/settings/billing` },
-      {
-        onSuccess: (data) => {
-          if (data?.url) {
-            window.location.href = data.url;
-          }
-        },
-        onError: (e: { message?: string }) => {
-          console.error('Error abriendo portal:', e);
-        },
-      }
-    );
+    const returnUrl = `${baseUrl}/settings/billing`;
+    createPortalMutation.mutate(returnUrl, {
+      onSuccess: (data) => {
+        if (data?.url) {
+          window.location.href = data.url;
+        }
+      },
+      onError: (e: { message?: string }) => {
+        console.error('Error abriendo portal:', e);
+      },
+    });
   };
 
   useEffect(() => {
