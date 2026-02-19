@@ -11,7 +11,7 @@ import { PlanLimitsService } from '../common/services/plan-limits.service';
 import Stripe from 'stripe';
 
 export type SubscriptionInfoDto = {
-  plan: { id: string; name: string; slug: string } | null;
+  plan: { id: string; name: string; slug: string; priceMonthly: number | null; priceYearly: number | null } | null;
   subscription: {
     status: string;
     currentPeriodEnd: string | null;
@@ -21,6 +21,8 @@ export type SubscriptionInfoDto = {
   scheduledPlan: { id: string; name: string; slug: string } | null;
   /** Fecha en que se aplicará el cambio programado (fin del ciclo). */
   scheduledChangeAt: string | null;
+  /** Intervalo de facturación actual: 'monthly' o 'yearly'. */
+  billingInterval: 'monthly' | 'yearly' | null;
   /** Si true, el usuario puede abrir el portal de Stripe (actualizar pago, facturas). */
   canManageBilling: boolean;
   /** Si true, la app debe mostrarse bloqueada y solo el botón de pagar hasta completar el primer pago. */
@@ -939,10 +941,16 @@ export class BillingService {
   async getSubscriptionForTenant(
     tenantId: string,
   ): Promise<SubscriptionInfoDto> {
+    // Obtener tenant para acceder a billingInterval
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { billingInterval: true },
+    });
+    
     let subscription = await this.prisma.subscription.findUnique({
       where: { tenantId },
       include: {
-        plan: { select: { id: true, name: true, slug: true } },
+        plan: { select: { id: true, name: true, slug: true, priceMonthly: true, priceYearly: true } },
         scheduledPlan: { select: { id: true, name: true, slug: true } },
       },
     });
@@ -955,7 +963,7 @@ export class BillingService {
         (await this.prisma.subscription.findUnique({
           where: { tenantId },
           include: {
-            plan: { select: { id: true, name: true, slug: true } },
+            plan: { select: { id: true, name: true, slug: true, priceMonthly: true, priceYearly: true } },
             scheduledPlan: { select: { id: true, name: true, slug: true } },
           },
         })) ?? subscription;
@@ -995,6 +1003,8 @@ export class BillingService {
             id: subscription.plan.id,
             name: subscription.plan.name,
             slug: subscription.plan.slug,
+            priceMonthly: subscription.plan.priceMonthly != null ? Number(subscription.plan.priceMonthly) : null,
+            priceYearly: subscription.plan.priceYearly != null ? Number(subscription.plan.priceYearly) : null,
           }
         : null,
       subscription: {
@@ -1011,6 +1021,7 @@ export class BillingService {
           }
         : null,
       scheduledChangeAt: subscription.scheduledChangeAt?.toISOString() ?? null,
+      billingInterval: tenant?.billingInterval as 'monthly' | 'yearly' | null ?? null,
       canManageBilling,
       requiresPayment: requiresPayment || shouldBlockAccess,
       gracePeriodEnd: gracePeriodEnd?.toISOString() ?? null,

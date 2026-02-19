@@ -383,10 +383,18 @@ export default function BillingPage() {
   const subscription = data?.subscription;
   const scheduledPlan = data?.scheduledPlan ?? null;
   const scheduledChangeAt = data?.scheduledChangeAt ?? null;
+  const billingInterval = data?.billingInterval ?? null;
   const canManageBilling = data?.canManageBilling ?? false;
   const requiresPayment = data?.requiresPayment === true;
   const gracePeriodEnd = data?.gracePeriodEnd ?? null;
   const inGracePeriod = data?.inGracePeriod === true;
+  
+  // Calcular precio efectivo del plan actual
+  const currentPrice = plan
+    ? billingInterval === 'yearly' && plan.priceYearly != null
+      ? plan.priceYearly
+      : plan.priceMonthly ?? plan.priceYearly ?? null
+    : null;
 
   const statusLabel = subscription
     ? (STATUS_LABELS[subscription.status] ?? subscription.status)
@@ -459,6 +467,16 @@ export default function BillingPage() {
                 <p className="text-sm text-foreground flex items-start gap-3 font-medium">
                   <AlertCircle className="h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
                   Pago pendiente. Completa el pago para desbloquear tu cuenta y acceder a todos los módulos.
+                  {currentPrice != null && (
+                    <span className="ml-2 font-semibold text-amber-700 dark:text-amber-500">
+                      Total a pagar: {formatPrice(currentPrice)}
+                      {billingInterval && (
+                        <span className="text-xs font-normal ml-1">
+                          /{billingInterval === 'yearly' ? 'año' : 'mes'}
+                        </span>
+                      )}
+                    </span>
+                  )}
                 </p>
                 {subscriptionQuery.isFetching && (
                   <p className="text-xs text-muted-foreground flex items-center gap-2">
@@ -535,8 +553,18 @@ export default function BillingPage() {
                 <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
                   <Sparkles className="h-6 w-6" />
                 </div>
-                <div>
-                  <p className="font-semibold text-foreground">{plan.name}</p>
+                <div className="flex-1">
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <p className="font-semibold text-foreground">{plan.name}</p>
+                    {currentPrice != null && (
+                      <span className="text-lg font-bold text-primary">
+                        {formatPrice(currentPrice)}
+                        <span className="text-xs font-normal text-muted-foreground ml-1">
+                          /{billingInterval === 'yearly' ? 'año' : 'mes'}
+                        </span>
+                      </span>
+                    )}
+                  </div>
                   <p className="text-xs text-muted-foreground uppercase tracking-wider font-mono mt-0.5">
                     {plan.slug}
                   </p>

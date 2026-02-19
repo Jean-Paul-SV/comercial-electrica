@@ -1,5 +1,5 @@
 export type SubscriptionInfo = {
-  plan: { id: string; name: string; slug: string } | null;
+  plan: { id: string; name: string; slug: string; priceMonthly: number | null; priceYearly: number | null } | null;
   subscription: {
     status: string;
     currentPeriodEnd: string | null;
@@ -9,6 +9,8 @@ export type SubscriptionInfo = {
   scheduledPlan: { id: string; name: string; slug: string } | null;
   /** Fecha en que se aplicará el cambio programado (ISO). */
   scheduledChangeAt: string | null;
+  /** Intervalo de facturación actual: 'monthly' o 'yearly'. */
+  billingInterval: 'monthly' | 'yearly' | null;
   /** Si true, el usuario puede abrir el portal de Stripe. */
   canManageBilling: boolean;
   /** Si true, la app se muestra bloqueada; solo se muestra la pantalla de pagar. */
