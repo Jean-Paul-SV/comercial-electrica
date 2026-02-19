@@ -35,7 +35,7 @@ export default function ProviderOverviewPage() {
               <ArrowLeft className="h-4 w-4" />
               <span className="sr-only">Volver</span>
             </Link>
-          </div>
+          </Button>
           <div>
             <h1 className="text-2xl font-semibold tracking-tight flex items-center gap-2">
               <LayoutGrid className="h-6 w-6 text-primary" />
