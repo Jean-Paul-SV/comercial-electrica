@@ -77,15 +77,19 @@ function PlanCard({
 }: {
   p: BillingPlanItem;
   currentPlanId: string;
-  onSelectDian: (id: string, name: string) => void;
-  onSelectChange: (id: string, name: string) => void;
+  onSelectDian: (id: string, name: string, billingInterval: 'monthly' | 'yearly') => void;
+  onSelectChange: (id: string, name: string, billingInterval: 'monthly' | 'yearly') => void;
   isChanging: boolean;
 }) {
+  const [billingInterval, setBillingInterval] = useState<'monthly' | 'yearly'>(
+    p.priceYearly != null ? 'yearly' : 'monthly'
+  );
   const isCurrent = currentPlanId === p.id;
   const validation = useValidateDowngrade(isCurrent ? null : p.id);
   const downgradeBlocked = validation.data?.allowed === false;
   const firstError = validation.data?.errors?.[0];
   const highlights = PLAN_FEATURES[p.slug] ?? [];
+  const hasBothPrices = p.priceMonthly != null && p.priceYearly != null;
 
   return (
     <div
@@ -111,23 +115,60 @@ function PlanCard({
             </Badge>
           )}
         </div>
-        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-          {(p.priceMonthly ?? p.priceYearly) != null && (
-            <span className="text-lg font-bold text-foreground">
-              {formatPrice(p.priceMonthly ?? p.priceYearly ?? 0)}
-              <span className="text-xs font-normal text-muted-foreground ml-1">
-                {p.priceMonthly != null ? '/mes' : '/año'}
+        <div className="space-y-2">
+          {hasBothPrices && !isCurrent && (
+            <div className="flex items-center gap-2 rounded-lg border border-border/60 bg-muted/20 p-1.5">
+              <button
+                type="button"
+                onClick={() => setBillingInterval('monthly')}
+                className={`flex-1 rounded px-2 py-1 text-xs font-medium transition-colors ${
+                  billingInterval === 'monthly'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                Mensual
+              </button>
+              <button
+                type="button"
+                onClick={() => setBillingInterval('yearly')}
+                className={`flex-1 rounded px-2 py-1 text-xs font-medium transition-colors ${
+                  billingInterval === 'yearly'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                Anual
+              </button>
+            </div>
+          )}
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            {(p.priceMonthly ?? p.priceYearly) != null && (
+              <span className="text-lg font-bold text-foreground">
+                {formatPrice(
+                  billingInterval === 'yearly' && p.priceYearly != null
+                    ? p.priceYearly
+                    : p.priceMonthly ?? p.priceYearly ?? 0
+                )}
+                <span className="text-xs font-normal text-muted-foreground ml-1">
+                  {billingInterval === 'yearly' ? '/año' : '/mes'}
+                </span>
               </span>
-            </span>
-          )}
-          {p.priceMonthly != null && p.priceYearly != null && (
-            <span className="text-xs text-muted-foreground">
-              Anual: {formatPrice(p.priceYearly)}
-            </span>
-          )}
-          {p.priceMonthly == null && p.priceYearly == null && (
-            <span className="text-muted-foreground text-sm">Consultar precio</span>
-          )}
+            )}
+            {hasBothPrices && billingInterval === 'monthly' && (
+              <span className="text-xs text-muted-foreground">
+                Ahorra {Math.round(((p.priceMonthly! * 12 - p.priceYearly!) / (p.priceMonthly! * 12)) * 100)}% con anual
+              </span>
+            )}
+            {hasBothPrices && billingInterval === 'yearly' && p.priceMonthly != null && p.priceYearly != null && (
+              <span className="text-xs text-success font-medium">
+                Ahorras {formatPrice(p.priceMonthly * 12 - p.priceYearly)} vs mensual
+              </span>
+            )}
+            {p.priceMonthly == null && p.priceYearly == null && (
+              <span className="text-muted-foreground text-sm">Consultar precio</span>
+            )}
+          </div>
         </div>
         {p.description?.trim() && (
           <p className="text-sm text-muted-foreground leading-snug">
@@ -149,9 +190,9 @@ function PlanCard({
               disabled={isChanging || downgradeBlocked}
               onClick={() => {
                 if (isPlanWithDian(p.slug)) {
-                  onSelectDian(p.id, p.name);
+                  onSelectDian(p.id, p.name, billingInterval);
                 } else {
-                  onSelectChange(p.id, p.name);
+                  onSelectChange(p.id, p.name, billingInterval);
                 }
               }}
             >
@@ -177,9 +218,9 @@ export default function BillingPage() {
   const changePlanMutation = useChangePlan();
   const submitFeedbackMutation = useSubmitFeedback();
   const { data: dianStatus } = useDianConfigStatus();
-  const [dianPlanDialog, setDianPlanDialog] = useState<{ id: string; name: string } | null>(null);
+  const [dianPlanDialog, setDianPlanDialog] = useState<{ id: string; name: string; billingInterval: 'monthly' | 'yearly' } | null>(null);
   /** Plan pendiente de confirmación (sin DIAN): mostrar modal de prorrateo antes de cambiar. */
-  const [changePlanConfirm, setChangePlanConfirm] = useState<{ id: string; name: string } | null>(null);
+  const [changePlanConfirm, setChangePlanConfirm] = useState<{ id: string; name: string; billingInterval: 'monthly' | 'yearly' } | null>(null);
   /** Errores de validación al intentar downgrade (ej. demasiados usuarios). */
   const [changePlanErrors, setChangePlanErrors] = useState<string[]>([]);
 
@@ -203,7 +244,9 @@ export default function BillingPage() {
   const handleConfirmDianPlan = () => {
     if (!dianPlanDialog) return;
     const planName = dianPlanDialog.name;
-    changePlanMutation.mutate(dianPlanDialog.id, {
+    changePlanMutation.mutate(
+      { planId: dianPlanDialog.id, billingInterval: dianPlanDialog.billingInterval },
+      {
       onSuccess: () => {
         submitFeedbackMutation.mutate(
           `Solicitud de activación de facturación electrónica (DIAN). Plan contratado: ${planName}. Por favor contactar al cliente para activar el servicio.`,
@@ -526,8 +569,8 @@ export default function BillingPage() {
                       key={p.id}
                       p={p}
                       currentPlanId={plan.id}
-                      onSelectDian={(id, name) => setDianPlanDialog({ id, name })}
-                      onSelectChange={(id, name) => setChangePlanConfirm({ id, name })}
+                      onSelectDian={(id, name, billingInterval) => setDianPlanDialog({ id, name, billingInterval })}
+                      onSelectChange={(id, name, billingInterval) => setChangePlanConfirm({ id, name, billingInterval })}
                       isChanging={changePlanMutation.isPending || submitFeedbackMutation.isPending}
                     />
                   ))}
@@ -614,7 +657,9 @@ export default function BillingPage() {
               onClick={() => {
                 if (!changePlanConfirm) return;
                 setChangePlanErrors([]);
-                changePlanMutation.mutate(changePlanConfirm.id, {
+                changePlanMutation.mutate(
+                  { planId: changePlanConfirm.id, billingInterval: changePlanConfirm.billingInterval },
+                  {
                   onSuccess: (result) => {
                     if (result?.scheduledChangeAt) {
                       const date = new Date(result.scheduledChangeAt).toLocaleDateString('es-CO', {

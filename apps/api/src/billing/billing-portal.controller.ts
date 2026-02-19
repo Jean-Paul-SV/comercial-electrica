@@ -104,7 +104,7 @@ export class BillingPortalController {
         'Solo los usuarios de una empresa pueden cambiar el plan.',
       );
     }
-    return this.billing.changeTenantPlan(tenantId, dto.planId);
+    return this.billing.changeTenantPlan(tenantId, dto.planId, dto.billingInterval);
   }
 
   @UseGuards(JwtAuthGuard)

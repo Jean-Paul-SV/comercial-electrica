@@ -29,7 +29,8 @@ export function useChangePlan() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (planId: string) => changePlan(token!, planId),
+    mutationFn: (params: { planId: string; billingInterval?: 'monthly' | 'yearly' }) =>
+      changePlan(token!, params.planId, params.billingInterval),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['billing', 'subscription'] });
     },

@@ -12,8 +12,13 @@ export function getBillingPlans(authToken: string): Promise<BillingPlan[]> {
 export function changePlan(
   authToken: string,
   planId: string,
+  billingInterval?: 'monthly' | 'yearly',
 ): Promise<ChangePlanResult> {
-  return apiClient.patch<ChangePlanResult>('/billing/plan', { planId }, { authToken });
+  return apiClient.patch<ChangePlanResult>(
+    '/billing/plan',
+    { planId, ...(billingInterval && { billingInterval }) },
+    { authToken }
+  );
 }
 
 export type ValidateDowngradeResult = {

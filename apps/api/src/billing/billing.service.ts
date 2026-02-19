@@ -426,6 +426,7 @@ export class BillingService {
   async changeTenantPlan(
     tenantId: string,
     planId: string,
+    billingInterval?: 'monthly' | 'yearly',
   ): Promise<ChangePlanResultDto> {
     const tenant = await this.prisma.tenant.findUnique({
       where: { id: tenantId },
@@ -471,6 +472,9 @@ export class BillingService {
       throw new NotFoundException('Plan no encontrado.');
     }
 
+    // Usar el billingInterval proporcionado o mantener el actual
+    const effectiveBillingInterval = billingInterval ?? tenant.billingInterval;
+    
     const currentPrice = tenant.plan
       ? this.getPlanEffectivePrice(
           tenant.plan.priceMonthly != null ? Number(tenant.plan.priceMonthly) : null,
@@ -481,18 +485,18 @@ export class BillingService {
     const newPriceEffective = this.getPlanEffectivePrice(
       newPlan.priceMonthly != null ? Number(newPlan.priceMonthly) : null,
       newPlan.priceYearly != null ? Number(newPlan.priceYearly) : null,
-      tenant.billingInterval,
+      effectiveBillingInterval,
     );
 
     const isUpgrade = newPriceEffective > currentPrice;
-    const isSamePlan = tenant.plan?.id === planId;
+    const isSamePlan = tenant.plan?.id === planId && tenant.billingInterval === effectiveBillingInterval;
 
     if (isSamePlan) {
       return { success: true };
     }
 
     if (isUpgrade) {
-      return this.applyUpgrade(tenantId, tenant, newPlan);
+      return this.applyUpgrade(tenantId, tenant, newPlan, effectiveBillingInterval);
     }
 
     // Downgrade: validar y programar cambio al final del ciclo
@@ -514,14 +518,20 @@ export class BillingService {
       );
     }
 
-    await this.prisma.subscription.update({
-      where: { tenantId },
-      data: {
-        scheduledPlanId: planId,
-        scheduledChangeAt: periodEnd,
-        updatedAt: new Date(),
-      },
-    });
+    await this.prisma.$transaction([
+      this.prisma.tenant.update({
+        where: { id: tenantId },
+        data: { billingInterval: effectiveBillingInterval },
+      }),
+      this.prisma.subscription.update({
+        where: { tenantId },
+        data: {
+          scheduledPlanId: planId,
+          scheduledChangeAt: periodEnd,
+          updatedAt: new Date(),
+        },
+      }),
+    ]);
     this.logger.log(
       `Downgrade programado para tenant ${tenantId}: plan ${planId} a partir de ${periodEnd.toISOString()}`,
     );
@@ -546,6 +556,7 @@ export class BillingService {
       stripePriceIdYearly: string | null;
       features: { moduleCode: string }[];
     },
+    billingInterval?: string | null,
   ): Promise<ChangePlanResultDto> {
     const hasDianModule = newPlan.features.some(
       (f) => f.moduleCode === 'electronic_invoicing',
@@ -557,7 +568,10 @@ export class BillingService {
     await this.prisma.$transaction(async (tx) => {
       await tx.tenant.update({
         where: { id: tenantId },
-        data: { planId: newPlan.id },
+        data: {
+          planId: newPlan.id,
+          ...(billingInterval != null && { billingInterval }),
+        },
       });
       if (tenant.subscription) {
         await tx.subscription.update({
@@ -603,8 +617,9 @@ export class BillingService {
       }
     });
 
+    const effectiveBillingInterval = billingInterval ?? tenant.billingInterval;
     const useYearly =
-      tenant.billingInterval === 'yearly' && newPlan.stripePriceIdYearly;
+      effectiveBillingInterval === 'yearly' && newPlan.stripePriceIdYearly;
     const effectivePriceId = useYearly
       ? newPlan.stripePriceIdYearly!
       : newPlan.stripePriceId ?? null;
