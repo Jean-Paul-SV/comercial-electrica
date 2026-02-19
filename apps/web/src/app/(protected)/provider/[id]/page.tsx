@@ -28,11 +28,21 @@ export default function ProviderTenantDetailPage() {
   const updateTenant = useUpdateTenant();
   const renewSubscription = useRenewSubscription();
   const [selectedPlanId, setSelectedPlanId] = useState<string>('');
+  const [selectedBillingInterval, setSelectedBillingInterval] = useState<'monthly' | 'yearly'>('monthly');
   useEffect(() => {
     if (tenant?.plan?.id) setSelectedPlanId(tenant.plan.id);
     else setSelectedPlanId('');
   }, [tenant?.plan?.id]);
-  const planChanged = selectedPlanId !== (tenant?.plan?.id ?? '');
+  useEffect(() => {
+    setSelectedBillingInterval(
+      tenant?.billingInterval === 'yearly' ? 'yearly' : 'monthly'
+    );
+  }, [tenant?.billingInterval]);
+  const selectedPlan = plans.find((p) => p.id === selectedPlanId);
+  const hasYearlyOption = selectedPlan?.stripePriceIdYearly && selectedPlan?.stripePriceId;
+  const planChanged =
+    selectedPlanId !== (tenant?.plan?.id ?? '') ||
+    (hasYearlyOption && selectedBillingInterval !== (tenant?.billingInterval ?? 'monthly'));
 
   const handleChangePlan = async () => {
     if (!id) return;
@@ -40,6 +50,7 @@ export default function ProviderTenantDetailPage() {
       await updateTenant.mutateAsync({
         id,
         planId: selectedPlanId || undefined,
+        billingInterval: hasYearlyOption ? selectedBillingInterval : undefined,
       });
       toast.success('Plan actualizado.');
     } catch (e: unknown) {
@@ -149,6 +160,40 @@ export default function ProviderTenantDetailPage() {
         </Button>
       </div>
 
+      {/* Plan y suscripción visibles */}
+      <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border/60 bg-muted/10 px-4 py-3">
+        <span className="text-sm text-muted-foreground">Plan:</span>
+        <Badge variant="secondary" className="font-semibold text-foreground">
+          {tenant.plan?.name ?? 'Sin plan'}
+        </Badge>
+        {tenant.subscription && (
+          <>
+            <span className="text-sm text-muted-foreground ml-2">Suscripción:</span>
+            <Badge
+              variant={tenant.subscription.status === 'PENDING_PAYMENT' ? 'default' : 'outline'}
+              className={
+                tenant.subscription.status === 'PENDING_PAYMENT'
+                  ? 'bg-amber-600 hover:bg-amber-600'
+                  : tenant.subscription.status === 'ACTIVE'
+                    ? 'border-emerald-500/50 text-emerald-700 dark:text-emerald-400'
+                    : ''
+              }
+            >
+              {tenant.subscription.status === 'PENDING_PAYMENT'
+                ? 'Pago pendiente'
+                : tenant.subscription.status === 'ACTIVE'
+                  ? 'Activa'
+                  : tenant.subscription.status}
+            </Badge>
+            {tenant.subscription.currentPeriodEnd && (
+              <span className="text-sm text-muted-foreground ml-1">
+                · Próxima factura: {new Date(tenant.subscription.currentPeriodEnd).toLocaleDateString('es-CO')}
+              </span>
+            )}
+          </>
+        )}
+      </div>
+
       {/* Facturación electrónica (DIAN) — acceso directo */}
       <Card className="border-primary/20 bg-primary/5">
         <CardContent className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pt-6">
@@ -190,7 +235,10 @@ export default function ProviderTenantDetailPage() {
 
             <div className="space-y-3 pt-4 border-t border-border/60">
               <p className="text-sm font-medium text-foreground">Cambiar plan</p>
-              <div className="flex flex-wrap gap-2">
+              <p className="text-xs text-muted-foreground">
+                El cambio aquí actualiza el plan en la plataforma. Si la empresa paga con Stripe, el cargo prorrateado y la próxima factura se gestionan desde su página de facturación.
+              </p>
+              <div className="flex flex-wrap items-end gap-2">
                 <Select
                   value={selectedPlanId}
                   onChange={(e) => setSelectedPlanId(e.target.value)}
@@ -203,6 +251,18 @@ export default function ProviderTenantDetailPage() {
                     </option>
                   ))}
                 </Select>
+                {hasYearlyOption && (
+                  <Select
+                    value={selectedBillingInterval}
+                    onChange={(e) =>
+                      setSelectedBillingInterval(e.target.value as 'monthly' | 'yearly')
+                    }
+                    className="min-w-[120px]"
+                  >
+                    <option value="monthly">Cobro mensual</option>
+                    <option value="yearly">Cobro anual</option>
+                  </Select>
+                )}
                 <Button
                   size="sm"
                   variant="secondary"
@@ -232,25 +292,30 @@ export default function ProviderTenantDetailPage() {
                     </>
                   )}
                 </div>
-                <div className="pt-2 flex flex-wrap gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={renewSubscription.isPending}
-                    onClick={() => handleRenewSubscription(30)}
-                    className="min-w-[120px]"
-                  >
-                    {renewSubscription.isPending ? 'Renovando…' : 'Renovar 30 días'}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="default"
-                    disabled={renewSubscription.isPending}
-                    onClick={() => handleRenewSubscription(365)}
-                    className="min-w-[120px]"
-                  >
-                    {renewSubscription.isPending ? 'Renovando…' : 'Renovar 1 año'}
-                  </Button>
+                <div className="pt-2 space-y-2">
+                  <p className="text-xs text-muted-foreground">
+                    Si la empresa paga con Stripe, el cobro se hace en la fecha de la próxima factura. Estos botones extienden el periodo en la plataforma (útil si cobras fuera de Stripe).
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={renewSubscription.isPending}
+                      onClick={() => handleRenewSubscription(30)}
+                      className="min-w-[120px]"
+                    >
+                      {renewSubscription.isPending ? 'Renovando…' : 'Renovar 30 días'}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="default"
+                      disabled={renewSubscription.isPending}
+                      onClick={() => handleRenewSubscription(365)}
+                      className="min-w-[120px]"
+                    >
+                      {renewSubscription.isPending ? 'Renovando…' : 'Renovar 1 año'}
+                    </Button>
+                  </div>
                 </div>
               </div>
             )}

@@ -341,6 +341,7 @@ export default function ProviderTenantsPage() {
                       <TableHead className="font-semibold text-muted-foreground">Slug</TableHead>
                       <TableHead className="font-semibold text-muted-foreground">Estado</TableHead>
                       <TableHead className="font-semibold text-muted-foreground">Plan</TableHead>
+                      <TableHead className="font-semibold text-muted-foreground">Suscripción</TableHead>
                       <TableHead className="font-semibold text-muted-foreground">Usuarios</TableHead>
                       <TableHead className="font-semibold text-muted-foreground">Última actividad</TableHead>
                       <TableHead className="w-[72px] font-semibold text-muted-foreground"></TableHead>
@@ -349,7 +350,7 @@ export default function ProviderTenantsPage() {
                   <TableBody>
                     {items.length === 0 ? (
                       <TableRow className="hover:bg-transparent">
-                        <TableCell colSpan={7} className="text-center text-muted-foreground py-12">
+                        <TableCell colSpan={8} className="text-center text-muted-foreground py-12">
                           No hay empresas que coincidan con los filtros.
                         </TableCell>
                       </TableRow>
@@ -359,11 +360,7 @@ export default function ProviderTenantsPage() {
                           <TableCell className="font-medium">{t.name}</TableCell>
                           <TableCell className="text-muted-foreground font-mono text-sm">{t.slug}</TableCell>
                           <TableCell>
-                            {t.subscription?.status === 'PENDING_PAYMENT' ? (
-                              <Badge className="font-medium bg-amber-600 hover:bg-amber-600 dark:bg-amber-500 text-white border-0">
-                                Pago pendiente
-                              </Badge>
-                            ) : !t.isActive ? (
+                            {!t.isActive ? (
                               <Badge variant="secondary" className="font-medium">
                                 Suspendida
                               </Badge>
@@ -373,7 +370,20 @@ export default function ProviderTenantsPage() {
                               </Badge>
                             )}
                           </TableCell>
-                          <TableCell>{t.plan?.name ?? '—'}</TableCell>
+                          <TableCell className="text-foreground font-medium">{t.plan?.name ?? '—'}</TableCell>
+                          <TableCell>
+                            {t.subscription?.status === 'PENDING_PAYMENT' ? (
+                              <Badge className="font-medium bg-amber-600 hover:bg-amber-600 dark:bg-amber-500 text-white border-0">
+                                Pago pendiente
+                              </Badge>
+                            ) : t.subscription?.status === 'ACTIVE' ? (
+                              <Badge variant="secondary" className="font-medium">Activa</Badge>
+                            ) : t.subscription?.status ? (
+                              <Badge variant="outline" className="font-medium">{t.subscription.status}</Badge>
+                            ) : (
+                              <span className="text-muted-foreground text-sm">—</span>
+                            )}
+                          </TableCell>
                           <TableCell className="tabular-nums">{t.usersCount}</TableCell>
                           <TableCell className="text-muted-foreground text-sm tabular-nums">
                             {t.lastActivityAt

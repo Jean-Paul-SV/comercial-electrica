@@ -50,6 +50,7 @@ const editPlanSchema = z.object({
     .optional()
     .transform((v) => (v === '' ? undefined : v)),
   stripePriceId: z.string().max(255).optional().or(z.literal('')),
+  stripePriceIdYearly: z.string().max(255).optional().or(z.literal('')),
   isActive: z.boolean(),
 });
 
@@ -66,6 +67,7 @@ const newPlanSchema = z.object({
     .optional()
     .transform((v) => (v === '' ? undefined : v)),
   stripePriceId: z.string().max(255).optional().or(z.literal('')),
+  stripePriceIdYearly: z.string().max(255).optional().or(z.literal('')),
   isActive: z.boolean(),
   includesDian: z.boolean(),
 });
@@ -89,6 +91,7 @@ function toFormValues(p: PlanListItem): EditPlanFormValues {
     priceYearly: p.priceYearly ?? undefined,
     maxUsers: p.maxUsers ?? undefined,
     stripePriceId: p.stripePriceId ?? '',
+    stripePriceIdYearly: p.stripePriceIdYearly ?? '',
     isActive: p.isActive,
   };
 }
@@ -111,6 +114,7 @@ export default function ProviderPlansPage() {
       priceYearly: null,
       maxUsers: null,
       stripePriceId: null,
+      stripePriceIdYearly: null,
       isActive: true,
       includesDian: false,
     } as PlanListItem),
@@ -126,6 +130,7 @@ export default function ProviderPlansPage() {
       priceYearly: undefined,
       maxUsers: undefined,
       stripePriceId: '',
+      stripePriceIdYearly: '',
       isActive: true,
       includesDian: true,
     },
@@ -141,6 +146,7 @@ export default function ProviderPlansPage() {
         priceYearly: undefined,
         maxUsers: undefined,
         stripePriceId: '',
+        stripePriceIdYearly: '',
         isActive: true,
         includesDian: true,
       });
@@ -166,6 +172,7 @@ export default function ProviderPlansPage() {
         priceYearly: values.priceYearly,
         maxUsers: values.maxUsers ?? null,
         stripePriceId: values.stripePriceId || null,
+        stripePriceIdYearly: values.stripePriceIdYearly || null,
         isActive: values.isActive,
         includesDian: values.includesDian,
       },
@@ -181,6 +188,7 @@ export default function ProviderPlansPage() {
             priceYearly: undefined,
             maxUsers: undefined,
             stripePriceId: '',
+            stripePriceIdYearly: '',
             isActive: true,
             includesDian: true,
           });
@@ -204,6 +212,7 @@ export default function ProviderPlansPage() {
           priceYearly: values.priceYearly,
           maxUsers: values.maxUsers ?? null,
           stripePriceId: values.stripePriceId || null,
+          stripePriceIdYearly: values.stripePriceIdYearly || null,
           isActive: values.isActive,
         },
       },
@@ -460,15 +469,24 @@ export default function ProviderPlansPage() {
             <div className="space-y-4">
               <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Cobro con Stripe (opcional)</p>
               <div className="space-y-2">
-                <Label htmlFor="new-stripe">Stripe Price ID</Label>
+                <Label htmlFor="new-stripe">Stripe Price ID (mensual)</Label>
                 <Input
                   id="new-stripe"
                   placeholder="price_1ABC..."
                   {...newPlanForm.register('stripePriceId')}
                   className="rounded-lg font-mono text-sm"
                 />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="new-stripe-yearly">Stripe Price ID (anual)</Label>
+                <Input
+                  id="new-stripe-yearly"
+                  placeholder="price_1XYZ..."
+                  {...newPlanForm.register('stripePriceIdYearly')}
+                  className="rounded-lg font-mono text-sm"
+                />
                 <p className="text-xs text-muted-foreground">
-                  Si lo configuras, al dar de alta una empresa con este plan se creará la suscripción en Stripe automáticamente.
+                  Mensual y/o anual. Al crear una empresa podrás elegir cobro mensual o anual si el plan tiene ambos.
                 </p>
               </div>
             </div>
@@ -596,15 +614,24 @@ export default function ProviderPlansPage() {
             <div className="space-y-4">
               <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Cobro con Stripe (opcional)</p>
               <div className="space-y-2">
-                <Label htmlFor="edit-stripe">Stripe Price ID</Label>
+                <Label htmlFor="edit-stripe">Stripe Price ID (mensual)</Label>
                 <Input
                   id="edit-stripe"
                   placeholder="price_1ABC..."
                   {...form.register('stripePriceId')}
                   className="rounded-lg font-mono text-sm"
                 />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-stripe-yearly">Stripe Price ID (anual)</Label>
+                <Input
+                  id="edit-stripe-yearly"
+                  placeholder="price_1XYZ..."
+                  {...form.register('stripePriceIdYearly')}
+                  className="rounded-lg font-mono text-sm"
+                />
                 <p className="text-xs text-muted-foreground">
-                  Si está definido, al dar de alta una empresa con este plan se creará la suscripción en Stripe automáticamente.
+                  Mensual y/o anual. La empresa puede elegir cobro mensual o anual si el plan tiene ambos.
                 </p>
               </div>
             </div>

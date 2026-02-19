@@ -87,8 +87,15 @@ export function useUpdateTenant() {
   const { token } = useAuth();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, planId }: { id: string; planId?: string }) =>
-      api.updateTenant(id, { planId }, token!),
+    mutationFn: ({
+      id,
+      planId,
+      billingInterval,
+    }: {
+      id: string;
+      planId?: string;
+      billingInterval?: 'monthly' | 'yearly';
+    }) => api.updateTenant(id, { planId, billingInterval }, token!),
     onSuccess: (_, { id }) => {
       queryClient.invalidateQueries({ queryKey: ['provider', 'tenant', id] });
       queryClient.invalidateQueries({ queryKey: ['provider', 'tenants'] });

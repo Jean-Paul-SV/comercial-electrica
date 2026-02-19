@@ -3,6 +3,7 @@ export type TenantListItem = {
   name: string;
   slug: string;
   isActive: boolean;
+  billingInterval: string | null;
   lastActivityAt: string | null;
   createdAt: string;
   plan: { id: string; name: string; slug: string } | null;
@@ -27,6 +28,7 @@ export type TenantDetail = {
   name: string;
   slug: string;
   isActive: boolean;
+  billingInterval: string | null;
   lastActivityAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -49,6 +51,7 @@ export type CreateTenantPayload = {
   name: string;
   slug: string;
   planId?: string;
+  billingInterval?: 'monthly' | 'yearly';
   adminEmail: string;
   adminName?: string;
   adminPassword?: string;
@@ -69,6 +72,7 @@ export type PlanListItem = {
   priceYearly: number | null;
   maxUsers: number | null;
   stripePriceId: string | null;
+  stripePriceIdYearly: string | null;
   isActive: boolean;
   /** Si el plan incluye facturación electrónica DIAN. */
   includesDian: boolean;
@@ -82,6 +86,7 @@ export type CreatePlanPayload = {
   priceYearly?: number;
   maxUsers?: number | null;
   stripePriceId?: string | null;
+  stripePriceIdYearly?: string | null;
   isActive?: boolean;
   /** Incluir facturación electrónica DIAN. Si false, el plan es "sin DIAN". */
   includesDian?: boolean;
@@ -94,7 +99,13 @@ export type UpdatePlanPayload = {
   priceYearly?: number;
   maxUsers?: number | null;
   stripePriceId?: string | null;
+  stripePriceIdYearly?: string | null;
   isActive?: boolean;
+};
+
+export type UpdateTenantPayload = {
+  planId?: string;
+  billingInterval?: 'monthly' | 'yearly';
 };
 
 export type ProviderTenantsSummary = {

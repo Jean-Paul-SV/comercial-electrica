@@ -61,12 +61,20 @@ export class CreatePlanDto {
   maxUsers?: number | null;
 
   @ApiPropertyOptional({
-    description: 'ID del precio recurrente en Stripe (ej. price_xxx)',
+    description: 'ID del precio recurrente mensual en Stripe (ej. price_xxx)',
   })
   @IsOptional()
   @IsString()
   @MaxLength(255)
   stripePriceId?: string | null;
+
+  @ApiPropertyOptional({
+    description: 'ID del precio recurrente anual en Stripe (ej. price_yyy)',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  stripePriceIdYearly?: string | null;
 
   @ApiPropertyOptional({
     description: 'Plan activo (visible en selector)',

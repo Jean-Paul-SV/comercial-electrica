@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import {
   Card,
@@ -21,6 +22,7 @@ import {
 } from '@shared/components/ui/dialog';
 import { CreditCard, Calendar, Package, AlertCircle, CheckCircle2, Sparkles, RefreshCw } from 'lucide-react';
 import { useSubscriptionInfo, useCreatePortalSession, useBillingPlans, useChangePlan } from '@features/billing/hooks';
+import { useDianConfigStatus } from '@features/dian/hooks';
 import { useSubmitFeedback } from '@features/feedback/hooks';
 import { useAuth } from '@shared/providers/AuthProvider';
 import { DianActivationDisclaimer } from '@shared/components/DianActivationDisclaimer';
@@ -54,7 +56,10 @@ export default function BillingPage() {
   const plansQuery = useBillingPlans();
   const changePlanMutation = useChangePlan();
   const submitFeedbackMutation = useSubmitFeedback();
+  const { data: dianStatus } = useDianConfigStatus();
   const [dianPlanDialog, setDianPlanDialog] = useState<{ id: string; name: string } | null>(null);
+  /** Plan pendiente de confirmación (sin DIAN): mostrar modal de prorrateo antes de cambiar. */
+  const [changePlanConfirm, setChangePlanConfirm] = useState<{ id: string; name: string } | null>(null);
 
   const handleOpenPortal = () => {
     const returnUrl =
@@ -262,6 +267,18 @@ export default function BillingPage() {
           <CardDescription className="text-sm mt-0.5">
             Tu plan incluye los módulos activos para tu empresa.
           </CardDescription>
+          {plan && isPlanWithDian(plan.slug) && dianStatus && !dianStatus.readyForSend && (
+            <div className="mt-4 rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm">
+              <p className="font-medium text-foreground">Tu plan incluye facturación electrónica (DIAN).</p>
+              <p className="text-muted-foreground mt-1">
+                Para emitir facturas a la DIAN, configura certificado, NIT y numeración en{' '}
+                <Link href="/settings/electronic-invoicing" className="text-primary underline hover:no-underline font-medium">
+                  Configuración de facturación electrónica
+                </Link>
+                . Hasta entonces podrás usar documentos internos.
+              </p>
+            </div>
+          )}
           <DianActivationDisclaimer variant="card" className="mt-4" />
         </CardHeader>
         <CardContent className="pt-6 space-y-5">
@@ -415,10 +432,7 @@ export default function BillingPage() {
                                 if (isPlanWithDian(p.slug)) {
                                   setDianPlanDialog({ id: p.id, name: p.name });
                                 } else {
-                                  changePlanMutation.mutate(p.id, {
-                                    onSuccess: () => toast.success('Plan actualizado.'),
-                                    onError: (e) => toast.error(getErrorMessage(e)),
-                                  });
+                                  setChangePlanConfirm({ id: p.id, name: p.name });
                                 }
                               }}
                             >
@@ -466,6 +480,46 @@ export default function BillingPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Confirmación cambio de plan (prorrateo) */}
+      <Dialog open={!!changePlanConfirm} onOpenChange={(open) => !open && setChangePlanConfirm(null)}>
+        <DialogContent showClose>
+          <DialogHeader>
+            <DialogTitle>Confirmar cambio de plan</DialogTitle>
+            <div className="space-y-3 text-left text-sm text-muted-foreground">
+              <p>
+                Vas a cambiar a <strong className="text-foreground">{changePlanConfirm?.name}</strong>.
+              </p>
+              <p>
+                Se aplicará un <strong>crédito</strong> por la parte no usada de tu plan actual y un <strong>cargo prorrateado</strong> por el nuevo plan hasta el fin del periodo. El detalle exacto aparecerá en tu próxima factura (o en &quot;Gestionar método de pago y facturas&quot;).
+              </p>
+              <p>
+                El cambio de plan y acceso a las nuevas funciones es inmediato.
+              </p>
+            </div>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setChangePlanConfirm(null)}>
+              Cancelar
+            </Button>
+            <Button
+              disabled={changePlanMutation.isPending}
+              onClick={() => {
+                if (!changePlanConfirm) return;
+                changePlanMutation.mutate(changePlanConfirm.id, {
+                  onSuccess: () => {
+                    toast.success('Plan actualizado.');
+                    setChangePlanConfirm(null);
+                  },
+                  onError: (e) => toast.error(getErrorMessage(e)),
+                });
+              }}
+            >
+              {changePlanMutation.isPending ? 'Cambiando…' : 'Sí, cambiar de plan'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!dianPlanDialog} onOpenChange={(open) => !open && setDianPlanDialog(null)}>
         <DialogContent showClose={true}>

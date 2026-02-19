@@ -2,6 +2,8 @@
 
 Para usar pagos en Orion necesitas crear cuentas y configurar las credenciales en el backend.
 
+**Véase también:** [Facturación y planes](./FACTURACION_Y_PLANES.md) — cómo funcionan los planes, el cambio de plan, prorrateo y cobro mensual/anual.
+
 ---
 
 ## 1. Stripe (suscripciones y facturación recurrente)

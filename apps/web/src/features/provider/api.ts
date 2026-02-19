@@ -79,7 +79,7 @@ export function updateTenantStatus(
 
 export function updateTenant(
   id: string,
-  payload: { planId?: string },
+  payload: import('./types').UpdateTenantPayload,
   authToken: string
 ): Promise<{ success: boolean; planId: string | null }> {
   return apiClient.patch(`/provider/tenants/${id}`, payload, { authToken });

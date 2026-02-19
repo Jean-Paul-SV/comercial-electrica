@@ -285,6 +285,7 @@ export class BillingService {
       where: { id: tenantId },
       select: {
         id: true,
+        billingInterval: true,
         subscription: {
           select: {
             id: true,
@@ -301,6 +302,7 @@ export class BillingService {
       select: {
         id: true,
         stripePriceId: true,
+        stripePriceIdYearly: true,
         features: {
           select: { moduleCode: true },
         },
@@ -363,7 +365,12 @@ export class BillingService {
       }
     });
 
-    // Actualizar el precio en Stripe para que coincida con el plan elegido
+    // Actualizar el precio en Stripe: usar mensual o anual según tenant.billingInterval
+    const useYearly =
+      tenant.billingInterval === 'yearly' && plan.stripePriceIdYearly;
+    const effectivePriceId = useYearly
+      ? plan.stripePriceIdYearly!
+      : plan.stripePriceId ?? null;
     const subscription = await this.prisma.subscription.findUnique({
       where: { tenantId },
       select: { stripeSubscriptionId: true },
@@ -371,7 +378,7 @@ export class BillingService {
     if (
       this.stripe &&
       subscription?.stripeSubscriptionId &&
-      plan.stripePriceId
+      effectivePriceId
     ) {
       try {
         const stripeSub = await this.stripe.subscriptions.retrieve(
@@ -383,12 +390,12 @@ export class BillingService {
           await this.stripe.subscriptions.update(
             subscription.stripeSubscriptionId,
             {
-              items: [{ id: itemId, price: plan.stripePriceId }],
+              items: [{ id: itemId, price: effectivePriceId }],
               proration_behavior: 'create_prorations',
             },
           );
           this.logger.log(
-            `Suscripción Stripe ${subscription.stripeSubscriptionId} actualizada al plan ${planId} (price ${plan.stripePriceId})`,
+            `Suscripción Stripe ${subscription.stripeSubscriptionId} actualizada al plan ${planId} (price ${effectivePriceId})`,
           );
         }
       } catch (err) {

@@ -46,6 +46,7 @@ type PlanDto = {
   priceYearly: number | null;
   maxUsers: number | null;
   stripePriceId: string | null;
+  stripePriceIdYearly: string | null;
   isActive: boolean;
   /** Si el plan incluye facturación electrónica DIAN (módulo electronic_invoicing). */
   includesDian: boolean;
@@ -135,6 +136,7 @@ export class ProviderService {
         priceYearly: true,
         maxUsers: true,
         stripePriceId: true,
+        stripePriceIdYearly: true,
         isActive: true,
         features: { select: { moduleCode: true } },
       },
@@ -169,6 +171,7 @@ export class ProviderService {
           dto.priceYearly != null ? new Prisma.Decimal(dto.priceYearly) : null,
         maxUsers: dto.maxUsers ?? null,
         stripePriceId: dto.stripePriceId ?? null,
+        stripePriceIdYearly: dto.stripePriceIdYearly ?? null,
         isActive: dto.isActive ?? true,
         features: {
           create: moduleCodes.map((moduleCode) => ({ moduleCode })),
@@ -183,6 +186,7 @@ export class ProviderService {
         priceYearly: true,
         maxUsers: true,
         stripePriceId: true,
+        stripePriceIdYearly: true,
         isActive: true,
         features: { select: { moduleCode: true } },
       },
@@ -212,6 +216,7 @@ export class ProviderService {
         priceYearly: true,
         maxUsers: true,
         stripePriceId: true,
+        stripePriceIdYearly: true,
         isActive: true,
         features: { select: { moduleCode: true } },
       },
@@ -268,6 +273,7 @@ export class ProviderService {
           name: true,
           slug: true,
           isActive: true,
+          billingInterval: true,
           lastActivityAt: true,
           createdAt: true,
           plan: { select: { id: true, name: true, slug: true } },
@@ -297,6 +303,7 @@ export class ProviderService {
       name: tenant.name,
       slug: tenant.slug,
       isActive: tenant.isActive,
+      billingInterval: tenant.billingInterval ?? null,
       lastActivityAt: tenant.lastActivityAt?.toISOString() ?? null,
       createdAt: tenant.createdAt.toISOString(),
       plan: tenant.plan,
@@ -315,6 +322,7 @@ export class ProviderService {
         name: true,
         slug: true,
         isActive: true,
+        billingInterval: true,
         lastActivityAt: true,
         createdAt: true,
         updatedAt: true,
@@ -394,17 +402,22 @@ export class ProviderService {
     });
     if (!tenant) throw new NotFoundException('Tenant no encontrado.');
     const planId = dto.planId ?? undefined;
+    const updateData: { planId?: string; billingInterval?: string | null } = {};
+    if (dto.planId !== undefined) updateData.planId = dto.planId;
+    if (dto.billingInterval !== undefined) updateData.billingInterval = dto.billingInterval;
     await this.prisma.$transaction(async (tx) => {
-      await tx.tenant.update({
-        where: { id },
-        data: { planId },
-      });
-      if (tenant.subscription) {
+      if (Object.keys(updateData).length > 0) {
+        await tx.tenant.update({
+          where: { id },
+          data: updateData,
+        });
+      }
+      if (tenant.subscription && dto.planId !== undefined) {
         await tx.subscription.update({
           where: { tenantId: id },
           data: { planId },
         });
-      } else {
+      } else if (!tenant.subscription && dto.planId !== undefined) {
         const { now, periodEnd } = this.calculateDefaultSubscriptionPeriod();
         await tx.subscription.create({
           data: {
@@ -482,6 +495,7 @@ export class ProviderService {
           name: dto.name.trim(),
           slug,
           planId: dto.planId ?? undefined,
+          billingInterval: dto.billingInterval ?? null,
         },
       });
       const { now, periodEnd } = this.calculateDefaultSubscriptionPeriod();
@@ -522,13 +536,18 @@ export class ProviderService {
     if (dto.planId) {
       const plan = await this.prisma.plan.findUnique({
         where: { id: dto.planId },
-        select: { stripePriceId: true },
+        select: { stripePriceId: true, stripePriceIdYearly: true },
       });
-      if (plan?.stripePriceId) {
+      const useYearly =
+        dto.billingInterval === 'yearly' && plan?.stripePriceIdYearly;
+      const priceId = useYearly
+        ? plan!.stripePriceIdYearly!
+        : plan?.stripePriceId ?? null;
+      if (priceId) {
         const stripeSubscriptionId =
           await this.billing.createStripeSubscription(
             tenant.id,
-            plan.stripePriceId,
+            priceId,
             adminEmail,
             dto.name?.trim() ?? tenant.name,
           );
@@ -565,6 +584,7 @@ export class ProviderService {
       description: string | null;
       maxUsers: number | null;
       stripePriceId: string | null;
+      stripePriceIdYearly?: string | null;
       isActive: boolean;
       features?: { moduleCode: string }[];
     },
@@ -583,6 +603,7 @@ export class ProviderService {
       priceYearly: plan.priceYearly != null ? Number(plan.priceYearly) : null,
       maxUsers: plan.maxUsers,
       stripePriceId: plan.stripePriceId ?? null,
+      stripePriceIdYearly: plan.stripePriceIdYearly ?? null,
       isActive: plan.isActive,
       includesDian,
     };
@@ -596,6 +617,7 @@ export class ProviderService {
       priceYearly?: number;
       maxUsers?: number | null;
       stripePriceId?: string | null;
+      stripePriceIdYearly?: string | null;
       isActive?: boolean;
     } = {};
 
@@ -606,6 +628,9 @@ export class ProviderService {
     if (dto.maxUsers !== undefined) data.maxUsers = dto.maxUsers;
     if (dto.stripePriceId !== undefined) {
       data.stripePriceId = dto.stripePriceId || null;
+    }
+    if (dto.stripePriceIdYearly !== undefined) {
+      data.stripePriceIdYearly = dto.stripePriceIdYearly || null;
     }
     if (dto.isActive !== undefined) data.isActive = dto.isActive;
 

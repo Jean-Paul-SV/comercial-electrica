@@ -26,6 +26,12 @@ export class CreateTenantDto {
   @IsUUID()
   planId?: string;
 
+  /** Cobro recurrente en Stripe: 'monthly' (por defecto) o 'yearly'. Solo aplica si el plan tiene stripePriceIdYearly. */
+  @IsOptional()
+  @IsString()
+  @Matches(/^(monthly|yearly)$/, { message: 'billingInterval debe ser monthly o yearly' })
+  billingInterval?: 'monthly' | 'yearly';
+
   /** Email del primer usuario administrador (único en la plataforma). */
   @IsEmail()
   adminEmail: string;

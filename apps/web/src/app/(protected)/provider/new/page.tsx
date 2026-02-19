@@ -36,6 +36,7 @@ const schema = z.object({
     )
     .transform((s) => s.toLowerCase().trim()),
   planId: z.string().uuid().optional().or(z.literal('')),
+  billingInterval: z.enum(['monthly', 'yearly']).optional().or(z.literal('')),
   adminEmail: z.string().email('Correo del administrador inválido'),
   adminName: z.string().max(200).optional(),
   adminPassword: z
@@ -59,6 +60,7 @@ export default function ProviderNewTenantPage() {
       name: '',
       slug: '',
       planId: '',
+      billingInterval: '',
       adminEmail: '',
       adminName: '',
       adminPassword: '',
@@ -72,6 +74,10 @@ export default function ProviderNewTenantPage() {
         name: values.name,
         slug: values.slug,
         planId: values.planId?.trim() || undefined,
+        billingInterval:
+          (values.billingInterval === 'monthly' || values.billingInterval === 'yearly'
+            ? values.billingInterval
+            : undefined) as 'monthly' | 'yearly' | undefined,
         adminEmail: values.adminEmail.trim(),
         adminName: values.adminName?.trim() || undefined,
         adminPassword: values.adminPassword?.trim() || undefined,
@@ -196,6 +202,27 @@ export default function ProviderNewTenantPage() {
                     {form.formState.errors.planId.message}
                   </p>
                 )}
+                {plans.length > 0 && form.watch('planId') && (() => {
+                  const selectedPlan = plans.find((p) => p.id === form.watch('planId'));
+                  const hasYearly = selectedPlan?.stripePriceIdYearly && selectedPlan?.stripePriceId;
+                  if (!hasYearly) return null;
+                  return (
+                    <div className="space-y-2 pt-2 border-t border-border/50">
+                      <Label htmlFor="billingInterval" className="text-foreground font-medium">Cobro en Stripe</Label>
+                      <select
+                        id="billingInterval"
+                        {...form.register('billingInterval')}
+                        className={formSelectClass}
+                      >
+                        <option value="monthly">Mensual</option>
+                        <option value="yearly">Anual</option>
+                      </select>
+                      <p className="text-xs text-muted-foreground">
+                        Este plan tiene precio mensual y anual en Stripe. Elige con cuál se creará la suscripción.
+                      </p>
+                    </div>
+                  );
+                })()}
               </div>
             </div>
 

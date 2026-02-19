@@ -133,17 +133,18 @@ enum BackupScope {
 
 // ---------- Multi-tenant (RBAC + Plan/módulos, ver docs/ROLES_Y_PERMISOS_DISEÑO.md y ARQUITECTURA_MODULAR_SAAS.md) ----------
 model Plan {
-  id              String    @id @default(uuid()) @db.Uuid
-  name            String
-  slug            String    @unique
-  description     String?
-  priceMonthly    Decimal?  @db.Decimal(10, 2)
-  priceYearly     Decimal?  @db.Decimal(10, 2)
-  maxUsers        Int?      // Límite de usuarios por tenant; null = sin límite (legacy)
-  stripePriceId   String?   @db.VarChar(255)
-  isActive        Boolean   @default(true)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id                   String    @id @default(uuid()) @db.Uuid
+  name                 String
+  slug                 String    @unique
+  description          String?
+  priceMonthly         Decimal?  @db.Decimal(10, 2)
+  priceYearly          Decimal?  @db.Decimal(10, 2)
+  maxUsers             Int?      // Límite de usuarios por tenant; null = sin límite (legacy)
+  stripePriceId        String?   @db.VarChar(255)   // Price ID Stripe cobro mensual
+  stripePriceIdYearly  String?   @db.VarChar(255)   // Price ID Stripe cobro anual (opcional)
+  isActive             Boolean   @default(true)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 
   features       PlanFeature[]
   tenants        Tenant[]
@@ -167,6 +168,8 @@ model Tenant {
   name            String
   slug            String    @unique
   planId          String?   @db.Uuid
+  /// Cobro recurrente en Stripe: 'monthly' (por defecto) o 'yearly'. Solo aplica si el plan tiene ambos Price IDs.
+  billingInterval String?   @db.VarChar(20)
   isActive        Boolean   @default(true)
   lastActivityAt  DateTime? @db.Timestamptz
   createdAt       DateTime  @default(now())
