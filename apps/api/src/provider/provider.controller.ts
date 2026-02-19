@@ -35,6 +35,8 @@ import {
   UpdateDianConfigDto,
   UploadCertificateDto,
 } from '../dian/dto/dian-config.dto';
+import { UsageService } from '../usage/usage.service';
+import { ListUsageQueryDto } from '../usage/dto/list-usage-query.dto';
 
 @ApiTags('provider')
 @ApiBearerAuth()
@@ -45,6 +47,7 @@ export class ProviderController {
     private readonly provider: ProviderService,
     private readonly dianService: DianService,
     private readonly feedbackService: FeedbackService,
+    private readonly usageService: UsageService,
   ) {}
 
   @Get('tenants/summary')
@@ -56,6 +59,24 @@ export class ProviderController {
   @ApiResponse({ status: 200, description: 'Resumen calculado correctamente.' })
   getTenantsSummary() {
     return this.provider.getTenantsSummary();
+  }
+
+  @Get('usage/events')
+  @ApiOperation({
+    summary: 'Listar eventos de uso',
+    description:
+      'Eventos de uso para mejorar el producto (screen_view, sale_created, etc.). Solo admin de plataforma.',
+  })
+  @ApiResponse({ status: 200, description: 'Lista paginada de eventos.' })
+  listUsageEvents(@Query() query: ListUsageQueryDto) {
+    return this.usageService.list({
+      tenantId: query.tenantId,
+      event: query.event,
+      from: query.from,
+      to: query.to,
+      limit: query.limit,
+      offset: query.offset,
+    });
   }
 
   @Get('plans')

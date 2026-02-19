@@ -14,10 +14,29 @@ export type TenantListItem = {
     currentPeriodEnd: string | null;
   } | null;
   usersCount: number;
+  productsCount?: number;
+  salesCount?: number;
+  customersCount?: number;
 };
 
 export type ListTenantsResponse = {
   items: TenantListItem[];
+  total: number;
+  limit: number;
+  offset: number;
+};
+
+export type UsageEventItem = {
+  id: string;
+  event: string;
+  payload: Record<string, unknown> | null;
+  createdAt: string;
+  tenantId: string | null;
+  tenant: { id: string; name: string; slug: string } | null;
+};
+
+export type ListUsageEventsResponse = {
+  items: UsageEventItem[];
   total: number;
   limit: number;
   offset: number;

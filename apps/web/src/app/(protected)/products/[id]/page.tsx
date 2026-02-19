@@ -29,7 +29,7 @@ export default function ProductDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="space-y-6">
+      <div className="p-4 md:p-6 space-y-6 max-w-5xl mx-auto">
         <Skeleton className="h-6 w-32 rounded" />
         <div className="flex flex-col gap-2">
           <Skeleton className="h-8 w-64 rounded" />
@@ -58,7 +58,7 @@ export default function ProductDetailPage() {
 
   if (isError || !product) {
     return (
-      <div className="space-y-6">
+      <div className="p-4 md:p-6 space-y-6 max-w-5xl mx-auto">
         <Link href="/products" className="inline-flex">
           <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground hover:text-foreground">
             <ArrowLeft className="h-4 w-4" />
@@ -86,8 +86,13 @@ export default function ProductDetailPage() {
   const qtyOnHand = product.stock?.qtyOnHand ?? null;
   const qtyReserved = product.stock?.qtyReserved ?? null;
 
+  const dataCardClass =
+    'rounded-lg border border-border/60 bg-muted/30 dark:bg-muted/20 p-4 flex items-center gap-3 min-w-0';
+  const iconWrapClass =
+    'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground';
+
   return (
-    <div className="space-y-6">
+    <div className="p-4 md:p-6 space-y-6 max-w-5xl mx-auto">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <Link href="/products" className="inline-flex">
           <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground hover:text-foreground -ml-2">
@@ -95,33 +100,33 @@ export default function ProductDetailPage() {
             Volver a productos
           </Button>
         </Link>
-        <Link href="/products">
-          <Button variant="outline" size="sm" className="gap-2 rounded-xl">
+        <Link href="/products" className="w-full sm:w-auto">
+          <Button variant="outline" size="sm" className="gap-2 w-full sm:w-auto">
             <Pencil className="h-4 w-4" />
             Ir a listado para editar
           </Button>
         </Link>
       </div>
 
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl flex items-center gap-2 flex-wrap">
-            <span>{product.name}</span>
-            <Badge variant={product.isActive ? 'success' : 'secondary'} className="font-medium">
-              {product.isActive ? 'Activo' : 'Inactivo'}
-            </Badge>
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1 font-mono">
-            {product.internalCode}
-            {product.category ? ` · ${product.category.name}` : ''}
-          </p>
-        </div>
-      </div>
+      <header>
+        <h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl flex items-center gap-2 flex-wrap">
+          <span>{product.name}</span>
+          <Badge variant={product.isActive ? 'success' : 'secondary'} className="font-medium">
+            {product.isActive ? 'Activo' : 'Inactivo'}
+          </Badge>
+        </h1>
+        <p className="text-sm text-muted-foreground mt-1 font-mono">
+          {product.internalCode}
+          {product.category ? ` · ${product.category.name}` : ''}
+        </p>
+      </header>
 
-      <Card className="border border-border/80 shadow-sm rounded-xl overflow-hidden">
+      <Card className="overflow-hidden">
         <CardHeader className="pb-4 border-b border-border/60">
-          <CardTitle className="text-lg font-medium flex items-center gap-2 text-foreground">
-            <Package className="h-5 w-5 shrink-0 text-primary" aria-hidden />
+          <CardTitle className="text-lg font-medium flex items-center gap-2">
+            <span className={iconWrapClass}>
+              <Package className="h-4 w-4" />
+            </span>
             Parte actual
           </CardTitle>
           <CardDescription>
@@ -129,119 +134,131 @@ export default function ProductDetailPage() {
             {product.category ? ` · Categoría: ${product.category.name}` : ''}
           </CardDescription>
         </CardHeader>
-        <CardContent className="pt-6 space-y-6">
-          <div>
-            <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">Identificación</h3>
-            <div className="grid gap-4 sm:grid-cols-3">
-              <div className="rounded-lg border border-border/60 bg-muted/20 p-4 flex items-start gap-3">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                  <Hash className="h-4 w-4" />
-                </span>
-                <div className="min-w-0">
-                  <p className="text-xs font-medium text-muted-foreground">Código interno</p>
-                  <p className="text-sm font-mono font-medium text-foreground mt-0.5">{product.internalCode}</p>
+        <CardContent className="pt-6">
+          <div className="grid gap-8 lg:grid-cols-2">
+            {/* Columna izquierda: Identificación + Inventario */}
+            <div className="space-y-6">
+              <section>
+                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+                  Identificación
+                </h3>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <div className={dataCardClass}>
+                    <span className={iconWrapClass}>
+                      <Hash className="h-4 w-4" />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium text-muted-foreground">Código interno</p>
+                      <p className="text-sm font-mono font-medium text-foreground mt-0.5 truncate">{product.internalCode}</p>
+                    </div>
+                  </div>
+                  <div className={dataCardClass}>
+                    <span className={iconWrapClass}>
+                      <FolderOpen className="h-4 w-4" />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium text-muted-foreground">Categoría</p>
+                      <p className="text-sm font-medium text-foreground mt-0.5 truncate" title={product.category?.name ?? undefined}>
+                        {product.category?.name ?? '—'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className={dataCardClass}>
+                    <span className={iconWrapClass}>
+                      <Tag className="h-4 w-4" />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium text-muted-foreground">Estado</p>
+                      <p className="text-sm font-medium text-foreground mt-0.5">
+                        {product.isActive ? 'Activo' : 'Inactivo'}
+                      </p>
+                    </div>
+                  </div>
                 </div>
-              </div>
-              <div className="rounded-lg border border-border/60 bg-muted/20 p-4 flex items-start gap-3">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                  <FolderOpen className="h-4 w-4" />
-                </span>
-                <div className="min-w-0">
-                  <p className="text-xs font-medium text-muted-foreground">Categoría</p>
-                  <p className="text-sm font-medium text-foreground mt-0.5 truncate" title={product.category?.name ?? undefined}>
-                    {product.category?.name ?? '—'}
-                  </p>
-                </div>
-              </div>
-              <div className="rounded-lg border border-border/60 bg-muted/20 p-4 flex items-start gap-3">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                  <Tag className="h-4 w-4" />
-                </span>
-                <div className="min-w-0">
-                  <p className="text-xs font-medium text-muted-foreground">Estado</p>
-                  <p className="text-sm font-medium text-foreground mt-0.5">
-                    {product.isActive ? 'Activo' : 'Inactivo'}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
+              </section>
 
-          <div>
-            <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">Precios</h3>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <div className="rounded-lg border border-border/60 bg-muted/20 p-4 flex items-start gap-3">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                  <DollarSign className="h-4 w-4" />
-                </span>
-                <div className="min-w-0">
-                  <p className="text-xs font-medium text-muted-foreground">Costo</p>
-                  <p className="text-sm tabular-nums font-medium text-foreground mt-0.5">{formatMoney(cost)}</p>
+              <section>
+                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+                  Inventario
+                </h3>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <div className={dataCardClass}>
+                    <span className={iconWrapClass}>
+                      <Boxes className="h-4 w-4" />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium text-muted-foreground">Stock en mano</p>
+                      <p className="text-sm tabular-nums font-medium text-foreground mt-0.5">{qtyOnHand ?? '—'}</p>
+                    </div>
+                  </div>
+                  <div className={dataCardClass}>
+                    <span className={iconWrapClass}>
+                      <Lock className="h-4 w-4" />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium text-muted-foreground">Reservado</p>
+                      <p className="text-sm tabular-nums font-medium text-foreground mt-0.5">{qtyReserved ?? '—'}</p>
+                    </div>
+                  </div>
+                  <div className={dataCardClass}>
+                    <span className={iconWrapClass}>
+                      <Layers className="h-4 w-4" />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium text-muted-foreground">Stock mínimo</p>
+                      <p className="text-sm tabular-nums font-medium text-foreground mt-0.5">
+                        {product.minStock != null ? product.minStock : '—'}
+                      </p>
+                    </div>
+                  </div>
                 </div>
-              </div>
-              <div className="rounded-lg border border-border/60 bg-muted/20 p-4 flex items-start gap-3">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                  <Tag className="h-4 w-4" />
-                </span>
-                <div className="min-w-0">
-                  <p className="text-xs font-medium text-muted-foreground">Precio de venta</p>
-                  <p className="text-sm tabular-nums font-medium text-foreground mt-0.5">{formatMoney(price)}</p>
-                </div>
-              </div>
-              <div className="rounded-lg border border-border/60 bg-muted/20 p-4 flex items-start gap-3">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                  <TrendingUp className="h-4 w-4" />
-                </span>
-                <div className="min-w-0">
-                  <p className="text-xs font-medium text-muted-foreground">Margen actual</p>
-                  <p className="text-sm tabular-nums font-medium text-foreground mt-0.5">{marginCurrent.toFixed(1)}%</p>
-                </div>
-              </div>
-              <div className="rounded-lg border border-border/60 bg-muted/20 p-4 flex items-start gap-3">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                  <Percent className="h-4 w-4" />
-                </span>
-                <div className="min-w-0">
-                  <p className="text-xs font-medium text-muted-foreground">IVA</p>
-                  <p className="text-sm tabular-nums font-medium text-foreground mt-0.5">{taxRate}%</p>
-                </div>
-              </div>
+              </section>
             </div>
-          </div>
 
-          <div>
-            <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">Inventario</h3>
-            <div className="grid gap-4 sm:grid-cols-3">
-              <div className="rounded-lg border border-border/60 bg-muted/20 p-4 flex items-start gap-3">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                  <Boxes className="h-4 w-4" />
-                </span>
-                <div className="min-w-0">
-                  <p className="text-xs font-medium text-muted-foreground">Stock en mano</p>
-                  <p className="text-sm tabular-nums font-medium text-foreground mt-0.5">{qtyOnHand ?? '—'}</p>
+            {/* Columna derecha: Precios */}
+            <section>
+              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+                Precios
+              </h3>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className={dataCardClass}>
+                  <span className={iconWrapClass}>
+                    <DollarSign className="h-4 w-4" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium text-muted-foreground">Costo</p>
+                    <p className="text-sm tabular-nums font-medium text-foreground mt-0.5">{formatMoney(cost)}</p>
+                  </div>
+                </div>
+                <div className={dataCardClass}>
+                  <span className={iconWrapClass}>
+                    <Tag className="h-4 w-4" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium text-muted-foreground">Precio de venta</p>
+                    <p className="text-sm tabular-nums font-medium text-foreground mt-0.5">{formatMoney(price)}</p>
+                  </div>
+                </div>
+                <div className={dataCardClass}>
+                  <span className={iconWrapClass}>
+                    <TrendingUp className="h-4 w-4" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium text-muted-foreground">Margen actual</p>
+                    <p className="text-sm tabular-nums font-medium text-foreground mt-0.5">{marginCurrent.toFixed(1)}%</p>
+                  </div>
+                </div>
+                <div className={dataCardClass}>
+                  <span className={iconWrapClass}>
+                    <Percent className="h-4 w-4" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium text-muted-foreground">IVA</p>
+                    <p className="text-sm tabular-nums font-medium text-foreground mt-0.5">{taxRate}%</p>
+                  </div>
                 </div>
               </div>
-              <div className="rounded-lg border border-border/60 bg-muted/20 p-4 flex items-start gap-3">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                  <Lock className="h-4 w-4" />
-                </span>
-                <div className="min-w-0">
-                  <p className="text-xs font-medium text-muted-foreground">Reservado</p>
-                  <p className="text-sm tabular-nums font-medium text-foreground mt-0.5">{qtyReserved ?? '—'}</p>
-                </div>
-              </div>
-              <div className="rounded-lg border border-border/60 bg-muted/20 p-4 flex items-start gap-3">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                  <Layers className="h-4 w-4" />
-                </span>
-                <div className="min-w-0">
-                  <p className="text-xs font-medium text-muted-foreground">Stock mínimo</p>
-                  <p className="text-sm tabular-nums font-medium text-foreground mt-0.5">
-                    {product.minStock != null ? product.minStock : '—'}
-                  </p>
-                </div>
-              </div>
-            </div>
+            </section>
           </div>
         </CardContent>
       </Card>

@@ -211,7 +211,7 @@ export default function ProviderElectronicInvoicingPage() {
 
   if (configQuery.isLoading || statusQuery.isLoading) {
     return (
-      <div className="p-4 md:p-6 space-y-6 max-w-2xl">
+      <div className="p-4 md:p-6 space-y-6 max-w-5xl mx-auto">
         <Skeleton className="h-8 w-48" />
         <Card>
           <CardHeader>
@@ -229,7 +229,7 @@ export default function ProviderElectronicInvoicingPage() {
 
   if (configQuery.isError || statusQuery.isError) {
     return (
-      <div className="p-4 md:p-6 space-y-6 max-w-2xl">
+      <div className="p-4 md:p-6 space-y-6 max-w-5xl mx-auto">
         <p className="text-destructive flex items-center gap-2">
           <AlertCircle className="h-4 w-4 shrink-0" />
           {getErrorMessage(configQuery.error ?? statusQuery.error)}
@@ -244,7 +244,7 @@ export default function ProviderElectronicInvoicingPage() {
   const statusInfo = STATUS_CONFIG[status] ?? STATUS_CONFIG.incomplete;
 
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-2xl">
+    <div className="p-4 md:p-6 space-y-6 max-w-5xl mx-auto">
       <div className="flex flex-col gap-2">
         <Button variant="ghost" size="sm" className="w-fit gap-2" asChild>
           <Link href={`/provider/${tenantId}`}>
@@ -260,96 +260,103 @@ export default function ProviderElectronicInvoicingPage() {
         </p>
       </div>
 
-      {/* Estado */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base flex items-center gap-2">
-            {readyForSend ? (
-              <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-500" />
-            ) : status === 'cert_expired' || status === 'range_exhausted' ? (
-              <ShieldAlert className="h-5 w-5 text-destructive" />
-            ) : (
-              <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-500" />
-            )}
-            Estado
-          </CardTitle>
-          <CardDescription>{statusInfo.description}</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          <Badge variant={statusInfo.variant}>{statusInfo.label}</Badge>
-          {missing.length > 0 && (
-            <div className="text-sm text-muted-foreground mt-2">
-              <span className="font-medium">Falta:</span>{' '}
-              {missing.map((key) => MISSING_LABELS[key] ?? key).join(', ')}
-            </div>
-          )}
-          {statusResponse?.certValidUntil && (
-            <p className="text-sm text-muted-foreground">
-              Certificado válido hasta:{' '}
-              {new Date(statusResponse.certValidUntil).toLocaleDateString('es-CO', {
-                day: 'numeric',
-                month: 'long',
-                year: 'numeric',
-              })}
-            </p>
-          )}
-          {readyForSend && (
-            <div className="mt-3 space-y-2 border-t pt-3">
-              {certExpiresInDays != null && certExpiresInDays < 30 && (
-                <p className={certExpiresInDays < 15 ? 'text-sm text-destructive' : 'text-sm text-amber-600 dark:text-amber-500'}>
-                  Certificado vence en {certExpiresInDays} día{certExpiresInDays !== 1 ? 's' : ''}.
-                </p>
-              )}
-              {rangeRemaining != null && rangeRemaining < 500 && (
-                <p className="text-sm text-amber-600 dark:text-amber-500">
-                  Quedan {rangeRemaining} números en el rango.
-                </p>
-              )}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Qué hacer */}
-      {!readyForSend && (
-        <Card className="border-amber-200 dark:border-amber-900/50 bg-amber-50/50 dark:bg-amber-950/20">
+      {/* Estado + Qué hacer: misma fila cuando hay pasos pendientes */}
+      <div className={`grid gap-4 ${!readyForSend ? 'md:grid-cols-2' : ''}`}>
+        <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">Qué hacer</CardTitle>
-            <CardDescription>
-              Complete los datos obligatorios: NIT, Software ID, PIN, certificado .p12 y numeración.
-            </CardDescription>
+            <CardTitle className="text-base flex items-center gap-2">
+              {readyForSend ? (
+                <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-500" />
+              ) : status === 'cert_expired' || status === 'range_exhausted' ? (
+                <ShieldAlert className="h-5 w-5 text-destructive" />
+              ) : (
+                <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-500" />
+              )}
+              Estado
+            </CardTitle>
+            <CardDescription>{statusInfo.description}</CardDescription>
           </CardHeader>
+          <CardContent className="space-y-2">
+            <Badge variant={statusInfo.variant}>{statusInfo.label}</Badge>
+            {missing.length > 0 && (
+              <div className="text-sm text-muted-foreground mt-2">
+                <span className="font-medium">Falta:</span>{' '}
+                {missing.map((key) => MISSING_LABELS[key] ?? key).join(', ')}
+              </div>
+            )}
+            {statusResponse?.certValidUntil && (
+              <p className="text-sm text-muted-foreground">
+                Certificado válido hasta:{' '}
+                {new Date(statusResponse.certValidUntil).toLocaleDateString('es-CO', {
+                  day: 'numeric',
+                  month: 'long',
+                  year: 'numeric',
+                })}
+              </p>
+            )}
+            {readyForSend && (
+              <div className="mt-3 space-y-2 border-t pt-3">
+                {certExpiresInDays != null && certExpiresInDays < 30 && (
+                  <p className={certExpiresInDays < 15 ? 'text-sm text-destructive' : 'text-sm text-amber-600 dark:text-amber-500'}>
+                    Certificado vence en {certExpiresInDays} día{certExpiresInDays !== 1 ? 's' : ''}.
+                  </p>
+                )}
+                {rangeRemaining != null && rangeRemaining < 500 && (
+                  <p className="text-sm text-amber-600 dark:text-amber-500">
+                    Quedan {rangeRemaining} números en el rango.
+                  </p>
+                )}
+              </div>
+            )}
+          </CardContent>
         </Card>
-      )}
+        {!readyForSend && (
+          <Card className="border-amber-200 dark:border-amber-900/50 bg-amber-50/50 dark:bg-amber-950/20">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Qué hacer</CardTitle>
+              <CardDescription>
+                Complete los datos obligatorios: NIT, Software ID, PIN, certificado .p12 y numeración.
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        )}
+      </div>
 
-      {/* Plantilla */}
+      {/* Plantilla: acción rápida */}
       <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Plantillas</CardTitle>
-          <CardDescription>
-            Aplique valores típicos y luego complete NIT, software y certificado.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() =>
-              setForm((p) => ({
-                ...p,
-                env: 'HABILITACION',
-                prefix: 'FAC',
-                rangeFrom: 1,
-                rangeTo: 999999,
-              }))
-            }
-          >
-            Aplicar plantilla: Pyme básico (habilitación)
-          </Button>
+        <CardContent className="pt-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <p className="font-medium text-foreground">Plantilla rápida</p>
+              <p className="text-sm text-muted-foreground mt-0.5">
+                Aplique valores típicos de habilitación y luego complete NIT, software y certificado.
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="shrink-0 w-full sm:w-auto"
+              onClick={() =>
+                setForm((p) => ({
+                  ...p,
+                  env: 'HABILITACION',
+                  prefix: 'FAC',
+                  rangeFrom: 1,
+                  rangeTo: 999999,
+                }))
+              }
+            >
+              Aplicar plantilla: Pyme básico (habilitación)
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
+      {/* Formulario en 2 columnas: emisor + software | certificado + numeración */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Columna izquierda: Datos del emisor + Software DIAN */}
+        <div className="space-y-6">
       {/* Datos del emisor */}
       <Card>
         <CardHeader>
@@ -419,7 +426,10 @@ export default function ProviderElectronicInvoicingPage() {
           </div>
         </CardContent>
       </Card>
+        </div>
 
+        {/* Columna derecha: Certificado + Numeración */}
+        <div className="space-y-6">
       {/* Certificado */}
       <Card>
         <CardHeader>
@@ -538,6 +548,8 @@ export default function ProviderElectronicInvoicingPage() {
           </div>
         </CardContent>
       </Card>
+        </div>
+      </div>
 
       <Card>
         <CardContent className="pt-6">

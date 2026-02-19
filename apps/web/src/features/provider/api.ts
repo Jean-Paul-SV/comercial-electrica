@@ -10,6 +10,7 @@ import type {
   ProviderTenantsSummary,
   DianActivationRequest,
   ProviderFeedbackItem,
+  ListUsageEventsResponse,
 } from './types';
 
 export type ListTenantsQuery = {
@@ -157,6 +158,33 @@ export function updateFeedbackStatus(
   return apiClient.patch(
     `/provider/feedback/${id}`,
     { status },
+    { authToken }
+  );
+}
+
+export type ListUsageEventsQuery = {
+  tenantId?: string;
+  event?: string;
+  from?: string;
+  to?: string;
+  limit?: number;
+  offset?: number;
+};
+
+export function listUsageEvents(
+  authToken: string,
+  query?: ListUsageEventsQuery
+): Promise<ListUsageEventsResponse> {
+  const params = new URLSearchParams();
+  if (query?.tenantId) params.set('tenantId', query.tenantId);
+  if (query?.event) params.set('event', query.event);
+  if (query?.from) params.set('from', query.from);
+  if (query?.to) params.set('to', query.to);
+  if (query?.limit != null) params.set('limit', String(query.limit));
+  if (query?.offset != null) params.set('offset', String(query.offset));
+  const qs = params.toString();
+  return apiClient.get<ListUsageEventsResponse>(
+    `/provider/usage/events${qs ? `?${qs}` : ''}`,
     { authToken }
   );
 }

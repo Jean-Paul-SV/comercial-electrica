@@ -206,26 +206,28 @@ export default function ProviderTenantDetailPage() {
       </div>
 
       {/* Facturación electrónica (DIAN) — acceso directo */}
-      <Card className="border-primary/20 bg-primary/5">
-        <CardContent className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pt-6">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-              <FileCheck className="h-5 w-5" />
-            </div>
+      <Card className="overflow-hidden">
+        <CardHeader className="pb-3">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="font-semibold text-foreground">Facturación electrónica (DIAN)</p>
-              <p className="text-sm text-muted-foreground">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                  <FileCheck className="h-4 w-4" />
+                </span>
+                Facturación electrónica (DIAN)
+              </CardTitle>
+              <CardDescription className="mt-1.5">
                 NIT, certificado, Software ID y numeración para esta empresa.
-              </p>
+              </CardDescription>
             </div>
+            <Button asChild variant="outline" size="sm" className="shrink-0 w-full sm:w-auto">
+              <Link href={`/provider/${tenant.id}/electronic-invoicing`} className="gap-2">
+                <FileCheck className="h-4 w-4" />
+                Configurar DIAN
+              </Link>
+            </Button>
           </div>
-          <Button asChild className="shrink-0">
-            <Link href={`/provider/${tenant.id}/electronic-invoicing`} className="gap-2">
-              <FileCheck className="h-4 w-4" />
-              Configurar DIAN
-            </Link>
-          </Button>
-        </CardContent>
+        </CardHeader>
       </Card>
 
       <div className="grid gap-4 md:grid-cols-2">

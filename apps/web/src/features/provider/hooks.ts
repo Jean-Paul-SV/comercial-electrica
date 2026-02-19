@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@shared/providers/AuthProvider';
 import * as api from './api';
-import type { ListTenantsQuery, ListFeedbackQuery } from './api';
+import type { ListTenantsQuery, ListFeedbackQuery, ListUsageEventsQuery } from './api';
 import type { CreateTenantPayload, ProviderAlert } from './types';
 
 export function usePlans(activeOnly?: boolean) {
@@ -167,6 +167,15 @@ export function useProviderFeedback(query?: ListFeedbackQuery) {
   return useQuery({
     queryKey: ['provider', 'feedback', query],
     queryFn: () => api.listFeedback(token!, query),
+    enabled: Boolean(token),
+  });
+}
+
+export function useUsageEvents(query?: ListUsageEventsQuery) {
+  const { token } = useAuth();
+  return useQuery({
+    queryKey: ['provider', 'usage', query],
+    queryFn: () => api.listUsageEvents(token!, query),
     enabled: Boolean(token),
   });
 }

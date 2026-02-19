@@ -469,9 +469,17 @@ export default function DashboardView() {
           <CardContent className="pt-4 pb-4">
             <p className="text-sm text-muted-foreground">
               {(dashboardSummary.error as { status?: number })?.status === 403
-                ? 'El resumen con IA está disponible en Plan Premium o Enterprise.'
+                ? '¿Quieres tener el resumen del día con IA? Adquiere un plan Premium o Enterprise en Facturación.'
                 : 'No se pudo cargar el resumen del día.'}
             </p>
+            {(dashboardSummary.error as { status?: number })?.status === 403 && (
+              <Link
+                href="/settings/billing"
+                className="inline-block mt-2 text-sm font-medium text-primary hover:underline"
+              >
+                Ver planes y facturación →
+              </Link>
+            )}
           </CardContent>
         </Card>
       )}

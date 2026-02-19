@@ -287,7 +287,7 @@ export class ProviderService {
             },
           },
           _count: {
-            select: { users: true },
+            select: { users: true, products: true, sales: true, customers: true },
           },
         },
         orderBy: { createdAt: 'desc' },
@@ -310,6 +310,9 @@ export class ProviderService {
       plan: tenant.plan,
       subscription: tenant.subscription,
       usersCount: tenant._count.users,
+      productsCount: tenant._count.products,
+      salesCount: tenant._count.sales,
+      customersCount: tenant._count.customers,
     }));
 
     return { items, total, limit, offset };
