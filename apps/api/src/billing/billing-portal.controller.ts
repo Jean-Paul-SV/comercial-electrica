@@ -8,6 +8,7 @@ import {
   Query,
   UseGuards,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import {
   ApiTags,
