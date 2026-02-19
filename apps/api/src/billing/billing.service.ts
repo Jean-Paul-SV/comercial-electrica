@@ -1052,8 +1052,10 @@ export class BillingService {
             ? stripeSubscription.customer
             : stripeSubscription.customer.id;
       } catch (err) {
-        this.logger.warn(
-          `No se pudo obtener suscripción Stripe ${subscription.stripeSubscriptionId}: ${(err as Error).message}`,
+        const errorMessage = (err as Error).message || String(err);
+        this.logger.error(
+          `No se pudo obtener suscripción Stripe ${subscription.stripeSubscriptionId}: ${errorMessage}`,
+          err instanceof Error ? err.stack : undefined,
         );
         // Si la suscripción fue eliminada en Stripe, intentar buscar el customer por metadata
         try {
@@ -1069,6 +1071,17 @@ export class BillingService {
             );
           }
         } catch (searchErr) {
+          const searchErrorMessage = (searchErr as Error).message || String(searchErr);
+          this.logger.error(
+            `Error al buscar cliente Stripe por metadata para tenant ${tenantId}: ${searchErrorMessage}`,
+            searchErr instanceof Error ? searchErr.stack : undefined,
+          );
+          // Distinguir entre errores de autenticación y otros
+          if (searchErr instanceof Error && searchErr.message.includes('api_key')) {
+            throw new BadRequestException(
+              'Error de configuración del servicio de facturación. Contacte a soporte.',
+            );
+          }
           throw new BadRequestException(
             'No se pudo conectar con el servicio de facturación. Intente más tarde o contacte a soporte.',
           );
@@ -1089,16 +1102,43 @@ export class BillingService {
           );
         }
       } catch (err) {
+        const errorMessage = (err as Error).message || String(err);
+        this.logger.error(
+          `Error al buscar cliente Stripe por metadata para tenant ${tenantId}: ${errorMessage}`,
+          err instanceof Error ? err.stack : undefined,
+        );
+        // Distinguir entre errores de autenticación y otros
+        if (err instanceof Error && err.message.includes('api_key')) {
+          throw new BadRequestException(
+            'Error de configuración del servicio de facturación. Contacte a soporte.',
+          );
+        }
         throw new BadRequestException(
           'No se pudo conectar con el servicio de facturación. Intente más tarde o contacte a soporte.',
         );
       }
     }
-    const session = await this.stripe.billingPortal.sessions.create({
-      customer: stripeCustomerId,
-      return_url: returnUrl,
-    });
-    return { url: session.url };
+    try {
+      const session = await this.stripe.billingPortal.sessions.create({
+        customer: stripeCustomerId,
+        return_url: returnUrl,
+      });
+      return { url: session.url };
+    } catch (err) {
+      const errorMessage = (err as Error).message || String(err);
+      this.logger.error(
+        `Error al crear sesión del portal de Stripe para customer ${stripeCustomerId}: ${errorMessage}`,
+        err instanceof Error ? err.stack : undefined,
+      );
+      if (err instanceof Error && err.message.includes('api_key')) {
+        throw new BadRequestException(
+          'Error de configuración del servicio de facturación. Contacte a soporte.',
+        );
+      }
+      throw new BadRequestException(
+        'No se pudo crear la sesión de facturación. Intente más tarde o contacte a soporte.',
+      );
+    }
   }
 
   /**
