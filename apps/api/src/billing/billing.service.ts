@@ -381,12 +381,9 @@ export class BillingService {
         payment_settings: { save_default_payment_method: 'on_subscription' },
         expand: ['latest_invoice.payment_intent'],
       };
-      // Aplicar Tax Rate manual si está configurado (para COP u otras monedas no soportadas por Stripe Tax)
+      // Impuestos: solo si hay Tax Rate configurado (evitar automatic_tax sin dirección fiscal en test)
       if (this.stripeTaxRateId) {
         subscriptionParams.default_tax_rates = [this.stripeTaxRateId];
-      } else {
-        // Intentar usar Stripe Tax automático si está disponible (puede no funcionar con COP)
-        subscriptionParams.automatic_tax = { enabled: true };
       }
       const subscription = await this.stripe.subscriptions.create(subscriptionParams);
       this.logger.log(
@@ -882,8 +879,6 @@ export class BillingService {
             };
             if (this.stripeTaxRateId) {
               updateParams.default_tax_rates = [this.stripeTaxRateId];
-            } else {
-              updateParams.automatic_tax = { enabled: true };
             }
             await this.stripe.subscriptions.update(
               subscription.stripeSubscriptionId,
@@ -1000,8 +995,6 @@ export class BillingService {
             };
             if (this.stripeTaxRateId) {
               updateParams.default_tax_rates = [this.stripeTaxRateId];
-            } else {
-              updateParams.automatic_tax = { enabled: true };
             }
             await this.stripe.subscriptions.update(sub.stripeSubscriptionId, updateParams);
           }
