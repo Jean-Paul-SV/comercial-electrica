@@ -113,6 +113,7 @@ export class BillingService {
 
     const subscription = await this.prisma.subscription.findUnique({
       where: { stripeSubscriptionId: subscriptionId },
+      include: { tenant: true },
     });
     if (!subscription) {
       this.logger.warn(
@@ -121,24 +122,76 @@ export class BillingService {
       return;
     }
 
-    const periodEnd = subscription.currentPeriodEnd
-      ? new Date(subscription.currentPeriodEnd)
-      : new Date();
-    periodEnd.setDate(periodEnd.getDate() + 30);
+    // Obtener fechas de periodo desde la factura o la suscripción en Stripe
+    let periodStart = subscription.currentPeriodStart;
+    let periodEnd = subscription.currentPeriodEnd;
+
+    // Si la factura tiene periodo, usarlo (más preciso)
+    if (invoice.period_start && invoice.period_end) {
+      periodStart = new Date(invoice.period_start * 1000);
+      periodEnd = new Date(invoice.period_end * 1000);
+    } else if (this.stripe) {
+      // Si no, obtener la suscripción desde Stripe para obtener fechas actualizadas
+      try {
+        const stripeSub = await this.stripe.subscriptions.retrieve(subscriptionId);
+        if (stripeSub.current_period_start && stripeSub.current_period_end) {
+          periodStart = new Date(stripeSub.current_period_start * 1000);
+          periodEnd = new Date(stripeSub.current_period_end * 1000);
+        }
+      } catch (err) {
+        this.logger.warn(
+          `No se pudo obtener suscripción Stripe ${subscriptionId} para actualizar fechas: ${(err as Error).message}`,
+        );
+        // Fallback: agregar 30 días si no hay periodo actual
+        if (!periodEnd) {
+          periodEnd = new Date();
+          periodEnd.setDate(periodEnd.getDate() + 30);
+        }
+      }
+    } else {
+      // Fallback: agregar 30 días si no hay Stripe configurado
+      if (!periodEnd) {
+        periodEnd = new Date();
+        periodEnd.setDate(periodEnd.getDate() + 30);
+      } else {
+        periodEnd = new Date(periodEnd);
+        periodEnd.setDate(periodEnd.getDate() + 30);
+      }
+    }
+
+    // Asegurar que periodEnd siempre tenga un valor
+    if (!periodEnd) {
+      periodEnd = new Date();
+      periodEnd.setDate(periodEnd.getDate() + 30);
+    }
+
+    const wasCancelled = subscription.status === 'CANCELLED';
 
     await this.prisma.subscription.update({
       where: { id: subscription.id },
       data: {
-        currentPeriodEnd: periodEnd,
+        currentPeriodStart: periodStart ?? undefined,
+        currentPeriodEnd: periodEnd ?? undefined,
         status: 'ACTIVE',
         lastPaymentFailedAt: null,
         updatedAt: new Date(),
       },
     });
 
-    this.logger.log(
-      `Suscripción ${subscription.id} (tenant ${subscription.tenantId}) prorrogada hasta ${periodEnd.toISOString()} por invoice.paid`,
-    );
+    // Si se reactivó desde cancelada, también reactivar el tenant si estaba inactivo
+    if (wasCancelled && !subscription.tenant.isActive) {
+      await this.prisma.tenant.update({
+        where: { id: subscription.tenantId },
+        data: { isActive: true, updatedAt: new Date() },
+      });
+      this.logger.log(
+        `Suscripción ${subscription.id} (tenant ${subscription.tenantId}) reactivada desde CANCELLED por invoice.paid. Tenant también reactivado.`,
+      );
+    } else {
+      this.logger.log(
+        `Suscripción ${subscription.id} (tenant ${subscription.tenantId}) prorrogada hasta ${periodEnd.toISOString()} por invoice.paid`,
+      );
+    }
   }
 
   /** Días dentro de los cuales un segundo pago fallido suspende la suscripción. */
@@ -225,6 +278,74 @@ export class BillingService {
     if (updated.count > 0) {
       this.logger.log(
         `Suscripción con stripeSubscriptionId=${subscriptionId} marcada como CANCELLED`,
+      );
+    }
+  }
+
+  /**
+   * Procesa evento customer.subscription.updated: sincroniza estado y fechas de periodo desde Stripe.
+   * Detecta cuando una suscripción cancelada se reactiva (p. ej. al agregar método de pago).
+   */
+  async handleSubscriptionUpdated(sub: Stripe.Subscription): Promise<void> {
+    const subscriptionId = sub.id;
+    const subscription = await this.prisma.subscription.findUnique({
+      where: { stripeSubscriptionId: subscriptionId },
+      include: { tenant: true },
+    });
+    
+    if (!subscription) {
+      this.logger.debug(
+        `No se encontró Subscription con stripeSubscriptionId=${subscriptionId} para actualizar`,
+      );
+      return;
+    }
+
+    // Mapear estados de Stripe a nuestros estados
+    let newStatus: 'ACTIVE' | 'CANCELLED' | 'SUSPENDED' | 'PENDING_PAYMENT' = subscription.status as any;
+    if (sub.status === 'active') {
+      newStatus = 'ACTIVE';
+    } else if (sub.status === 'canceled' || sub.status === 'unpaid') {
+      newStatus = 'CANCELLED';
+    } else if (sub.status === 'past_due' || sub.status === 'incomplete') {
+      newStatus = 'PENDING_PAYMENT';
+    } else if (sub.status === 'trialing') {
+      newStatus = 'ACTIVE'; // Tratar trial como activo
+    }
+
+    // Obtener fechas de periodo desde Stripe
+    const currentPeriodStart = sub.current_period_start
+      ? new Date(sub.current_period_start * 1000)
+      : subscription.currentPeriodStart;
+    const currentPeriodEnd = sub.current_period_end
+      ? new Date(sub.current_period_end * 1000)
+      : subscription.currentPeriodEnd;
+
+    const wasCancelled = subscription.status === 'CANCELLED';
+    const isNowActive = newStatus === 'ACTIVE';
+
+    await this.prisma.subscription.update({
+      where: { id: subscription.id },
+      data: {
+        status: newStatus,
+        currentPeriodStart,
+        currentPeriodEnd,
+        lastPaymentFailedAt: isNowActive ? null : subscription.lastPaymentFailedAt,
+        updatedAt: new Date(),
+      },
+    });
+
+    // Si se reactivó desde cancelada, también reactivar el tenant si estaba inactivo
+    if (wasCancelled && isNowActive && !subscription.tenant.isActive) {
+      await this.prisma.tenant.update({
+        where: { id: subscription.tenantId },
+        data: { isActive: true, updatedAt: new Date() },
+      });
+      this.logger.log(
+        `Suscripción ${subscription.id} (tenant ${subscription.tenantId}) reactivada desde CANCELLED a ACTIVE. Tenant también reactivado.`,
+      );
+    } else {
+      this.logger.log(
+        `Suscripción ${subscription.id} (tenant ${subscription.tenantId}) actualizada: ${subscription.status} → ${newStatus}`,
       );
     }
   }
@@ -992,6 +1113,11 @@ export class BillingService {
         case 'customer.subscription.deleted': {
           const sub = event.data.object;
           await this.handleSubscriptionDeleted(sub);
+          break;
+        }
+        case 'customer.subscription.updated': {
+          const sub = event.data.object;
+          await this.handleSubscriptionUpdated(sub);
           break;
         }
         default:
