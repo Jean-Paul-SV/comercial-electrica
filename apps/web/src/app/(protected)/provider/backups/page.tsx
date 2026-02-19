@@ -268,7 +268,8 @@ export default function ProviderBackupsPage() {
             )}
           </CardContent>
         </Card>
-      </div>
+        </div>
+      )}
 
       {/* Backups recientes */}
       <Card>
