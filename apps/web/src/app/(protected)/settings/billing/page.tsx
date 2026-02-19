@@ -372,6 +372,8 @@ export default function BillingPage() {
   const scheduledChangeAt = data?.scheduledChangeAt ?? null;
   const canManageBilling = data?.canManageBilling ?? false;
   const requiresPayment = data?.requiresPayment === true;
+  const gracePeriodEnd = data?.gracePeriodEnd ?? null;
+  const inGracePeriod = data?.inGracePeriod === true;
 
   const statusLabel = subscription
     ? (STATUS_LABELS[subscription.status] ?? subscription.status)
@@ -395,6 +397,45 @@ export default function BillingPage() {
             : 'Información de tu suscripción, renovación y opciones de pago.'}
         </p>
       </header>
+
+      {/* Aviso periodo de gracia */}
+      {inGracePeriod && !requiresPayment && (
+        <Card className="overflow-hidden rounded-2xl border-amber-500/30 bg-gradient-to-br from-amber-500/10 to-amber-600/5 shadow-sm">
+          <CardContent className="p-5 sm:p-6">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-col gap-2">
+                <p className="text-sm text-foreground flex items-start gap-3 font-medium">
+                  <AlertCircle className="h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
+                  Periodo de gracia activo. Tu periodo de pago terminó, pero tienes{' '}
+                  {gracePeriodEnd && (
+                    <>
+                      hasta el{' '}
+                      <span className="font-semibold">
+                        {new Date(gracePeriodEnd).toLocaleDateString('es-CO', {
+                          day: 'numeric',
+                          month: 'long',
+                          year: 'numeric',
+                        })}
+                      </span>
+                    </>
+                  )}
+                  {' '}para reactivar tu suscripción antes de perder el acceso.
+                </p>
+              </div>
+              {canManageBilling && (
+                <Button
+                  onClick={handleOpenPortal}
+                  disabled={createPortalMutation.isPending}
+                  className="gap-2 shrink-0"
+                >
+                  <CreditCard className="h-4 w-4" />
+                  {createPortalMutation.isPending ? 'Abriendo…' : 'Reactivar suscripción'}
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Aviso pago pendiente + CTA */}
       {requiresPayment && (
@@ -438,19 +479,41 @@ export default function BillingPage() {
           <CardDescription className="text-sm mt-0.5">
             Tu plan incluye los módulos activos para tu empresa.
           </CardDescription>
-          {plan && isPlanWithDian(plan.slug) && dianStatus && !dianStatus.readyForSend && isActive && (
-            <div className="mt-4 rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm">
-              <p className="font-medium text-foreground">Tu plan incluye facturación electrónica (DIAN).</p>
-              <p className="text-muted-foreground mt-1">
-                Para emitir facturas a la DIAN, configura certificado, NIT y numeración en{' '}
-                <Link href="/settings/electronic-invoicing" className="text-primary underline hover:no-underline font-medium">
-                  Configuración de facturación electrónica
-                </Link>
-                . Hasta entonces podrás usar documentos internos.
-              </p>
-            </div>
+          {plan && isPlanWithDian(plan.slug) && dianStatus && isActive && (
+            <>
+              {dianStatus.readyForSend ? (
+                <div className="mt-4 rounded-lg border border-emerald-500/30 bg-emerald-500/5 px-4 py-3 text-sm">
+                  <div className="flex items-start gap-3">
+                    <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400 mt-0.5" />
+                    <div>
+                      <p className="font-medium text-foreground">¡Ya cuentas con facturación electrónica (DIAN)!</p>
+                      <p className="text-muted-foreground mt-1">
+                        Tu configuración está completa y lista para emitir facturas electrónicas a la DIAN. Puedes gestionar tu configuración en{' '}
+                        <Link href="/settings/electronic-invoicing" className="text-primary underline hover:no-underline font-medium">
+                          Configuración de facturación electrónica
+                        </Link>
+                        .
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="mt-4 rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm">
+                    <p className="font-medium text-foreground">Tu plan incluye facturación electrónica (DIAN).</p>
+                    <p className="text-muted-foreground mt-1">
+                      Para emitir facturas a la DIAN, configura certificado, NIT y numeración en{' '}
+                      <Link href="/settings/electronic-invoicing" className="text-primary underline hover:no-underline font-medium">
+                        Configuración de facturación electrónica
+                      </Link>
+                      . Hasta entonces podrás usar documentos internos.
+                    </p>
+                  </div>
+                  <DianActivationDisclaimer variant="card" className="mt-4" />
+                </>
+              )}
+            </>
           )}
-          <DianActivationDisclaimer variant="card" className="mt-4" />
         </CardHeader>
         <CardContent className="pt-6 space-y-5">
           {plan ? (
@@ -513,11 +576,35 @@ export default function BillingPage() {
                   {subscription.currentPeriodEnd && (
                     <p className="text-sm text-muted-foreground">
                       {isCancelled ? (
-                        periodEnded ? (
+                        inGracePeriod ? (
+                          <>
+                            Tu periodo de pago terminó el{' '}
+                            <span className="font-medium text-foreground">
+                              {new Date(subscription.currentPeriodEnd).toLocaleDateString('es-CO', {
+                                day: 'numeric',
+                                month: 'long',
+                                year: 'numeric',
+                              })}
+                            </span>
+                            . Estás en un <strong>periodo de gracia de 7 días</strong>. Tu acceso continuará hasta el{' '}
+                            <span className="font-medium text-foreground">
+                              {gracePeriodEnd ? new Date(gracePeriodEnd).toLocaleDateString('es-CO', {
+                                day: 'numeric',
+                                month: 'long',
+                                year: 'numeric',
+                              }) : 'fin del periodo de gracia'}
+                            </span>
+                            . Reactiva tu suscripción antes de esa fecha para evitar perder el acceso.
+                          </>
+                        ) : periodEnded ? (
                           <>
                             Tu acceso finalizó el{' '}
                             <span className="font-medium text-foreground">
-                              {new Date(subscription.currentPeriodEnd).toLocaleDateString('es-CO', {
+                              {gracePeriodEnd ? new Date(gracePeriodEnd).toLocaleDateString('es-CO', {
+                                day: 'numeric',
+                                month: 'long',
+                                year: 'numeric',
+                              }) : new Date(subscription.currentPeriodEnd).toLocaleDateString('es-CO', {
                                 day: 'numeric',
                                 month: 'long',
                                 year: 'numeric',
@@ -535,7 +622,7 @@ export default function BillingPage() {
                                 year: 'numeric',
                               })}
                             </span>
-                            . Después de esa fecha perderás el acceso.
+                            . Después de esa fecha tendrás un periodo de gracia de 7 días para reactivar.
                           </>
                         )
                       ) : (
@@ -608,7 +695,9 @@ export default function BillingPage() {
               <p className="text-xs text-muted-foreground leading-relaxed">
                 Los planes &quot;con DIAN&quot; te dan acceso a facturación electrónica. Hasta que actives el servicio podrás usar documentos internos.
               </p>
-              <DianActivationDisclaimer variant="inline" className="text-xs mt-2" />
+              {plansQuery.data?.some((p) => isPlanWithDian(p.slug)) && (
+                <DianActivationDisclaimer variant="inline" className="text-xs mt-2" />
+              )}
               {plansQuery.isLoading ? (
                 <div className="grid gap-4 sm:grid-cols-2 mt-4">
                   {[1, 2, 3].map((i) => (

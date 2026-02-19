@@ -13,6 +13,10 @@ export type SubscriptionInfo = {
   canManageBilling: boolean;
   /** Si true, la app se muestra bloqueada; solo se muestra la pantalla de pagar. */
   requiresPayment: boolean;
+  /** Fecha de fin del periodo de gracia (7 días después de currentPeriodEnd para suscripciones canceladas). */
+  gracePeriodEnd: string | null;
+  /** Si true, la suscripción está cancelada, el periodo terminó, pero aún está dentro del periodo de gracia (7 días). */
+  inGracePeriod: boolean;
 };
 
 export type ChangePlanResult = {

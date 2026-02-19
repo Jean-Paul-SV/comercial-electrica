@@ -25,6 +25,10 @@ export type SubscriptionInfoDto = {
   canManageBilling: boolean;
   /** Si true, la app debe mostrarse bloqueada y solo el botón de pagar hasta completar el primer pago. */
   requiresPayment: boolean;
+  /** Fecha de fin del periodo de gracia (7 días después de currentPeriodEnd para suscripciones canceladas). */
+  gracePeriodEnd: string | null;
+  /** Si true, la suscripción está cancelada, el periodo terminó, pero aún está dentro del periodo de gracia (7 días). */
+  inGracePeriod: boolean;
 };
 
 export type ChangePlanResultDto = {
@@ -964,12 +968,26 @@ export class BillingService {
       (!!subscription.stripeSubscriptionId || !!subscription.planId);
     const requiresPayment = String(subscription.status) === 'PENDING_PAYMENT';
     
-    // Si está cancelada y ya pasó el periodo, también requiere pago (bloquear acceso)
+    // Periodo de gracia: 7 días después de que termine el periodo para suscripciones canceladas
+    const GRACE_PERIOD_DAYS = 7;
     const isCancelled = String(subscription.status) === 'CANCELLED';
     const periodEnded = subscription.currentPeriodEnd
       ? new Date(subscription.currentPeriodEnd) < new Date()
       : false;
-    const shouldBlockAccess = isCancelled && periodEnded;
+    
+    // Calcular fecha de fin del periodo de gracia
+    let gracePeriodEnd: Date | null = null;
+    if (isCancelled && subscription.currentPeriodEnd) {
+      gracePeriodEnd = new Date(subscription.currentPeriodEnd);
+      gracePeriodEnd.setDate(gracePeriodEnd.getDate() + GRACE_PERIOD_DAYS);
+    }
+    
+    // Solo bloquear acceso si está cancelada Y ya pasó el periodo de gracia
+    const gracePeriodEnded = gracePeriodEnd ? new Date() >= gracePeriodEnd : false;
+    const shouldBlockAccess = isCancelled && periodEnded && gracePeriodEnded;
+    
+    // Estar en periodo de gracia: cancelada, periodo terminado, pero aún dentro de los 7 días
+    const inGracePeriod = isCancelled && periodEnded && !gracePeriodEnded;
     
     return {
       plan: subscription.plan
@@ -995,6 +1013,8 @@ export class BillingService {
       scheduledChangeAt: subscription.scheduledChangeAt?.toISOString() ?? null,
       canManageBilling,
       requiresPayment: requiresPayment || shouldBlockAccess,
+      gracePeriodEnd: gracePeriodEnd?.toISOString() ?? null,
+      inGracePeriod: inGracePeriod || false,
     };
   }
 
