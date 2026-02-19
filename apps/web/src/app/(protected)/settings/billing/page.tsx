@@ -21,7 +21,7 @@ import {
   DialogFooter,
 } from '@shared/components/ui/dialog';
 import { CreditCard, Calendar, Package, AlertCircle, CheckCircle2, Sparkles, RefreshCw } from 'lucide-react';
-import { useSubscriptionInfo, useCreatePortalSession, useBillingPlans, useChangePlan } from '@features/billing/hooks';
+import { useSubscriptionInfo, useCreatePortalSession, useBillingPlans, useChangePlan, useValidateDowngrade } from '@features/billing/hooks';
 import { useDianConfigStatus } from '@features/dian/hooks';
 import { useSubmitFeedback } from '@features/feedback/hooks';
 import { useAuth } from '@shared/providers/AuthProvider';
@@ -49,6 +49,105 @@ function formatPrice(value: number): string {
   }).format(value);
 }
 
+type BillingPlanItem = {
+  id: string;
+  name: string;
+  slug: string;
+  priceMonthly: number | null;
+  priceYearly: number | null;
+  maxUsers: number | null;
+};
+
+/** Tarjeta de un plan con validación de downgrade para deshabilitar botón si no permitido. */
+function PlanCard({
+  p,
+  currentPlanId,
+  onSelectDian,
+  onSelectChange,
+  isChanging,
+}: {
+  p: BillingPlanItem;
+  currentPlanId: string;
+  onSelectDian: (id: string, name: string) => void;
+  onSelectChange: (id: string, name: string) => void;
+  isChanging: boolean;
+}) {
+  const isCurrent = currentPlanId === p.id;
+  const validation = useValidateDowngrade(isCurrent ? null : p.id);
+  const downgradeBlocked = validation.data?.allowed === false;
+  const firstError = validation.data?.errors?.[0];
+
+  return (
+    <div
+      className={`rounded-xl border p-5 transition-all ${
+        isCurrent
+          ? 'border-primary/40 bg-primary/10 shadow-sm ring-1 ring-primary/20'
+          : 'border-border/70 bg-card hover:border-primary/30 hover:shadow-md'
+      }`}
+    >
+      <div className="flex flex-col gap-4">
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <p className="font-semibold text-foreground">{p.name}</p>
+            {p.maxUsers != null && (
+              <p className="text-xs text-muted-foreground mt-0.5">
+                hasta {p.maxUsers} usuarios
+              </p>
+            )}
+          </div>
+          {isCurrent && (
+            <Badge variant="secondary" className="shrink-0 px-2.5">
+              Vigente
+            </Badge>
+          )}
+        </div>
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          {(p.priceMonthly ?? p.priceYearly) != null && (
+            <span className="text-lg font-bold text-foreground">
+              {formatPrice(p.priceMonthly ?? p.priceYearly ?? 0)}
+              <span className="text-xs font-normal text-muted-foreground ml-1">
+                {p.priceMonthly != null ? '/mes' : '/año'}
+              </span>
+            </span>
+          )}
+          {p.priceMonthly != null && p.priceYearly != null && (
+            <span className="text-xs text-muted-foreground">
+              Anual: {formatPrice(p.priceYearly)}
+            </span>
+          )}
+          {p.priceMonthly == null && p.priceYearly == null && (
+            <span className="text-muted-foreground text-sm">Consultar precio</span>
+          )}
+        </div>
+        {!isCurrent && (
+          <div className="space-y-1">
+            <Button
+              size="sm"
+              variant="outline"
+              className="w-full sm:w-auto rounded-lg border-primary/40 text-primary hover:bg-primary/10"
+              disabled={isChanging || downgradeBlocked}
+              onClick={() => {
+                if (isPlanWithDian(p.slug)) {
+                  onSelectDian(p.id, p.name);
+                } else {
+                  onSelectChange(p.id, p.name);
+                }
+              }}
+            >
+              {isChanging ? 'Cambiando…' : downgradeBlocked ? 'No disponible' : 'Cambiar a este plan'}
+            </Button>
+            {downgradeBlocked && firstError && (
+              <p className="text-xs text-destructive" title={validation.data?.errors?.join(' ')}>
+                {firstError}
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function BillingPage() {
   const { isPlatformAdmin } = useAuth();
   const subscriptionQuery = useSubscriptionInfo();
@@ -60,6 +159,8 @@ export default function BillingPage() {
   const [dianPlanDialog, setDianPlanDialog] = useState<{ id: string; name: string } | null>(null);
   /** Plan pendiente de confirmación (sin DIAN): mostrar modal de prorrateo antes de cambiar. */
   const [changePlanConfirm, setChangePlanConfirm] = useState<{ id: string; name: string } | null>(null);
+  /** Errores de validación al intentar downgrade (ej. demasiados usuarios). */
+  const [changePlanErrors, setChangePlanErrors] = useState<string[]>([]);
 
   const handleOpenPortal = () => {
     const returnUrl =
@@ -203,6 +304,8 @@ export default function BillingPage() {
   const data = subscriptionQuery.data;
   const plan = data?.plan;
   const subscription = data?.subscription;
+  const scheduledPlan = data?.scheduledPlan ?? null;
+  const scheduledChangeAt = data?.scheduledChangeAt ?? null;
   const canManageBilling = data?.canManageBilling ?? false;
   const requiresPayment = data?.requiresPayment === true;
 
@@ -354,6 +457,26 @@ export default function BillingPage() {
             </div>
           )}
 
+          {/* Aviso: cambio de plan programado (downgrade) */}
+          {scheduledPlan && scheduledChangeAt && (
+            <div className="flex items-start gap-4 rounded-xl border border-blue-500/20 bg-blue-500/5 p-4 sm:p-5">
+              <Calendar className="h-5 w-5 shrink-0 text-blue-600 dark:text-blue-400 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-foreground">
+                  Tu plan cambiará a <strong>{scheduledPlan.name}</strong> el{' '}
+                  {new Date(scheduledChangeAt).toLocaleDateString('es-CO', {
+                    day: 'numeric',
+                    month: 'long',
+                    year: 'numeric',
+                  })}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Hasta entonces mantienes tu plan actual y sus funcionalidades. No hay reembolso por el periodo ya pagado.
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Cambiar de plan */}
           {plan && (
             <section className="space-y-4 rounded-2xl border border-border/60 bg-muted/5 p-5 sm:p-6">
@@ -362,7 +485,8 @@ export default function BillingPage() {
                 <h2 className="text-base font-semibold text-foreground">Cambiar de plan</h2>
               </div>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                Elige plan mensual o anual. El cambio se aplica de inmediato; el periodo actual se mantiene.
+                Si eliges un plan <strong>más costoso</strong>, el cambio es inmediato y se cobra solo la diferencia proporcional en tu próxima factura.
+                Si eliges un plan <strong>más económico</strong>, el cambio se aplica al final de tu periodo actual (sin reembolso).
               </p>
               <p className="text-xs text-muted-foreground leading-relaxed">
                 Los planes &quot;con DIAN&quot; te dan acceso a facturación electrónica. Hasta que actives el servicio podrás usar documentos internos.
@@ -376,75 +500,16 @@ export default function BillingPage() {
                 </div>
               ) : plansQuery.data && plansQuery.data.length > 0 ? (
                 <div className="grid gap-4 sm:grid-cols-2 mt-4">
-                  {plansQuery.data.map((p) => {
-                    const isCurrent = plan.id === p.id;
-                    const price = p.priceMonthly ?? p.priceYearly;
-                    return (
-                      <div
-                        key={p.id}
-                        className={`rounded-xl border p-5 transition-all ${
-                          isCurrent
-                            ? 'border-primary/40 bg-primary/10 shadow-sm ring-1 ring-primary/20'
-                            : 'border-border/70 bg-card hover:border-primary/30 hover:shadow-md'
-                        }`}
-                      >
-                        <div className="flex flex-col gap-4">
-                          <div className="flex items-start justify-between gap-2">
-                            <div>
-                              <p className="font-semibold text-foreground">{p.name}</p>
-                              {p.maxUsers != null && (
-                                <p className="text-xs text-muted-foreground mt-0.5">
-                                  hasta {p.maxUsers} usuarios
-                                </p>
-                              )}
-                            </div>
-                            {isCurrent && (
-                              <Badge variant="secondary" className="shrink-0 px-2.5">
-                                Vigente
-                              </Badge>
-                            )}
-                          </div>
-                          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                            {price != null && (
-                              <span className="text-lg font-bold text-foreground">
-                                {formatPrice(price)}
-                                <span className="text-xs font-normal text-muted-foreground ml-1">
-                                  {p.priceMonthly != null ? '/mes' : '/año'}
-                                </span>
-                              </span>
-                            )}
-                            {p.priceMonthly != null && p.priceYearly != null && (
-                              <span className="text-xs text-muted-foreground">
-                                Anual: {formatPrice(p.priceYearly)}
-                              </span>
-                            )}
-                            {p.priceMonthly == null && p.priceYearly == null && (
-                              <span className="text-muted-foreground text-sm">Consultar precio</span>
-                            )}
-                          </div>
-                          {!isCurrent && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="w-full sm:w-auto rounded-lg border-primary/40 text-primary hover:bg-primary/10"
-                              disabled={changePlanMutation.isPending || submitFeedbackMutation.isPending}
-                              onClick={() => {
-                                if (isPlanWithDian(p.slug)) {
-                                  setDianPlanDialog({ id: p.id, name: p.name });
-                                } else {
-                                  setChangePlanConfirm({ id: p.id, name: p.name });
-                                }
-                              }}
-                            >
-                              {changePlanMutation.isPending || submitFeedbackMutation.isPending
-                                ? 'Cambiando…'
-                                : 'Cambiar a este plan'}
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
+                  {plansQuery.data.map((p) => (
+                    <PlanCard
+                      key={p.id}
+                      p={p}
+                      currentPlanId={plan.id}
+                      onSelectDian={(id, name) => setDianPlanDialog({ id, name })}
+                      onSelectChange={(id, name) => setChangePlanConfirm({ id, name })}
+                      isChanging={changePlanMutation.isPending || submitFeedbackMutation.isPending}
+                    />
+                  ))}
                 </div>
               ) : (
                 <p className="text-sm text-muted-foreground mt-2">
@@ -481,8 +546,16 @@ export default function BillingPage() {
         </CardContent>
       </Card>
 
-      {/* Confirmación cambio de plan (prorrateo) */}
-      <Dialog open={!!changePlanConfirm} onOpenChange={(open) => !open && setChangePlanConfirm(null)}>
+      {/* Confirmación cambio de plan */}
+      <Dialog
+        open={!!changePlanConfirm}
+        onOpenChange={(open) => {
+          if (!open) {
+            setChangePlanConfirm(null);
+            setChangePlanErrors([]);
+          }
+        }}
+      >
         <DialogContent showClose>
           <DialogHeader>
             <DialogTitle>¿Cambiar de plan?</DialogTitle>
@@ -491,27 +564,57 @@ export default function BillingPage() {
                 Pasarás al <strong className="text-foreground">{changePlanConfirm?.name}</strong>.
               </p>
               <p>
-                En tu próxima factura verás un <strong>descuento</strong> por lo que no hayas usado del plan actual y el <strong>cobro del nuevo plan</strong> solo por los días restantes hasta tu próxima fecha de pago. Puedes revisar el detalle en tu siguiente factura o en &quot;Gestionar método de pago y facturas&quot;.
+                Si el nuevo plan es <strong>más costoso</strong>: el cambio es inmediato. En tu próxima factura verás un descuento por lo no usado del plan actual y el cobro del nuevo plan solo por los días restantes. Podrás usar las nuevas funciones de inmediato.
               </p>
               <p>
-                El cambio se aplica al instante y podrás usar las nuevas funciones de inmediato.
+                Si el nuevo plan es <strong>más económico</strong>: el cambio se aplicará al final de tu periodo actual (en la próxima fecha de renovación). No hay reembolso; hasta entonces mantienes tu plan actual.
               </p>
+              <p className="text-xs">
+                Puedes revisar el detalle en tu siguiente factura o en &quot;Gestionar método de pago y facturas&quot;.
+              </p>
+              {changePlanErrors.length > 0 && (
+                <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 space-y-2">
+                  <p className="font-medium text-destructive text-left">No se puede completar el cambio:</p>
+                  <ul className="list-disc list-inside text-destructive/90 text-left space-y-1">
+                    {changePlanErrors.map((err, i) => (
+                      <li key={i}>{err}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
           </DialogHeader>
           <DialogFooter className="gap-2 sm:gap-0">
-            <Button variant="outline" onClick={() => setChangePlanConfirm(null)}>
+            <Button variant="outline" onClick={() => { setChangePlanConfirm(null); setChangePlanErrors([]); }}>
               Cancelar
             </Button>
             <Button
               disabled={changePlanMutation.isPending}
               onClick={() => {
                 if (!changePlanConfirm) return;
+                setChangePlanErrors([]);
                 changePlanMutation.mutate(changePlanConfirm.id, {
-                  onSuccess: () => {
-                    toast.success('Plan actualizado.');
+                  onSuccess: (result) => {
+                    if (result?.scheduledChangeAt) {
+                      const date = new Date(result.scheduledChangeAt).toLocaleDateString('es-CO', {
+                        day: 'numeric', month: 'long', year: 'numeric',
+                      });
+                      toast.success(`Plan actualizado. Tu plan cambiará el ${date}.`);
+                    } else {
+                      toast.success('Plan actualizado. El nuevo plan se aplica hoy.');
+                    }
                     setChangePlanConfirm(null);
                   },
-                  onError: (e) => toast.error(getErrorMessage(e)),
+                  onError: (e: unknown) => {
+                    const err = e as { response?: { data?: { errors?: string[]; message?: string } } };
+                    const errors = Array.isArray(err.response?.data?.errors) ? err.response.data.errors : [];
+                    if (errors.length > 0) {
+                      setChangePlanErrors(errors);
+                    } else {
+                      toast.error(getErrorMessage(e));
+                      setChangePlanConfirm(null);
+                    }
+                  },
                 });
               }}
             >

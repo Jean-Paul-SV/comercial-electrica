@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getSubscription, createPortalSession, getBillingPlans, changePlan } from './api';
+import { getSubscription, createPortalSession, getBillingPlans, changePlan, validateDowngrade } from './api';
 import { useAuth } from '@shared/providers/AuthProvider';
 
 export function useSubscriptionInfo() {
@@ -46,5 +46,16 @@ export function useCreatePortalSession() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['billing', 'subscription'] });
     },
+  });
+}
+
+/** Valida si el downgrade al plan indicado está permitido (errores/advertencias). */
+export function useValidateDowngrade(planId: string | null) {
+  const { token, isPlatformAdmin } = useAuth();
+
+  return useQuery({
+    queryKey: ['billing', 'validate-downgrade', planId],
+    enabled: Boolean(token) && !isPlatformAdmin && Boolean(planId),
+    queryFn: () => validateDowngrade(token!, planId!),
   });
 }

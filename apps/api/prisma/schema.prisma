@@ -146,9 +146,10 @@ model Plan {
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
 
-  features       PlanFeature[]
-  tenants        Tenant[]
-  subscriptions  Subscription[]
+  features                PlanFeature[]
+  tenants                  Tenant[]
+  subscriptions            Subscription[]
+  subscriptionsScheduled   Subscription[]  @relation("ScheduledPlan")
 }
 
 model PlanFeature {
@@ -279,15 +280,20 @@ model Subscription {
   currentPeriodEnd      DateTime?          @db.Timestamptz
   stripeSubscriptionId  String?            @unique @db.VarChar(255)
   lastPaymentFailedAt   DateTime?          @db.Timestamptz
+  /// Plan programado para downgrade; se aplica en scheduledChangeAt (fin del ciclo).
+  scheduledPlanId       String?            @db.Uuid
+  scheduledChangeAt     DateTime?         @db.Timestamptz
   createdAt             DateTime           @default(now())
   updatedAt             DateTime           @updatedAt
 
-  tenant Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  plan   Plan?    @relation(fields: [planId], references: [id], onDelete: SetNull)
+  tenant         Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  plan           Plan?   @relation(fields: [planId], references: [id], onDelete: SetNull)
+  scheduledPlan  Plan?   @relation("ScheduledPlan", fields: [scheduledPlanId], references: [id], onDelete: SetNull)
 
   @@index([status])
   @@index([currentPeriodEnd])
   @@index([stripeSubscriptionId])
+  @@index([scheduledChangeAt])
 }
 
 model StripeEvent {

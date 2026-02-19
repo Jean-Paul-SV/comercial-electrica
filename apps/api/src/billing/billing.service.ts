@@ -7,6 +7,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { PlanLimitsService } from '../common/services/plan-limits.service';
 import Stripe from 'stripe';
 
 export type SubscriptionInfoDto = {
@@ -16,10 +17,26 @@ export type SubscriptionInfoDto = {
     currentPeriodEnd: string | null;
     currentPeriodStart: string | null;
   } | null;
+  /** Plan programado para downgrade; vigente a partir de scheduledChangeAt. */
+  scheduledPlan: { id: string; name: string; slug: string } | null;
+  /** Fecha en que se aplicará el cambio programado (fin del ciclo). */
+  scheduledChangeAt: string | null;
   /** Si true, el usuario puede abrir el portal de Stripe (actualizar pago, facturas). */
   canManageBilling: boolean;
   /** Si true, la app debe mostrarse bloqueada y solo el botón de pagar hasta completar el primer pago. */
   requiresPayment: boolean;
+};
+
+export type ChangePlanResultDto = {
+  success: boolean;
+  /** Si el cambio es diferido (downgrade), fecha en que se aplicará. */
+  scheduledChangeAt?: string;
+};
+
+export type DowngradeValidationResult = {
+  allowed: boolean;
+  errors: string[];
+  warnings: string[];
 };
 
 @Injectable()
@@ -31,6 +48,7 @@ export class BillingService {
   constructor(
     private readonly config: ConfigService,
     private readonly prisma: PrismaService,
+    private readonly planLimits: PlanLimitsService,
   ) {
     const secretKey = this.config.get<string>('STRIPE_SECRET_KEY');
     this.webhookSecret =
@@ -186,13 +204,19 @@ export class BillingService {
   }
 
   /**
-   * Procesa evento customer.subscription.deleted: marcar Subscription como CANCELLED.
+   * Procesa evento customer.subscription.deleted: marcar Subscription como CANCELLED
+   * y limpiar cambio de plan programado si existía.
    */
   async handleSubscriptionDeleted(sub: Stripe.Subscription): Promise<void> {
     const subscriptionId = sub.id;
     const updated = await this.prisma.subscription.updateMany({
       where: { stripeSubscriptionId: subscriptionId },
-      data: { status: 'CANCELLED', updatedAt: new Date() },
+      data: {
+        status: 'CANCELLED',
+        scheduledPlanId: null,
+        scheduledChangeAt: null,
+        updatedAt: new Date(),
+      },
     });
     if (updated.count > 0) {
       this.logger.log(
@@ -274,22 +298,142 @@ export class BillingService {
   }
 
   /**
-   * Cambia el plan del tenant (y su suscripción). Actualiza también la suscripción en Stripe
-   * para que el precio cobrado coincida con el plan elegido.
+   * Precio efectivo del plan según intervalo de facturación (para comparar upgrade vs downgrade).
+   */
+  private getPlanEffectivePrice(
+    priceMonthly: number | null,
+    priceYearly: number | null,
+    billingInterval: string | null,
+  ): number {
+    const useYearly = billingInterval === 'yearly' && priceYearly != null;
+    if (useYearly) return priceYearly;
+    return priceMonthly ?? priceYearly ?? 0;
+  }
+
+  /**
+   * Valida si un downgrade está permitido: límite de usuarios, módulos que perdería, DIAN activa.
+   */
+  async validateDowngrade(
+    tenantId: string,
+    newPlanId: string,
+  ): Promise<DowngradeValidationResult> {
+    const errors: string[] = [];
+    const warnings: string[] = [];
+
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: {
+        planId: true,
+        plan: {
+          select: {
+            id: true,
+            features: { select: { moduleCode: true } },
+          },
+        },
+      },
+    });
+    const newPlan = await this.prisma.plan.findUnique({
+      where: { id: newPlanId },
+      select: {
+        id: true,
+        maxUsers: true,
+        features: { select: { moduleCode: true } },
+      },
+    });
+    if (!tenant?.plan || !newPlan) {
+      return { allowed: false, errors: ['Plan actual o nuevo no encontrado.'], warnings };
+    }
+    if (tenant.plan.id === newPlan.id) {
+      return { allowed: true, errors: [], warnings: [] };
+    }
+
+    const currentModules = new Set(tenant.plan.features.map((f) => f.moduleCode));
+    const newModules = new Set(newPlan.features.map((f) => f.moduleCode));
+
+    // Límite de usuarios: el nuevo plan no puede tener menos que los usuarios activos
+    if (newPlan.maxUsers != null) {
+      const currentUsers = await this.planLimits.getCurrentUserCount(tenantId);
+      if (currentUsers > newPlan.maxUsers) {
+        errors.push(
+          `El plan elegido permite hasta ${newPlan.maxUsers} usuarios. Tu empresa tiene ${currentUsers} usuarios activos. Reduce el número de usuarios antes de cambiar de plan.`,
+        );
+      }
+    }
+
+    // DIAN activa: no permitir bajar a plan sin DIAN sin flujo controlado (bloqueamos por seguridad fiscal)
+    const currentHasDian = currentModules.has('electronic_invoicing');
+    const newHasDian = newModules.has('electronic_invoicing');
+    if (currentHasDian && !newHasDian) {
+      const dianConfig = await this.prisma.dianConfig.findUnique({
+        where: { tenantId },
+        select: { activationStatus: true },
+      });
+      if (dianConfig?.activationStatus === 'ACTIVATED') {
+        errors.push(
+          'Tu facturación electrónica (DIAN) está activa. No puedes cambiar a un plan sin DIAN por riesgo fiscal. Contacta a soporte si necesitas desactivar el servicio.',
+        );
+      } else {
+        warnings.push(
+          'El plan actual incluye facturación electrónica (DIAN). Al cambiar, perderás acceso a ese módulo.',
+        );
+      }
+    }
+
+    // Advertencias por módulos que perdería
+    const modulesToLose = [...currentModules].filter((m) => !newModules.has(m));
+    const moduleLabels: Record<string, string> = {
+      advanced_reports: 'Reportes',
+      suppliers: 'Compras y proveedores',
+      electronic_invoicing: 'Facturación electrónica (DIAN)',
+      audit: 'Auditoría',
+      backups: 'Backups',
+      ai: 'IA',
+    };
+    if (modulesToLose.length > 0 && !errors.some((e) => e.includes('DIAN'))) {
+      const labels = modulesToLose
+        .map((m) => moduleLabels[m] ?? m)
+        .filter(Boolean);
+      if (labels.length > 0) {
+        warnings.push(`Perderás acceso a: ${labels.join(', ')}.`);
+      }
+    }
+
+    return {
+      allowed: errors.length === 0,
+      errors,
+      warnings,
+    };
+  }
+
+  /**
+   * Cambio de plan tipo Spotify: upgrade inmediato con prorrateo, downgrade al final del ciclo.
    */
   async changeTenantPlan(
     tenantId: string,
     planId: string,
-  ): Promise<{ success: boolean }> {
+  ): Promise<ChangePlanResultDto> {
     const tenant = await this.prisma.tenant.findUnique({
       where: { id: tenantId },
       select: {
         id: true,
         billingInterval: true,
+        planId: true,
+        plan: {
+          select: {
+            id: true,
+            priceMonthly: true,
+            priceYearly: true,
+            stripePriceId: true,
+            stripePriceIdYearly: true,
+            features: { select: { moduleCode: true } },
+          },
+        },
         subscription: {
           select: {
             id: true,
             stripeSubscriptionId: true,
+            currentPeriodEnd: true,
+            planId: true,
           },
         },
       },
@@ -297,41 +441,123 @@ export class BillingService {
     if (!tenant) {
       throw new NotFoundException('Empresa no encontrada.');
     }
-    const plan = await this.prisma.plan.findUnique({
+    const newPlan = await this.prisma.plan.findUnique({
       where: { id: planId },
       select: {
         id: true,
+        priceMonthly: true,
+        priceYearly: true,
         stripePriceId: true,
         stripePriceIdYearly: true,
-        features: {
-          select: { moduleCode: true },
-        },
+        features: { select: { moduleCode: true } },
       },
     });
-    if (!plan) {
+    if (!newPlan) {
       throw new NotFoundException('Plan no encontrado.');
     }
-    const hasDianModule = plan.features.some(
+
+    const currentPrice = tenant.plan
+      ? this.getPlanEffectivePrice(
+          tenant.plan.priceMonthly != null ? Number(tenant.plan.priceMonthly) : null,
+          tenant.plan.priceYearly != null ? Number(tenant.plan.priceYearly) : null,
+          tenant.billingInterval,
+        )
+      : 0;
+    const newPriceEffective = this.getPlanEffectivePrice(
+      newPlan.priceMonthly != null ? Number(newPlan.priceMonthly) : null,
+      newPlan.priceYearly != null ? Number(newPlan.priceYearly) : null,
+      tenant.billingInterval,
+    );
+
+    const isUpgrade = newPriceEffective > currentPrice;
+    const isSamePlan = tenant.plan?.id === planId;
+
+    if (isSamePlan) {
+      return { success: true };
+    }
+
+    if (isUpgrade) {
+      return this.applyUpgrade(tenantId, tenant, newPlan);
+    }
+
+    // Downgrade: validar y programar cambio al final del ciclo
+    const validation = await this.validateDowngrade(tenantId, planId);
+    if (!validation.allowed) {
+      throw new BadRequestException({
+        message: 'No se puede completar el cambio de plan.',
+        errors: validation.errors,
+        warnings: validation.warnings,
+      });
+    }
+
+    const periodEnd = tenant.subscription?.currentPeriodEnd
+      ? new Date(tenant.subscription.currentPeriodEnd)
+      : null;
+    if (!periodEnd) {
+      throw new BadRequestException(
+        'No se pudo obtener la fecha de fin de periodo. Contacte a soporte.',
+      );
+    }
+
+    await this.prisma.subscription.update({
+      where: { tenantId },
+      data: {
+        scheduledPlanId: planId,
+        scheduledChangeAt: periodEnd,
+        updatedAt: new Date(),
+      },
+    });
+    this.logger.log(
+      `Downgrade programado para tenant ${tenantId}: plan ${planId} a partir de ${periodEnd.toISOString()}`,
+    );
+    return {
+      success: true,
+      scheduledChangeAt: periodEnd.toISOString(),
+    };
+  }
+
+  /**
+   * Aplica upgrade: BD + Stripe con prorrateo; flujo DIAN si aplica.
+   */
+  private async applyUpgrade(
+    tenantId: string,
+    tenant: {
+      billingInterval: string | null;
+      subscription: { id: string; stripeSubscriptionId: string | null } | null;
+    },
+    newPlan: {
+      id: string;
+      stripePriceId: string | null;
+      stripePriceIdYearly: string | null;
+      features: { moduleCode: string }[];
+    },
+  ): Promise<ChangePlanResultDto> {
+    const hasDianModule = newPlan.features.some(
       (f) => f.moduleCode === 'electronic_invoicing',
     );
     const now = new Date();
     const periodEnd = new Date(now);
     periodEnd.setDate(periodEnd.getDate() + 30);
+
     await this.prisma.$transaction(async (tx) => {
       await tx.tenant.update({
         where: { id: tenantId },
-        data: { planId },
+        data: { planId: newPlan.id },
       });
       if (tenant.subscription) {
         await tx.subscription.update({
           where: { tenantId },
-          data: { planId },
+          data: {
+            planId: newPlan.id,
+            scheduledPlanId: null,
+            scheduledChangeAt: null,
+          },
         });
       } else {
         await tx.subscription.create({
           data: {
             tenantId,
-            planId,
+            planId: newPlan.id,
             status: 'ACTIVE',
             currentPeriodStart: now,
             currentPeriodEnd: periodEnd,
@@ -339,13 +565,11 @@ export class BillingService {
         });
       }
 
-      // Si el plan incluye DIAN, crear o actualizar DianConfig con estado PENDING
       if (hasDianModule) {
         const existingConfig = await tx.dianConfig.findUnique({
           where: { tenantId },
         });
         if (existingConfig) {
-          // Si ya existe pero no está activado, mantener o poner en PENDING
           if (existingConfig.activationStatus !== 'ACTIVATED') {
             await tx.dianConfig.update({
               where: { tenantId },
@@ -353,7 +577,6 @@ export class BillingService {
             });
           }
         } else {
-          // Crear nueva configuración DIAN con estado PENDING
           await tx.dianConfig.create({
             data: {
               tenantId,
@@ -365,12 +588,11 @@ export class BillingService {
       }
     });
 
-    // Actualizar el precio en Stripe: usar mensual o anual según tenant.billingInterval
     const useYearly =
-      tenant.billingInterval === 'yearly' && plan.stripePriceIdYearly;
+      tenant.billingInterval === 'yearly' && newPlan.stripePriceIdYearly;
     const effectivePriceId = useYearly
-      ? plan.stripePriceIdYearly!
-      : plan.stripePriceId ?? null;
+      ? newPlan.stripePriceIdYearly!
+      : newPlan.stripePriceId ?? null;
     const subscription = await this.prisma.subscription.findUnique({
       where: { tenantId },
       select: { stripeSubscriptionId: true },
@@ -395,7 +617,7 @@ export class BillingService {
             },
           );
           this.logger.log(
-            `Suscripción Stripe ${subscription.stripeSubscriptionId} actualizada al plan ${planId} (price ${effectivePriceId})`,
+            `Suscripción Stripe ${subscription.stripeSubscriptionId} actualizada al plan ${newPlan.id} (upgrade, price ${effectivePriceId})`,
           );
         }
       } catch (err) {
@@ -406,6 +628,84 @@ export class BillingService {
     }
 
     return { success: true };
+  }
+
+  /**
+   * Aplica los cambios de plan programados (downgrades) cuya fecha ya llegó.
+   * Ejecutar por cron cada hora.
+   */
+  async applyScheduledPlanChanges(): Promise<{ applied: number }> {
+    const now = new Date();
+    const subs = await this.prisma.subscription.findMany({
+      where: {
+        scheduledPlanId: { not: null },
+        scheduledChangeAt: { lte: now },
+        status: 'ACTIVE',
+      },
+      include: {
+        tenant: { select: { billingInterval: true } },
+        scheduledPlan: {
+          select: {
+            id: true,
+            stripePriceId: true,
+            stripePriceIdYearly: true,
+          },
+        },
+      },
+    });
+
+    let applied = 0;
+    for (const sub of subs) {
+      if (!sub.scheduledPlanId || !sub.scheduledChangeAt || !sub.scheduledPlan) continue;
+      const useYearly =
+        sub.tenant.billingInterval === 'yearly' &&
+        sub.scheduledPlan.stripePriceIdYearly;
+      const effectivePriceId = useYearly
+        ? sub.scheduledPlan.stripePriceIdYearly!
+        : sub.scheduledPlan.stripePriceId ?? null;
+
+      if (this.stripe && sub.stripeSubscriptionId && effectivePriceId) {
+        try {
+          const stripeSub = await this.stripe.subscriptions.retrieve(
+            sub.stripeSubscriptionId,
+            { expand: ['items.data'] },
+          );
+          const itemId = stripeSub.items.data[0]?.id;
+          if (itemId) {
+            await this.stripe.subscriptions.update(sub.stripeSubscriptionId, {
+              items: [{ id: itemId, price: effectivePriceId }],
+              proration_behavior: 'none',
+            });
+          }
+        } catch (err) {
+          this.logger.error(
+            `applyScheduledPlanChanges: error Stripe para tenant ${sub.tenantId}: ${(err as Error).message}`,
+          );
+          continue;
+        }
+      }
+
+      await this.prisma.$transaction([
+        this.prisma.tenant.update({
+          where: { id: sub.tenantId },
+          data: { planId: sub.scheduledPlanId },
+        }),
+        this.prisma.subscription.update({
+          where: { id: sub.id },
+          data: {
+            planId: sub.scheduledPlanId,
+            scheduledPlanId: null,
+            scheduledChangeAt: null,
+            updatedAt: now,
+          },
+        }),
+      ]);
+      applied++;
+      this.logger.log(
+        `Cambio programado aplicado: tenant ${sub.tenantId} -> plan ${sub.scheduledPlanId}`,
+      );
+    }
+    return { applied };
   }
 
   /**
@@ -463,6 +763,7 @@ export class BillingService {
       where: { tenantId },
       include: {
         plan: { select: { id: true, name: true, slug: true } },
+        scheduledPlan: { select: { id: true, name: true, slug: true } },
       },
     });
     if (!subscription) {
@@ -475,6 +776,7 @@ export class BillingService {
           where: { tenantId },
           include: {
             plan: { select: { id: true, name: true, slug: true } },
+            scheduledPlan: { select: { id: true, name: true, slug: true } },
           },
         })) ?? subscription;
     }
@@ -495,6 +797,14 @@ export class BillingService {
         currentPeriodStart:
           subscription.currentPeriodStart?.toISOString() ?? null,
       },
+      scheduledPlan: subscription.scheduledPlan
+        ? {
+            id: subscription.scheduledPlan.id,
+            name: subscription.scheduledPlan.name,
+            slug: subscription.scheduledPlan.slug,
+          }
+        : null,
+      scheduledChangeAt: subscription.scheduledChangeAt?.toISOString() ?? null,
       canManageBilling,
       requiresPayment,
     };

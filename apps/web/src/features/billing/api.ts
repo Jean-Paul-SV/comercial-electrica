@@ -1,5 +1,5 @@
 import { apiClient } from '@infrastructure/api/client';
-import type { SubscriptionInfo, PortalSessionResponse, BillingPlan } from './types';
+import type { SubscriptionInfo, PortalSessionResponse, BillingPlan, ChangePlanResult } from './types';
 
 export function getSubscription(authToken: string): Promise<SubscriptionInfo> {
   return apiClient.get('/billing/subscription', { authToken });
@@ -12,8 +12,24 @@ export function getBillingPlans(authToken: string): Promise<BillingPlan[]> {
 export function changePlan(
   authToken: string,
   planId: string,
-): Promise<{ success: boolean }> {
-  return apiClient.patch<{ success: boolean }>('/billing/plan', { planId }, { authToken });
+): Promise<ChangePlanResult> {
+  return apiClient.patch<ChangePlanResult>('/billing/plan', { planId }, { authToken });
+}
+
+export type ValidateDowngradeResult = {
+  allowed: boolean;
+  errors: string[];
+  warnings: string[];
+};
+
+export function validateDowngrade(
+  authToken: string,
+  planId: string,
+): Promise<ValidateDowngradeResult> {
+  return apiClient.get<ValidateDowngradeResult>(
+    `/billing/plan/validate-downgrade?planId=${encodeURIComponent(planId)}`,
+    { authToken },
+  );
 }
 
 export function createPortalSession(

@@ -5,6 +5,7 @@ import {
   Post,
   Body,
   Req,
+  Query,
   UseGuards,
   BadRequestException,
 } from '@nestjs/common';
@@ -47,14 +48,51 @@ export class BillingPortalController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Get('plan/validate-downgrade')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Validar si se puede hacer downgrade a un plan',
+    description:
+      'Devuelve si el cambio al plan indicado está permitido (downgrade) y lista de errores/advertencias. Útil para deshabilitar el botón o mostrar avisos antes de confirmar.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Resultado de validación',
+    schema: {
+      type: 'object',
+      properties: {
+        allowed: { type: 'boolean' },
+        errors: { type: 'array', items: { type: 'string' } },
+        warnings: { type: 'array', items: { type: 'string' } },
+      },
+    },
+  })
+  async validateDowngrade(
+    @Req() req: { user?: { tenantId?: string | null } },
+    @Query('planId') planId: string,
+  ) {
+    const tenantId = req.user?.tenantId;
+    if (!tenantId) {
+      throw new BadRequestException(
+        'Solo los usuarios de una empresa pueden validar el cambio de plan.',
+      );
+    }
+    if (!planId || typeof planId !== 'string') {
+      throw new BadRequestException('planId es requerido.');
+    }
+    return this.billing.validateDowngrade(tenantId, planId);
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Patch('plan')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Cambiar plan del tenant',
     description:
-      'Actualiza el plan de la empresa del usuario. El periodo de suscripci?n se mantiene.',
+      'Upgrade: inmediato con prorrateo. Downgrade: programado al final del ciclo. Devuelve scheduledChangeAt si el cambio es diferido.',
   })
-  @ApiResponse({ status: 200, description: 'Plan actualizado.' })
+  @ApiResponse({ status: 200, description: 'Plan actualizado (o cambio programado).' })
+  @ApiResponse({ status: 400, description: 'Downgrade bloqueado (ej. demasiados usuarios, DIAN activa).' })
   @ApiResponse({ status: 404, description: 'Plan o empresa no encontrados.' })
   async changePlan(
     @Req() req: { user?: { tenantId?: string | null } },
