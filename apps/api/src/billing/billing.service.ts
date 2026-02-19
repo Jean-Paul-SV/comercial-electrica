@@ -440,6 +440,101 @@ export class BillingService {
   }
 
   /**
+   * Crea una sesión de Stripe Checkout para comprar un plan (flujo tipo Spotify).
+   * El usuario es redirigido a la página de Stripe donde introduce tarjeta y completa la compra.
+   * La suscripción en nuestra BD se crea/actualiza en el webhook checkout.session.completed.
+   * Solo para tenants sin plan o sin suscripción activa en Stripe.
+   */
+  async createCheckoutSessionForPlan(
+    tenantId: string,
+    planId: string,
+    billingInterval: 'monthly' | 'yearly',
+    returnUrl: string,
+  ): Promise<{ url: string }> {
+    if (!this.stripe) {
+      throw new BadRequestException(
+        'La gestión de facturación no está configurada. Contacte a soporte.',
+      );
+    }
+
+    const plan = await this.prisma.plan.findUnique({
+      where: { id: planId },
+      select: {
+        id: true,
+        name: true,
+        stripePriceId: true,
+        stripePriceIdYearly: true,
+        features: { select: { moduleCode: true } },
+      },
+    });
+    if (!plan) {
+      throw new NotFoundException('Plan no encontrado.');
+    }
+
+    const useYearly = billingInterval === 'yearly' && plan.stripePriceIdYearly;
+    const stripePriceId = useYearly ? plan.stripePriceIdYearly : plan.stripePriceId;
+    if (!stripePriceId) {
+      throw new BadRequestException(
+        `El plan no tiene precio configurado en Stripe para facturación ${billingInterval}. Contacte a soporte.`,
+      );
+    }
+
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: {
+        name: true,
+        subscription: { select: { stripeSubscriptionId: true } },
+        users: {
+          where: { role: 'ADMIN' },
+          take: 1,
+          select: { email: true },
+        },
+      },
+    });
+    if (!tenant) {
+      throw new NotFoundException('Empresa no encontrada.');
+    }
+
+    const customerEmail = tenant.users[0]?.email;
+    if (!customerEmail) {
+      throw new BadRequestException(
+        'No se encontró un email de administrador para esta empresa. Contacte a soporte.',
+      );
+    }
+
+    const sessionParams: Stripe.Checkout.SessionCreateParams = {
+      mode: 'subscription',
+      line_items: [{ price: stripePriceId, quantity: 1 }],
+      customer_email: customerEmail,
+      metadata: {
+        tenantId,
+        planId: plan.id,
+        billingInterval,
+      },
+      subscription_data: {
+        metadata: { tenantId, planId: plan.id },
+        trial_period_days: undefined,
+      },
+      success_url: `${returnUrl}?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: returnUrl,
+      allow_promotion_codes: true,
+    };
+
+    if (this.stripeTaxRateId) {
+      sessionParams.tax_id_collection = { enabled: false };
+      sessionParams.subscription_data!.default_tax_rates = [this.stripeTaxRateId];
+    } else {
+      sessionParams.automatic_tax = { enabled: true };
+    }
+
+    const session = await this.stripe.checkout.sessions.create(sessionParams);
+    this.logger.log(
+      `Checkout Session creada para tenant ${tenantId} plan ${planId}: ${session.id}`,
+    );
+    return { url: session.url! };
+  }
+
+  /**
    * Precio efectivo del plan según intervalo de facturación (para comparar upgrade vs downgrade).
    */
   private getPlanEffectivePrice(
@@ -1437,6 +1532,97 @@ export class BillingService {
   }
 
   /**
+   * Procesa checkout.session.completed: cuando el usuario completa la compra en Stripe Checkout,
+   * creamos o actualizamos la suscripción en nuestra BD y asignamos el plan al tenant.
+   */
+  async handleCheckoutSessionCompleted(session: Stripe.Checkout.Session): Promise<void> {
+    if (session.mode !== 'subscription' || !session.subscription) {
+      this.logger.debug(
+        `checkout.session.completed ignorado: mode=${session.mode}, subscription=${session.subscription}`,
+      );
+      return;
+    }
+
+    const tenantId = session.metadata?.tenantId as string | undefined;
+    const planId = session.metadata?.planId as string | undefined;
+    const billingInterval = (session.metadata?.billingInterval as 'monthly' | 'yearly') || 'monthly';
+
+    if (!tenantId || !planId) {
+      this.logger.warn(
+        `checkout.session.completed sin tenantId o planId en metadata: ${session.id}`,
+      );
+      return;
+    }
+
+    const stripeSubscriptionId =
+      typeof session.subscription === 'string' ? session.subscription : session.subscription.id;
+    let currentPeriodStart: Date | null = null;
+    let currentPeriodEnd: Date | null = null;
+
+    try {
+      const stripeSub = await this.stripe!.subscriptions.retrieve(stripeSubscriptionId);
+      if (stripeSub.current_period_start) {
+        currentPeriodStart = new Date(stripeSub.current_period_start * 1000);
+      }
+      if (stripeSub.current_period_end) {
+        currentPeriodEnd = new Date(stripeSub.current_period_end * 1000);
+      }
+    } catch (err) {
+      this.logger.error(
+        `Error obteniendo suscripción Stripe ${stripeSubscriptionId}: ${(err as Error).message}`,
+      );
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      const existing = await tx.subscription.findUnique({
+        where: { tenantId },
+      });
+
+      if (existing) {
+        await tx.subscription.update({
+          where: { tenantId },
+          data: {
+            planId,
+            status: 'ACTIVE',
+            stripeSubscriptionId,
+            currentPeriodStart,
+            currentPeriodEnd,
+            scheduledPlanId: null,
+            scheduledChangeAt: null,
+            updatedAt: new Date(),
+          },
+        });
+      } else {
+        await tx.subscription.create({
+          data: {
+            tenantId,
+            planId,
+            status: 'ACTIVE',
+            stripeSubscriptionId,
+            currentPeriodStart,
+            currentPeriodEnd,
+            updatedAt: new Date(),
+          },
+        });
+      }
+
+      await tx.tenant.update({
+        where: { id: tenantId },
+        data: {
+          planId,
+          billingInterval,
+          isActive: true,
+          updatedAt: new Date(),
+        },
+      });
+    });
+
+    this.logger.log(
+      `Checkout completado: tenant ${tenantId} plan ${planId} stripeSub ${stripeSubscriptionId}`,
+    );
+  }
+
+  /**
    * Despacha el evento Stripe al manejador correspondiente.
    * Implementa idempotencia: verifica si el evento ya fue procesado antes de procesarlo.
    */
@@ -1473,6 +1659,11 @@ export class BillingService {
         case 'customer.subscription.updated': {
           const sub = event.data.object;
           await this.handleSubscriptionUpdated(sub);
+          break;
+        }
+        case 'checkout.session.completed': {
+          const session = event.data.object as Stripe.Checkout.Session;
+          await this.handleCheckoutSessionCompleted(session);
           break;
         }
         default:

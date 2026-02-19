@@ -20,6 +20,7 @@ import { ConfigService } from '@nestjs/config';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { BillingService } from './billing.service';
 import { CreatePortalSessionDto } from './dto/create-portal-session.dto';
+import { CreateCheckoutSessionDto } from './dto/create-checkout-session.dto';
 import { ChangePlanDto } from './dto/change-plan.dto';
 
 @ApiTags('billing')
@@ -162,6 +163,50 @@ export class BillingPortalController {
       );
     }
     return this.billing.getSubscriptionForTenant(tenantId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('checkout-session')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Crear sesión de Checkout para comprar un plan',
+    description:
+      'Devuelve la URL de Stripe Checkout (página tipo Spotify) para que el usuario introduzca tarjeta y complete la compra. La suscripción se activa al completar el pago.',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'URL de Checkout',
+    schema: { type: 'object', properties: { url: { type: 'string', format: 'uri' } } },
+  })
+  @ApiResponse({ status: 400, description: 'Plan sin precio en Stripe o sin email de admin.' })
+  @ApiResponse({ status: 404, description: 'Plan o empresa no encontrados.' })
+  async createCheckoutSession(
+    @Req() req: { user?: { tenantId?: string | null } },
+    @Body() dto: CreateCheckoutSessionDto,
+  ) {
+    const tenantId = req.user?.tenantId;
+    if (!tenantId) {
+      throw new BadRequestException(
+        'Solo los usuarios de una empresa pueden iniciar una compra.',
+      );
+    }
+    const baseUrl =
+      this.config.get<string>('FRONTEND_URL') ?? 'http://localhost:3001';
+    let returnUrl = `${baseUrl.replace(/\/$/, '')}/settings/billing`;
+    if (dto.returnUrl?.trim()) {
+      try {
+        new URL(dto.returnUrl);
+        returnUrl = dto.returnUrl;
+      } catch {
+        // mantener default
+      }
+    }
+    return this.billing.createCheckoutSessionForPlan(
+      tenantId,
+      dto.planId,
+      dto.billingInterval,
+      returnUrl,
+    );
   }
 
   @UseGuards(JwtAuthGuard)

@@ -37,6 +37,19 @@ export function validateDowngrade(
   );
 }
 
+export function createCheckoutSession(
+  authToken: string,
+  planId: string,
+  billingInterval: 'monthly' | 'yearly',
+  returnUrl?: string,
+): Promise<PortalSessionResponse> {
+  return apiClient.post<PortalSessionResponse>(
+    '/billing/checkout-session',
+    { planId, billingInterval, ...(returnUrl && { returnUrl }) },
+    { authToken },
+  );
+}
+
 export function createPortalSession(
   authToken: string,
   returnUrl?: string,

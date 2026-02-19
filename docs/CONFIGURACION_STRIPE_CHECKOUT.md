@@ -1,10 +1,10 @@
 # Configuración de Stripe para Checkout Sessions
 
-## Problema Actual
+## Flujo actual (tipo Spotify)
 
-Cuando un usuario selecciona un plan nuevo, el sistema crea una suscripción incompleta en Stripe que necesita un método de pago. El problema es que el Customer Portal de Stripe solo permite actualizar el método de pago si ya existe uno guardado, pero no permite completar el pago de una suscripción incompleta.
+Cuando un usuario **no tiene plan** y elige uno, al hacer clic en **"Completar compra"** se le redirige a **Stripe Checkout**: una página donde introduce tarjeta, revisa el resumen y completa el pago. Al pagar, el webhook `checkout.session.completed` activa el plan en la app. No se usa Customer Portal para la primera compra.
 
-## Solución: Configurar Checkout Sessions
+## Qué debes configurar
 
 Para que los usuarios puedan completar el pago de suscripciones nuevas, necesitas configurar Checkout Sessions en Stripe.
 
@@ -36,12 +36,12 @@ El Customer Portal se usa para gestionar métodos de pago y facturas de suscripc
 
 1. Ve a **Stripe Dashboard** → **Developers** → **Webhooks**
 2. Verifica que tienes un webhook apuntando a tu API: `https://tu-api.com/billing/webhooks/stripe`
-3. Los eventos que debe escuchar:
+3. Los eventos que debe escuchar (obligatorio para compra tipo Spotify):
+   - `checkout.session.completed` — al completar la compra en Checkout, se activa el plan en la app
    - `invoice.paid`
    - `invoice.payment_failed`
    - `customer.subscription.updated`
    - `customer.subscription.deleted`
-   - `checkout.session.completed`
 
 ### Paso 5: Probar el Flujo Completo
 

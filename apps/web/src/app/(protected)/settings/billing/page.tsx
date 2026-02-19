@@ -21,7 +21,7 @@ import {
   DialogFooter,
 } from '@shared/components/ui/dialog';
 import { CreditCard, Calendar, Package, AlertCircle, CheckCircle2, Sparkles, RefreshCw } from 'lucide-react';
-import { useSubscriptionInfo, useCreatePortalSession, useBillingPlans, useChangePlan, useValidateDowngrade } from '@features/billing/hooks';
+import { useSubscriptionInfo, useCreatePortalSession, useCreateCheckoutSession, useBillingPlans, useChangePlan, useValidateDowngrade } from '@features/billing/hooks';
 import { useDianConfigStatus } from '@features/dian/hooks';
 import { useSubmitFeedback } from '@features/feedback/hooks';
 import { useAuth } from '@shared/providers/AuthProvider';
@@ -246,6 +246,7 @@ export default function BillingPage() {
   const { isPlatformAdmin } = useAuth();
   const subscriptionQuery = useSubscriptionInfo();
   const createPortalMutation = useCreatePortalSession();
+  const createCheckoutMutation = useCreateCheckoutSession();
   const plansQuery = useBillingPlans();
   const changePlanMutation = useChangePlan();
   const submitFeedbackMutation = useSubmitFeedback();
@@ -909,7 +910,7 @@ export default function BillingPage() {
               ) : (
                 <>
                   <p>
-                    Al confirmar, se creará tu suscripción y serás redirigido al portal de pago seguro de Stripe para completar el pago y activar tu cuenta.
+                    Serás redirigido a la página de pago seguro (Stripe Checkout), donde podrás agregar tu tarjeta y completar la compra. El plan se activará al instante.
                   </p>
                   <p className="text-xs">
                     Una vez completado el pago, tendrás acceso inmediato a todas las funcionalidades del plan seleccionado.
@@ -933,42 +934,58 @@ export default function BillingPage() {
               Cancelar
             </Button>
             <Button
-              disabled={changePlanMutation.isPending}
+              disabled={changePlanMutation.isPending || createCheckoutMutation.isPending}
               onClick={() => {
                 if (!changePlanConfirm) return;
                 setChangePlanErrors([]);
+
+                if (!plan) {
+                  // Sin plan: ir directo a Stripe Checkout (página tipo Spotify: tarjeta + completar compra)
+                  const returnUrl = typeof window !== 'undefined' ? `${window.location.origin}/settings/billing` : undefined;
+                  createCheckoutMutation.mutate(
+                    {
+                      planId: changePlanConfirm.id,
+                      billingInterval: changePlanConfirm.billingInterval,
+                      returnUrl,
+                    },
+                    {
+                      onSuccess: (data) => {
+                        if (data?.url) {
+                          toast.success('Redirigiendo a la página de pago...');
+                          setChangePlanConfirm(null);
+                          window.location.href = data.url;
+                        } else {
+                          toast.error('No se pudo abrir la página de pago.');
+                        }
+                      },
+                      onError: (e: unknown) => {
+                        const err = e as { response?: { data?: { errors?: string[]; message?: string } } };
+                        const errors = Array.isArray(err.response?.data?.errors) ? err.response.data.errors : [];
+                        if (errors.length > 0) {
+                          setChangePlanErrors(errors);
+                        } else {
+                          toast.error(getErrorMessage(e));
+                          setChangePlanConfirm(null);
+                        }
+                      },
+                    },
+                  );
+                  return;
+                }
+
                 changePlanMutation.mutate(
                   { planId: changePlanConfirm.id, billingInterval: changePlanConfirm.billingInterval },
                   {
                   onSuccess: (result) => {
-                    if (plan) {
-                      // Cambio de plan existente
-                      if (result?.scheduledChangeAt) {
-                        const date = new Date(result.scheduledChangeAt).toLocaleDateString('es-CO', {
-                          day: 'numeric', month: 'long', year: 'numeric',
-                        });
-                        toast.success(`Plan actualizado. Tu plan cambiará el ${date}.`);
-                      } else {
-                        toast.success('Plan actualizado. El nuevo plan se aplica hoy.');
-                      }
-                      setChangePlanConfirm(null);
-                    } else {
-                      // Nuevo plan - redirigir al portal de pago
-                      toast.success('Plan seleccionado. Redirigiendo al portal de pago...');
-                      setChangePlanConfirm(null);
-                      // Refrescar la suscripción y esperar un poco más para que Stripe cree la suscripción
-                      subscriptionQuery.refetch().then(() => {
-                        // Esperar 1.5 segundos para dar tiempo a que Stripe cree la suscripción
-                        setTimeout(() => {
-                          handleOpenPortal();
-                        }, 1500);
-                      }).catch(() => {
-                        // Si falla el refetch, intentar abrir el portal de todas formas después de un delay
-                        setTimeout(() => {
-                          handleOpenPortal();
-                        }, 2000);
+                    if (result?.scheduledChangeAt) {
+                      const date = new Date(result.scheduledChangeAt).toLocaleDateString('es-CO', {
+                        day: 'numeric', month: 'long', year: 'numeric',
                       });
+                      toast.success(`Plan actualizado. Tu plan cambiará el ${date}.`);
+                    } else {
+                      toast.success('Plan actualizado. El nuevo plan se aplica hoy.');
                     }
+                    setChangePlanConfirm(null);
                   },
                   onError: (e: unknown) => {
                     const err = e as { response?: { data?: { errors?: string[]; message?: string } } };
@@ -983,9 +1000,11 @@ export default function BillingPage() {
                 });
               }}
             >
-              {changePlanMutation.isPending 
-                ? (plan ? 'Cambiando…' : 'Creando suscripción…') 
-                : (plan ? 'Sí, cambiar de plan' : 'Pagar y activar')}
+              {createCheckoutMutation.isPending
+                ? 'Redirigiendo a pago…'
+                : changePlanMutation.isPending 
+                  ? (plan ? 'Cambiando…' : 'Creando suscripción…') 
+                  : (plan ? 'Sí, cambiar de plan' : 'Completar compra')}
             </Button>
           </DialogFooter>
         </DialogContent>
