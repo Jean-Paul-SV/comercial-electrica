@@ -1135,7 +1135,64 @@ export class BillingService {
       ? stripeSubscription.customer
       : stripeSubscription.customer.id;
     
-    // Si hay una factura pendiente con payment_intent, usar el payment_intent para completar el pago
+    // Si la suscripción está incompleta, usar el payment_intent de la factura para completar el pago
+    if (stripeSubscription.status === 'incomplete' || stripeSubscription.status === 'incomplete_expired') {
+      const latestInvoice = stripeSubscription.latest_invoice;
+      if (latestInvoice && typeof latestInvoice !== 'string') {
+        // Obtener la factura completa con el payment_intent
+        const invoice = await this.stripe.invoices.retrieve(latestInvoice.id, {
+          expand: ['payment_intent'],
+        });
+        
+        if (invoice.payment_intent) {
+          const paymentIntentId = typeof invoice.payment_intent === 'string'
+            ? invoice.payment_intent
+            : invoice.payment_intent.id;
+          
+          const paymentIntent = await this.stripe.paymentIntents.retrieve(paymentIntentId);
+          
+          if (paymentIntent.status === 'requires_payment_method' || paymentIntent.status === 'requires_action') {
+            // Crear Checkout Session para completar el payment intent existente
+            try {
+              const checkoutSession = await this.stripe.checkout.sessions.create({
+                customer: customerId,
+                payment_intent_data: {
+                  metadata: { tenantId },
+                },
+                mode: 'payment',
+                line_items: [{
+                  price_data: {
+                    currency: invoice.currency || 'cop',
+                    product_data: {
+                      name: (subscription.plan as any)?.name || 'Suscripción',
+                    },
+                    unit_amount: invoice.amount_due,
+                  },
+                  quantity: 1,
+                }],
+                success_url: `${returnUrl}?session_id={CHECKOUT_SESSION_ID}`,
+                cancel_url: returnUrl,
+                metadata: { tenantId, subscriptionId: subscription.stripeSubscriptionId },
+              });
+              
+              this.logger.log(
+                `Checkout Session creada para completar suscripción incompleta de tenant ${tenantId}: ${checkoutSession.id}`,
+              );
+              
+              return { url: checkoutSession.url! };
+            } catch (err) {
+              this.logger.error(
+                `Error al crear Checkout Session para suscripción incompleta: ${(err as Error).message}`,
+                err instanceof Error ? err.stack : undefined,
+              );
+              // Continuar con el flujo alternativo
+            }
+          }
+        }
+      }
+    }
+    
+    // Si hay una factura pendiente con payment_intent (para suscripciones activas con pago fallido)
     const latestInvoice = stripeSubscription.latest_invoice;
     if (latestInvoice && typeof latestInvoice !== 'string' && latestInvoice.payment_intent) {
       const paymentIntent = typeof latestInvoice.payment_intent === 'string'
@@ -1180,7 +1237,60 @@ export class BillingService {
       }
     }
     
-    // Si no hay payment intent o falló, crear Checkout Session con subscription_data
+    // Si no hay payment intent o falló, usar la suscripción existente incompleta
+    // Si la suscripción está incompleta, usar Checkout para completar el pago
+    if (stripeSubscription.status === 'incomplete' || stripeSubscription.status === 'incomplete_expired') {
+      // Obtener el payment_intent de la factura pendiente
+      const latestInvoice = stripeSubscription.latest_invoice;
+      if (latestInvoice && typeof latestInvoice !== 'string') {
+        const invoice = await this.stripe.invoices.retrieve(latestInvoice.id, {
+          expand: ['payment_intent'],
+        });
+        
+        if (invoice.payment_intent) {
+          const paymentIntentId = typeof invoice.payment_intent === 'string'
+            ? invoice.payment_intent
+            : invoice.payment_intent.id;
+          
+          // Crear Checkout Session para completar el payment intent existente
+          try {
+            const checkoutSession = await this.stripe.checkout.sessions.create({
+              customer: customerId,
+              payment_intent_data: {
+                metadata: { tenantId },
+              },
+              mode: 'payment',
+              line_items: [{
+                price_data: {
+                  currency: invoice.currency || 'cop',
+                  product_data: {
+                    name: (subscription.plan as any)?.name || 'Suscripción',
+                  },
+                  unit_amount: invoice.amount_due,
+                },
+                quantity: 1,
+              }],
+              success_url: `${returnUrl}?session_id={CHECKOUT_SESSION_ID}`,
+              cancel_url: returnUrl,
+              metadata: { tenantId, subscriptionId: subscription.stripeSubscriptionId },
+            });
+            
+            this.logger.log(
+              `Checkout Session creada para completar suscripción incompleta de tenant ${tenantId}: ${checkoutSession.id}`,
+            );
+            
+            return { url: checkoutSession.url! };
+          } catch (err) {
+            this.logger.error(
+              `Error al crear Checkout Session para suscripción incompleta: ${(err as Error).message}`,
+              err instanceof Error ? err.stack : undefined,
+            );
+          }
+        }
+      }
+    }
+    
+    // Si llegamos aquí, crear Checkout Session con subscription (usar la suscripción existente)
     // Obtener el precio según el intervalo de facturación
     const useYearly = subscription.tenant.billingInterval === 'yearly' && subscription.plan?.stripePriceIdYearly;
     const priceId = useYearly
@@ -1194,22 +1304,19 @@ export class BillingService {
     }
     
     try {
-      // Crear Checkout Session que actualizará la suscripción existente
+      // Crear Checkout Session usando la suscripción existente
       const checkoutSession = await this.stripe.checkout.sessions.create({
         customer: customerId,
         mode: 'subscription',
         line_items: [{ price: priceId, quantity: 1 }],
-        subscription_data: {
-          metadata: { tenantId },
-        },
-        // Usar la suscripción existente si es posible
+        subscription: subscription.stripeSubscriptionId, // Usar la suscripción existente
         success_url: `${returnUrl}?session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: returnUrl,
         metadata: { tenantId, existingSubscriptionId: subscription.stripeSubscriptionId },
       });
       
       this.logger.log(
-        `Checkout Session creada para tenant ${tenantId}: ${checkoutSession.id}`,
+        `Checkout Session creada para tenant ${tenantId} usando suscripción existente: ${checkoutSession.id}`,
       );
       
       return { url: checkoutSession.url! };
