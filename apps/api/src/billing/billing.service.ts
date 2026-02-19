@@ -1027,10 +1027,16 @@ export class BillingService {
     returnUrl: string,
   ): Promise<{ url: string }> {
     if (!this.stripe) {
+      this.logger.error(
+        `createPortalSession llamado pero STRIPE_SECRET_KEY no está configurada. Tenant: ${tenantId}`,
+      );
       throw new BadRequestException(
         'La gestión de facturación no está configurada. Contacte a soporte.',
       );
     }
+    this.logger.debug(
+      `Creando sesión del portal para tenant ${tenantId}, returnUrl: ${returnUrl}`,
+    );
     const subscription = await this.prisma.subscription.findUnique({
       where: { tenantId },
     });
