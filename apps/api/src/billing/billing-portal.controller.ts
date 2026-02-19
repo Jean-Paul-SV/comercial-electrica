@@ -24,6 +24,8 @@ import { ChangePlanDto } from './dto/change-plan.dto';
 @ApiTags('billing')
 @Controller('billing')
 export class BillingPortalController {
+  private readonly logger = new Logger(BillingPortalController.name);
+
   constructor(
     private readonly billing: BillingService,
     private readonly config: ConfigService,
@@ -182,11 +184,14 @@ export class BillingPortalController {
     description: 'Sin suscripci?n Stripe o Stripe no configurado',
   })
   async createPortalSession(
-    @Req() req: { user?: { tenantId?: string | null } },
+    @Req() req: { user?: { tenantId?: string | null; id?: string } },
     @Body() dto: CreatePortalSessionDto,
   ) {
+    this.logger.log(`[createPortalSession] Request recibido - tenantId: ${req.user?.tenantId}, returnUrl: ${dto.returnUrl}`);
+    
     const tenantId = req.user?.tenantId;
     if (!tenantId) {
+      this.logger.warn(`[createPortalSession] Usuario sin tenantId - userId: ${req.user?.id || 'unknown'}`);
       throw new BadRequestException(
         'Solo los usuarios de una empresa pueden abrir el portal de facturación.',
       );
@@ -197,15 +202,27 @@ export class BillingPortalController {
     let returnUrl = dto.returnUrl?.trim();
     if (!returnUrl || returnUrl.length === 0) {
       returnUrl = `${baseUrl.replace(/\/$/, '')}/settings/billing`;
+      this.logger.log(`[createPortalSession] returnUrl vacío, usando default: ${returnUrl}`);
     } else {
       // Validar que sea una URL válida (básico)
       try {
         new URL(returnUrl);
-      } catch {
+        this.logger.log(`[createPortalSession] returnUrl válido: ${returnUrl}`);
+      } catch (err) {
         // Si no es una URL válida, usar el default
+        this.logger.warn(`[createPortalSession] returnUrl inválido "${returnUrl}", usando default`);
         returnUrl = `${baseUrl.replace(/\/$/, '')}/settings/billing`;
       }
     }
-    return this.billing.createPortalSession(tenantId, returnUrl);
+    
+    try {
+      this.logger.log(`[createPortalSession] Llamando a billing.createPortalSession para tenant ${tenantId}`);
+      const result = await this.billing.createPortalSession(tenantId, returnUrl);
+      this.logger.log(`[createPortalSession] Sesión creada exitosamente para tenant ${tenantId}`);
+      return result;
+    } catch (error) {
+      this.logger.error(`[createPortalSession] Error al crear sesión para tenant ${tenantId}:`, error instanceof Error ? error.stack : String(error));
+      throw error;
+    }
   }
 }

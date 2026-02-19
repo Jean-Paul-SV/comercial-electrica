@@ -9,6 +9,7 @@ import {
   Body,
   UseGuards,
   ForbiddenException,
+  Logger,
 } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
@@ -38,6 +39,8 @@ import {
 @RequireModule('electronic_invoicing')
 @Controller('dian')
 export class DianController {
+  private readonly logger = new Logger(DianController.name);
+
   constructor(
     private readonly dianService: DianService,
     private readonly permissions: PermissionsService,
@@ -186,12 +189,28 @@ export class DianController {
       },
     },
   })
-  async getConfigStatus(@Req() req: { user?: { tenantId?: string } }) {
+  async getConfigStatus(@Req() req: { user?: { tenantId?: string; id?: string } }) {
     const tenantId = req?.user?.tenantId;
-    if (tenantId) {
-      return this.dianService.getConfigStatusForTenant(tenantId);
+    const userId = req?.user?.id || 'unknown';
+    this.logger.log(`[getConfigStatus] Request recibido - userId: ${userId}, tenantId: ${tenantId || 'null'}`);
+    
+    if (!tenantId) {
+      this.logger.warn(`[getConfigStatus] Usuario sin tenantId - userId: ${userId}. Esto causará 403 si el usuario no es platform admin.`);
+      // El guard ya debería haber rechazado esto, pero por si acaso
+      throw new ForbiddenException(
+        'Tenant requerido para consultar estado de configuración DIAN.',
+      );
     }
-    return this.dianService.getConfigStatus();
+    
+    try {
+      this.logger.log(`[getConfigStatus] Obteniendo estado para tenant ${tenantId}`);
+      const result = await this.dianService.getConfigStatusForTenant(tenantId);
+      this.logger.log(`[getConfigStatus] Estado obtenido exitosamente para tenant ${tenantId}`);
+      return result;
+    } catch (error) {
+      this.logger.error(`[getConfigStatus] Error al obtener estado para tenant ${tenantId}:`, error instanceof Error ? error.stack : String(error));
+      throw error;
+    }
   }
 
   @Get('documents/:id/status')

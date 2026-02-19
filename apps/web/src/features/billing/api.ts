@@ -41,9 +41,24 @@ export function createPortalSession(
   authToken: string,
   returnUrl?: string,
 ): Promise<PortalSessionResponse> {
+  const payload = returnUrl ? { returnUrl } : {};
+  console.log('[Billing API] createPortalSession - Request:', {
+    url: '/billing/portal-session',
+    payload,
+    hasAuthToken: !!authToken,
+    returnUrl,
+  });
   return apiClient.post<PortalSessionResponse>(
     '/billing/portal-session',
-    returnUrl ? { returnUrl } : {},
+    payload,
     { authToken },
-  );
+  ).catch((error) => {
+    console.error('[Billing API] createPortalSession - Error:', {
+      message: error?.message,
+      status: error?.response?.status,
+      data: error?.response?.data,
+      error,
+    });
+    throw error;
+  });
 }

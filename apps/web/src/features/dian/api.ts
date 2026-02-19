@@ -37,8 +37,20 @@ export function getDianConfig(authToken: string): Promise<DianConfigPublic | nul
 export function getDianConfigStatus(
   authToken: string,
 ): Promise<DianConfigStatusResponse> {
+  console.log('[DIAN API] getDianConfigStatus - Request:', {
+    url: `${DIAN_BASE}/config-status`,
+    hasAuthToken: !!authToken,
+  });
   return apiClient.get<DianConfigStatusResponse>(`${DIAN_BASE}/config-status`, {
     authToken,
+  }).catch((error) => {
+    console.error('[DIAN API] getDianConfigStatus - Error:', {
+      message: error?.message,
+      status: error?.response?.status,
+      data: error?.response?.data,
+      error,
+    });
+    throw error;
   });
 }
 
