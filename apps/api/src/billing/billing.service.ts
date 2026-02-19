@@ -755,47 +755,87 @@ export class BillingService {
       where: { tenantId },
       select: { stripeSubscriptionId: true },
     });
-    if (
-      this.stripe &&
-      subscription?.stripeSubscriptionId &&
-      effectivePriceId
-    ) {
-      try {
-        const stripeSub = await this.stripe.subscriptions.retrieve(
-          subscription.stripeSubscriptionId,
-          { expand: ['items.data.price'] },
-        );
-        const currentPriceId = stripeSub.items.data[0]?.price?.id;
-        const itemId = stripeSub.items.data[0]?.id;
-        
-        // Solo actualizar si el precio es diferente
-        if (itemId && currentPriceId !== effectivePriceId) {
-          const updateParams: Stripe.SubscriptionUpdateParams = {
-            items: [{ id: itemId, price: effectivePriceId }],
-            proration_behavior: 'create_prorations',
-          };
-          if (this.stripeTaxRateId) {
-            updateParams.default_tax_rates = [this.stripeTaxRateId];
-          } else {
-            updateParams.automatic_tax = { enabled: true };
-          }
-          await this.stripe.subscriptions.update(
+    
+    // Si hay Stripe configurado y un precio efectivo
+    if (this.stripe && effectivePriceId) {
+      if (subscription?.stripeSubscriptionId) {
+        // Ya existe suscripción en Stripe: actualizar precio
+        try {
+          const stripeSub = await this.stripe.subscriptions.retrieve(
             subscription.stripeSubscriptionId,
-            updateParams,
+            { expand: ['items.data.price'] },
           );
-          this.logger.log(
-            `Suscripción Stripe ${subscription.stripeSubscriptionId} actualizada: plan ${newPlan.id}, billingInterval ${effectiveBillingInterval}, price ${effectivePriceId} (antes: ${currentPriceId})`,
-          );
-        } else if (currentPriceId === effectivePriceId) {
-          this.logger.log(
-            `Suscripción Stripe ${subscription.stripeSubscriptionId} ya tiene el precio correcto (${effectivePriceId})`,
+          const currentPriceId = stripeSub.items.data[0]?.price?.id;
+          const itemId = stripeSub.items.data[0]?.id;
+          
+          // Solo actualizar si el precio es diferente
+          if (itemId && currentPriceId !== effectivePriceId) {
+            const updateParams: Stripe.SubscriptionUpdateParams = {
+              items: [{ id: itemId, price: effectivePriceId }],
+              proration_behavior: 'create_prorations',
+            };
+            if (this.stripeTaxRateId) {
+              updateParams.default_tax_rates = [this.stripeTaxRateId];
+            } else {
+              updateParams.automatic_tax = { enabled: true };
+            }
+            await this.stripe.subscriptions.update(
+              subscription.stripeSubscriptionId,
+              updateParams,
+            );
+            this.logger.log(
+              `Suscripción Stripe ${subscription.stripeSubscriptionId} actualizada: plan ${newPlan.id}, billingInterval ${effectiveBillingInterval}, price ${effectivePriceId} (antes: ${currentPriceId})`,
+            );
+          } else if (currentPriceId === effectivePriceId) {
+            this.logger.log(
+              `Suscripción Stripe ${subscription.stripeSubscriptionId} ya tiene el precio correcto (${effectivePriceId})`,
+            );
+          }
+        } catch (err) {
+          this.logger.error(
+            `No se pudo actualizar el precio en Stripe al cambiar de plan: ${(err as Error).message}`,
+            (err as Error).stack,
           );
         }
-      } catch (err) {
-        this.logger.error(
-          `No se pudo actualizar el precio en Stripe al cambiar de plan: ${(err as Error).message}`,
-          (err as Error).stack,
+      } else {
+        // No existe suscripción en Stripe: crear una nueva
+        const tenant = await this.prisma.tenant.findUnique({
+          where: { id: tenantId },
+          select: {
+            name: true,
+            users: {
+              where: { role: 'ADMIN' },
+              take: 1,
+              select: { email: true },
+            },
+          },
+        });
+        const adminEmail = tenant?.users[0]?.email || `tenant-${tenantId}@example.com`;
+        const customerName = tenant?.name || `Tenant ${tenantId}`;
+        
+        const stripeSubscriptionId = await this.createStripeSubscription(
+          tenantId,
+          effectivePriceId,
+          adminEmail,
+          customerName,
         );
+        
+        if (stripeSubscriptionId) {
+          await this.prisma.subscription.update({
+            where: { tenantId },
+            data: {
+              stripeSubscriptionId,
+              status: 'PENDING_PAYMENT', // Bloqueado hasta que el cliente pague en Stripe
+            },
+          });
+          this.logger.log(
+            `Suscripción Stripe creada para tenant ${tenantId}: ${stripeSubscriptionId}`,
+          );
+        } else {
+          this.logger.warn(
+            `No se pudo crear suscripción Stripe para tenant ${tenantId}. El plan se asignó pero el pago deberá gestionarse manualmente.`,
+          );
+        }
       }
     } else if (!effectivePriceId) {
       this.logger.warn(

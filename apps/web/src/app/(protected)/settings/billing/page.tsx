@@ -907,11 +907,17 @@ export default function BillingPage() {
                       // Nuevo plan - redirigir al portal de pago
                       toast.success('Plan seleccionado. Redirigiendo al portal de pago...');
                       setChangePlanConfirm(null);
-                      // Refrescar la suscripción y luego abrir el portal
+                      // Refrescar la suscripción y esperar un poco más para que Stripe cree la suscripción
                       subscriptionQuery.refetch().then(() => {
+                        // Esperar 1.5 segundos para dar tiempo a que Stripe cree la suscripción
                         setTimeout(() => {
                           handleOpenPortal();
-                        }, 500);
+                        }, 1500);
+                      }).catch(() => {
+                        // Si falla el refetch, intentar abrir el portal de todas formas después de un delay
+                        setTimeout(() => {
+                          handleOpenPortal();
+                        }, 2000);
                       });
                     }
                   },
