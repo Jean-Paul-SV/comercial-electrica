@@ -412,90 +412,26 @@ export default function SalesPage() {
           resetForm();
           setLastCreatedSale(data);
         },
-        onError: (e: unknown, variables, context) => {
-          // Log completo del error para depuración - incluir variables y context también
-          try {
-            console.error('[SalesPage] Error completo al crear venta:', {
-              error: e,
-              errorType: typeof e,
-              errorConstructor: e?.constructor?.name,
-              errorKeys: e && typeof e === 'object' ? Object.keys(e) : [],
-              errorString: String(e),
-              errorJSON: JSON.stringify(e, Object.getOwnPropertyNames(e), 2),
-              errorToString: e?.toString(),
-              variables,
-              context,
-              errorMessage: (e as any)?.message,
-              errorStatus: (e as any)?.status,
-              errorResponse: (e as any)?.response,
-            });
-          } catch (logError) {
-            console.error('[SalesPage] Error al loggear el error:', logError);
-            console.error('[SalesPage] Error original (raw):', e);
-          }
-          
+        onError: (e: unknown) => {
+          console.error('[SalesPage] Error al crear venta:', e);
           if (isNetworkError(e)) {
             toast.info(
               'Venta guardada localmente. Se enviará al servidor cuando haya conexión.'
             );
             return;
           }
-          
-          // Intentar extraer información del error de múltiples formas
-          let errorObj: { message?: string | string[]; missingProductIds?: string[]; status?: number; response?: any } = {};
-          
-          // Intentar acceder al error de diferentes formas
-          if (e && typeof e === 'object') {
-            errorObj = e as typeof errorObj;
-            // También intentar acceder a propiedades anidadas
-            if ((e as any).response) {
-              errorObj = { ...errorObj, ...((e as any).response as typeof errorObj) };
-            }
-            if ((e as any).data) {
-              errorObj = { ...errorObj, ...((e as any).data as typeof errorObj) };
-            }
-          }
-          
-          const missingIds = errorObj?.missingProductIds;
+          const errorObj = e && typeof e === 'object' ? e as { missingProductIds?: string[] } : {};
+          const missingIds = errorObj?.missingProductIds ?? (e as { response?: { data?: { missingProductIds?: string[] } } })?.response?.data?.missingProductIds;
           if (missingIds?.length) {
             const lineNumbers = lines
               .map((l, i) => (missingIds.includes(l.productId) ? i + 1 : null))
               .filter((n): n is number => n != null);
-            const lineStr =
-              lineNumbers.length > 0
-                ? ` en las líneas ${lineNumbers.join(', ')}`
-                : '';
+            const lineStr = lineNumbers.length > 0 ? ` en las líneas ${lineNumbers.join(', ')}` : '';
             toast.error(
               `Productos no encontrados o inactivos${lineStr}. Elimine esas líneas o elija otro producto.`
             );
           } else {
-            // Mostrar el mensaje de error del backend si está disponible
-            let errorMessage = 'No se pudo registrar la venta';
-            
-            // Intentar múltiples formas de obtener el mensaje
-            if (errorObj?.message) {
-              errorMessage = Array.isArray(errorObj.message) 
-                ? errorObj.message.join(', ') 
-                : String(errorObj.message);
-            } else if ((e as any)?.message) {
-              errorMessage = Array.isArray((e as any).message)
-                ? (e as any).message.join(', ')
-                : String((e as any).message);
-            } else if (e instanceof Error && e.message) {
-              errorMessage = e.message;
-            } else if (typeof e === 'string') {
-              errorMessage = e;
-            } else if (errorObj?.status === 400 || (e as any)?.status === 400) {
-              errorMessage = 'Error de validación. Verifica los datos ingresados. Revisa la consola para más detalles.';
-            } else if (errorObj?.status === 403 || (e as any)?.status === 403) {
-              errorMessage = 'No tienes permisos para realizar esta acción.';
-            } else if (errorObj?.status === 404 || (e as any)?.status === 404) {
-              errorMessage = 'Recurso no encontrado.';
-            } else if (errorObj?.status === 500 || (e as any)?.status === 500) {
-              errorMessage = 'Error del servidor. Intenta nuevamente más tarde.';
-            }
-            
-            toast.error(errorMessage);
+            toast.error(getErrorMessage(e, 'No se pudo registrar la venta'));
           }
         },
       }

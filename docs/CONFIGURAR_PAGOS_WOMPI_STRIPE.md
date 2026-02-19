@@ -15,11 +15,11 @@ Para usar pagos en Orion necesitas crear cuentas y configurar las credenciales e
 1. Entra en **https://dashboard.stripe.com** y crea una cuenta (modo **prueba** para desarrollo). Si estás en Colombia, elige **Estados Unidos** como país de la cuenta.
 2. **Clave secreta:** En *Developers → API keys* copia la **Secret key** (empieza por `sk_test_` en pruebas).
    - En el proyecto: `STRIPE_SECRET_KEY=sk_test_...` en el `.env` del **API** (raíz o `apps/api`).
-3. **Webhook (opcional pero recomendado):** En *Developers → Webhooks* añade un endpoint:
-   - URL: `https://tu-dominio.com/billing/stripe` (en local puedes usar ngrok para pruebas).
-   - Eventos: `invoice.paid`, `invoice.payment_failed`, `customer.subscription.deleted`, etc. (según lo que use el `BillingService`).
+3. **Webhook (recomendado; en producción es casi obligatorio):** En *Developers → Webhooks* añade un endpoint:
+   - **URL:** `https://tu-api.com/billing/webhooks/stripe` (reemplaza `tu-api.com` por el dominio de tu API, por ejemplo `tu-app.onrender.com`). En local usa ngrok y esa URL.
+   - **Eventos a escuchar:** `invoice.paid`, `invoice.payment_failed`, `customer.subscription.deleted`.
    - Copia el **Signing secret** (empieza por `whsec_`).
-   - En el proyecto: `STRIPE_WEBHOOK_SECRET=whsec_...` en el `.env` del API.
+   - En el proyecto: `STRIPE_WEBHOOK_SECRET=whsec_...` en el `.env` del API (y en producción en las variables de entorno del servicio).
 
 ### Variables en `.env` (API)
 
@@ -28,7 +28,18 @@ STRIPE_SECRET_KEY=sk_test_...
 STRIPE_WEBHOOK_SECRET=whsec_...
 ```
 
-Sin `STRIPE_SECRET_KEY` el módulo de facturación no creará suscripciones en Stripe. Sin `STRIPE_WEBHOOK_SECRET` los webhooks no se validarán (en producción deberías configurarlo).
+Sin `STRIPE_SECRET_KEY` el módulo de facturación no creará suscripciones en Stripe. Sin `STRIPE_WEBHOOK_SECRET` los webhooks no se validarán (en producción la API responde 500 si falta).
+
+### Próximos pasos Stripe (checklist)
+
+| Paso | Dónde | Qué hacer |
+|------|--------|-----------|
+| 1 | **Stripe Dashboard** → Developers → Webhooks | Añadir endpoint: URL = `https://TU-DOMINIO-API/billing/webhooks/stripe`. Seleccionar eventos: `invoice.paid`, `invoice.payment_failed`, `customer.subscription.deleted`. Copiar el **Signing secret** (whsec_...). |
+| 2 | **Producción (Render, etc.)** → Environment | Definir `STRIPE_SECRET_KEY` y `STRIPE_WEBHOOK_SECRET`. Sin el webhook secret, en producción el webhook responde 500. |
+| 3 | **Panel proveedor** → Planes | Asignar **Stripe Price ID** a cada plan que quieras cobrar por Stripe (ej. `price_...` desde Stripe → Products → precios). |
+| 4 | **Después del primer pago** | En Stripe → Webhooks → tu endpoint → "Eventos recientes": comprobar que los envíos devuelven **200**. Si hay 4xx/5xx, revisar logs de la API y que la URL y el secret sean correctos. |
+
+**Nota:** Si el webhook falla o llega tarde, la app intenta igual desbloquear al usuario: al cargar la página de facturación se consulta el estado de la suscripción en Stripe y, si ya está activa, se actualiza la base de datos. Así el usuario no se queda bloqueado aunque el webhook falle una vez.
 
 ---
 

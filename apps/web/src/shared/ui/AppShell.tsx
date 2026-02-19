@@ -170,7 +170,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           {user && (
             <div className="mb-3 space-y-0.5">
               <p className="text-xs text-muted-foreground truncate">{user.email}</p>
-              <span className="text-xs font-medium text-muted-foreground">{user.role}</span>
+              <span className="text-xs font-medium text-muted-foreground">{user.role === 'USER' ? 'USUARIO' : user.role}</span>
             </div>
           )}
           <Button

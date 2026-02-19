@@ -103,7 +103,7 @@ export default function DashboardView() {
           Dashboard
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Sesión: {user?.email} · {user?.role}
+          Sesión: {user?.email} · {user?.role === 'USER' ? 'USUARIO' : user?.role}
         </p>
       </div>
 

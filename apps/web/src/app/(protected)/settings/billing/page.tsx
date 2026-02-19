@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Card,
   CardContent,
@@ -11,12 +11,26 @@ import {
 import { Button } from '@shared/components/ui/button';
 import { Badge } from '@shared/components/ui/badge';
 import { Skeleton } from '@shared/components/ui/skeleton';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@shared/components/ui/dialog';
 import { CreditCard, Calendar, Package, AlertCircle, CheckCircle2, Sparkles, RefreshCw } from 'lucide-react';
 import { useSubscriptionInfo, useCreatePortalSession, useBillingPlans, useChangePlan } from '@features/billing/hooks';
+import { useSubmitFeedback } from '@features/feedback/hooks';
 import { useAuth } from '@shared/providers/AuthProvider';
 import { DianActivationDisclaimer } from '@shared/components/DianActivationDisclaimer';
 import { toast } from 'sonner';
 import { getErrorMessage } from '@shared/utils/errors';
+
+/** Planes con DIAN requieren activación manual; al elegirlos se envía mensaje a soporte. */
+function isPlanWithDian(slug: string): boolean {
+  return slug === 'enterprise' || slug.includes('con-dian');
+}
 
 const STATUS_LABELS: Record<string, string> = {
   ACTIVE: 'Activa',
@@ -39,6 +53,8 @@ export default function BillingPage() {
   const createPortalMutation = useCreatePortalSession();
   const plansQuery = useBillingPlans();
   const changePlanMutation = useChangePlan();
+  const submitFeedbackMutation = useSubmitFeedback();
+  const [dianPlanDialog, setDianPlanDialog] = useState<{ id: string; name: string } | null>(null);
 
   const handleOpenPortal = () => {
     const returnUrl =
@@ -50,6 +66,33 @@ export default function BillingPage() {
         if (data?.url) {
           window.location.href = data.url;
         }
+      },
+      onError: (e) => {
+        toast.error(getErrorMessage(e));
+      },
+    });
+  };
+
+  const handleConfirmDianPlan = () => {
+    if (!dianPlanDialog) return;
+    const planName = dianPlanDialog.name;
+    changePlanMutation.mutate(dianPlanDialog.id, {
+      onSuccess: () => {
+        submitFeedbackMutation.mutate(
+          `Solicitud de activación de facturación electrónica (DIAN). Plan contratado: ${planName}. Por favor contactar al cliente para activar el servicio.`,
+          {
+            onSuccess: () => {
+              toast.success(
+                'Plan actualizado. Hemos enviado tu solicitud de activación DIAN a soporte; te contactaremos pronto.',
+              );
+              setDianPlanDialog(null);
+            },
+            onError: () => {
+              toast.success('Plan actualizado. Contacta a soporte para activar la facturación electrónica (DIAN).');
+              setDianPlanDialog(null);
+            },
+          },
+        );
       },
       onError: (e) => {
         toast.error(getErrorMessage(e));
@@ -367,15 +410,21 @@ export default function BillingPage() {
                               size="sm"
                               variant="outline"
                               className="w-full sm:w-auto rounded-lg border-primary/40 text-primary hover:bg-primary/10"
-                              disabled={changePlanMutation.isPending}
+                              disabled={changePlanMutation.isPending || submitFeedbackMutation.isPending}
                               onClick={() => {
-                                changePlanMutation.mutate(p.id, {
-                                  onSuccess: () => toast.success('Plan actualizado.'),
-                                  onError: (e) => toast.error(getErrorMessage(e)),
-                                });
+                                if (isPlanWithDian(p.slug)) {
+                                  setDianPlanDialog({ id: p.id, name: p.name });
+                                } else {
+                                  changePlanMutation.mutate(p.id, {
+                                    onSuccess: () => toast.success('Plan actualizado.'),
+                                    onError: (e) => toast.error(getErrorMessage(e)),
+                                  });
+                                }
                               }}
                             >
-                              {changePlanMutation.isPending ? 'Cambiando…' : 'Cambiar a este plan'}
+                              {changePlanMutation.isPending || submitFeedbackMutation.isPending
+                                ? 'Cambiando…'
+                                : 'Cambiar a este plan'}
                             </Button>
                           )}
                         </div>
@@ -417,6 +466,29 @@ export default function BillingPage() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={!!dianPlanDialog} onOpenChange={(open) => !open && setDianPlanDialog(null)}>
+        <DialogContent showClose={true}>
+          <DialogHeader>
+            <DialogTitle>Activar facturación electrónica (DIAN)</DialogTitle>
+            <DialogDescription>
+              Este plan incluye facturación electrónica. La activación se realiza de forma manual por nuestro equipo.
+              Al continuar, se enviará un mensaje a soporte para que te contactemos y activen el servicio.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setDianPlanDialog(null)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleConfirmDianPlan}
+              disabled={changePlanMutation.isPending || submitFeedbackMutation.isPending}
+            >
+              {changePlanMutation.isPending || submitFeedbackMutation.isPending ? 'Enviando…' : 'Continuar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
