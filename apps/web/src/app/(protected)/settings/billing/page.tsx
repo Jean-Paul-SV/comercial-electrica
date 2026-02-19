@@ -377,6 +377,10 @@ export default function BillingPage() {
     ? (STATUS_LABELS[subscription.status] ?? subscription.status)
     : null;
   const isActive = subscription?.status === 'ACTIVE';
+  const isCancelled = subscription?.status === 'CANCELLED';
+  const periodEnded = subscription?.currentPeriodEnd
+    ? new Date(subscription.currentPeriodEnd) < new Date()
+    : false;
 
   return (
     <div className="space-y-8 max-w-5xl mx-auto px-4 sm:px-6 pb-8">
@@ -434,7 +438,7 @@ export default function BillingPage() {
           <CardDescription className="text-sm mt-0.5">
             Tu plan incluye los módulos activos para tu empresa.
           </CardDescription>
-          {plan && isPlanWithDian(plan.slug) && dianStatus && !dianStatus.readyForSend && (
+          {plan && isPlanWithDian(plan.slug) && dianStatus && !dianStatus.readyForSend && isActive && (
             <div className="mt-4 rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm">
               <p className="font-medium text-foreground">Tu plan incluye facturación electrónica (DIAN).</p>
               <p className="text-muted-foreground mt-1">
@@ -507,14 +511,44 @@ export default function BillingPage() {
                 </div>
                 {subscription.currentPeriodEnd && (
                   <p className="text-sm text-muted-foreground">
-                    Próxima renovación:{' '}
-                    <span className="font-medium text-foreground">
-                      {new Date(subscription.currentPeriodEnd).toLocaleDateString('es-CO', {
-                        day: 'numeric',
-                        month: 'long',
-                        year: 'numeric',
-                      })}
-                    </span>
+                    {isCancelled ? (
+                      periodEnded ? (
+                        <>
+                          Tu acceso finalizó el{' '}
+                          <span className="font-medium text-foreground">
+                            {new Date(subscription.currentPeriodEnd).toLocaleDateString('es-CO', {
+                              day: 'numeric',
+                              month: 'long',
+                              year: 'numeric',
+                            })}
+                          </span>
+                          . Reactiva tu suscripción para continuar usando el servicio.
+                        </>
+                      ) : (
+                        <>
+                          Tu acceso continuará hasta el{' '}
+                          <span className="font-medium text-foreground">
+                            {new Date(subscription.currentPeriodEnd).toLocaleDateString('es-CO', {
+                              day: 'numeric',
+                              month: 'long',
+                              year: 'numeric',
+                            })}
+                          </span>
+                          . Después de esa fecha perderás el acceso.
+                        </>
+                      )
+                    ) : (
+                      <>
+                        Próxima renovación:{' '}
+                        <span className="font-medium text-foreground">
+                          {new Date(subscription.currentPeriodEnd).toLocaleDateString('es-CO', {
+                            day: 'numeric',
+                            month: 'long',
+                            year: 'numeric',
+                          })}
+                        </span>
+                      </>
+                    )}
                   </p>
                 )}
               </div>
@@ -583,8 +617,8 @@ export default function BillingPage() {
             </section>
           )}
 
-          {/* Portal Stripe (cuando no es pago pendiente) */}
-          {canManageBilling && !requiresPayment && (
+          {/* Portal Stripe (cuando no es pago pendiente y la suscripción está activa) */}
+          {canManageBilling && !requiresPayment && isActive && (
             <div className="space-y-3 rounded-xl border border-border/60 bg-muted/5 p-4 sm:p-5">
               <p className="text-sm text-muted-foreground">
                 Actualiza tu método de pago, descarga facturas o gestiona tu suscripción en el portal seguro de Stripe.

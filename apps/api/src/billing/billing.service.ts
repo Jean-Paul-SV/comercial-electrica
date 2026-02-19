@@ -838,6 +838,14 @@ export class BillingService {
     const canManageBilling =
       !!this.stripe && !!subscription.stripeSubscriptionId;
     const requiresPayment = String(subscription.status) === 'PENDING_PAYMENT';
+    
+    // Si está cancelada y ya pasó el periodo, también requiere pago (bloquear acceso)
+    const isCancelled = String(subscription.status) === 'CANCELLED';
+    const periodEnded = subscription.currentPeriodEnd
+      ? new Date(subscription.currentPeriodEnd) < new Date()
+      : false;
+    const shouldBlockAccess = isCancelled && periodEnded;
+    
     return {
       plan: subscription.plan
         ? {
@@ -861,7 +869,7 @@ export class BillingService {
         : null,
       scheduledChangeAt: subscription.scheduledChangeAt?.toISOString() ?? null,
       canManageBilling,
-      requiresPayment,
+      requiresPayment: requiresPayment || shouldBlockAccess,
     };
   }
 
