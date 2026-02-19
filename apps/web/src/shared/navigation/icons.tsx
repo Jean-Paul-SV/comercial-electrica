@@ -6,6 +6,8 @@
 
 import {
   LayoutDashboard,
+  LayoutGrid,
+  BarChart3,
   ShoppingCart,
   Package,
   BookOpen,
@@ -33,6 +35,8 @@ import {
 
 export const navIconMap: Record<string, LucideIcon> = {
   LayoutDashboard,
+  LayoutGrid,
+  BarChart3,
   ShoppingCart,
   Package,
   BookOpen,
