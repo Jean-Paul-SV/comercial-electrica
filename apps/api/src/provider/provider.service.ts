@@ -716,6 +716,7 @@ export class ProviderService {
 
   /**
    * Lista las solicitudes de activación DIAN pendientes (empresas que cambiaron a plan con DIAN pero aún no han activado).
+   * Solo incluye tenants cuyo plan actual incluye el módulo electronic_invoicing.
    */
   async listDianActivationRequests() {
     const configs = await this.prisma.dianConfig.findMany({
@@ -733,6 +734,11 @@ export class ProviderService {
                 id: true,
                 name: true,
                 slug: true,
+                features: {
+                  select: {
+                    moduleCode: true,
+                  },
+                },
               },
             },
             createdAt: true,
@@ -744,7 +750,14 @@ export class ProviderService {
       },
     });
 
-    return configs.map((config) => ({
+    // Filtrar solo tenants cuyo plan actual incluye DIAN
+    const configsWithDianPlan = configs.filter((config) => {
+      const plan = config.tenant.plan;
+      if (!plan) return false;
+      return plan.features.some((f) => f.moduleCode === DIAN_MODULE_CODE);
+    });
+
+    return configsWithDianPlan.map((config) => ({
       id: config.id,
       tenantId: config.tenantId,
       tenantName: config.tenant.name,
