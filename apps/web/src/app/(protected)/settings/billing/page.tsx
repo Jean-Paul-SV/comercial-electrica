@@ -824,7 +824,7 @@ export default function BillingPage() {
         </CardContent>
       </Card>
 
-      {/* Confirmación cambio de plan */}
+      {/* Confirmación cambio de plan o selección de plan */}
       <Dialog
         open={!!changePlanConfirm}
         onOpenChange={(open) => {
@@ -836,20 +836,37 @@ export default function BillingPage() {
       >
         <DialogContent showClose>
           <DialogHeader>
-            <DialogTitle>¿Cambiar de plan?</DialogTitle>
+            <DialogTitle>{plan ? '¿Cambiar de plan?' : 'Confirmar selección de plan'}</DialogTitle>
             <div className="space-y-3 text-left text-sm text-muted-foreground">
               <p>
-                Pasarás al <strong className="text-foreground">{changePlanConfirm?.name}</strong>.
+                {plan ? (
+                  <>Pasarás al <strong className="text-foreground">{changePlanConfirm?.name}</strong>.</>
+                ) : (
+                  <>Has seleccionado el <strong className="text-foreground">{changePlanConfirm?.name}</strong>.</>
+                )}
               </p>
-              <p>
-                Si el nuevo plan es <strong>más costoso</strong>: el cambio es inmediato. En tu próxima factura verás un descuento por lo no usado del plan actual y el cobro del nuevo plan solo por los días restantes. Podrás usar las nuevas funciones de inmediato.
-              </p>
-              <p>
-                Si el nuevo plan es <strong>más económico</strong>: el cambio se aplicará al final de tu periodo actual (en la próxima fecha de renovación). No hay reembolso; hasta entonces mantienes tu plan actual.
-              </p>
-              <p className="text-xs">
-                Puedes revisar el detalle en tu siguiente factura o en &quot;Gestionar método de pago y facturas&quot;.
-              </p>
+              {plan ? (
+                <>
+                  <p>
+                    Si el nuevo plan es <strong>más costoso</strong>: el cambio es inmediato. En tu próxima factura verás un descuento por lo no usado del plan actual y el cobro del nuevo plan solo por los días restantes. Podrás usar las nuevas funciones de inmediato.
+                  </p>
+                  <p>
+                    Si el nuevo plan es <strong>más económico</strong>: el cambio se aplicará al final de tu periodo actual (en la próxima fecha de renovación). No hay reembolso; hasta entonces mantienes tu plan actual.
+                  </p>
+                  <p className="text-xs">
+                    Puedes revisar el detalle en tu siguiente factura o en &quot;Gestionar método de pago y facturas&quot;.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p>
+                    Al confirmar, se creará tu suscripción y serás redirigido al portal de pago seguro de Stripe para completar el pago y activar tu cuenta.
+                  </p>
+                  <p className="text-xs">
+                    Una vez completado el pago, tendrás acceso inmediato a todas las funcionalidades del plan seleccionado.
+                  </p>
+                </>
+              )}
               {changePlanErrors.length > 0 && (
                 <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 space-y-2">
                   <p className="font-medium text-destructive text-left">No se puede completar el cambio:</p>
@@ -875,15 +892,28 @@ export default function BillingPage() {
                   { planId: changePlanConfirm.id, billingInterval: changePlanConfirm.billingInterval },
                   {
                   onSuccess: (result) => {
-                    if (result?.scheduledChangeAt) {
-                      const date = new Date(result.scheduledChangeAt).toLocaleDateString('es-CO', {
-                        day: 'numeric', month: 'long', year: 'numeric',
-                      });
-                      toast.success(`Plan actualizado. Tu plan cambiará el ${date}.`);
+                    if (plan) {
+                      // Cambio de plan existente
+                      if (result?.scheduledChangeAt) {
+                        const date = new Date(result.scheduledChangeAt).toLocaleDateString('es-CO', {
+                          day: 'numeric', month: 'long', year: 'numeric',
+                        });
+                        toast.success(`Plan actualizado. Tu plan cambiará el ${date}.`);
+                      } else {
+                        toast.success('Plan actualizado. El nuevo plan se aplica hoy.');
+                      }
+                      setChangePlanConfirm(null);
                     } else {
-                      toast.success('Plan actualizado. El nuevo plan se aplica hoy.');
+                      // Nuevo plan - redirigir al portal de pago
+                      toast.success('Plan seleccionado. Redirigiendo al portal de pago...');
+                      setChangePlanConfirm(null);
+                      // Refrescar la suscripción y luego abrir el portal
+                      subscriptionQuery.refetch().then(() => {
+                        setTimeout(() => {
+                          handleOpenPortal();
+                        }, 500);
+                      });
                     }
-                    setChangePlanConfirm(null);
                   },
                   onError: (e: unknown) => {
                     const err = e as { response?: { data?: { errors?: string[]; message?: string } } };
@@ -898,7 +928,9 @@ export default function BillingPage() {
                 });
               }}
             >
-              {changePlanMutation.isPending ? 'Cambiando…' : 'Sí, cambiar de plan'}
+              {changePlanMutation.isPending 
+                ? (plan ? 'Cambiando…' : 'Creando suscripción…') 
+                : (plan ? 'Sí, cambiar de plan' : 'Pagar y activar')}
             </Button>
           </DialogFooter>
         </DialogContent>
