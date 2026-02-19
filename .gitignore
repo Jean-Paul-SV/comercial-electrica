@@ -54,6 +54,7 @@ coverage
 *.temp
 .cache
 
-# Backups (no subir dumps SQL al repo)
+# Backups (no subir dumps SQL ni zips al repo)
 apps/api/backups/*.sql
+apps/api/backups/*.zip
 .en
