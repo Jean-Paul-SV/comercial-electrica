@@ -290,7 +290,7 @@ export class ProviderService {
   }
 
   async listTenants(query: ListTenantsQueryDto) {
-    const limit = Math.min(query.limit ?? 20, 100);
+    const limit = Math.min(query.limit ?? 20, 500);
     const offset = query.offset ?? 0;
     const isActiveFilter =
       query.isActive === undefined ? undefined : query.isActive === 'true';
