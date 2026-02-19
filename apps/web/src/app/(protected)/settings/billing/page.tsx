@@ -510,23 +510,37 @@ export default function BillingPage() {
                   </Badge>
                 </div>
                 {subscription.currentPeriodEnd && (
-                  <p className="text-sm text-muted-foreground">
-                    {isCancelled ? (
-                      periodEnded ? (
-                        <>
-                          Tu acceso finalizó el{' '}
-                          <span className="font-medium text-foreground">
-                            {new Date(subscription.currentPeriodEnd).toLocaleDateString('es-CO', {
-                              day: 'numeric',
-                              month: 'long',
-                              year: 'numeric',
-                            })}
-                          </span>
-                          . Reactiva tu suscripción para continuar usando el servicio.
-                        </>
+                  <div className="space-y-2">
+                    <p className="text-sm text-muted-foreground">
+                      {isCancelled ? (
+                        periodEnded ? (
+                          <>
+                            Tu acceso finalizó el{' '}
+                            <span className="font-medium text-foreground">
+                              {new Date(subscription.currentPeriodEnd).toLocaleDateString('es-CO', {
+                                day: 'numeric',
+                                month: 'long',
+                                year: 'numeric',
+                              })}
+                            </span>
+                            . Reactiva tu suscripción para continuar usando el servicio.
+                          </>
+                        ) : (
+                          <>
+                            Tu suscripción fue cancelada (probablemente se quitó el método de pago). Tu acceso continuará hasta el{' '}
+                            <span className="font-medium text-foreground">
+                              {new Date(subscription.currentPeriodEnd).toLocaleDateString('es-CO', {
+                                day: 'numeric',
+                                month: 'long',
+                                year: 'numeric',
+                              })}
+                            </span>
+                            . Después de esa fecha perderás el acceso.
+                          </>
+                        )
                       ) : (
                         <>
-                          Tu acceso continuará hasta el{' '}
+                          Próxima renovación:{' '}
                           <span className="font-medium text-foreground">
                             {new Date(subscription.currentPeriodEnd).toLocaleDateString('es-CO', {
                               day: 'numeric',
@@ -534,22 +548,22 @@ export default function BillingPage() {
                               year: 'numeric',
                             })}
                           </span>
-                          . Después de esa fecha perderás el acceso.
                         </>
-                      )
-                    ) : (
-                      <>
-                        Próxima renovación:{' '}
-                        <span className="font-medium text-foreground">
-                          {new Date(subscription.currentPeriodEnd).toLocaleDateString('es-CO', {
-                            day: 'numeric',
-                            month: 'long',
-                            year: 'numeric',
-                          })}
-                        </span>
-                      </>
+                      )}
+                    </p>
+                    {isCancelled && canManageBilling && (
+                      <Button
+                        onClick={handleOpenPortal}
+                        disabled={createPortalMutation.isPending}
+                        variant="outline"
+                        size="sm"
+                        className="gap-2 mt-2"
+                      >
+                        <CreditCard className="h-4 w-4" />
+                        {createPortalMutation.isPending ? 'Abriendo…' : periodEnded ? 'Reactivar suscripción' : 'Agregar método de pago y reactivar'}
+                      </Button>
                     )}
-                  </p>
+                  </div>
                 )}
               </div>
             </div>
