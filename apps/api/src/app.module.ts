@@ -30,6 +30,7 @@ import { OnboardingModule } from './onboarding/onboarding.module';
 import { ProviderModule } from './provider/provider.module';
 import { BillingModule } from './billing/billing.module';
 import { FeedbackModule } from './feedback/feedback.module';
+import { UsageModule } from './usage/usage.module';
 import { validateEnv } from './config/env.validation';
 import { MetricsModule } from './metrics/metrics.module';
 import { RequestMetricsInterceptor } from './metrics/request-metrics.interceptor';
@@ -119,6 +120,7 @@ import { ConfigValidationModule } from './common/config/config-validation.module
     ProviderModule,
     BillingModule,
     FeedbackModule,
+    UsageModule,
     ConfigValidationModule, // Validar configuración después de ConfigModule
   ],
   controllers: [AppController],

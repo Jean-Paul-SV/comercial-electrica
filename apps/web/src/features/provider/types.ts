@@ -29,6 +29,7 @@ export type TenantDetail = {
   slug: string;
   isActive: boolean;
   billingInterval: string | null;
+  contactPhone: string | null;
   lastActivityAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -56,6 +57,8 @@ export type CreateTenantPayload = {
   adminName?: string;
   adminPassword?: string;
   issuerName?: string;
+  /** Número de contacto del dueño o persona con quien comunicarse. */
+  contactPhone?: string;
 };
 
 export type CreateTenantResponse = {

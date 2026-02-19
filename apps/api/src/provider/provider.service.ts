@@ -323,6 +323,7 @@ export class ProviderService {
         slug: true,
         isActive: true,
         billingInterval: true,
+        contactPhone: true,
         lastActivityAt: true,
         createdAt: true,
         updatedAt: true,
@@ -496,6 +497,7 @@ export class ProviderService {
           slug,
           planId: dto.planId ?? undefined,
           billingInterval: dto.billingInterval ?? null,
+          contactPhone: dto.contactPhone?.trim() || null,
         },
       });
       const { now, periodEnd } = this.calculateDefaultSubscriptionPeriod();

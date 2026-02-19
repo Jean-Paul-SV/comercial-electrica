@@ -170,6 +170,8 @@ model Tenant {
   planId          String?   @db.Uuid
   /// Cobro recurrente en Stripe: 'monthly' (por defecto) o 'yearly'. Solo aplica si el plan tiene ambos Price IDs.
   billingInterval String?   @db.VarChar(20)
+  /// Teléfono de contacto del dueño o persona a contactar (soporte/comunicación).
+  contactPhone    String?   @db.VarChar(50)
   isActive        Boolean   @default(true)
   lastActivityAt  DateTime? @db.Timestamptz
   createdAt       DateTime  @default(now())
@@ -200,6 +202,26 @@ model Tenant {
   backupRuns         BackupRun[]
   payments           Payment[]
   feedbacks          TenantFeedback[]
+  usageEvents        UsageEvent[]
+}
+
+/// Eventos de uso para mejorar el producto (solo uso interno, sin vender datos).
+/// Sin PII en payload; tenantId/userId para contexto agregado.
+model UsageEvent {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String?  @db.Uuid
+  userId    String?  @db.Uuid
+  event     String   @db.VarChar(120)
+  payload   Json?
+  createdAt DateTime @default(now()) @db.Timestamptz
+
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@index([userId])
+  @@index([event])
+  @@index([createdAt])
 }
 
 model TenantModule {
@@ -397,10 +419,11 @@ model User {
   updatedAt              DateTime  @updatedAt
 
   tenant    Tenant?         @relation(fields: [tenantId], references: [id], onDelete: SetNull)
-  userRoles UserRole[]
-  auditLogs AuditLog[]
-  sales     Sale[]
-  feedbacks TenantFeedback[]
+  userRoles   UserRole[]
+  auditLogs   AuditLog[]
+  sales       Sale[]
+  feedbacks   TenantFeedback[]
+  usageEvents UsageEvent[]
 }
 
 model Category {

@@ -51,7 +51,22 @@ El enlace lleva a **Configuración → Facturación electrónica**, donde se com
 
 ---
 
-## 6. Planes mensuales y anuales
+## 6. Cómo saber que ya pasaste las pruebas DIAN
+
+Cuando la empresa está en **ambiente de habilitación (pruebas)** y envías facturas de prueba a la DIAN:
+
+1. **En la app (Ventas o Facturas):** Cada factura que tenga documento DIAN muestra un **estado**:
+   - **En cola DIAN** / **Enviada a DIAN** → la DIAN aún no ha respondido o está en proceso.
+   - **Emitida** (o badge verde) → la DIAN **aceptó** el documento. Eso significa que esa factura de prueba **pasó**.
+   - **Rechazada por DIAN** (badge rojo) → la DIAN rechazó el documento; suele mostrar el mensaje de error. Hay que corregir datos (NIT, numeración, certificado, etc.) y volver a intentar.
+
+2. **Que “ya pasaste” las pruebas:** Cuando **varias facturas de prueba** salen con estado **Emitida** (ACCEPTED), en la práctica la integración con la DIAN para ese contribuyente en habilitación está funcionando. No tienes que “pasar pruebas” cada vez que agregas un cliente: cada empresa hace sus pruebas **una vez** (con su propio Software ID y PIN en habilitación).
+
+3. **Pasar a producción:** Cuando la DIAN dé por aprobado al contribuyente (según su proceso, a veces con resolución o notificación), en **Panel proveedor → Empresa → Configurar DIAN** (o Facturación electrónica) cambia el **ambiente** de esa empresa de **HABILITACION** a **PRODUCCION**. A partir de ahí las facturas son válidas legalmente.
+
+---
+
+## 7. Planes mensuales y anuales
 
 Cada plan puede tener en Stripe dos precios:
 - **Stripe Price ID (mensual):** cobro cada mes.
@@ -61,7 +76,7 @@ En **Panel proveedor → Planes** puedes definir ambos en cada plan. Al **crear 
 
 ---
 
-## 7. Resumen
+## 8. Resumen
 
 | Acción | Dónde se ve el efecto |
 |--------|------------------------|

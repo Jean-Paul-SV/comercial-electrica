@@ -43,6 +43,7 @@ import { useCashSessionsList } from '@features/cash/hooks';
 import { useCustomersList, useCustomerSalesStats } from '@features/customers/hooks';
 import { useProductsList } from '@features/products/hooks';
 import { useDianConfig } from '@features/dian/hooks';
+import { useTrackUsage } from '@features/usage/useTrackUsage';
 import { useAuth } from '@shared/providers/AuthProvider';
 import type { CreateSaleItemPayload, CreateSaleResponse } from '@features/sales/types';
 
@@ -57,6 +58,7 @@ type SaleLine = { productId: string; qty: number; unitPrice?: number };
 
 export default function SalesPage() {
   const { token } = useAuth();
+  const { track } = useTrackUsage();
   const hasSalesCreate = useHasPermission('sales:create');
   const hasSalesUpdate = useHasPermission('sales:update');
   const dianConfigQuery = useDianConfig();
@@ -407,6 +409,7 @@ export default function SalesPage() {
       },
       {
         onSuccess: (data) => {
+          track('sale_created', { hasInvoice: data?.invoiceId != null });
           toast.success('Venta registrada');
           setOpenNewSale(false);
           resetForm();

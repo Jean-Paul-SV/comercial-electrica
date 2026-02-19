@@ -68,9 +68,16 @@ export default function SupportPage() {
         </CardHeader>
         <CardContent>
           <p className="text-muted-foreground text-sm mb-4">
-            Si eres el administrador, configura la variable de entorno{' '}
+            Si eres el administrador, configura la variable{' '}
             <code className="rounded bg-muted px-1">NEXT_PUBLIC_SUPPORT_WHATSAPP_NUMBER</code> en el
-            frontend (formato internacional sin +, por ejemplo 573001234567).
+            <strong> frontend</strong>, no en la API:
+          </p>
+          <ul className="text-muted-foreground text-sm mb-4 list-disc list-inside space-y-1">
+            <li><strong>Local:</strong> en <code className="rounded bg-muted px-1">apps/web/.env.local</code> y reinicia el servidor web (<code className="rounded bg-muted px-1">npm run dev:web</code>).</li>
+            <li><strong>Producción (Vercel, etc.):</strong> en Variables de entorno del <strong>proyecto web</strong>, no del proyecto API.</li>
+          </ul>
+          <p className="text-muted-foreground text-sm mb-4">
+            Formato del número: internacional sin + (ej. 573045983093).
           </p>
           <Button asChild variant="secondary">
             <Link href="/app">Volver al inicio</Link>

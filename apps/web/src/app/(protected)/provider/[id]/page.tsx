@@ -192,6 +192,17 @@ export default function ProviderTenantDetailPage() {
             )}
           </>
         )}
+        {tenant.contactPhone && (
+          <>
+            <span className="text-sm text-muted-foreground ml-2">Contacto:</span>
+            <a
+              href={`tel:${tenant.contactPhone.replace(/\s/g, '')}`}
+              className="text-sm font-medium text-primary hover:underline"
+            >
+              {tenant.contactPhone}
+            </a>
+          </>
+        )}
       </div>
 
       {/* Facturación electrónica (DIAN) — acceso directo */}

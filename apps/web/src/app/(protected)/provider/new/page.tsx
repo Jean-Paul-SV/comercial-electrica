@@ -16,7 +16,7 @@ import {
 import { Button } from '@shared/components/ui/button';
 import { Input } from '@shared/components/ui/input';
 import { Label } from '@shared/components/ui/label';
-import { ArrowLeft, Building2, UserPlus, FileText } from 'lucide-react';
+import { ArrowLeft, Building2, UserPlus, FileText, Phone } from 'lucide-react';
 import { useCreateTenant, usePlans } from '@features/provider/hooks';
 
 const formInputClass =
@@ -45,6 +45,7 @@ const schema = z.object({
     .optional()
     .or(z.literal('')),
   issuerName: z.string().max(200).optional().or(z.literal('')),
+  contactPhone: z.string().max(50).optional().or(z.literal('')),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -65,6 +66,7 @@ export default function ProviderNewTenantPage() {
       adminName: '',
       adminPassword: '',
       issuerName: '',
+      contactPhone: '',
     },
   });
 
@@ -82,6 +84,7 @@ export default function ProviderNewTenantPage() {
         adminName: values.adminName?.trim() || undefined,
         adminPassword: values.adminPassword?.trim() || undefined,
         issuerName: values.issuerName?.trim() || undefined,
+        contactPhone: values.contactPhone?.trim() || undefined,
       });
       toast.success(`Empresa "${res.tenant.name}" creada.`);
       if (res.tempAdminPassword) {
@@ -98,7 +101,7 @@ export default function ProviderNewTenantPage() {
   });
 
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-3xl mx-auto">
+    <div className="p-4 md:p-6 lg:p-8 space-y-6 max-w-4xl lg:max-w-5xl xl:max-w-6xl mx-auto">
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="icon" asChild className="rounded-xl shrink-0">
           <Link href="/provider">
@@ -223,6 +226,28 @@ export default function ProviderNewTenantPage() {
                     </div>
                   );
                 })()}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="contactPhone" className="text-foreground font-medium flex items-center gap-2">
+                  <Phone className="h-4 w-4 text-muted-foreground shrink-0" />
+                  Número de contacto (opcional)
+                </Label>
+                <Input
+                  id="contactPhone"
+                  {...form.register('contactPhone')}
+                  placeholder="Ej. +57 300 123 4567 o 601 234 5678"
+                  className={formInputClass}
+                  type="tel"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Teléfono del dueño o persona con quien desees que se comunique soporte (WhatsApp, llamada, etc.).
+                </p>
+                {form.formState.errors.contactPhone && (
+                  <p className="text-sm text-destructive">
+                    {form.formState.errors.contactPhone.message}
+                  </p>
+                )}
               </div>
             </div>
 

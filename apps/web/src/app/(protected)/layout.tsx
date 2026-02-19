@@ -9,6 +9,7 @@ import { AppShell } from '@shared/ui/AppShell';
 import { SidebarProvider } from '@shared/ui/sidebar';
 import { canAccessPath } from '@shared/auth/roles';
 import { getModuleForPath } from '@shared/navigation/routeModuleMap';
+import { UsageTracker } from '@features/usage/UsageTracker';
 import { WifiOff } from 'lucide-react';
 
 const isOnboardingPath = (path: string | null) =>
@@ -164,6 +165,7 @@ function ProtectedLayoutContent({ children }: { children: React.ReactNode }) {
 
   return (
     <SidebarProvider>
+      <UsageTracker />
       <AppShell>{children}</AppShell>
     </SidebarProvider>
   );

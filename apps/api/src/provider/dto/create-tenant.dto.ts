@@ -53,4 +53,10 @@ export class CreateTenantDto {
   @IsString()
   @MaxLength(200)
   issuerName?: string;
+
+  /** Número de contacto del dueño o persona con quien comunicarse (soporte). Opcional. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  contactPhone?: string;
 }

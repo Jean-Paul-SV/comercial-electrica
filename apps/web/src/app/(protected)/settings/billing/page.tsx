@@ -485,16 +485,16 @@ export default function BillingPage() {
       <Dialog open={!!changePlanConfirm} onOpenChange={(open) => !open && setChangePlanConfirm(null)}>
         <DialogContent showClose>
           <DialogHeader>
-            <DialogTitle>Confirmar cambio de plan</DialogTitle>
+            <DialogTitle>¿Cambiar de plan?</DialogTitle>
             <div className="space-y-3 text-left text-sm text-muted-foreground">
               <p>
-                Vas a cambiar a <strong className="text-foreground">{changePlanConfirm?.name}</strong>.
+                Pasarás al <strong className="text-foreground">{changePlanConfirm?.name}</strong>.
               </p>
               <p>
-                Se aplicará un <strong>crédito</strong> por la parte no usada de tu plan actual y un <strong>cargo prorrateado</strong> por el nuevo plan hasta el fin del periodo. El detalle exacto aparecerá en tu próxima factura (o en &quot;Gestionar método de pago y facturas&quot;).
+                En tu próxima factura verás un <strong>descuento</strong> por lo que no hayas usado del plan actual y el <strong>cobro del nuevo plan</strong> solo por los días restantes hasta tu próxima fecha de pago. Puedes revisar el detalle en tu siguiente factura o en &quot;Gestionar método de pago y facturas&quot;.
               </p>
               <p>
-                El cambio de plan y acceso a las nuevas funciones es inmediato.
+                El cambio se aplica al instante y podrás usar las nuevas funciones de inmediato.
               </p>
             </div>
           </DialogHeader>
