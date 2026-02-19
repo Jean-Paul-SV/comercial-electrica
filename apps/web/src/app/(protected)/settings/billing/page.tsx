@@ -53,9 +53,18 @@ type BillingPlanItem = {
   id: string;
   name: string;
   slug: string;
+  description: string | null;
   priceMonthly: number | null;
   priceYearly: number | null;
   maxUsers: number | null;
+};
+
+const PLAN_FEATURES: Record<string, string[]> = {
+  'basico-sin-dian': ['Ventas', 'Inventario', 'Clientes', 'Backup 1 día a la semana'],
+  'premium-sin-dian': ['Todo lo del Básico', 'Reportes avanzados', 'IA en el resumen del día', 'Backup 2 días a la semana'],
+  'basico-con-dian': ['Ventas', 'Inventario', 'Clientes', 'Facturación electrónica DIAN', 'Backup 3 días a la semana'],
+  'premium-con-dian': ['Todo lo del Básico con DIAN', 'Reportes avanzados', 'IA en el resumen del día', 'Compras y proveedores', 'Backup diario'],
+  enterprise: ['DIAN', 'Reportes avanzados', 'Compras y proveedores', 'Auditoría', 'Backups avanzados'],
 };
 
 /** Tarjeta de un plan con validación de downgrade para deshabilitar botón si no permitido. */
@@ -76,6 +85,7 @@ function PlanCard({
   const validation = useValidateDowngrade(isCurrent ? null : p.id);
   const downgradeBlocked = validation.data?.allowed === false;
   const firstError = validation.data?.errors?.[0];
+  const highlights = PLAN_FEATURES[p.slug] ?? [];
 
   return (
     <div
@@ -119,6 +129,17 @@ function PlanCard({
             <span className="text-muted-foreground text-sm">Consultar precio</span>
           )}
         </div>
+        {p.description?.trim() && (
+          <p className="text-sm text-muted-foreground leading-snug">
+            {p.description}
+          </p>
+        )}
+        {highlights.length > 0 && (
+          <p className="text-xs text-muted-foreground">
+            <span className="font-medium text-foreground">Incluye: </span>
+            {highlights.join(' · ')}
+          </p>
+        )}
         {!isCurrent && (
           <div className="space-y-1">
             <Button

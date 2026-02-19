@@ -11,6 +11,7 @@ import type {
   DianActivationRequest,
   ProviderFeedbackItem,
   ListUsageEventsResponse,
+  UsageByDayItem,
 } from './types';
 
 export type ListTenantsQuery = {
@@ -185,6 +186,29 @@ export function listUsageEvents(
   const qs = params.toString();
   return apiClient.get<ListUsageEventsResponse>(
     `/provider/usage/events${qs ? `?${qs}` : ''}`,
+    { authToken }
+  );
+}
+
+export type UsageByDayQuery = {
+  from?: string;
+  to?: string;
+  tenantId?: string;
+  event?: string;
+};
+
+export function getUsageEventsByDay(
+  authToken: string,
+  query?: UsageByDayQuery
+): Promise<UsageByDayItem[]> {
+  const params = new URLSearchParams();
+  if (query?.from) params.set('from', query.from);
+  if (query?.to) params.set('to', query.to);
+  if (query?.tenantId) params.set('tenantId', query.tenantId);
+  if (query?.event) params.set('event', query.event);
+  const qs = params.toString();
+  return apiClient.get<UsageByDayItem[]>(
+    `/provider/usage/events/by-day${qs ? `?${qs}` : ''}`,
     { authToken }
   );
 }

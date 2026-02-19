@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@shared/providers/AuthProvider';
 import * as api from './api';
-import type { ListTenantsQuery, ListFeedbackQuery, ListUsageEventsQuery } from './api';
+import type { ListTenantsQuery, ListFeedbackQuery, ListUsageEventsQuery, UsageByDayQuery } from './api';
 import type { CreateTenantPayload, ProviderAlert } from './types';
 
 export function usePlans(activeOnly?: boolean) {
@@ -176,6 +176,15 @@ export function useUsageEvents(query?: ListUsageEventsQuery) {
   return useQuery({
     queryKey: ['provider', 'usage', query],
     queryFn: () => api.listUsageEvents(token!, query),
+    enabled: Boolean(token),
+  });
+}
+
+export function useUsageEventsByDay(query?: UsageByDayQuery) {
+  const { token } = useAuth();
+  return useQuery({
+    queryKey: ['provider', 'usage', 'by-day', query],
+    queryFn: () => api.getUsageEventsByDay(token!, query),
     enabled: Boolean(token),
   });
 }

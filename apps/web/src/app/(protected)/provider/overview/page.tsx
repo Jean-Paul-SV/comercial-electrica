@@ -19,12 +19,23 @@ import {
 } from '@shared/components/ui/table';
 import { Badge } from '@shared/components/ui/badge';
 import { Skeleton } from '@shared/components/ui/skeleton';
-import { ArrowLeft, LayoutGrid, Eye } from 'lucide-react';
-import { useListTenants } from '@features/provider/hooks';
+import { ArrowLeft, LayoutGrid, Eye, Building2, Users, Activity, Wallet, TrendingUp } from 'lucide-react';
+import { useListTenants, useTenantsSummary, useUsageEventsByDay } from '@features/provider/hooks';
+import { KpiBarChart } from '@shared/components/charts/KpiBarChart';
+import { UsagePeakChart } from '@shared/components/charts/UsagePeakChart';
+import { formatMoney } from '@shared/utils/format';
 
 export default function ProviderOverviewPage() {
   const { data, isLoading } = useListTenants({ limit: 500 });
+  const { data: summary, isLoading: summaryLoading } = useTenantsSummary();
+  const { data: eventsByDay, isLoading: eventsByDayLoading } = useUsageEventsByDay();
   const tenants = data?.items ?? [];
+
+  const plansBarData = (summary?.plansUsage ?? []).map((p) => ({
+    name: p.name,
+    value: p.tenantsCount,
+    fullName: p.name,
+  }));
 
   return (
     <div className="p-4 md:p-6 space-y-6">
@@ -46,6 +57,113 @@ export default function ProviderOverviewPage() {
             </p>
           </div>
         </div>
+      </div>
+
+      {/* KPIs */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total empresas</CardTitle>
+            <Building2 className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            {summaryLoading ? (
+              <Skeleton className="h-8 w-16" />
+            ) : (
+              <span className="text-2xl font-bold tabular-nums">{summary?.totalTenants ?? 0}</span>
+            )}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Empresas activas</CardTitle>
+            <Activity className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            {summaryLoading ? (
+              <Skeleton className="h-8 w-16" />
+            ) : (
+              <span className="text-2xl font-bold tabular-nums">{summary?.activeTenants ?? 0}</span>
+            )}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total usuarios</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            {summaryLoading ? (
+              <Skeleton className="h-8 w-16" />
+            ) : (
+              <span className="text-2xl font-bold tabular-nums">{summary?.totalUsers ?? 0}</span>
+            )}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">MRR aproximado</CardTitle>
+            <Wallet className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            {summaryLoading ? (
+              <Skeleton className="h-8 w-24" />
+            ) : (
+              <span className="text-xl font-semibold tabular-nums">
+                {formatMoney(summary?.totalMrrApprox ?? 0)}
+              </span>
+            )}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Ventas del mes</CardTitle>
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            {summaryLoading ? (
+              <Skeleton className="h-8 w-24" />
+            ) : (
+              <span className="text-xl font-semibold tabular-nums">
+                {formatMoney(summary?.totalSalesCurrentMonth ?? 0)}
+              </span>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Gráfico por plan + Uso en el tiempo */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg">Empresas por plan</CardTitle>
+            <CardDescription>Distribución por tipo de plan.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {summaryLoading ? (
+              <Skeleton className="h-56 w-full rounded-lg" />
+            ) : plansBarData.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-6 text-center">Sin datos de planes.</p>
+            ) : (
+              <KpiBarChart data={plansBarData} className="h-56 w-full min-w-0" />
+            )}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg">Uso en el tiempo</CardTitle>
+            <CardDescription>Eventos de uso por día (últimos 30 días).</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {eventsByDayLoading ? (
+              <Skeleton className="h-56 w-full rounded-lg" />
+            ) : !eventsByDay?.length ? (
+              <p className="text-sm text-muted-foreground py-6 text-center">Sin eventos en el periodo.</p>
+            ) : (
+              <UsagePeakChart data={eventsByDay} className="h-56 w-full min-w-0" />
+            )}
+          </CardContent>
+        </Card>
       </div>
 
       <Card>

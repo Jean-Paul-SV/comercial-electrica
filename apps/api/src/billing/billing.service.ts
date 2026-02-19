@@ -270,6 +270,7 @@ export class BillingService {
       id: string;
       name: string;
       slug: string;
+      description: string | null;
       priceMonthly: number | null;
       priceYearly: number | null;
       maxUsers: number | null;
@@ -281,6 +282,7 @@ export class BillingService {
         id: true,
         name: true,
         slug: true,
+        description: true,
         priceMonthly: true,
         priceYearly: true,
         maxUsers: true,
@@ -291,6 +293,7 @@ export class BillingService {
       id: p.id,
       name: p.name,
       slug: p.slug,
+      description: p.description ?? null,
       priceMonthly: p.priceMonthly != null ? Number(p.priceMonthly) : null,
       priceYearly: p.priceYearly != null ? Number(p.priceYearly) : null,
       maxUsers: p.maxUsers,

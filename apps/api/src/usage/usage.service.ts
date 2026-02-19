@@ -50,6 +50,45 @@ export class UsageService {
   }
 
   /**
+   * Eventos agregados por día para gráficos de picos (panel proveedor).
+   * Devuelve { date: string (YYYY-MM-DD), count: number }[].
+   */
+  async listByDay(options: {
+    tenantId?: string;
+    event?: string;
+    from?: string;
+    to?: string;
+  }): Promise<{ date: string; count: number }[]> {
+    const toDate = options.to ? new Date(options.to) : new Date();
+    const fromDate = options.from ? new Date(options.from) : (() => {
+      const d = new Date(toDate);
+      d.setDate(d.getDate() - 30);
+      return d;
+    })();
+    const conditions: Prisma.Sql[] = [];
+    if (options.tenantId) conditions.push(Prisma.sql`"tenantId" = ${options.tenantId}::uuid`);
+    if (options.event) conditions.push(Prisma.sql`"event" = ${options.event}`);
+    conditions.push(Prisma.sql`"createdAt" >= ${fromDate}`);
+    conditions.push(Prisma.sql`"createdAt" <= ${toDate}`);
+    const where = conditions.length > 0 ? Prisma.sql`WHERE ${Prisma.join(conditions, ' AND ')}` : Prisma.empty;
+
+    const rows = await this.prisma.$queryRaw<{ day: Date; count: bigint }[]>(
+      Prisma.sql`
+        SELECT date_trunc('day', "createdAt" AT TIME ZONE 'UTC')::date AS day, count(*)::bigint AS count
+        FROM "UsageEvent"
+        ${where}
+        GROUP BY 1
+        ORDER BY 1
+      `,
+    );
+
+    return rows.map((r) => ({
+      date: (r.day as Date).toISOString().slice(0, 10),
+      count: Number(r.count),
+    }));
+  }
+
+  /**
    * Registra un evento de uso para mejorar el producto (solo uso interno).
    * tenantId y userId se toman del JWT; no se almacenan PII en payload.
    */

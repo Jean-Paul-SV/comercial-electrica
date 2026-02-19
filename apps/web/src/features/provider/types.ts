@@ -42,6 +42,12 @@ export type ListUsageEventsResponse = {
   offset: number;
 };
 
+/** Eventos agregados por día (gráfico de picos). */
+export type UsageByDayItem = {
+  date: string;
+  count: number;
+};
+
 export type TenantDetail = {
   id: string;
   name: string;
@@ -135,6 +141,10 @@ export type ProviderTenantsSummary = {
   activeTenants: number;
   suspendedTenants: number;
   totalUsers: number;
+  /** MRR aproximado sumando el valor mensual equivalente de todos los tenants activos. */
+  totalMrrApprox: number;
+  /** Total de ventas (grandTotal) del mes en curso, sumando todas las empresas. */
+  totalSalesCurrentMonth: number;
   plansUsage: {
     id: string;
     name: string;

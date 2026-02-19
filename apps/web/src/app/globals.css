@@ -107,6 +107,12 @@
   display: none !important;
 }
 
+/* Recharts: evitar recuadro/blanco de foco al hacer click en el gráfico */
+.recharts-wrapper:focus,
+.recharts-wrapper:focus-visible {
+  outline: none;
+}
+
 /* Mejor respuesta táctil en móvil: reduce retraso y doble zoom en inputs */
 @layer base {
   @media (pointer: coarse) {

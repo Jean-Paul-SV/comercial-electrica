@@ -242,13 +242,13 @@ export class ReportsController {
     return this.reportsService.getActionableIndicators(dto, tenantId);
   }
 
-  @RequireModule('ai')
+  @RequireModule('ai', 'advanced_reports')
   @Get('dashboard-summary')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Resumen del dashboard en lenguaje natural (IA)',
     description:
-      'Requiere módulo "ai" (planes Premium y Enterprise). Una o dos frases que resumen los indicadores. Si OPENAI_API_KEY está configurado usa LLM; si no, fallback con los primeros insights.',
+      'Requiere módulo "ai" o "advanced_reports" (planes Premium y Enterprise). Una o dos frases que resumen los indicadores. Si OPENAI_API_KEY está configurado usa LLM; si no, fallback con los primeros insights.',
   })
   @ApiQuery({
     name: 'days',

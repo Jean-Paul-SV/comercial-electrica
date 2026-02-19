@@ -22,7 +22,8 @@ import {
 } from '@shared/components/ui/table';
 import { Skeleton } from '@shared/components/ui/skeleton';
 import { ArrowLeft, BarChart3, ChevronLeft, ChevronRight } from 'lucide-react';
-import { useUsageEvents, useListTenants } from '@features/provider/hooks';
+import { useUsageEvents, useListTenants, useUsageEventsByDay } from '@features/provider/hooks';
+import { UsagePeakChart } from '@shared/components/charts/UsagePeakChart';
 
 const PAGE_SIZE = 50;
 
@@ -35,6 +36,13 @@ export default function ProviderUsagePage() {
 
   const { data: tenantsData, isLoading: tenantsLoading } = useListTenants({ limit: 500 });
   const tenants = tenantsData?.items ?? [];
+
+  const { data: eventsByDay, isLoading: eventsByDayLoading } = useUsageEventsByDay({
+    from: from || undefined,
+    to: to || undefined,
+    tenantId: tenantId || undefined,
+    event: eventFilter || undefined,
+  });
 
   const { data, isLoading } = useUsageEvents({
     limit: PAGE_SIZE,
@@ -130,7 +138,7 @@ export default function ProviderUsagePage() {
             Filtra por empresa, tipo de evento o rango de fechas.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-6">
           <div className="flex flex-wrap gap-4 items-end">
             <div className="space-y-1">
               <Label className="text-xs">Empresa</Label>
@@ -189,6 +197,19 @@ export default function ProviderUsagePage() {
                 className="h-9 w-[140px]"
               />
             </div>
+          </div>
+
+          <div>
+            <p className="text-sm font-medium text-muted-foreground mb-2">Eventos por día (mismos filtros)</p>
+            {eventsByDayLoading ? (
+              <Skeleton className="h-64 w-full rounded-lg" />
+            ) : !eventsByDay?.length ? (
+              <p className="text-sm text-muted-foreground py-6 text-center rounded-lg border border-dashed border-border">
+                Sin eventos en el periodo. Sin filtros se muestran los últimos 30 días.
+              </p>
+            ) : (
+              <UsagePeakChart data={eventsByDay} className="h-64 w-full min-w-0" />
+            )}
           </div>
 
           {isLoading ? (

@@ -37,6 +37,7 @@ import {
 } from '../dian/dto/dian-config.dto';
 import { UsageService } from '../usage/usage.service';
 import { ListUsageQueryDto } from '../usage/dto/list-usage-query.dto';
+import { UsageByDayQueryDto } from '../usage/dto/usage-by-day-query.dto';
 
 @ApiTags('provider')
 @ApiBearerAuth()
@@ -59,6 +60,22 @@ export class ProviderController {
   @ApiResponse({ status: 200, description: 'Resumen calculado correctamente.' })
   getTenantsSummary() {
     return this.provider.getTenantsSummary();
+  }
+
+  @Get('usage/events/by-day')
+  @ApiOperation({
+    summary: 'Eventos de uso agregados por día',
+    description:
+      'Para gráficos de picos (panel proveedor). Devuelve { date, count }[]. Si no se envían from/to se usan los últimos 30 días.',
+  })
+  @ApiResponse({ status: 200, description: 'Lista de fechas con conteo de eventos.' })
+  listUsageEventsByDay(@Query() query: UsageByDayQueryDto) {
+    return this.usageService.listByDay({
+      tenantId: query.tenantId,
+      event: query.event,
+      from: query.from,
+      to: query.to,
+    });
   }
 
   @Get('usage/events')

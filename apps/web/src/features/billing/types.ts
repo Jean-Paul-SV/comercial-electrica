@@ -29,6 +29,8 @@ export type BillingPlan = {
   id: string;
   name: string;
   slug: string;
+  /** Descripción del plan para que el cliente vea qué incluye y en qué se diferencia de otros. */
+  description: string | null;
   priceMonthly: number | null;
   priceYearly: number | null;
   maxUsers: number | null;

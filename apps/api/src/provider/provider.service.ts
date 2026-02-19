@@ -65,32 +65,94 @@ export class ProviderService {
    * No devuelve datos personales; solo conteos por tenant / plan / módulo.
    */
   async getTenantsSummary() {
-    const [totalTenants, activeTenants, suspendedTenants, totalUsers] =
-      await Promise.all([
-        this.prisma.tenant.count(),
-        // Solo cuentan como activas las que están activas Y con suscripción al día (ACTIVE)
-        this.prisma.tenant.count({
-          where: {
-            isActive: true,
-            OR: [
-              { subscription: { is: null } },
-              { subscription: { status: 'ACTIVE' } },
-            ],
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+
+    const [
+      totalTenants,
+      activeTenants,
+      suspendedTenants,
+      totalUsers,
+      activeTenantsForMrr,
+      salesCurrentMonthAgg,
+    ] = await Promise.all([
+      this.prisma.tenant.count(),
+      // Solo cuentan como activas las que están activas Y con suscripción al día (ACTIVE)
+      this.prisma.tenant.count({
+        where: {
+          isActive: true,
+          OR: [
+            { subscription: { is: null } },
+            { subscription: { status: 'ACTIVE' } },
+          ],
+        },
+      }),
+      // Suspendidas = desactivadas manualmente O con pago pendiente / cancelada
+      this.prisma.tenant.count({
+        where: {
+          OR: [
+            { isActive: false },
+            { subscription: { status: { not: 'ACTIVE' } } },
+          ],
+        },
+      }),
+      this.prisma.user.count({
+        where: { tenantId: { not: null } },
+      }),
+      // Tenants activos para estimar MRR aproximado (según precio de plan e intervalo)
+      this.prisma.tenant.findMany({
+        where: {
+          isActive: true,
+          OR: [
+            { subscription: { is: null } },
+            { subscription: { status: 'ACTIVE' } },
+          ],
+        },
+        select: {
+          billingInterval: true,
+          plan: {
+            select: {
+              priceMonthly: true,
+              priceYearly: true,
+            },
           },
-        }),
-        // Suspendidas = desactivadas manualmente O con pago pendiente / cancelada
-        this.prisma.tenant.count({
-          where: {
-            OR: [
-              { isActive: false },
-              { subscription: { status: { not: 'ACTIVE' } } },
-            ],
-          },
-        }),
-        this.prisma.user.count({
-          where: { tenantId: { not: null } },
-        }),
-      ]);
+        },
+      }),
+      // Ventas del mes (todas las empresas) considerando solo ventas pagadas
+      this.prisma.sale.aggregate({
+        _sum: { grandTotal: true },
+        where: {
+          status: 'PAID',
+          soldAt: { gte: monthStart, lt: nextMonthStart },
+        },
+      }),
+    ]);
+
+    const totalMrrApprox = activeTenantsForMrr.reduce((acc, tenant) => {
+      const plan = tenant.plan;
+      if (!plan) return acc;
+      const priceMonthly =
+        plan.priceMonthly != null ? Number(plan.priceMonthly) : null;
+      const priceYearly =
+        plan.priceYearly != null ? Number(plan.priceYearly) : null;
+      const interval = tenant.billingInterval;
+
+      let effectiveMonthly = 0;
+      if (interval === 'yearly' && priceYearly != null) {
+        effectiveMonthly = priceYearly / 12;
+      } else if (priceMonthly != null) {
+        effectiveMonthly = priceMonthly;
+      } else if (priceYearly != null) {
+        effectiveMonthly = priceYearly / 12;
+      }
+      return acc + effectiveMonthly;
+    }, 0);
+
+    const totalSalesCurrentMonth =
+      salesCurrentMonthAgg._sum.grandTotal != null
+        ? Number(salesCurrentMonthAgg._sum.grandTotal)
+        : 0;
 
     const plans = await this.prisma.plan.findMany({
       select: {
@@ -112,6 +174,8 @@ export class ProviderService {
       activeTenants,
       suspendedTenants,
       totalUsers,
+      totalMrrApprox,
+      totalSalesCurrentMonth,
       plansUsage: plans.map((p) => ({
         id: p.id,
         name: p.name,
