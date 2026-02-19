@@ -410,12 +410,14 @@ export default function BillingPage() {
       {/* Hero */}
       <header className="space-y-1">
         <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-          {requiresPayment ? 'Completa tu pago' : 'Plan'}
+          {requiresPayment ? 'Completa tu pago' : plan ? 'Plan' : 'Elige tu plan'}
         </h1>
         <p className="text-sm text-muted-foreground max-w-xl">
           {requiresPayment
             ? 'Tu empresa está creada. Activa tu acceso completando el pago de tu suscripción.'
-            : 'Información de tu suscripción, renovación y opciones de pago.'}
+            : plan
+              ? 'Información de tu suscripción, renovación y opciones de pago.'
+              : 'Selecciona el plan que mejor se adapte a las necesidades de tu empresa.'}
         </p>
       </header>
 
@@ -575,9 +577,14 @@ export default function BillingPage() {
               </Badge>
             </div>
           ) : (
-            <p className="text-muted-foreground text-sm rounded-xl border border-dashed border-border/60 bg-muted/10 px-4 py-3">
-              No hay plan asignado. Contacte a soporte.
-            </p>
+            <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 px-4 py-3">
+              <p className="text-sm text-foreground font-medium mb-1">
+                No tienes un plan asignado
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Selecciona un plan a continuación para comenzar a usar el servicio.
+              </p>
+            </div>
           )}
 
           {subscription && (
@@ -722,49 +729,66 @@ export default function BillingPage() {
             </div>
           )}
 
-          {/* Cambiar de plan */}
-          {plan && (
-            <section className="space-y-4 rounded-2xl border border-border/60 bg-muted/5 p-5 sm:p-6">
-              <div className="flex items-center gap-2">
+          {/* Seleccionar o cambiar de plan */}
+          <section className="space-y-4 rounded-2xl border border-border/60 bg-muted/5 p-5 sm:p-6">
+            <div className="flex items-center gap-2">
+              {plan ? (
                 <RefreshCw className="h-5 w-5 shrink-0 text-primary/80" />
-                <h2 className="text-base font-semibold text-foreground">Cambiar de plan</h2>
-              </div>
-              <p className="text-sm text-muted-foreground leading-relaxed">
-                Si eliges un plan <strong>más costoso</strong>, el cambio es inmediato y se cobra solo la diferencia proporcional en tu próxima factura.
-                Si eliges un plan <strong>más económico</strong>, el cambio se aplica al final de tu periodo actual (sin reembolso).
-              </p>
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                Los planes &quot;con DIAN&quot; te dan acceso a facturación electrónica. Hasta que actives el servicio podrás usar documentos internos.
-              </p>
-              {plansQuery.data?.some((p) => isPlanWithDian(p.slug)) && (
-                <DianActivationDisclaimer variant="inline" className="text-xs mt-2" />
-              )}
-              {plansQuery.isLoading ? (
-                <div className="grid gap-4 sm:grid-cols-2 mt-4">
-                  {[1, 2, 3].map((i) => (
-                    <Skeleton key={i} className="h-36 rounded-xl" />
-                  ))}
-                </div>
-              ) : plansQuery.data && plansQuery.data.length > 0 ? (
-                <div className="grid gap-4 sm:grid-cols-2 mt-4">
-                  {plansQuery.data.map((p) => (
-                    <PlanCard
-                      key={p.id}
-                      p={p}
-                      currentPlanId={plan.id}
-                      onSelectDian={(id, name, billingInterval) => setDianPlanDialog({ id, name, billingInterval })}
-                      onSelectChange={(id, name, billingInterval) => setChangePlanConfirm({ id, name, billingInterval })}
-                      isChanging={changePlanMutation.isPending || submitFeedbackMutation.isPending}
-                    />
-                  ))}
-                </div>
               ) : (
-                <p className="text-sm text-muted-foreground mt-2">
-                  No hay planes disponibles. Contacte a soporte para cambiar su plan.
-                </p>
+                <Package className="h-5 w-5 shrink-0 text-primary/80" />
               )}
-            </section>
-          )}
+              <h2 className="text-base font-semibold text-foreground">
+                {plan ? 'Cambiar de plan' : 'Planes disponibles'}
+              </h2>
+            </div>
+            {plan ? (
+              <>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  Si eliges un plan <strong>más costoso</strong>, el cambio es inmediato y se cobra solo la diferencia proporcional en tu próxima factura.
+                  Si eliges un plan <strong>más económico</strong>, el cambio se aplica al final de tu periodo actual (sin reembolso).
+                </p>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Los planes &quot;con DIAN&quot; te dan acceso a facturación electrónica. Hasta que actives el servicio podrás usar documentos internos.
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  Elige el plan que mejor se adapte a las necesidades de tu empresa. Puedes cambiar de plan en cualquier momento.
+                </p>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Los planes &quot;con DIAN&quot; incluyen facturación electrónica. Una vez que actives el servicio podrás emitir facturas electrónicas a la DIAN.
+                </p>
+              </>
+            )}
+            {plansQuery.data?.some((p) => isPlanWithDian(p.slug)) && (
+              <DianActivationDisclaimer variant="inline" className="text-xs mt-2" />
+            )}
+            {plansQuery.isLoading ? (
+              <div className="grid gap-4 sm:grid-cols-2 mt-4">
+                {[1, 2, 3].map((i) => (
+                  <Skeleton key={i} className="h-36 rounded-xl" />
+                ))}
+              </div>
+            ) : plansQuery.data && plansQuery.data.length > 0 ? (
+              <div className="grid gap-4 sm:grid-cols-2 mt-4">
+                {plansQuery.data.map((p) => (
+                  <PlanCard
+                    key={p.id}
+                    p={p}
+                    currentPlanId={plan?.id || ''}
+                    onSelectDian={(id, name, billingInterval) => setDianPlanDialog({ id, name, billingInterval })}
+                    onSelectChange={(id, name, billingInterval) => setChangePlanConfirm({ id, name, billingInterval })}
+                    isChanging={changePlanMutation.isPending || submitFeedbackMutation.isPending}
+                  />
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground mt-2">
+                No hay planes disponibles. Contacte a soporte.
+              </p>
+            )}
+          </section>
 
           {/* Portal Stripe (cuando no es pago pendiente y la suscripción está activa) */}
           {canManageBilling && !requiresPayment && isActive && (
