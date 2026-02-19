@@ -190,3 +190,55 @@ export type ProviderAlert = {
   actionLabel: string;
   actionHref: string;
 };
+
+export type BackupMetadata = {
+  id: string;
+  tenantId: string;
+  tenantName: string;
+  tenantSlug: string;
+  planName: string | null;
+  planSlug: string | null;
+  scope: 'TENANT' | 'PLATFORM';
+  status: string;
+  startedAt: string;
+  finishedAt: string | null;
+  duration: number | null; // segundos
+  fileSize: number | null; // bytes
+  checksum: string | null;
+  createdAt: string;
+};
+
+export type BackupsStatistics = {
+  totalTenants: number;
+  tenantsWithBackups: number;
+  tenantsNeverUsedBackups: number;
+  adoptionRate: number; // porcentaje
+  totalBackups: number;
+  backupsLast30Days: number;
+  backupsLast7Days: number;
+  failedBackups: number;
+  completedBackups: number;
+  successRate: number; // porcentaje
+  averageBackupsPerTenant: number;
+  averageSize: number; // bytes
+  averageDuration: number; // segundos
+  backupsByDayOfWeek: {
+    domingo: number;
+    lunes: number;
+    martes: number;
+    miércoles: number;
+    jueves: number;
+    viernes: number;
+    sábado: number;
+  };
+};
+
+export type BackupAlert = {
+  type: 'failed' | 'large_size' | 'slow' | 'excessive_usage';
+  severity: 'warning' | 'error';
+  message: string;
+  tenantId?: string;
+  tenantName?: string;
+  backupId?: string;
+  details?: Record<string, unknown>;
+};

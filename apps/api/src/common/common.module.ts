@@ -8,7 +8,11 @@ import { TenantContextService } from './services/tenant-context.service';
 import { PlanLimitsService } from './services/plan-limits.service';
 import { AlertService } from './services/alert.service';
 import { QueryPerformanceService } from './services/query-performance.service';
+import { HealthMonitorService } from './services/health-monitor.service';
+import { HealthMonitorScheduler } from './schedulers/health-monitor.scheduler';
 import { MailerModule } from '../mailer/mailer.module';
+import { QueueModule } from '../queue/queue.module';
+import { PrismaModule } from '../prisma/prisma.module';
 
 /**
  * Módulo común que exporta servicios compartidos
@@ -16,7 +20,7 @@ import { MailerModule } from '../mailer/mailer.module';
  */
 @Global()
 @Module({
-  imports: [ConfigModule, MailerModule],
+  imports: [ConfigModule, MailerModule, QueueModule, PrismaModule],
   providers: [
     AuditService,
     ValidationLimitsService,
@@ -26,6 +30,8 @@ import { MailerModule } from '../mailer/mailer.module';
     PlanLimitsService,
     AlertService,
     QueryPerformanceService,
+    HealthMonitorService,
+    HealthMonitorScheduler,
   ],
   exports: [
     AuditService,
@@ -36,6 +42,7 @@ import { MailerModule } from '../mailer/mailer.module';
     PlanLimitsService,
     AlertService,
     QueryPerformanceService,
+    HealthMonitorService,
   ],
 })
 export class CommonModule {}

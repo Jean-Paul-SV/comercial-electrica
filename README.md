@@ -171,6 +171,31 @@ comercial-electrica/
 
 ---
 
+## 🚀 Producción
+
+### Checklist Pre-Lanzamiento
+
+- [ ] Variables de entorno configuradas (ver `env.example`)
+- [ ] Webhook de Stripe configurado en producción
+- [ ] Alertas habilitadas (`ALERTS_ENABLED=true`)
+- [ ] Monitor externo configurado (UptimeRobot, etc.)
+- [ ] Script de verificación pasa: `node scripts/verificar-pre-despliegue.js`
+
+### Documentación de Producción
+
+- 📘 **[RUNBOOK_OPERACIONES_COMPLETO.md](./docs/RUNBOOK_OPERACIONES_COMPLETO.md)** - Operaciones diarias
+- 🔧 **[TROUBLESHOOTING_COMPLETO.md](./docs/TROUBLESHOOTING_COMPLETO.md)** - Resolver problemas
+- 🚀 **[PROCEDIMIENTO_DESPLIEGUE.md](./docs/PROCEDIMIENTO_DESPLIEGUE.md)** - Desplegar de forma segura
+- ✅ **[RESUMEN_IMPLEMENTACION_PRODUCCION.md](./docs/RESUMEN_IMPLEMENTACION_PRODUCCION.md)** - Resumen de lo implementado
+
+### Monitoreo
+
+- **Health Check:** `GET /health` (público)
+- **Métricas:** `GET /metrics` (requiere JWT + `metrics:read`)
+- **Alertas:** Automáticas cuando BD/Redis/Backups fallan
+
+---
+
 ## Comandos útiles
 
 ```bash
@@ -178,6 +203,9 @@ comercial-electrica/
 npm run dev              # API + Web
 npm run dev:api          # Solo API
 npm run dev:web          # Solo Web
+
+# Verificación pre-despliegue
+node scripts/verificar-pre-despliegue.js
 
 # Base de datos
 npm run db:up            # Levantar Postgres + Redis

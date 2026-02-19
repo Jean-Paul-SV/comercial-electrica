@@ -1014,6 +1014,8 @@ model BackupRun {
   storagePath String?
   checksum    String?
   createdAt   DateTime @default(now())
+  /// Soft delete: fecha de eliminación (null = activo). Los backups eliminados se mantienen para conteo de límites.
+  deletedAt   DateTime? @db.Timestamptz
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
@@ -1021,4 +1023,5 @@ model BackupRun {
   @@index([startedAt])
   @@index([status])
   @@index([scope])
+  @@index([deletedAt])
 }

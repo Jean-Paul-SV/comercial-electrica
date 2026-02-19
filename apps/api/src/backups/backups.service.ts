@@ -13,12 +13,13 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { createHash } from 'crypto';
 import { readFile, unlink } from 'fs/promises';
-import { createWriteStream } from 'fs';
+import { createWriteStream, statSync } from 'fs';
 import { existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import archiver from 'archiver';
 import { TenantModulesService } from '../auth/tenant-modules.service';
+import { AlertService } from '../common/services/alert.service';
 
 const execAsync = promisify(exec);
 
@@ -52,6 +53,7 @@ export class BackupsService {
     private readonly config: ConfigService,
     private readonly audit: AuditService,
     private readonly tenantModules: TenantModulesService,
+    private readonly alertService: AlertService,
   ) {
     this.backupDir =
       this.config.get<string>('BACKUP_DIR') || join(process.cwd(), 'backups');
@@ -130,6 +132,7 @@ export class BackupsService {
     const start = this.startOfToday();
     const end = new Date(start);
     end.setDate(end.getDate() + 1);
+    // Contar incluso backups eliminados (soft delete) para prevenir abuso
     const count = await this.prisma.backupRun.count({
       where: {
         tenantId,
@@ -139,6 +142,28 @@ export class BackupsService {
       },
     });
     return count > 0;
+  }
+
+  /**
+   * Cuenta backups creados en la semana actual (lunes a domingo) para planes básicos.
+   * Incluye backups eliminados (soft delete) para prevenir abuso: crear → borrar → crear.
+   */
+  private async countBackupsThisWeek(tenantId: string): Promise<number> {
+    const now = new Date();
+    const dayOfWeek = now.getDay(); // 0 = domingo, 1 = lunes, ...
+    const monday = new Date(now);
+    monday.setDate(now.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1)); // Lunes de esta semana
+    monday.setHours(0, 0, 0, 0);
+    
+    // Contar TODOS los backups de la semana (incluyendo eliminados) para prevenir abuso
+    return this.prisma.backupRun.count({
+      where: {
+        tenantId,
+        scope: 'TENANT',
+        startedAt: { gte: monday },
+        // NO filtrar por deletedAt: contar incluso backups eliminados
+      },
+    });
   }
 
   private async assertTenantBackupAllowed(tenantId: string): Promise<void> {
@@ -163,6 +188,14 @@ export class BackupsService {
       if (!allowedDays.includes(todayDow)) {
         throw new ForbiddenException(
           `Tu plan permite backups ${policy.daysPerWeek} día(s) por semana. Hoy no es un día programado para tu empresa.`,
+        );
+      }
+      
+      // Contar backups creados esta semana (incluyendo eliminados) para prevenir abuso
+      const backupsThisWeek = await this.countBackupsThisWeek(tenantId);
+      if (backupsThisWeek >= policy.daysPerWeek) {
+        throw new ForbiddenException(
+          `Ya has creado ${backupsThisWeek} backup(s) esta semana. Tu plan permite ${policy.daysPerWeek} backup(s) por semana.`,
         );
       }
     }
@@ -287,6 +320,34 @@ export class BackupsService {
           finishedAt: new Date(),
         },
       });
+
+      // Enviar alerta si las alertas están habilitadas
+      const alertsEnabled = this.config.get<string>('ALERTS_ENABLED') === 'true';
+      if (alertsEnabled) {
+        const tenant = isTenantBackup && tidForRun
+          ? await this.prisma.tenant.findUnique({
+              where: { id: tidForRun },
+              select: { name: true },
+            })
+          : null;
+
+        await this.alertService.sendAlert({
+          title: '🚨 Backup fallido',
+          message: `El backup ${isTenantBackup ? 'del tenant' : 'de plataforma'} falló. ${error instanceof Error ? error.message : String(error)}`,
+          severity: 'critical',
+          tenantId: isTenantBackup ? tidForRun : undefined,
+          tenantName: tenant?.name ?? undefined,
+          metadata: {
+            backupId: backupRun.id,
+            scope: isTenantBackup ? 'TENANT' : 'PLATFORM',
+            error: error instanceof Error ? error.message : String(error),
+            timestamp: new Date().toISOString(),
+          },
+        }).catch((alertError) => {
+          this.logger.error('Error enviando alerta de backup fallido:', alertError);
+        });
+      }
+
       throw error;
     }
   }
@@ -501,12 +562,13 @@ export class BackupsService {
 
   /**
    * Lista backups. Si tenantId está definido, solo los de ese tenant; si no (plataforma), todos.
+   * Solo muestra backups activos (no eliminados con soft delete).
    */
   async listBackups(tenantId?: string | null) {
     const where =
       typeof tenantId === 'string' && tenantId.trim() !== ''
-        ? { tenantId, scope: 'TENANT' as const }
-        : {};
+        ? { tenantId, scope: 'TENANT' as const, deletedAt: null }
+        : { deletedAt: null };
     return this.prisma.backupRun.findMany({
       where,
       orderBy: { startedAt: 'desc' },
@@ -515,10 +577,11 @@ export class BackupsService {
 
   /**
    * Obtiene un backup por ID. Si tenantId está definido, solo si pertenece a ese tenant.
+   * Solo devuelve backups activos (no eliminados con soft delete).
    */
   async getBackup(id: string, tenantId?: string | null) {
-    const backup = await this.prisma.backupRun.findUnique({
-      where: { id },
+    const backup = await this.prisma.backupRun.findFirst({
+      where: { id, deletedAt: null },
     });
     if (!backup) {
       throw new NotFoundException(`Backup ${id} no encontrado`);
@@ -535,6 +598,7 @@ export class BackupsService {
 
   /**
    * Devuelve ruta y nombre para descargar. Plataforma puede descargar cualquier backup; un tenant solo el suyo.
+   * Solo permite descargar backups activos (no eliminados con soft delete).
    */
   async getBackupDownload(
     id: string,
@@ -582,7 +646,9 @@ export class BackupsService {
   }
 
   /**
-   * Elimina un backup. Si tenantId está definido, solo si pertenece a ese tenant.
+   * Elimina un backup (soft delete). Si tenantId está definido, solo si pertenece a ese tenant.
+   * Para planes básicos, bloquea eliminación de backups recientes (últimos 7 días) para prevenir abuso.
+   * Los backups eliminados se mantienen en BD para conteo de límites semanales.
    */
   async deleteBackup(
     id: string,
@@ -590,15 +656,47 @@ export class BackupsService {
     tenantId?: string | null,
   ): Promise<void> {
     const backup = await this.getBackup(id, tenantId);
-    if (backup.storagePath && existsSync(backup.storagePath)) {
-      await unlink(backup.storagePath);
+    
+    // Validar si el plan permite eliminar backups recientes (prevenir abuso: crear → borrar → crear)
+    if (tenantId) {
+      const tenant = await this.prisma.tenant.findUnique({
+        where: { id: tenantId },
+        select: { plan: { select: { slug: true } } },
+      });
+      const policy = this.getBackupPolicyForPlanSlug(tenant?.plan?.slug);
+      
+      // Planes básicos: no permitir borrar backups de los últimos 7 días
+      if (policy.tier === 'basic') {
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        
+        if (backup.startedAt >= sevenDaysAgo) {
+          throw new ForbiddenException(
+            'No puedes eliminar backups recientes (últimos 7 días) en tu plan. Esto previene abusos del límite de backups por semana.',
+          );
+        }
+      }
     }
-    await this.prisma.backupRun.delete({ where: { id } });
+    
+    // Soft delete: marcar como eliminado en lugar de borrar físicamente
+    // Esto permite mantener el conteo para límites semanales
+    await this.prisma.backupRun.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    });
+    
+    // Eliminar archivo físico del disco (opcional; puedes mantenerlo para recuperación)
+    if (backup.storagePath && existsSync(backup.storagePath)) {
+      await unlink(backup.storagePath).catch((err) => {
+        this.logger.warn(`No se pudo eliminar archivo físico del backup ${id}: ${err instanceof Error ? err.message : String(err)}`);
+      });
+    }
+    
     await this.audit.logDelete('backupRun', id, deletedByUserId ?? null, {
       storagePath: backup.storagePath ?? undefined,
       status: backup.status,
     });
-    this.logger.log(`Backup eliminado: ${id}`);
+    this.logger.log(`Backup eliminado (soft delete): ${id}`);
   }
 
   /**
@@ -758,12 +856,14 @@ export class BackupsService {
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - retentionDays);
 
+    // Solo considerar backups activos (no eliminados) para cleanup
     const old = await this.prisma.backupRun.findMany({
       where: {
         tenantId,
         scope: 'TENANT',
         status: 'COMPLETED',
         startedAt: { lt: cutoff },
+        deletedAt: null, // Solo backups activos
       },
       select: { id: true },
       orderBy: { startedAt: 'asc' },
@@ -779,8 +879,14 @@ export class BackupsService {
       }
     }
 
+    // Solo considerar backups activos para el límite maxToKeep
     const extra = await this.prisma.backupRun.findMany({
-      where: { tenantId, scope: 'TENANT', status: 'COMPLETED' },
+      where: {
+        tenantId,
+        scope: 'TENANT',
+        status: 'COMPLETED',
+        deletedAt: null, // Solo backups activos
+      },
       orderBy: { startedAt: 'desc' },
       skip: maxToKeep,
       select: { id: true },
@@ -797,8 +903,13 @@ export class BackupsService {
   }
 
   private async cleanupPlatformBackups(maxToKeep: number): Promise<void> {
+    // Solo considerar backups activos (no eliminados) para cleanup
     const backups = await this.prisma.backupRun.findMany({
-      where: { scope: 'PLATFORM', status: 'COMPLETED' },
+      where: {
+        scope: 'PLATFORM',
+        status: 'COMPLETED',
+        deletedAt: null, // Solo backups activos
+      },
       orderBy: { startedAt: 'desc' },
       skip: maxToKeep,
       select: { id: true },
@@ -815,5 +926,451 @@ export class BackupsService {
         );
       }
     }
+  }
+
+  /**
+   * Lista backups con metadatos para el panel proveedor (sin acceso al contenido).
+   * Incluye información del tenant y estadísticas básicas.
+   */
+  async listBackupsForProvider(limit: number = 100) {
+    const backups = await this.prisma.backupRun.findMany({
+      where: { deletedAt: null }, // Solo backups activos
+      include: {
+        tenant: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            plan: {
+              select: {
+                id: true,
+                name: true,
+                slug: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: { startedAt: 'desc' },
+      take: limit,
+    });
+
+    return backups.map((b) => {
+      const duration = b.finishedAt
+        ? Math.round((b.finishedAt.getTime() - b.startedAt.getTime()) / 1000)
+        : null;
+      
+      let fileSize: number | null = null;
+      if (b.storagePath && existsSync(b.storagePath)) {
+        try {
+          fileSize = statSync(b.storagePath).size;
+        } catch (err) {
+          // Archivo puede haber sido eliminado o no ser accesible
+          this.logger.warn(`No se pudo obtener tamaño del backup ${b.id}: ${err instanceof Error ? err.message : String(err)}`);
+        }
+      }
+
+      return {
+        id: b.id,
+        tenantId: b.tenantId,
+        tenantName: b.tenant.name,
+        tenantSlug: b.tenant.slug,
+        planName: b.tenant.plan?.name ?? null,
+        planSlug: b.tenant.plan?.slug ?? null,
+        scope: b.scope,
+        status: b.status,
+        startedAt: b.startedAt.toISOString(),
+        finishedAt: b.finishedAt?.toISOString() ?? null,
+        duration: duration, // segundos
+        fileSize: fileSize, // bytes
+        checksum: b.checksum,
+        createdAt: b.createdAt.toISOString(),
+      };
+    });
+  }
+
+  /**
+   * Obtiene estadísticas agregadas de backups para el panel proveedor.
+   */
+  async getBackupsStatistics() {
+    const now = new Date();
+    const thirtyDaysAgo = new Date(now);
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const sevenDaysAgo = new Date(now);
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    // Total de tenants activos
+    const totalTenants = await this.prisma.tenant.count({
+      where: { isActive: true },
+    });
+
+    // Tenants que han creado al menos un backup
+    const tenantsWithBackups = await this.prisma.backupRun.findMany({
+      where: {
+        scope: 'TENANT',
+        deletedAt: null,
+      },
+      select: { tenantId: true },
+      distinct: ['tenantId'],
+    });
+    const tenantsWithBackupsCount = tenantsWithBackups.length;
+    const tenantsNeverUsedBackups = totalTenants - tenantsWithBackupsCount;
+
+    // Backups totales (activos)
+    const totalBackups = await this.prisma.backupRun.count({
+      where: { deletedAt: null },
+    });
+
+    // Backups de los últimos 30 días
+    const backupsLast30Days = await this.prisma.backupRun.count({
+      where: {
+        deletedAt: null,
+        startedAt: { gte: thirtyDaysAgo },
+      },
+    });
+
+    // Backups de los últimos 7 días
+    const backupsLast7Days = await this.prisma.backupRun.count({
+      where: {
+        deletedAt: null,
+        startedAt: { gte: sevenDaysAgo },
+      },
+    });
+
+    // Backups fallidos (últimos 30 días)
+    const failedBackups = await this.prisma.backupRun.count({
+      where: {
+        status: 'FAILED',
+        deletedAt: null,
+        startedAt: { gte: thirtyDaysAgo },
+      },
+    });
+
+    // Backups completados (últimos 30 días)
+    const completedBackups = await this.prisma.backupRun.count({
+      where: {
+        status: 'COMPLETED',
+        deletedAt: null,
+        startedAt: { gte: thirtyDaysAgo },
+      },
+    });
+
+    // Tasa de éxito
+    const successRate =
+      completedBackups + failedBackups > 0
+        ? Math.round((completedBackups / (completedBackups + failedBackups)) * 100)
+        : 100;
+
+    // Promedio de backups por tenant (últimos 30 días)
+    const averageBackupsPerTenant =
+      tenantsWithBackupsCount > 0
+        ? Math.round((backupsLast30Days / tenantsWithBackupsCount) * 10) / 10
+        : 0;
+
+    // Tamaño promedio de backups completados (últimos 30 días)
+    const completedBackupsWithSize = await this.prisma.backupRun.findMany({
+      where: {
+        status: 'COMPLETED',
+        deletedAt: null,
+        startedAt: { gte: thirtyDaysAgo },
+        storagePath: { not: null },
+      },
+      select: { storagePath: true },
+    });
+
+    let totalSize = 0;
+    let backupsWithValidSize = 0;
+    for (const b of completedBackupsWithSize) {
+      if (b.storagePath && existsSync(b.storagePath)) {
+        try {
+          const size = statSync(b.storagePath).size;
+          totalSize += size;
+          backupsWithValidSize++;
+        } catch {
+          // Ignorar errores de lectura
+        }
+      }
+    }
+    const averageSize = backupsWithValidSize > 0 ? Math.round(totalSize / backupsWithValidSize) : 0;
+
+    // Duración promedio (últimos 30 días)
+    const completedBackupsWithDuration = await this.prisma.backupRun.findMany({
+      where: {
+        status: 'COMPLETED',
+        deletedAt: null,
+        startedAt: { gte: thirtyDaysAgo },
+        finishedAt: { not: null },
+      },
+      select: { startedAt: true, finishedAt: true },
+    });
+
+    let totalDuration = 0;
+    for (const b of completedBackupsWithDuration) {
+      if (b.finishedAt) {
+        totalDuration += Math.round((b.finishedAt.getTime() - b.startedAt.getTime()) / 1000);
+      }
+    }
+    const averageDuration =
+      completedBackupsWithDuration.length > 0
+        ? Math.round(totalDuration / completedBackupsWithDuration.length)
+        : 0;
+
+    // Backups por día de la semana (últimos 30 días)
+    const backupsByDay = await this.prisma.backupRun.findMany({
+      where: {
+        deletedAt: null,
+        startedAt: { gte: thirtyDaysAgo },
+      },
+      select: { startedAt: true },
+    });
+
+    const dayCounts: Record<number, number> = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
+    for (const b of backupsByDay) {
+      const dayOfWeek = b.startedAt.getDay();
+      dayCounts[dayOfWeek] = (dayCounts[dayOfWeek] || 0) + 1;
+    }
+
+    return {
+      totalTenants,
+      tenantsWithBackups: tenantsWithBackupsCount,
+      tenantsNeverUsedBackups,
+      adoptionRate: totalTenants > 0 ? Math.round((tenantsWithBackupsCount / totalTenants) * 100) : 0,
+      totalBackups,
+      backupsLast30Days,
+      backupsLast7Days,
+      failedBackups,
+      completedBackups,
+      successRate,
+      averageBackupsPerTenant,
+      averageSize, // bytes
+      averageDuration, // segundos
+      backupsByDayOfWeek: {
+        domingo: dayCounts[0],
+        lunes: dayCounts[1],
+        martes: dayCounts[2],
+        miércoles: dayCounts[3],
+        jueves: dayCounts[4],
+        viernes: dayCounts[5],
+        sábado: dayCounts[6],
+      },
+    };
+  }
+
+  /**
+   * Obtiene alertas de backups para el panel proveedor (fallidos recientes, tamaños anormales, etc.).
+   */
+  async getBackupsAlerts() {
+    const now = new Date();
+    const sevenDaysAgo = new Date(now);
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    const alerts: Array<{
+      type: 'failed' | 'large_size' | 'slow' | 'excessive_usage';
+      severity: 'warning' | 'error';
+      message: string;
+      tenantId?: string;
+      tenantName?: string;
+      backupId?: string;
+      details?: Record<string, unknown>;
+    }> = [];
+
+    // Backups fallidos recientes
+    const failedBackups = await this.prisma.backupRun.findMany({
+      where: {
+        status: 'FAILED',
+        deletedAt: null,
+        startedAt: { gte: sevenDaysAgo },
+      },
+      include: {
+        tenant: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+          },
+        },
+      },
+      orderBy: { startedAt: 'desc' },
+      take: 10,
+    });
+
+    for (const b of failedBackups) {
+      alerts.push({
+        type: 'failed',
+        severity: 'error',
+        message: `Backup fallido para ${b.tenant.name}`,
+        tenantId: b.tenantId,
+        tenantName: b.tenant.name,
+        backupId: b.id,
+        details: {
+          startedAt: b.startedAt.toISOString(),
+        },
+      });
+    }
+
+    // Backups con tamaño anormalmente grande (últimos 7 días)
+    const completedBackups = await this.prisma.backupRun.findMany({
+      where: {
+        status: 'COMPLETED',
+        deletedAt: null,
+        startedAt: { gte: sevenDaysAgo },
+        storagePath: { not: null },
+      },
+      include: {
+        tenant: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            plan: {
+              select: { slug: true },
+            },
+          },
+        },
+      },
+      orderBy: { startedAt: 'desc' },
+    });
+
+    // Calcular tamaño promedio para detectar anomalías
+    const sizes: number[] = [];
+    for (const b of completedBackups) {
+      if (b.storagePath && existsSync(b.storagePath)) {
+        try {
+          const size = statSync(b.storagePath).size;
+          sizes.push(size);
+        } catch {
+          // Ignorar errores
+        }
+      }
+    }
+
+    if (sizes.length > 0) {
+      const avgSize = sizes.reduce((a, b) => a + b, 0) / sizes.length;
+      const threshold = avgSize * 3; // 3x el promedio se considera anormal
+
+      for (const b of completedBackups) {
+        if (b.storagePath && existsSync(b.storagePath)) {
+          try {
+            const size = statSync(b.storagePath).size;
+            if (size > threshold) {
+              alerts.push({
+                type: 'large_size',
+                severity: 'warning',
+                message: `Backup inusualmente grande (${Math.round(size / 1024 / 1024)}MB) para ${b.tenant.name}`,
+                tenantId: b.tenantId,
+                tenantName: b.tenant.name,
+                backupId: b.id,
+                details: {
+                  size: size,
+                  averageSize: Math.round(avgSize),
+                  startedAt: b.startedAt.toISOString(),
+                },
+              });
+            }
+          } catch {
+            // Ignorar errores
+          }
+        }
+      }
+    }
+
+    // Backups muy lentos (>30 minutos)
+    const slowBackups = await this.prisma.backupRun.findMany({
+      where: {
+        status: 'COMPLETED',
+        deletedAt: null,
+        startedAt: { gte: sevenDaysAgo },
+        finishedAt: { not: null },
+      },
+      include: {
+        tenant: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+          },
+        },
+      },
+    });
+
+    for (const b of slowBackups) {
+      if (b.finishedAt) {
+        const duration = Math.round((b.finishedAt.getTime() - b.startedAt.getTime()) / 1000);
+        if (duration > 1800) {
+          // 30 minutos
+          alerts.push({
+            type: 'slow',
+            severity: 'warning',
+            message: `Backup muy lento (${Math.round(duration / 60)} min) para ${b.tenant.name}`,
+            tenantId: b.tenantId,
+            tenantName: b.tenant.name,
+            backupId: b.id,
+            details: {
+              duration: duration,
+              startedAt: b.startedAt.toISOString(),
+            },
+          });
+        }
+      }
+    }
+
+    // Uso excesivo (planes básicos con muchos backups completados)
+    const basicPlanBackups = await this.prisma.backupRun.findMany({
+      where: {
+        scope: 'TENANT',
+        deletedAt: null,
+        status: 'COMPLETED', // Solo backups completados cuentan para límites
+        startedAt: { gte: sevenDaysAgo },
+      },
+      include: {
+        tenant: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            plan: {
+              select: { slug: true },
+            },
+          },
+        },
+      },
+    });
+
+    const backupsByTenant: Record<string, { count: number; tenant: typeof basicPlanBackups[0]['tenant'] }> = {};
+    for (const b of basicPlanBackups) {
+      if (!backupsByTenant[b.tenantId]) {
+        backupsByTenant[b.tenantId] = { count: 0, tenant: b.tenant };
+      }
+      backupsByTenant[b.tenantId].count++;
+    }
+
+    for (const [tenantId, data] of Object.entries(backupsByTenant)) {
+      const tenant = data.tenant;
+      if (tenant && tenant.plan?.slug) {
+        const policy = this.getBackupPolicyForPlanSlug(tenant.plan.slug);
+        if (policy.tier === 'basic' && data.count > policy.daysPerWeek * 2) {
+          // Más del doble del límite semanal
+          alerts.push({
+            type: 'excessive_usage',
+            severity: 'warning',
+            message: `${tenant.name} ha creado ${data.count} backups esta semana (límite: ${policy.daysPerWeek}/semana)`,
+            tenantId: tenant.id,
+            tenantName: tenant.name,
+            details: {
+              backupsThisWeek: data.count,
+              limit: policy.daysPerWeek,
+            },
+          });
+        }
+      }
+    }
+
+    return alerts.sort((a, b) => {
+      // Ordenar por severidad (error primero) y luego por fecha
+      if (a.severity !== b.severity) {
+        return a.severity === 'error' ? -1 : 1;
+      }
+      return 0;
+    });
   }
 }

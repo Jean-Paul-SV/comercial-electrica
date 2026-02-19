@@ -38,6 +38,7 @@ import {
 import { UsageService } from '../usage/usage.service';
 import { ListUsageQueryDto } from '../usage/dto/list-usage-query.dto';
 import { UsageByDayQueryDto } from '../usage/dto/usage-by-day-query.dto';
+import { BackupsService } from '../backups/backups.service';
 
 @ApiTags('provider')
 @ApiBearerAuth()
@@ -49,6 +50,7 @@ export class ProviderController {
     private readonly dianService: DianService,
     private readonly feedbackService: FeedbackService,
     private readonly usageService: UsageService,
+    private readonly backupsService: BackupsService,
   ) {}
 
   @Get('tenants/summary')
@@ -350,5 +352,39 @@ export class ProviderController {
   })
   markDianActivationAsCompleted(@Param('id') tenantId: string) {
     return this.provider.markDianActivationAsCompleted(tenantId);
+  }
+
+  @Get('backups')
+  @ApiOperation({
+    summary: 'Listar backups con metadatos (panel proveedor)',
+    description:
+      'Lista backups recientes con información del tenant y estadísticas básicas. Solo metadatos, sin acceso al contenido.',
+  })
+  @ApiResponse({ status: 200, description: 'Lista de backups con metadatos.' })
+  listBackups(@Query('limit') limit?: string) {
+    const limitNum = limit ? parseInt(limit, 10) : 100;
+    return this.backupsService.listBackupsForProvider(limitNum);
+  }
+
+  @Get('backups/statistics')
+  @ApiOperation({
+    summary: 'Estadísticas agregadas de backups',
+    description:
+      'Métricas de adopción, éxito, tamaños promedio, etc. Útil para monitoreo y análisis del producto.',
+  })
+  @ApiResponse({ status: 200, description: 'Estadísticas calculadas.' })
+  getBackupsStatistics() {
+    return this.backupsService.getBackupsStatistics();
+  }
+
+  @Get('backups/alerts')
+  @ApiOperation({
+    summary: 'Alertas de backups',
+    description:
+      'Backups fallidos recientes, tamaños anormales, uso excesivo, etc. Para detectar problemas técnicos.',
+  })
+  @ApiResponse({ status: 200, description: 'Lista de alertas.' })
+  getBackupsAlerts() {
+    return this.backupsService.getBackupsAlerts();
   }
 }

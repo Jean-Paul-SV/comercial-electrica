@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@shared/providers/AuthProvider';
 import * as api from './api';
 import type { ListTenantsQuery, ListFeedbackQuery, ListUsageEventsQuery, UsageByDayQuery } from './api';
-import type { CreateTenantPayload, ProviderAlert } from './types';
+import type { CreateTenantPayload, ProviderAlert, BackupMetadata, BackupsStatistics, BackupAlert } from './types';
 
 export function usePlans(activeOnly?: boolean) {
   const { token } = useAuth();
@@ -266,4 +266,32 @@ export function useProviderAlerts(): { alerts: ProviderAlert[]; isLoading: boole
   }, [plans, tenants, plansQuery.isSuccess, tenantsQuery.isSuccess]);
 
   return { alerts, isLoading };
+}
+
+export function useBackupsMetadata(limit?: number) {
+  const { token } = useAuth();
+  return useQuery({
+    queryKey: ['provider', 'backups', 'metadata', limit],
+    queryFn: () => api.listBackupsMetadata(token!, limit),
+    enabled: Boolean(token),
+  });
+}
+
+export function useBackupsStatistics() {
+  const { token } = useAuth();
+  return useQuery({
+    queryKey: ['provider', 'backups', 'statistics'],
+    queryFn: () => api.getBackupsStatistics(token!),
+    enabled: Boolean(token),
+  });
+}
+
+export function useBackupsAlerts() {
+  const { token } = useAuth();
+  return useQuery({
+    queryKey: ['provider', 'backups', 'alerts'],
+    queryFn: () => api.getBackupsAlerts(token!),
+    enabled: Boolean(token),
+    refetchInterval: 60000, // Refrescar cada minuto
+  });
 }

@@ -24,7 +24,9 @@ export class AppService {
   async getHealth() {
     const startTime = Date.now();
     let dbStatus = 'unknown';
+    let dbResponseTime: number | null = null;
     let redisStatus: 'connected' | 'disconnected' | 'unknown' = 'unknown';
+    let redisResponseTime: number | null = null;
     const queues: Record<
       string,
       | {
@@ -37,16 +39,22 @@ export class AppService {
       | { status: 'disconnected' }
     > = {};
 
+    // Verificar base de datos con medición de tiempo
     try {
+      const dbStart = Date.now();
       await this.prisma.$queryRaw`SELECT 1`;
+      dbResponseTime = Date.now() - dbStart;
       dbStatus = 'connected';
     } catch (error) {
       dbStatus = 'disconnected';
       this.logger.error('Database health check failed:', error);
     }
 
+    // Verificar Redis con medición de tiempo
     try {
+      const redisStart = Date.now();
       redisStatus = await this.cache.ping();
+      redisResponseTime = Date.now() - redisStart;
     } catch (error) {
       redisStatus = 'disconnected';
       this.logger.error('Redis health check failed:', error);
@@ -81,22 +89,45 @@ export class AppService {
     const responseTime = Date.now() - startTime;
     const uptime = (Date.now() - this.startTime) / 1000;
 
+    // Verificar si hay problemas críticos
+    const hasCriticalIssues =
+      dbStatus !== 'connected' ||
+      Object.values(queues).some((q) => (q as any).failed > 10);
+
     const overallOk =
       dbStatus === 'connected' &&
       redisStatus === 'connected' &&
-      Object.values(queues).every((q) => q.status === 'connected');
+      Object.values(queues).every((q) => q.status === 'connected') &&
+      !hasCriticalIssues;
 
     return {
-      status: overallOk ? 'ok' : 'degraded',
+      status: overallOk ? 'ok' : hasCriticalIssues ? 'error' : 'degraded',
       timestamp: new Date().toISOString(),
       uptime: Math.round(uptime),
       environment: process.env.NODE_ENV || 'development',
+      version: process.env.npm_package_version || '1.0.0',
       services: {
-        database: dbStatus,
-        redis: redisStatus,
+        database: {
+          status: dbStatus,
+          responseTime: dbResponseTime ? `${dbResponseTime}ms` : null,
+        },
+        redis: {
+          status: redisStatus,
+          responseTime: redisResponseTime ? `${redisResponseTime}ms` : null,
+        },
         queues,
-        responseTime: `${responseTime}ms`,
+        healthCheckResponseTime: `${responseTime}ms`,
       },
+      warnings: hasCriticalIssues
+        ? [
+            dbStatus !== 'connected'
+              ? 'Base de datos desconectada'
+              : null,
+            Object.values(queues).some((q) => (q as any).failed > 10)
+              ? 'Algunas colas tienen muchos trabajos fallidos'
+              : null,
+          ].filter(Boolean)
+        : [],
     };
   }
 

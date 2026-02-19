@@ -44,6 +44,8 @@ export class BillingService {
   private readonly logger = new Logger(BillingService.name);
   private readonly stripe: Stripe | null = null;
   private readonly webhookSecret: string | null = null;
+  /** Tax Rate ID de Stripe para aplicar IVA (ej. txr_XXXXX). Si está configurado, se aplica a todas las suscripciones. */
+  private readonly stripeTaxRateId: string | null = null;
 
   constructor(
     private readonly config: ConfigService,
@@ -53,6 +55,8 @@ export class BillingService {
     const secretKey = this.config.get<string>('STRIPE_SECRET_KEY');
     this.webhookSecret =
       this.config.get<string>('STRIPE_WEBHOOK_SECRET') ?? null;
+    this.stripeTaxRateId =
+      this.config.get<string>('STRIPE_TAX_RATE_ID') ?? null;
     if (secretKey) {
       this.stripe = new Stripe(secretKey);
     } else {
@@ -242,14 +246,22 @@ export class BillingService {
         name: customerName ?? undefined,
         metadata: { tenantId },
       });
-      const subscription = await this.stripe.subscriptions.create({
+      const subscriptionParams: Stripe.SubscriptionCreateParams = {
         customer: customer.id,
         items: [{ price: stripePriceId }],
         metadata: { tenantId },
         payment_behavior: 'default_incomplete',
         payment_settings: { save_default_payment_method: 'on_subscription' },
         expand: ['latest_invoice.payment_intent'],
-      });
+      };
+      // Aplicar Tax Rate manual si está configurado (para COP u otras monedas no soportadas por Stripe Tax)
+      if (this.stripeTaxRateId) {
+        subscriptionParams.default_tax_rates = [this.stripeTaxRateId];
+      } else {
+        // Intentar usar Stripe Tax automático si está disponible (puede no funcionar con COP)
+        subscriptionParams.automatic_tax = { enabled: true };
+      }
+      const subscription = await this.stripe.subscriptions.create(subscriptionParams);
       this.logger.log(
         `Stripe suscripción creada: ${subscription.id} para tenant ${tenantId}`,
       );
@@ -612,12 +624,18 @@ export class BillingService {
         );
         const itemId = stripeSub.items.data[0]?.id;
         if (itemId) {
+          const updateParams: Stripe.SubscriptionUpdateParams = {
+            items: [{ id: itemId, price: effectivePriceId }],
+            proration_behavior: 'create_prorations',
+          };
+          if (this.stripeTaxRateId) {
+            updateParams.default_tax_rates = [this.stripeTaxRateId];
+          } else {
+            updateParams.automatic_tax = { enabled: true };
+          }
           await this.stripe.subscriptions.update(
             subscription.stripeSubscriptionId,
-            {
-              items: [{ id: itemId, price: effectivePriceId }],
-              proration_behavior: 'create_prorations',
-            },
+            updateParams,
           );
           this.logger.log(
             `Suscripción Stripe ${subscription.stripeSubscriptionId} actualizada al plan ${newPlan.id} (upgrade, price ${effectivePriceId})`,
@@ -675,10 +693,16 @@ export class BillingService {
           );
           const itemId = stripeSub.items.data[0]?.id;
           if (itemId) {
-            await this.stripe.subscriptions.update(sub.stripeSubscriptionId, {
+            const updateParams: Stripe.SubscriptionUpdateParams = {
               items: [{ id: itemId, price: effectivePriceId }],
               proration_behavior: 'none',
-            });
+            };
+            if (this.stripeTaxRateId) {
+              updateParams.default_tax_rates = [this.stripeTaxRateId];
+            } else {
+              updateParams.automatic_tax = { enabled: true };
+            }
+            await this.stripe.subscriptions.update(sub.stripeSubscriptionId, updateParams);
           }
         } catch (err) {
           this.logger.error(

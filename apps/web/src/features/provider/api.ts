@@ -12,6 +12,9 @@ import type {
   ProviderFeedbackItem,
   ListUsageEventsResponse,
   UsageByDayItem,
+  BackupMetadata,
+  BackupsStatistics,
+  BackupAlert,
 } from './types';
 
 export type ListTenantsQuery = {
@@ -211,4 +214,31 @@ export function getUsageEventsByDay(
     `/provider/usage/events/by-day${qs ? `?${qs}` : ''}`,
     { authToken }
   );
+}
+
+export function listBackupsMetadata(
+  authToken: string,
+  limit?: number
+): Promise<BackupMetadata[]> {
+  const params = new URLSearchParams();
+  if (limit) params.set('limit', String(limit));
+  const qs = params.toString();
+  return apiClient.get<BackupMetadata[]>(
+    `/provider/backups${qs ? `?${qs}` : ''}`,
+    { authToken }
+  );
+}
+
+export function getBackupsStatistics(
+  authToken: string
+): Promise<BackupsStatistics> {
+  return apiClient.get<BackupsStatistics>('/provider/backups/statistics', {
+    authToken,
+  });
+}
+
+export function getBackupsAlerts(authToken: string): Promise<BackupAlert[]> {
+  return apiClient.get<BackupAlert[]>('/provider/backups/alerts', {
+    authToken,
+  });
 }
