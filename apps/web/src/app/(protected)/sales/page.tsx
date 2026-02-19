@@ -2,6 +2,9 @@
 
 import { useMemo, useState, useEffect } from 'react';
 import { toast } from 'sonner';
+import { useForm } from 'react-hook-form';
+import { z } from 'zod';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { isNetworkError } from '@infrastructure/api/client';
 import {
   Card,
@@ -37,15 +40,16 @@ import { formatMoney, formatDateTime } from '@shared/utils/format';
 import { getErrorMessage } from '@shared/utils/errors';
 import { useHasPermission } from '@shared/hooks/useHasPermission';
 import Link from 'next/link';
-import { ShoppingCart, Plus, Trash2, Search, FileText, Printer, Layers, Eye } from 'lucide-react';
+import { ShoppingCart, Plus, Trash2, Search, FileText, Printer, Layers, Eye, UserPlus } from 'lucide-react';
 import { useSalesList, useCreateSale } from '@features/sales/hooks';
 import { useCashSessionsList } from '@features/cash/hooks';
-import { useCustomersList, useCustomerSalesStats } from '@features/customers/hooks';
+import { useCustomersList, useCustomerSalesStats, useCreateCustomer } from '@features/customers/hooks';
 import { useProductsList } from '@features/products/hooks';
 import { useDianConfig } from '@features/dian/hooks';
 import { useTrackUsage } from '@features/usage/useTrackUsage';
 import { useAuth } from '@shared/providers/AuthProvider';
 import type { CreateSaleItemPayload, CreateSaleResponse } from '@features/sales/types';
+import type { CustomerDocType } from '@features/customers/types';
 
 const PAYMENT_METHODS = [
   { value: 'CASH', label: 'Efectivo' },
@@ -53,6 +57,23 @@ const PAYMENT_METHODS = [
   { value: 'TRANSFER', label: 'Transferencia' },
   { value: 'OTHER', label: 'Otro' },
 ] as const;
+
+const DOC_TYPES: { value: CustomerDocType; label: string }[] = [
+  { value: 'CC', label: 'Cédula' },
+  { value: 'CE', label: 'Cédula ext.' },
+  { value: 'NIT', label: 'NIT' },
+  { value: 'PASSPORT', label: 'Pasaporte' },
+  { value: 'OTHER', label: 'Otro' },
+];
+
+const customerSchema = z.object({
+  docType: z.enum(['CC', 'CE', 'NIT', 'PASSPORT', 'OTHER']),
+  docNumber: z.string().min(3, 'Mínimo 3 caracteres'),
+  name: z.string().min(2, 'Nombre requerido'),
+  email: z.string().email('Email inválido').optional().or(z.literal('')),
+  phone: z.string().optional(),
+});
+type CustomerFormValues = z.infer<typeof customerSchema>;
 
 type SaleLine = { productId: string; qty: number; unitPrice?: number };
 
@@ -80,6 +101,7 @@ export default function SalesPage() {
   const [discountPercent, setDiscountPercent] = useState<number>(0);
   const [applyTax, setApplyTax] = useState<boolean>(true);
   const [requireElectronicInvoice, setRequireElectronicInvoice] = useState<boolean>(true);
+  const [openNewCustomer, setOpenNewCustomer] = useState(false);
 
   const limit = 20;
   const salesQuery = useSalesList({
@@ -88,6 +110,7 @@ export default function SalesPage() {
     search: search || undefined,
   });
   const createSaleMutation = useCreateSale();
+  const createCustomerMutation = useCreateCustomer();
   const cashSessionsQuery = useCashSessionsList({});
   const customersQuery = useCustomersList({
     page: 1,
@@ -95,6 +118,17 @@ export default function SalesPage() {
     search: openNewSale ? (saleCustomerSearch.trim() || undefined) : undefined,
   });
   const customerSalesStats = useCustomerSalesStats(customerId || null);
+
+  const customerForm = useForm<CustomerFormValues>({
+    resolver: zodResolver(customerSchema),
+    defaultValues: {
+      docType: 'CC',
+      docNumber: '',
+      name: '',
+      email: '',
+      phone: '',
+    },
+  });
   const productsQuery = useProductsList({
     page: 1,
     limit: 100,
@@ -441,6 +475,33 @@ export default function SalesPage() {
     );
   };
 
+  const handleCreateCustomer = (values: CustomerFormValues) => {
+    createCustomerMutation.mutate(
+      {
+        docType: values.docType,
+        docNumber: values.docNumber.trim(),
+        name: values.name.trim(),
+        email: values.email?.trim() || undefined,
+        phone: values.phone?.trim() || undefined,
+      },
+      {
+        onSuccess: (newCustomer) => {
+          toast.success('Cliente creado exitosamente');
+          setOpenNewCustomer(false);
+          customerForm.reset();
+          // Refrescar la lista de clientes y seleccionar el nuevo cliente
+          customersQuery.refetch().then(() => {
+            setCustomerId(newCustomer.id);
+            setSaleCustomerSearch('');
+          });
+        },
+        onError: (e: { message?: string }) => {
+          toast.error(e?.message ?? 'No se pudo crear el cliente');
+        },
+      }
+    );
+  };
+
   return (
     <div className="space-y-6 sm:space-y-8">
       <div className="flex flex-col gap-1">
@@ -646,10 +707,24 @@ export default function SalesPage() {
                   </p>
                 </div>
                 <div className="grid gap-2 min-w-0 sm:col-span-2">
-                  <Label htmlFor="new-sale-customer" className="text-muted-foreground text-sm">Cliente (opcional)</Label>
-                  <p className="text-xs text-muted-foreground -mt-1">
-                    Asocia la venta a un cliente para facturación y reportes.
-                  </p>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label htmlFor="new-sale-customer" className="text-muted-foreground text-sm">Cliente (opcional)</Label>
+                      <p className="text-xs text-muted-foreground -mt-1">
+                        Asocia la venta a un cliente para facturación y reportes.
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setOpenNewCustomer(true)}
+                      className="h-7 gap-1.5 text-xs text-muted-foreground hover:text-foreground shrink-0"
+                    >
+                      <UserPlus className="h-3.5 w-3.5" />
+                      Crear cliente
+                    </Button>
+                  </div>
                   <div className="space-y-1.5">
                     <div className="relative">
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
@@ -1503,6 +1578,117 @@ export default function SalesPage() {
               Imprimir factura
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal Crear Cliente */}
+      <Dialog
+        open={openNewCustomer}
+        onOpenChange={(open) => {
+          setOpenNewCustomer(open);
+          if (!open) {
+            customerForm.reset();
+          }
+        }}
+      >
+        <DialogContent showClose className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserPlus className="h-4 w-4" />
+              Nuevo cliente
+            </DialogTitle>
+            <p className="text-sm text-muted-foreground pt-1">
+              Crea un nuevo cliente para asociarlo a esta venta.
+            </p>
+          </DialogHeader>
+          <form
+            onSubmit={customerForm.handleSubmit(handleCreateCustomer)}
+            className="space-y-4"
+          >
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="new-customer-docType">Tipo documento</Label>
+                <select
+                  id="new-customer-docType"
+                  {...customerForm.register('docType')}
+                  className="flex h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                >
+                  {DOC_TYPES.map((t) => (
+                    <option key={t.value} value={t.value}>
+                      {t.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="new-customer-docNumber">Nº documento</Label>
+                <Input
+                  id="new-customer-docNumber"
+                  {...customerForm.register('docNumber')}
+                  placeholder="Ej: 1234567890"
+                  className="rounded-lg"
+                />
+                {customerForm.formState.errors.docNumber && (
+                  <p className="text-sm text-destructive">
+                    {customerForm.formState.errors.docNumber.message}
+                  </p>
+                )}
+              </div>
+              <div className="space-y-2 sm:col-span-2">
+                <Label htmlFor="new-customer-name">Nombre / Razón social</Label>
+                <Input
+                  id="new-customer-name"
+                  {...customerForm.register('name')}
+                  placeholder="Ej: Juan Pérez o Empresa S.A.S."
+                  className="rounded-lg"
+                />
+                {customerForm.formState.errors.name && (
+                  <p className="text-sm text-destructive">
+                    {customerForm.formState.errors.name.message}
+                  </p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="new-customer-email">Email</Label>
+                <Input
+                  id="new-customer-email"
+                  type="email"
+                  {...customerForm.register('email')}
+                  placeholder="Ej: cliente@correo.com"
+                  className="rounded-lg"
+                />
+                {customerForm.formState.errors.email && (
+                  <p className="text-sm text-destructive">
+                    {customerForm.formState.errors.email.message}
+                  </p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="new-customer-phone">Teléfono</Label>
+                <Input
+                  id="new-customer-phone"
+                  {...customerForm.register('phone')}
+                  placeholder="Ej: 300 123 4567"
+                  className="rounded-lg"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setOpenNewCustomer(false);
+                  customerForm.reset();
+                }}
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={createCustomerMutation.isPending}>
+                {createCustomerMutation.isPending ? 'Guardando…' : 'Crear cliente'}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     </div>

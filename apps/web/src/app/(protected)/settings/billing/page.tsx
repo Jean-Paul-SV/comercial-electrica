@@ -509,8 +509,8 @@ export default function BillingPage() {
                     {statusLabel}
                   </Badge>
                 </div>
-                {subscription.currentPeriodEnd && (
-                  <div className="space-y-2">
+                <div className="space-y-2">
+                  {subscription.currentPeriodEnd && (
                     <p className="text-sm text-muted-foreground">
                       {isCancelled ? (
                         periodEnded ? (
@@ -551,20 +551,25 @@ export default function BillingPage() {
                         </>
                       )}
                     </p>
-                    {isCancelled && canManageBilling && (
-                      <Button
-                        onClick={handleOpenPortal}
-                        disabled={createPortalMutation.isPending}
-                        variant="outline"
-                        size="sm"
-                        className="gap-2 mt-2"
-                      >
-                        <CreditCard className="h-4 w-4" />
-                        {createPortalMutation.isPending ? 'Abriendo…' : periodEnded ? 'Reactivar suscripción' : 'Agregar método de pago y reactivar'}
-                      </Button>
-                    )}
-                  </div>
-                )}
+                  )}
+                  {isCancelled && !subscription.currentPeriodEnd && (
+                    <p className="text-sm text-muted-foreground">
+                      Tu suscripción fue cancelada (probablemente se quitó el método de pago). Reactiva tu suscripción para continuar usando el servicio.
+                    </p>
+                  )}
+                  {isCancelled && canManageBilling && (
+                    <Button
+                      onClick={handleOpenPortal}
+                      disabled={createPortalMutation.isPending}
+                      variant="outline"
+                      size="sm"
+                      className="gap-2 mt-2"
+                    >
+                      <CreditCard className="h-4 w-4" />
+                      {createPortalMutation.isPending ? 'Abriendo…' : periodEnded ? 'Reactivar suscripción' : 'Agregar método de pago y reactivar'}
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
           )}

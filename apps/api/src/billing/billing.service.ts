@@ -835,8 +835,12 @@ export class BillingService {
           },
         })) ?? subscription;
     }
+    // Permitir gestionar billing si hay Stripe configurado y:
+    // 1. Hay una suscripción activa con stripeSubscriptionId, O
+    // 2. Hay un plan asignado (incluso si está cancelada, para poder reactivar)
     const canManageBilling =
-      !!this.stripe && !!subscription.stripeSubscriptionId;
+      !!this.stripe &&
+      (!!subscription.stripeSubscriptionId || !!subscription.planId);
     const requiresPayment = String(subscription.status) === 'PENDING_PAYMENT';
     
     // Si está cancelada y ya pasó el periodo, también requiere pago (bloquear acceso)
@@ -889,27 +893,65 @@ export class BillingService {
     const subscription = await this.prisma.subscription.findUnique({
       where: { tenantId },
     });
-    if (!subscription?.stripeSubscriptionId) {
+    if (!subscription) {
       throw new BadRequestException(
-        'No hay suscripción con Stripe para esta cuenta. Contacte a soporte para gestionar el pago.',
+        'No hay suscripción para esta cuenta. Contacte a soporte para gestionar el pago.',
       );
     }
     let stripeCustomerId: string;
-    try {
-      const stripeSubscription = await this.stripe.subscriptions.retrieve(
-        subscription.stripeSubscriptionId,
-      );
-      stripeCustomerId =
-        typeof stripeSubscription.customer === 'string'
-          ? stripeSubscription.customer
-          : stripeSubscription.customer.id;
-    } catch (err) {
-      this.logger.warn(
-        `No se pudo obtener suscripción Stripe ${subscription.stripeSubscriptionId}: ${(err as Error).message}`,
-      );
-      throw new BadRequestException(
-        'No se pudo conectar con el servicio de facturación. Intente más tarde.',
-      );
+    
+    // Intentar obtener el customerId desde la suscripción Stripe si existe
+    if (subscription.stripeSubscriptionId) {
+      try {
+        const stripeSubscription = await this.stripe.subscriptions.retrieve(
+          subscription.stripeSubscriptionId,
+        );
+        stripeCustomerId =
+          typeof stripeSubscription.customer === 'string'
+            ? stripeSubscription.customer
+            : stripeSubscription.customer.id;
+      } catch (err) {
+        this.logger.warn(
+          `No se pudo obtener suscripción Stripe ${subscription.stripeSubscriptionId}: ${(err as Error).message}`,
+        );
+        // Si la suscripción fue eliminada en Stripe, intentar buscar el customer por metadata
+        try {
+          const customers = await this.stripe.customers.search({
+            query: `metadata['tenantId']:'${tenantId}'`,
+            limit: 1,
+          });
+          if (customers.data.length > 0) {
+            stripeCustomerId = customers.data[0].id;
+          } else {
+            throw new BadRequestException(
+              'No se encontró información de facturación. Contacte a soporte para reactivar su suscripción.',
+            );
+          }
+        } catch (searchErr) {
+          throw new BadRequestException(
+            'No se pudo conectar con el servicio de facturación. Intente más tarde o contacte a soporte.',
+          );
+        }
+      }
+    } else {
+      // Si no hay stripeSubscriptionId, buscar el customer por metadata
+      try {
+        const customers = await this.stripe.customers.search({
+          query: `metadata['tenantId']:'${tenantId}'`,
+          limit: 1,
+        });
+        if (customers.data.length > 0) {
+          stripeCustomerId = customers.data[0].id;
+        } else {
+          throw new BadRequestException(
+            'No hay suscripción con Stripe para esta cuenta. Contacte a soporte para gestionar el pago.',
+          );
+        }
+      } catch (err) {
+        throw new BadRequestException(
+          'No se pudo conectar con el servicio de facturación. Intente más tarde o contacte a soporte.',
+        );
+      }
     }
     const session = await this.stripe.billingPortal.sessions.create({
       customer: stripeCustomerId,

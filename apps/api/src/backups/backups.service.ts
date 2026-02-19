@@ -128,17 +128,19 @@ export class BackupsService {
     return x;
   }
 
-  private async hasTenantBackupToday(tenantId: string): Promise<boolean> {
+  private async hasTenantBackupToday(tenantId: string, excludeDeleted: boolean = false): Promise<boolean> {
     const start = this.startOfToday();
     const end = new Date(start);
     end.setDate(end.getDate() + 1);
-    // Contar incluso backups eliminados (soft delete) para prevenir abuso
+    // Para planes Enterprise, excluir backups eliminados para permitir crear otro después de eliminar
+    // Para otros planes, contar incluso backups eliminados (soft delete) para prevenir abuso
     const count = await this.prisma.backupRun.count({
       where: {
         tenantId,
         scope: 'TENANT',
         status: 'COMPLETED',
         startedAt: { gte: start, lt: end },
+        ...(excludeDeleted ? { deletedAt: null } : {}),
       },
     });
     return count > 0;
@@ -200,7 +202,18 @@ export class BackupsService {
       }
     }
 
-    if (await this.hasTenantBackupToday(tenantId)) {
+    // Para planes Enterprise (daily_retention), permitir múltiples backups por día
+    // Solo contar backups activos (no eliminados) para permitir crear otro después de eliminar
+    if (policy.tier === 'daily_retention') {
+      // No aplicar límite diario para Enterprise - pueden crear múltiples backups por día
+      // El límite total de backups activos (maxToKeep: 400) ya previene abuso
+      return;
+    }
+
+    // Para otros planes (basic y daily), mantener límite de un backup por día
+    // Para daily, excluir eliminados para permitir crear otro después de eliminar
+    const excludeDeleted = policy.tier === 'daily';
+    if (await this.hasTenantBackupToday(tenantId, excludeDeleted)) {
       throw new BadRequestException(
         'Ya existe un backup de hoy para tu empresa.',
       );

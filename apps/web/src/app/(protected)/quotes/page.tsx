@@ -3,6 +3,9 @@
 import { useMemo, useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
+import { useForm } from 'react-hook-form';
+import { z } from 'zod';
+import { zodResolver } from '@hookform/resolvers/zod';
 import {
   Card,
   CardContent,
@@ -33,11 +36,12 @@ import { Pagination } from '@shared/components/Pagination';
 import { formatMoney, formatDate } from '@shared/utils/format';
 import { downloadQuotePdf } from '@shared/utils/quotePdf';
 import Link from 'next/link';
-import { FileSignature, Plus, Trash2, ShoppingCart, FileDown, Search, Layers, Info } from 'lucide-react';
+import { FileSignature, Plus, Trash2, ShoppingCart, FileDown, Search, Layers, Info, UserPlus } from 'lucide-react';
 import { useQuotesList, useCreateQuote, useConvertQuote, useUpdateQuoteStatus } from '@features/quotes/hooks';
 import { useProductsList } from '@features/products/hooks';
-import { useCustomersList } from '@features/customers/hooks';
+import { useCustomersList, useCreateCustomer } from '@features/customers/hooks';
 import { useCashSessionsList } from '@features/cash/hooks';
+import type { CustomerDocType } from '@features/customers/types';
 
 const selectClassName =
   'flex h-10 w-full items-center rounded-lg border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:opacity-50';
@@ -60,6 +64,23 @@ const PAYMENT_METHODS = [
 // IVA por defecto (porcentaje) cuando el producto no tiene tasa configurada.
 const DEFAULT_TAX_RATE_PERCENT = 19;
 
+const DOC_TYPES: { value: CustomerDocType; label: string }[] = [
+  { value: 'CC', label: 'Cédula' },
+  { value: 'CE', label: 'Cédula ext.' },
+  { value: 'NIT', label: 'NIT' },
+  { value: 'PASSPORT', label: 'Pasaporte' },
+  { value: 'OTHER', label: 'Otro' },
+];
+
+const customerSchema = z.object({
+  docType: z.enum(['CC', 'CE', 'NIT', 'PASSPORT', 'OTHER']),
+  docNumber: z.string().min(3, 'Mínimo 3 caracteres'),
+  name: z.string().min(2, 'Nombre requerido'),
+  email: z.string().email('Email inválido').optional().or(z.literal('')),
+  phone: z.string().optional(),
+});
+type CustomerFormValues = z.infer<typeof customerSchema>;
+
 type QuoteLine = { productId: string; qty: number; unitPrice?: number };
 
 export default function QuotesPage() {
@@ -81,6 +102,7 @@ export default function QuotesPage() {
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [discountPercent, setDiscountPercent] = useState<number>(0);
+  const [openNewCustomer, setOpenNewCustomer] = useState(false);
 
   const limit = 20;
   const query = useQuotesList({
@@ -92,9 +114,21 @@ export default function QuotesPage() {
   const createMutation = useCreateQuote();
   const convertMutation = useConvertQuote();
   const updateStatusMutation = useUpdateQuoteStatus();
+  const createCustomerMutation = useCreateCustomer();
   const productsQuery = useProductsList({ page: 1, limit: 100 });
   const customersQuery = useCustomersList({ page: 1, limit: 100 });
   const cashSessionsQuery = useCashSessionsList({});
+
+  const customerForm = useForm<CustomerFormValues>({
+    resolver: zodResolver(customerSchema),
+    defaultValues: {
+      docType: 'CC',
+      docNumber: '',
+      name: '',
+      email: '',
+      phone: '',
+    },
+  });
 
   const rows = useMemo(() => query.data?.data ?? [], [query.data]);
   const meta = query.data?.meta;
@@ -287,6 +321,32 @@ export default function QuotesPage() {
         },
         onError: (e: { message?: string }) => {
           toast.error(e?.message ?? 'No se pudo cancelar la cotización');
+        },
+      }
+    );
+  };
+
+  const handleCreateCustomer = (values: CustomerFormValues) => {
+    createCustomerMutation.mutate(
+      {
+        docType: values.docType,
+        docNumber: values.docNumber.trim(),
+        name: values.name.trim(),
+        email: values.email?.trim() || undefined,
+        phone: values.phone?.trim() || undefined,
+      },
+      {
+        onSuccess: (newCustomer) => {
+          toast.success('Cliente creado exitosamente');
+          setOpenNewCustomer(false);
+          customerForm.reset();
+          // Refrescar la lista de clientes y seleccionar el nuevo cliente
+          customersQuery.refetch().then(() => {
+            setCustomerId(newCustomer.id);
+          });
+        },
+        onError: (e: { message?: string }) => {
+          toast.error(e?.message ?? 'No se pudo crear el cliente');
         },
       }
     );
@@ -537,7 +597,19 @@ export default function QuotesPage() {
             </p>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label>Cliente (opcional)</Label>
+                <div className="flex items-center justify-between">
+                  <Label>Cliente (opcional)</Label>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setOpenNewCustomer(true)}
+                    className="h-7 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+                  >
+                    <UserPlus className="h-3.5 w-3.5" />
+                    Crear cliente
+                  </Button>
+                </div>
                 <select
                   value={customerId || 'none'}
                   onChange={(e) => setCustomerId(e.target.value === 'none' ? '' : e.target.value)}
@@ -880,6 +952,117 @@ export default function QuotesPage() {
               {updateStatusMutation.isPending ? 'Cancelando…' : 'Sí, cancelar'}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal Crear Cliente */}
+      <Dialog
+        open={openNewCustomer}
+        onOpenChange={(open) => {
+          setOpenNewCustomer(open);
+          if (!open) {
+            customerForm.reset();
+          }
+        }}
+      >
+        <DialogContent showClose className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserPlus className="h-4 w-4" />
+              Nuevo cliente
+            </DialogTitle>
+            <p className="text-sm text-muted-foreground pt-1">
+              Crea un nuevo cliente para asociarlo a esta cotización.
+            </p>
+          </DialogHeader>
+          <form
+            onSubmit={customerForm.handleSubmit(handleCreateCustomer)}
+            className="space-y-4"
+          >
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="new-customer-docType">Tipo documento</Label>
+                <select
+                  id="new-customer-docType"
+                  {...customerForm.register('docType')}
+                  className="flex h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                >
+                  {DOC_TYPES.map((t) => (
+                    <option key={t.value} value={t.value}>
+                      {t.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="new-customer-docNumber">Nº documento</Label>
+                <Input
+                  id="new-customer-docNumber"
+                  {...customerForm.register('docNumber')}
+                  placeholder="Ej: 1234567890"
+                  className="rounded-lg"
+                />
+                {customerForm.formState.errors.docNumber && (
+                  <p className="text-sm text-destructive">
+                    {customerForm.formState.errors.docNumber.message}
+                  </p>
+                )}
+              </div>
+              <div className="space-y-2 sm:col-span-2">
+                <Label htmlFor="new-customer-name">Nombre / Razón social</Label>
+                <Input
+                  id="new-customer-name"
+                  {...customerForm.register('name')}
+                  placeholder="Ej: Juan Pérez o Empresa S.A.S."
+                  className="rounded-lg"
+                />
+                {customerForm.formState.errors.name && (
+                  <p className="text-sm text-destructive">
+                    {customerForm.formState.errors.name.message}
+                  </p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="new-customer-email">Email</Label>
+                <Input
+                  id="new-customer-email"
+                  type="email"
+                  {...customerForm.register('email')}
+                  placeholder="Ej: cliente@correo.com"
+                  className="rounded-lg"
+                />
+                {customerForm.formState.errors.email && (
+                  <p className="text-sm text-destructive">
+                    {customerForm.formState.errors.email.message}
+                  </p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="new-customer-phone">Teléfono</Label>
+                <Input
+                  id="new-customer-phone"
+                  {...customerForm.register('phone')}
+                  placeholder="Ej: 300 123 4567"
+                  className="rounded-lg"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setOpenNewCustomer(false);
+                  customerForm.reset();
+                }}
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={createCustomerMutation.isPending}>
+                {createCustomerMutation.isPending ? 'Guardando…' : 'Crear cliente'}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     </div>
