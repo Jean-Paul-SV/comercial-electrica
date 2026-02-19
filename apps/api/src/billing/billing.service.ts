@@ -520,12 +520,12 @@ export class BillingService {
       allow_promotion_codes: true,
     };
 
+    // Impuestos: solo si hay Tax Rate configurado. Si no, no activar automatic_tax (Stripe exige dirección fiscal en test).
     if (this.stripeTaxRateId) {
       sessionParams.tax_id_collection = { enabled: false };
       sessionParams.subscription_data!.default_tax_rates = [this.stripeTaxRateId];
-    } else {
-      sessionParams.automatic_tax = { enabled: true };
     }
+    // Si no hay STRIPE_TAX_RATE_ID, no se setea automatic_tax para evitar error 400 por "valid head office address" en test.
 
     const session = await this.stripe.checkout.sessions.create(sessionParams);
     this.logger.log(
