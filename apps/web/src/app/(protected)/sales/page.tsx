@@ -409,7 +409,7 @@ export default function SalesPage() {
       },
       {
         onSuccess: (data) => {
-          track('sale_created', { hasInvoice: data?.invoiceId != null });
+          track('sale_created', { hasInvoice: data?.invoice != null });
           toast.success('Venta registrada');
           setOpenNewSale(false);
           resetForm();

@@ -10,6 +10,7 @@ export const MODULE_CODES = [
   'advanced_reports',
   'audit',
   'backups',
+  'ai', // Resumen del dashboard en lenguaje natural (IA). Solo planes Premium y Enterprise.
 ] as const;
 
 export type ModuleCode = (typeof MODULE_CODES)[number];

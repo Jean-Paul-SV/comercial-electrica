@@ -27,6 +27,7 @@ const DEFAULT_MODULE_CODES = [
   'advanced_reports',
   'audit',
   'backups',
+  'ai',
 ] as const;
 
 type PlanDecimalFields = Pick<

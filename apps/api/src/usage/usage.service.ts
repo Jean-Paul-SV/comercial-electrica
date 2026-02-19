@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -22,7 +23,7 @@ export class UsageService {
         event: event.slice(0, 120),
         tenantId: options.tenantId ?? undefined,
         userId: options.userId ?? undefined,
-        payload: options.payload ?? undefined,
+        payload: (options.payload ?? undefined) as Prisma.InputJsonValue,
       },
     });
   }

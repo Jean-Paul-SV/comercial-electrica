@@ -468,7 +468,9 @@ export default function DashboardView() {
         <Card className="border-0 shadow-sm border-l-4 border-l-muted">
           <CardContent className="pt-4 pb-4">
             <p className="text-sm text-muted-foreground">
-              No se pudo cargar el resumen del día.
+              {(dashboardSummary.error as { status?: number })?.status === 403
+                ? 'El resumen con IA está disponible en Plan Premium o Enterprise.'
+                : 'No se pudo cargar el resumen del día.'}
             </p>
           </CardContent>
         </Card>

@@ -224,7 +224,7 @@ export default function ReportsPage() {
             Reportes y dashboard
           </CardTitle>
           <CardDescription>
-            Ventas, inventario, caja, clientes desde GET /reports/*
+            Resúmenes de ventas, inventario, caja y clientes. Exporta a CSV cuando lo necesites.
           </CardDescription>
           <div className="flex flex-wrap items-center gap-2 pt-2">
             <span className="text-xs text-muted-foreground mr-1">Exportar CSV:</span>
