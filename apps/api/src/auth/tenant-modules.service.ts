@@ -51,8 +51,9 @@ export class TenantModulesService {
 
   /**
    * Obtiene los módulos habilitados para un tenant.
-   * 1) Módulos del plan + add-ons activos.
-   * 2) Aplicar overrides TenantModule (enabled true/false).
+   * 1) Si la suscripción está PENDING_PAYMENT, no hay acceso al plan: se devuelve [].
+   * 2) Módulos del plan + add-ons activos.
+   * 3) Aplicar overrides TenantModule (enabled true/false).
    * Si tenantId es null (single-tenant legacy), devuelve todos los módulos.
    */
   async getEnabledModules(tenantId: string | null): Promise<string[]> {
@@ -64,6 +65,7 @@ export class TenantModulesService {
       where: { id: tenantId },
       include: {
         plan: { include: { features: { select: { moduleCode: true } } } },
+        subscription: { select: { status: true } },
         modules: { select: { moduleCode: true, enabled: true } },
         addOns: {
           where: {
@@ -75,6 +77,11 @@ export class TenantModulesService {
     });
 
     if (!tenant) return [];
+
+    // Hasta que no se efectúe el pago, no hay acceso al plan
+    if (tenant.subscription && String(tenant.subscription.status) === 'PENDING_PAYMENT') {
+      return [];
+    }
 
     const fromPlan = tenant.plan?.features.map((f) => f.moduleCode) ?? [];
     const fromAddOns = tenant.addOns.map((a) => a.addOn.moduleCode);
