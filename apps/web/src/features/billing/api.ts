@@ -55,12 +55,6 @@ export function createPortalSession(
   returnUrl?: string,
 ): Promise<PortalSessionResponse> {
   const payload = returnUrl ? { returnUrl } : {};
-  console.log('[Billing API] createPortalSession - Request:', {
-    url: '/billing/portal-session',
-    payload,
-    hasAuthToken: !!authToken,
-    returnUrl,
-  });
   return apiClient.post<PortalSessionResponse>(
     '/billing/portal-session',
     payload,
