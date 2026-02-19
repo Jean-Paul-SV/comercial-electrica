@@ -167,8 +167,11 @@ function ProtectedLayoutContent({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // Pago pendiente: solo mostrar pantalla de facturación (sin sidebar)
-  if (!isPlatformAdmin && requiresPayment) {
+  // Pago pendiente o sin plan: solo mostrar pantalla de facturación (sin sidebar)
+  const hasPlan = subscriptionQuery.data?.plan !== null;
+  const shouldHideSidebar = !isPlatformAdmin && (requiresPayment || !hasPlan);
+  
+  if (shouldHideSidebar) {
     if (!isBillingPath) {
       router.replace('/settings/billing');
       return (

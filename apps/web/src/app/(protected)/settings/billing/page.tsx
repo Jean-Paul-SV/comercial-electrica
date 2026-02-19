@@ -85,7 +85,8 @@ function PlanCard({
     p.priceYearly != null ? 'yearly' : 'monthly'
   );
   const isCurrent = currentPlanId === p.id;
-  const validation = useValidateDowngrade(isCurrent ? null : p.id);
+  // Solo validar downgrade si hay un plan actual (currentPlanId no está vacío)
+  const validation = useValidateDowngrade(isCurrent || !currentPlanId ? null : p.id);
   const downgradeBlocked = validation.data?.allowed === false;
   const firstError = validation.data?.errors?.[0];
   const highlights = PLAN_FEATURES[p.slug] ?? [];
@@ -196,7 +197,13 @@ function PlanCard({
                 }
               }}
             >
-              {isChanging ? 'Cambiando…' : downgradeBlocked ? 'No disponible' : 'Cambiar a este plan'}
+              {isChanging 
+                ? 'Cambiando…' 
+                : downgradeBlocked 
+                  ? 'No disponible' 
+                  : currentPlanId 
+                    ? 'Cambiar a este plan'
+                    : 'Seleccionar plan'}
             </Button>
             {downgradeBlocked && firstError && (
               <p className="text-xs text-destructive" title={validation.data?.errors?.join(' ')}>
