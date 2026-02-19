@@ -1290,46 +1290,11 @@ export class BillingService {
       }
     }
     
-    // Si llegamos aquí, crear Checkout Session con subscription (usar la suscripción existente)
-    // Obtener el precio según el intervalo de facturación
-    const useYearly = subscription.tenant.billingInterval === 'yearly' && subscription.plan?.stripePriceIdYearly;
-    const priceId = useYearly
-      ? subscription.plan?.stripePriceIdYearly
-      : subscription.plan?.stripePriceId;
-    
-    if (!priceId) {
-      throw new BadRequestException(
-        'El plan no tiene un precio configurado en Stripe. Contacte a soporte.',
-      );
-    }
-    
-    try {
-      // Crear Checkout Session usando la suscripción existente
-      const checkoutSession = await this.stripe.checkout.sessions.create({
-        customer: customerId,
-        mode: 'subscription',
-        line_items: [{ price: priceId, quantity: 1 }],
-        subscription: subscription.stripeSubscriptionId, // Usar la suscripción existente
-        success_url: `${returnUrl}?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: returnUrl,
-        metadata: { tenantId, existingSubscriptionId: subscription.stripeSubscriptionId },
-      });
-      
-      this.logger.log(
-        `Checkout Session creada para tenant ${tenantId} usando suscripción existente: ${checkoutSession.id}`,
-      );
-      
-      return { url: checkoutSession.url! };
-    } catch (err) {
-      const errorMessage = (err as Error).message || String(err);
-      this.logger.error(
-        `Error al crear Checkout Session para tenant ${tenantId}: ${errorMessage}`,
-        err instanceof Error ? err.stack : undefined,
-      );
-      throw new BadRequestException(
-        'No se pudo crear la sesión de pago. Intente más tarde o contacte a soporte.',
-      );
-    }
+    // Si llegamos aquí no se pudo usar el payment_intent de la suscripción incompleta.
+    // La API de Stripe Checkout no permite adjuntar una suscripción existente; solo payment_intent.
+    throw new BadRequestException(
+      'No se pudo crear la sesión de pago para completar tu suscripción. Intenta de nuevo en unos momentos o contacta a soporte.',
+    );
   }
 
   /**
