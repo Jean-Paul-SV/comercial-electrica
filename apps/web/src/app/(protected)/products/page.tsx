@@ -38,7 +38,7 @@ import { Pagination } from '@shared/components/Pagination';
 import { EmptyState } from '@shared/components/EmptyState';
 import { formatMoney } from '@shared/utils/format';
 import Link from 'next/link';
-import { Package, Plus, Tag, Pencil, Eye, BookOpen } from 'lucide-react';
+import { Package, Plus, Tag, Pencil, Eye, BookOpen, Trash2, AlertTriangle } from 'lucide-react';
 import {
   useProductsList,
   useCreateProduct,
@@ -47,6 +47,7 @@ import {
   useCategories,
   useCreateCategory,
   useCreateProductDictionaryEntry,
+  useDeleteProduct,
 } from '@features/products/hooks';
 import { useCreateMovement } from '@features/inventory/hooks';
 import { useLowStockThreshold } from '@shared/hooks/useLowStockThreshold';
@@ -90,6 +91,7 @@ export default function ProductsPage() {
   const [addTermProductId, setAddTermProductId] = useState<string>('');
   const [addCategoryFromProductForm, setAddCategoryFromProductForm] = useState(false);
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
+  const [productToDelete, setProductToDelete] = useState<{ id: string; name: string; stockQty: number } | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>('');
   const limit = 20;
   const threshold = useMemo(() => {
@@ -121,6 +123,7 @@ export default function ProductsPage() {
   const createDictionaryEntry = useCreateProductDictionaryEntry();
   const createMovement = useCreateMovement();
   const productToEdit = useProduct(editingProductId);
+  const deleteProduct = useDeleteProduct();
   const productsForDictionary = useProductsList({ page: 1, limit: 100 });
 
   const rowsRaw = useMemo(() => query.data?.data ?? [], [query.data]);
@@ -533,6 +536,16 @@ export default function ProductsPage() {
                             >
                               <Pencil className="h-3.5 w-3.5" />
                             </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+                              onClick={() => setProductToDelete({ id: p.id, name: p.name, stockQty: p.stock?.qtyOnHand ?? 0 })}
+                              title="Eliminar producto"
+                              aria-label="Eliminar producto"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -712,7 +725,7 @@ export default function ProductsPage() {
           }
         }}
       >
-        <DialogContent showClose className="sm:max-w-lg">
+        <DialogContent showClose className="sm:max-w-3xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               {editingProductId ? (
@@ -965,6 +978,69 @@ export default function ProductsPage() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de confirmación para eliminar producto */}
+      <Dialog
+        open={!!productToDelete}
+        onOpenChange={(open) => {
+          if (!open) setProductToDelete(null);
+        }}
+      >
+        <DialogContent showClose className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Trash2 className="h-5 w-5 text-destructive" />
+              Eliminar producto
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-foreground">
+              ¿Eliminar el producto <strong>{productToDelete?.name}</strong>?
+            </p>
+            {productToDelete && productToDelete.stockQty > 0 && (
+              <div className="rounded-lg border border-warning/30 bg-warning/5 p-3 space-y-2">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="h-4 w-4 text-warning shrink-0 mt-0.5" />
+                  <div className="space-y-1 text-sm">
+                    <p className="font-medium text-warning-foreground">
+                      Este producto tiene {productToDelete.stockQty} unidad(es) en stock.
+                    </p>
+                    <p className="text-muted-foreground text-xs">
+                      Al eliminar el producto, el stock se perderá y no podrás recuperarlo. Si prefieres mantener el historial, considera desactivar el producto en lugar de eliminarlo.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+            <p className="text-xs text-muted-foreground">
+              Esta acción no se puede deshacer. El producto se desactivará y dejará de aparecer en el catálogo.
+            </p>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setProductToDelete(null)}>
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (!productToDelete) return;
+                deleteProduct.mutate(productToDelete.id, {
+                  onSuccess: () => {
+                    toast.success('Producto eliminado');
+                    setProductToDelete(null);
+                  },
+                  onError: (e: { message?: string }) => {
+                    toast.error(e?.message ?? 'No se pudo eliminar el producto');
+                  },
+                });
+              }}
+              disabled={deleteProduct.isPending}
+            >
+              {deleteProduct.isPending ? 'Eliminando…' : 'Eliminar producto'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

@@ -565,12 +565,15 @@ export class BillingService {
     const periodEnd = new Date(now);
     periodEnd.setDate(periodEnd.getDate() + 30);
 
+    // Determinar el billingInterval efectivo antes de la transacción
+    const effectiveBillingInterval = billingInterval ?? tenant.billingInterval;
+
     await this.prisma.$transaction(async (tx) => {
       await tx.tenant.update({
         where: { id: tenantId },
         data: {
           planId: newPlan.id,
-          ...(billingInterval != null && { billingInterval }),
+          ...(effectiveBillingInterval != null && { billingInterval: effectiveBillingInterval }),
         },
       });
       if (tenant.subscription) {
@@ -616,8 +619,6 @@ export class BillingService {
         }
       }
     });
-
-    const effectiveBillingInterval = billingInterval ?? tenant.billingInterval;
     const useYearly =
       effectiveBillingInterval === 'yearly' && newPlan.stripePriceIdYearly;
     const effectivePriceId = useYearly
@@ -635,10 +636,13 @@ export class BillingService {
       try {
         const stripeSub = await this.stripe.subscriptions.retrieve(
           subscription.stripeSubscriptionId,
-          { expand: ['items.data'] },
+          { expand: ['items.data.price'] },
         );
+        const currentPriceId = stripeSub.items.data[0]?.price?.id;
         const itemId = stripeSub.items.data[0]?.id;
-        if (itemId) {
+        
+        // Solo actualizar si el precio es diferente
+        if (itemId && currentPriceId !== effectivePriceId) {
           const updateParams: Stripe.SubscriptionUpdateParams = {
             items: [{ id: itemId, price: effectivePriceId }],
             proration_behavior: 'create_prorations',
@@ -653,14 +657,23 @@ export class BillingService {
             updateParams,
           );
           this.logger.log(
-            `Suscripción Stripe ${subscription.stripeSubscriptionId} actualizada al plan ${newPlan.id} (upgrade, price ${effectivePriceId})`,
+            `Suscripción Stripe ${subscription.stripeSubscriptionId} actualizada: plan ${newPlan.id}, billingInterval ${effectiveBillingInterval}, price ${effectivePriceId} (antes: ${currentPriceId})`,
+          );
+        } else if (currentPriceId === effectivePriceId) {
+          this.logger.log(
+            `Suscripción Stripe ${subscription.stripeSubscriptionId} ya tiene el precio correcto (${effectivePriceId})`,
           );
         }
       } catch (err) {
-        this.logger.warn(
+        this.logger.error(
           `No se pudo actualizar el precio en Stripe al cambiar de plan: ${(err as Error).message}`,
+          (err as Error).stack,
         );
       }
+    } else if (!effectivePriceId) {
+      this.logger.warn(
+        `No se pudo actualizar Stripe: plan ${newPlan.id} no tiene stripePriceId${effectiveBillingInterval === 'yearly' ? 'Yearly' : ''} configurado`,
+      );
     }
 
     return { success: true };

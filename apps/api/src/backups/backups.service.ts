@@ -671,9 +671,25 @@ export class BackupsService {
         sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
         
         if (backup.startedAt >= sevenDaysAgo) {
-          throw new ForbiddenException(
-            'No puedes eliminar backups recientes (últimos 7 días) en tu plan. Esto previene abusos del límite de backups por semana.',
+          // Calcular cuándo podrá eliminar el backup (7 días después de su creación)
+          const canDeleteAfter = new Date(backup.startedAt);
+          canDeleteAfter.setDate(canDeleteAfter.getDate() + 7);
+          const daysUntilCanDelete = Math.ceil(
+            (canDeleteAfter.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
           );
+          
+          let message = 'Este backup no se puede eliminar aún. ';
+          if (daysUntilCanDelete === 0) {
+            message += 'Podrás eliminarlo mañana.';
+          } else if (daysUntilCanDelete === 1) {
+            message += 'Podrás eliminarlo mañana.';
+          } else if (daysUntilCanDelete <= 7) {
+            message += `Podrás eliminarlo en ${daysUntilCanDelete} días.`;
+          } else {
+            message += 'Podrás eliminarlo después de 7 días desde su creación.';
+          }
+          
+          throw new ForbiddenException(message);
         }
       }
     }
