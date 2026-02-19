@@ -271,15 +271,21 @@ export default function BillingPage() {
   };
 
   // Al volver de Stripe, refrescar suscripción para que el layout desbloquee si el webhook ya procesó el pago
+  const hasRefetchedOnMount = useRef(false);
   useEffect(() => {
-    subscriptionQuery.refetch();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- solo al montar la página de facturación
+    if (!hasRefetchedOnMount.current && subscriptionQuery.data !== undefined) {
+      hasRefetchedOnMount.current = true;
+      subscriptionQuery.refetch();
+    }
+  }, [subscriptionQuery.data]); // Solo refetch una vez cuando los datos estén disponibles
 
   // Si sigue pendiente de pago, reintentar cada 2s hasta 4 veces para dar tiempo al webhook
   const pollCount = useRef(0);
-  const requiresPayment = subscriptionQuery.data?.requiresPayment === true;
+  const isPolling = useRef(false);
+  const requiresPaymentForPolling = subscriptionQuery.data?.requiresPayment === true;
   useEffect(() => {
-    if (!requiresPayment) return;
+    if (!requiresPaymentForPolling || isPolling.current) return;
+    isPolling.current = true;
     pollCount.current = 0;
     const POLL_MAX = 4;
     const POLL_INTERVAL_MS = 2000;
@@ -287,12 +293,16 @@ export default function BillingPage() {
       pollCount.current += 1;
       if (pollCount.current > POLL_MAX) {
         clearInterval(id);
+        isPolling.current = false;
         return;
       }
       subscriptionQuery.refetch();
     }, POLL_INTERVAL_MS);
-    return () => clearInterval(id);
-  }, [requiresPayment]); // eslint-disable-line react-hooks/exhaustive-deps -- solo depende de requiresPayment
+    return () => {
+      clearInterval(id);
+      isPolling.current = false;
+    };
+  }, [requiresPaymentForPolling]); // Solo depende de requiresPaymentForPolling
 
   if (isPlatformAdmin) {
     return (
