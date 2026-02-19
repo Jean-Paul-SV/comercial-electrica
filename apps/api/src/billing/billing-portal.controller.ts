@@ -188,13 +188,24 @@ export class BillingPortalController {
     const tenantId = req.user?.tenantId;
     if (!tenantId) {
       throw new BadRequestException(
-        'Solo los usuarios de una empresa pueden abrir el portal de facturaci?n.',
+        'Solo los usuarios de una empresa pueden abrir el portal de facturación.',
       );
     }
     const baseUrl =
       this.config.get<string>('FRONTEND_URL') ?? 'http://localhost:3001';
-    const returnUrl =
-      dto.returnUrl?.trim() || `${baseUrl.replace(/\/$/, '')}/settings/billing`;
+    // Validar y limpiar returnUrl: si viene vacío, undefined, o no es una URL válida, usar el default
+    let returnUrl = dto.returnUrl?.trim();
+    if (!returnUrl || returnUrl.length === 0) {
+      returnUrl = `${baseUrl.replace(/\/$/, '')}/settings/billing`;
+    } else {
+      // Validar que sea una URL válida (básico)
+      try {
+        new URL(returnUrl);
+      } catch {
+        // Si no es una URL válida, usar el default
+        returnUrl = `${baseUrl.replace(/\/$/, '')}/settings/billing`;
+      }
+    }
     return this.billing.createPortalSession(tenantId, returnUrl);
   }
 }

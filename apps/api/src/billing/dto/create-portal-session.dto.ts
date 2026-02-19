@@ -1,4 +1,4 @@
-import { IsString, IsUrl, MaxLength, IsOptional } from 'class-validator';
+import { IsString, MaxLength, IsOptional } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreatePortalSessionDto {
@@ -11,6 +11,5 @@ export class CreatePortalSessionDto {
   @IsOptional()
   @IsString()
   @MaxLength(2048)
-  @IsUrl({ require_tld: false }) // permitir localhost en desarrollo
   returnUrl?: string;
 }
