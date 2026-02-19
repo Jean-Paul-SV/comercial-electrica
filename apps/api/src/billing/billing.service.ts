@@ -870,9 +870,12 @@ export class BillingService {
           );
           const currentPriceId = stripeSub.items.data[0]?.price?.id;
           const itemId = stripeSub.items.data[0]?.id;
-          
-          // Solo actualizar si el precio es diferente
-          if (itemId && currentPriceId !== effectivePriceId) {
+          const isIncomplete =
+            stripeSub.status === 'incomplete' ||
+            stripeSub.status === 'incomplete_expired';
+
+          // Solo actualizar si el precio es diferente y la suscripción no está incompleta (Stripe no permite cambiar ítems en incomplete)
+          if (itemId && currentPriceId !== effectivePriceId && !isIncomplete) {
             const updateParams: Stripe.SubscriptionUpdateParams = {
               items: [{ id: itemId, price: effectivePriceId }],
               proration_behavior: 'create_prorations',
@@ -890,6 +893,10 @@ export class BillingService {
           } else if (currentPriceId === effectivePriceId) {
             this.logger.log(
               `Suscripción Stripe ${subscription.stripeSubscriptionId} ya tiene el precio correcto (${effectivePriceId})`,
+            );
+          } else if (isIncomplete) {
+            this.logger.log(
+              `Suscripción Stripe ${subscription.stripeSubscriptionId} en estado ${stripeSub.status}: no se actualiza precio hasta completar el pago`,
             );
           }
         } catch (err) {
@@ -988,7 +995,10 @@ export class BillingService {
             { expand: ['items.data'] },
           );
           const itemId = stripeSub.items.data[0]?.id;
-          if (itemId) {
+          const isIncomplete =
+            stripeSub.status === 'incomplete' ||
+            stripeSub.status === 'incomplete_expired';
+          if (itemId && !isIncomplete) {
             const updateParams: Stripe.SubscriptionUpdateParams = {
               items: [{ id: itemId, price: effectivePriceId }],
               proration_behavior: 'none',
@@ -997,6 +1007,10 @@ export class BillingService {
               updateParams.default_tax_rates = [this.stripeTaxRateId];
             }
             await this.stripe.subscriptions.update(sub.stripeSubscriptionId, updateParams);
+          } else if (isIncomplete) {
+            this.logger.log(
+              `applyScheduledPlanChanges: suscripción ${sub.stripeSubscriptionId} en ${stripeSub.status}, se omite actualización Stripe`,
+            );
           }
         } catch (err) {
           this.logger.error(
