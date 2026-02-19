@@ -4,13 +4,18 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getSubscription, createPortalSession, createCheckoutSession, getBillingPlans, changePlan, validateDowngrade } from './api';
 import { useAuth } from '@shared/providers/AuthProvider';
 
-export function useSubscriptionInfo() {
+export function useSubscriptionInfo(options?: { refetchWhenPendingPayment?: boolean }) {
   const { token, isPlatformAdmin } = useAuth();
 
   return useQuery({
     queryKey: ['billing', 'subscription'],
     enabled: Boolean(token) && !isPlatformAdmin,
     queryFn: () => getSubscription(token!),
+    // Cuando hay pago pendiente, seguir comprobando cada 3s hasta que el webhook actualice (máx. ~2 min)
+    refetchInterval: (query) => {
+      if (options?.refetchWhenPendingPayment && query.state.data?.requiresPayment) return 3000;
+      return false;
+    },
   });
 }
 

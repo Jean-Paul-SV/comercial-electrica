@@ -244,7 +244,7 @@ function PlanCard({
 
 export default function BillingPage() {
   const { isPlatformAdmin } = useAuth();
-  const subscriptionQuery = useSubscriptionInfo();
+  const subscriptionQuery = useSubscriptionInfo({ refetchWhenPendingPayment: true });
   const createPortalMutation = useCreatePortalSession();
   const createCheckoutMutation = useCreateCheckoutSession();
   const plansQuery = useBillingPlans();
@@ -513,12 +513,26 @@ export default function BillingPage() {
                     </span>
                   )}
                 </p>
-                {subscriptionQuery.isFetching && (
-                  <p className="text-xs text-muted-foreground flex items-center gap-2">
-                    <RefreshCw className="h-3.5 w-3.5 animate-spin shrink-0" aria-hidden />
-                    Comprobando pago…
-                  </p>
-                )}
+                <p className="text-xs text-muted-foreground flex items-center gap-2">
+                  {subscriptionQuery.isFetching ? (
+                    <>
+                      <RefreshCw className="h-3.5 w-3.5 animate-spin shrink-0" aria-hidden />
+                      Comprobando pago…
+                    </>
+                  ) : (
+                    <>
+                      Si acabas de pagar, se actualizará en unos segundos. Si tarda,{' '}
+                      <button
+                        type="button"
+                        onClick={() => subscriptionQuery.refetch()}
+                        className="underline font-medium text-foreground hover:no-underline"
+                      >
+                        actualiza la página
+                      </button>
+                      .
+                    </>
+                  )}
+                </p>
               </div>
               {canManageBilling && (
                 <Button
