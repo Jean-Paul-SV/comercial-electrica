@@ -31,6 +31,8 @@ export type SubscriptionInfoDto = {
   gracePeriodEnd: string | null;
   /** Si true, la suscripción está cancelada, el periodo terminó, pero aún está dentro del periodo de gracia (7 días). */
   inGracePeriod: boolean;
+  /** Monto que Stripe cobrará al completar el pago (prorrateo en upgrades). En pesos. Null si no aplica. */
+  pendingInvoiceAmount: number | null;
 };
 
 export type ChangePlanResultDto = {
@@ -1184,7 +1186,23 @@ export class BillingService {
     
     // Estar en periodo de gracia: cancelada, periodo terminado, pero aún dentro de los 7 días
     const inGracePeriod = isCancelled && periodEnded && !gracePeriodEnded;
-    
+
+    // Si hay pago pendiente y tenemos suscripción en Stripe, obtener el monto real a cobrar (prorrateo en upgrades)
+    let pendingInvoiceAmount: number | null = null;
+    if (requiresPayment && this.stripe && subscription.stripeSubscriptionId) {
+      try {
+        const upcoming = await this.stripe.invoices.retrieveUpcoming({
+          subscription: subscription.stripeSubscriptionId,
+        });
+        // amount_due en Stripe: para COP (zero-decimal) está en pesos
+        if (upcoming.amount_due != null && upcoming.amount_due >= 0) {
+          pendingInvoiceAmount = upcoming.amount_due;
+        }
+      } catch {
+        // Si no hay upcoming (ej. suscripción ya tiene factura pagada), ignorar
+      }
+    }
+
     return {
       plan: subscription.plan
         ? {
@@ -1214,6 +1232,7 @@ export class BillingService {
       requiresPayment: requiresPayment || shouldBlockAccess,
       gracePeriodEnd: gracePeriodEnd?.toISOString() ?? null,
       inGracePeriod: inGracePeriod || false,
+      pendingInvoiceAmount,
     };
   }
 

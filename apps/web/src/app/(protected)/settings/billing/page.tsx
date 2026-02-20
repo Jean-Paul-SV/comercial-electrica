@@ -421,7 +421,8 @@ export default function BillingPage() {
   const requiresPayment = data?.requiresPayment === true;
   const gracePeriodEnd = data?.gracePeriodEnd ?? null;
   const inGracePeriod = data?.inGracePeriod === true;
-  
+  const pendingInvoiceAmount = data?.pendingInvoiceAmount ?? null;
+
   // Calcular precio efectivo del plan actual
   const currentPrice = plan
     ? billingInterval === 'yearly' && plan.priceYearly != null
@@ -505,34 +506,65 @@ export default function BillingPage() {
                 </p>
                 {currentPrice != null && plan && (
                   <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2.5 text-sm space-y-1">
-                    {billingInterval === 'yearly' &&
-                    plan.priceMonthly != null &&
-                    plan.priceYearly != null &&
-                    plan.priceMonthly * 12 > plan.priceYearly ? (
+                    {pendingInvoiceAmount != null && pendingInvoiceAmount < currentPrice ? (
                       <>
                         <div className="flex justify-between text-muted-foreground">
-                          <span>12 meses en mensual</span>
-                          <span>{formatPrice(plan.priceMonthly * 12)}</span>
+                          <span>Precio del plan</span>
+                          <span>
+                            {formatPrice(currentPrice)}
+                            {billingInterval && (
+                              <span className="text-xs ml-1">/{billingInterval === 'yearly' ? 'año' : 'mes'}</span>
+                            )}
+                          </span>
                         </div>
                         <div className="flex justify-between text-muted-foreground">
-                          <span>Descuento por pago anual</span>
+                          <span>Descuento por cambio de plan (prorrateo)</span>
                           <span className="text-emerald-600 dark:text-emerald-400">
-                            -{formatPrice(plan.priceMonthly * 12 - plan.priceYearly)}
+                            -{formatPrice(currentPrice - pendingInvoiceAmount)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between font-semibold text-amber-700 dark:text-amber-500 pt-0.5 border-t border-amber-500/20">
+                          <span>Lo que pagarás al completar</span>
+                          <span>{formatPrice(pendingInvoiceAmount)}</span>
+                        </div>
+                      </>
+                    ) : pendingInvoiceAmount != null && pendingInvoiceAmount !== currentPrice ? (
+                      <div className="flex justify-between font-semibold text-amber-700 dark:text-amber-500">
+                        <span>Lo que pagarás al completar</span>
+                        <span>{formatPrice(pendingInvoiceAmount)}</span>
+                      </div>
+                    ) : (
+                      <>
+                        {billingInterval === 'yearly' &&
+                        plan.priceMonthly != null &&
+                        plan.priceYearly != null &&
+                        plan.priceMonthly * 12 > plan.priceYearly ? (
+                          <>
+                            <div className="flex justify-between text-muted-foreground">
+                              <span>12 meses en mensual</span>
+                              <span>{formatPrice(plan.priceMonthly * 12)}</span>
+                            </div>
+                            <div className="flex justify-between text-muted-foreground">
+                              <span>Descuento por pago anual</span>
+                              <span className="text-emerald-600 dark:text-emerald-400">
+                                -{formatPrice(plan.priceMonthly * 12 - plan.priceYearly)}
+                              </span>
+                            </div>
+                          </>
+                        ) : null}
+                        <div className="flex justify-between font-semibold text-amber-700 dark:text-amber-500 pt-0.5 border-t border-amber-500/20">
+                          <span>Lo que pagarás al completar</span>
+                          <span>
+                            {formatPrice(pendingInvoiceAmount ?? currentPrice)}
+                            {billingInterval && (
+                              <span className="text-xs font-normal ml-1">
+                                /{billingInterval === 'yearly' ? 'año' : 'mes'}
+                              </span>
+                            )}
                           </span>
                         </div>
                       </>
-                    ) : null}
-                    <div className="flex justify-between font-semibold text-amber-700 dark:text-amber-500 pt-0.5 border-t border-amber-500/20">
-                      <span>Lo que pagarás al completar</span>
-                      <span>
-                        {formatPrice(currentPrice)}
-                        {billingInterval && (
-                          <span className="text-xs font-normal ml-1">
-                            /{billingInterval === 'yearly' ? 'año' : 'mes'}
-                          </span>
-                        )}
-                      </span>
-                    </div>
+                    )}
                   </div>
                 )}
                 {currentPrice != null && !plan && (

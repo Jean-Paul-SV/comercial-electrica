@@ -19,6 +19,8 @@ export type SubscriptionInfo = {
   gracePeriodEnd: string | null;
   /** Si true, la suscripción está cancelada, el periodo terminó, pero aún está dentro del periodo de gracia (7 días). */
   inGracePeriod: boolean;
+  /** Monto que Stripe cobrará al completar el pago (prorrateo en upgrades). En pesos. Null si no aplica. */
+  pendingInvoiceAmount: number | null;
 };
 
 export type ChangePlanResult = {
