@@ -73,6 +73,11 @@ const MULTI_TENANT_TABLES = [
 ] as const;
 
 /**
+ * Tablas donde tenantId es opcional (null permitido: ej. eventos de sistema en AuditLog)
+ */
+const TABLES_OPTIONAL_TENANT_ID = ['AuditLog'] as const;
+
+/**
  * Tablas que NO son multi-tenant (no deben tener tenantId)
  */
 const SYSTEM_TABLES = [
@@ -101,11 +106,18 @@ async function checkOrphanedRecords(): Promise<VerificationResult[]> {
       });
 
       if (count > 0) {
-        results.push({
-          passed: false,
-          message: `❌ Tabla ${table} tiene ${count} registros sin tenantId (huérfanos)`,
-          details: { table, orphanedCount: count },
-        });
+        if (TABLES_OPTIONAL_TENANT_ID.includes(table as any)) {
+          results.push({
+            passed: true,
+            message: `✅ Tabla ${table}: tenantId opcional (${count} registros sin tenant, permitido)`,
+          });
+        } else {
+          results.push({
+            passed: false,
+            message: `❌ Tabla ${table} tiene ${count} registros sin tenantId (huérfanos)`,
+            details: { table, orphanedCount: count },
+          });
+        }
       } else {
         results.push({
           passed: true,
@@ -122,11 +134,18 @@ async function checkOrphanedRecords(): Promise<VerificationResult[]> {
         const count = Number(result[0]?.count || 0);
 
         if (count > 0) {
-          results.push({
-            passed: false,
-            message: `❌ Tabla ${table} tiene ${count} registros sin tenantId (huérfanos)`,
-            details: { table, orphanedCount: count },
-          });
+          if (TABLES_OPTIONAL_TENANT_ID.includes(table as any)) {
+            results.push({
+              passed: true,
+              message: `✅ Tabla ${table}: tenantId opcional (${count} registros sin tenant, permitido para eventos de sistema)`,
+            });
+          } else {
+            results.push({
+              passed: false,
+              message: `❌ Tabla ${table} tiene ${count} registros sin tenantId (huérfanos)`,
+              details: { table, orphanedCount: count },
+            });
+          }
         } else {
           results.push({
             passed: true,
@@ -218,6 +237,7 @@ async function checkUniqueConstraints(): Promise<VerificationResult[]> {
   const results: VerificationResult[] = [];
 
   // Verificar constraints de unicidad que incluyan tenantId
+  // pg_constraint no tiene table_name; se obtiene de pg_class.relname
   try {
     const constraints = await prisma.$queryRawUnsafe<Array<{
       table_name: string;
@@ -225,8 +245,8 @@ async function checkUniqueConstraints(): Promise<VerificationResult[]> {
       constraint_definition: string;
     }>>(`
       SELECT 
-        tc.table_name,
-        tc.constraint_name,
+        c.relname::text as table_name,
+        tc.conname::text as constraint_name,
         pg_get_constraintdef(tc.oid) as constraint_definition
       FROM pg_constraint tc
       JOIN pg_class c ON tc.conrelid = c.oid
@@ -234,7 +254,7 @@ async function checkUniqueConstraints(): Promise<VerificationResult[]> {
       WHERE n.nspname = 'public'
         AND tc.contype = 'u'
         AND pg_get_constraintdef(tc.oid) LIKE '%tenantId%'
-      ORDER BY tc.table_name, tc.constraint_name
+      ORDER BY c.relname, tc.conname
     `);
 
     if (constraints.length > 0) {
@@ -270,27 +290,27 @@ async function checkReferentialIntegrity(): Promise<VerificationResult[]> {
   const results: VerificationResult[] = [];
 
   // Verificar que relaciones entre tablas multi-tenant mantengan el mismo tenantId
-  // Ejemplo: Sale.tenantId debe coincidir con SaleItem.sale.tenantId
+  // SaleItem no tiene tenantId; se verifica que todo SaleItem pertenezca a una Sale con tenantId válido
   try {
-    // Verificar Sale -> SaleItem
-    const saleItemMismatches = await prisma.$queryRawUnsafe<Array<{ count: bigint }>>(`
+    // Verificar SaleItem: todas las Sale deben tener tenantId (SaleItem hereda por relación)
+    const saleItemOrphans = await prisma.$queryRawUnsafe<Array<{ count: bigint }>>(`
       SELECT COUNT(*) as count
       FROM "SaleItem" si
       JOIN "Sale" s ON si."saleId" = s.id
-      WHERE si."tenantId" != s."tenantId"
+      WHERE s."tenantId" IS NULL
     `);
 
-    const saleMismatchCount = Number(saleItemMismatches[0]?.count || 0);
-    if (saleMismatchCount > 0) {
+    const saleOrphanCount = Number(saleItemOrphans[0]?.count || 0);
+    if (saleOrphanCount > 0) {
       results.push({
         passed: false,
-        message: `❌ Encontrados ${saleMismatchCount} SaleItems con tenantId diferente a su Sale`,
-        details: { mismatchCount: saleMismatchCount },
+        message: `❌ Encontrados ${saleOrphanCount} SaleItems cuya Sale no tiene tenantId`,
+        details: { mismatchCount: saleOrphanCount },
       });
     } else {
       results.push({
         passed: true,
-        message: `✅ Integridad referencial: Sale -> SaleItem`,
+        message: `✅ Integridad referencial: Sale -> SaleItem (todas las Sale tienen tenantId)`,
       });
     }
 

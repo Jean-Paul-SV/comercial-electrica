@@ -30,6 +30,7 @@ import {
   Tag,
   MessageCircle,
   Lightbulb,
+  TrendingUp,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -59,6 +60,7 @@ export const navIconMap: Record<string, LucideIcon> = {
   Tag,
   MessageCircle,
   Lightbulb,
+  TrendingUp,
 };
 
 export function getNavIcon(name: string): LucideIcon | undefined {
