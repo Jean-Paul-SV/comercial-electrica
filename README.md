@@ -197,7 +197,8 @@ comercial-electrica/
 
 ### Documentación de Producción
 
-- 📋 **[PENDIENTES_POR_IMPLEMENTAR.md](./docs/PENDIENTES_POR_IMPLEMENTAR.md)** ⭐ - **Qué falta por implementar**
+- 📋 **[QUE_FALTA_POR_HACER.md](./docs/QUE_FALTA_POR_HACER.md)** ⭐ - **Qué falta (Render, Stripe, DIAN, alertas, checklist único)**
+- 📋 **[PENDIENTES_POR_IMPLEMENTAR.md](./docs/PENDIENTES_POR_IMPLEMENTAR.md)** - Pendientes técnicos detallados
 - 📘 **[RUNBOOK_OPERACIONES_COMPLETO.md](./docs/RUNBOOK_OPERACIONES_COMPLETO.md)** - Operaciones diarias
 - 🔧 **[TROUBLESHOOTING_COMPLETO.md](./docs/TROUBLESHOOTING_COMPLETO.md)** - Resolver problemas
 - 🚀 **[PROCEDIMIENTO_DESPLIEGUE.md](./docs/PROCEDIMIENTO_DESPLIEGUE.md)** - Desplegar de forma segura
