@@ -3,8 +3,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   getSubscription,
-  createPortalSession,
-  createCheckoutSession,
   getBillingPlans,
   changePlan,
   validateDowngrade,
@@ -48,33 +46,6 @@ export function useChangePlan() {
   return useMutation({
     mutationFn: (params: { planId: string; billingInterval?: 'monthly' | 'yearly' }) =>
       changePlan(token!, params.planId, params.billingInterval),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['billing', 'subscription'] });
-    },
-  });
-}
-
-export function useCreatePortalSession() {
-  const { token } = useAuth();
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (returnUrl?: string) =>
-      createPortalSession(token!, returnUrl),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['billing', 'subscription'] });
-    },
-  });
-}
-
-/** Crea sesión de Stripe Checkout para comprar un plan (página tipo Spotify: tarjeta + completar compra). */
-export function useCreateCheckoutSession() {
-  const { token } = useAuth();
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (params: { planId: string; billingInterval: 'monthly' | 'yearly'; returnUrl?: string }) =>
-      createCheckoutSession(token!, params.planId, params.billingInterval, params.returnUrl),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['billing', 'subscription'] });
     },

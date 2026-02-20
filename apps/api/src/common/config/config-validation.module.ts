@@ -33,18 +33,12 @@ export class ConfigValidationModule implements OnModuleInit {
       },
     ];
 
-    // Variables requeridas solo en producción
+    // Variables requeridas solo en producción (facturación: solo Wompi)
     const prodOnlyVars: Array<{
       key: string;
       description: string;
       condition?: () => boolean;
-    }> = [
-      {
-        key: 'STRIPE_WEBHOOK_SECRET',
-        description: 'Secret para validar webhooks de Stripe',
-        condition: () => !!this.config.get<string>('STRIPE_SECRET_KEY'),
-      },
-    ];
+    }> = [];
 
     // Validar variables siempre requeridas
     for (const { key, description } of requiredVars) {

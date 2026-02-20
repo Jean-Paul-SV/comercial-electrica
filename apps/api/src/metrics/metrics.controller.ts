@@ -5,10 +5,12 @@ import {
   UseGuards,
   Header,
   Post,
+  Query,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
+  ApiQuery,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
@@ -136,7 +138,13 @@ export class MetricsController {
   @ApiOperation({
     summary: 'Enviar alerta de prueba',
     description:
-      'Envía una alerta de prueba a todos los canales configurados (Slack, Email, Webhook). Requiere permiso metrics:read.',
+      'Envía una alerta de prueba a todos los canales configurados (Slack, Email, Webhook). Usar ?severity=critical para probar envío por email. Requiere permiso metrics:read.',
+  })
+  @ApiQuery({
+    name: 'severity',
+    required: false,
+    enum: ['info', 'warning', 'critical'],
+    description: 'Severidad de la alerta. critical = se envía por email (si SMTP y ALERT_EMAIL configurados).',
   })
   @ApiResponse({
     status: 200,
@@ -144,17 +152,28 @@ export class MetricsController {
   })
   @ApiResponse({ status: 401, description: 'No autenticado' })
   @ApiResponse({ status: 403, description: 'No autorizado' })
-  async sendTestAlert() {
+  async sendTestAlert(
+    @Query('severity') severity?: 'info' | 'warning' | 'critical',
+  ) {
+    const effectiveSeverity =
+      severity === 'critical' || severity === 'warning' ? severity : 'info';
     await this.alertService.sendAlert({
       title: 'Alerta de Prueba',
       message: 'Esta es una alerta de prueba del sistema de monitoreo Orion',
-      severity: 'info',
+      severity: effectiveSeverity,
       metadata: {
         timestamp: new Date().toISOString(),
         source: 'test-endpoint',
       },
     });
-    return { message: 'Alerta de prueba enviada' };
+    return {
+      message: 'Alerta de prueba enviada',
+      severity: effectiveSeverity,
+      emailSent:
+        effectiveSeverity === 'critical' ||
+        (effectiveSeverity === 'warning' &&
+          this.config.get<string>('ALERT_EMAIL_INCLUDE_WARNING') === 'true'),
+    };
   }
 
   @Get('slow-queries')

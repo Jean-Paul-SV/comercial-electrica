@@ -241,7 +241,7 @@ describe('Stripe Webhooks - Eventos Completos (e2e)', () => {
           object: {
             id: `ch_test_${Date.now()}`,
             object: 'charge',
-          },
+          } as Stripe.Charge,
         },
         livemode: false,
         pending_webhooks: 0,

@@ -1,7 +1,8 @@
 # 📋 Qué falta por hacer
 
 **Última actualización:** 2026-02-20  
-**Estado:** Todo lo implementable en código está hecho. Lo que sigue son **acciones manuales** y **configuración**.
+**Estado:** Todo lo implementable en código está hecho. Lo que sigue son **acciones manuales** y **configuración**.  
+**Facturación:** Solo **Wompi** (Nequi, PSE, tarjeta). Stripe fue eliminado.
 
 ---
 
@@ -10,8 +11,7 @@
 | Área | Qué falta | Prioridad | Tiempo aprox. |
 |------|-----------|-----------|----------------|
 | **Infraestructura** | Migrar Render free → starter + monitoreo externo | 🔴 Crítico | ~1 h |
-| **Stripe** | Webhook en producción + `STRIPE_WEBHOOK_SECRET` + Price IDs en planes | 🔴 Crítico | ~30 min |
-| **Stripe** | Probar un pago real (checkout + webhook) | 🟠 Alto | ~15 min |
+| **Wompi** | Cuenta + webhook/callback en producción + env (WOMPI_*) | 🔴 Crítico (cuando cobres) | ~30 min |
 | **DIAN** | Validación en habilitación con certificados reales | 🟠 Alto | 2-3 sem |
 | **Pruebas** | Ejecutar pruebas de carga (k6/Artillery) | 🟠 Alto | 1-2 días |
 | **Config** | Alertas por email (SMTP + ALERT_EMAIL) | 🟡 Medio | ~10 min |
@@ -21,90 +21,53 @@
 
 ## 🔴 Crítico (hacer primero)
 
-### 1. Infraestructura
+### 1. Render: pasar de Free a Starter
 
-- **Migrar plan Render** (free → starter o superior)  
-  - Guía: `docs/CHECKLIST_MIGRACION_RENDER_COMPLETO.md`  
-  - Tiempo: 30-45 min · Costo: ~$7-25/mes  
+- **Guía:** `docs/CHECKLIST_MIGRACION_RENDER_COMPLETO.md` (pasos 1–3: `render.yaml` → Dashboard → verificar).
+- Migrar plan Render (free → starter o superior).
+- Tiempo: 30–45 min · Costo: ~$7–25/mes.
+- **Cuando hagas la migración:** puedes crear un **nuevo** servicio de API con el nombre que quieras (ej. `orion-app-cloud-api`) para tener la URL nueva; el checklist incluye el paso opcional 3b (nueva URL).
 
-- **Monitoreo externo** (saber cuando la API cae)  
-  - UptimeRobot (o similar) apuntando a `GET /health`  
-  - Alertas por email cuando falle  
-  - Guía: dentro del checklist de Render  
+### 2. Monitoreo: UptimeRobot
 
-### 2. Stripe (facturación SaaS)
+- **Guía rápida (hacer ahora):** `docs/CONFIGURAR_MONITOREO_AHORA.md`
+- **Guía detallada:** `docs/CHECKLIST_MIGRACION_RENDER_COMPLETO.md` (sección “Configuración de Monitoreo Externo”) o `docs/GUIA_MONITOREO_EXTERNO.md`.
+- **URL:** `https://TU-API.onrender.com/health`
+- **Intervalo:** 5 min. **Alertas:** a tu email cuando el health falle o no responda.
 
-- **Webhook en producción**  
-  - En Stripe Dashboard: **Developers** → **Webhooks** → **Add endpoint**  
-  - URL: `https://TU-API-RENDER/billing/webhooks/stripe`  
-  - Eventos mínimos: `checkout.session.completed`, `invoice.paid`, `invoice.payment_failed`, `customer.subscription.updated`, `customer.subscription.deleted`  
-  - Copiar **Signing secret** (`whsec_...`)  
+### 3. Wompi (facturación – cuando vayas a cobrar)
 
-- **Variable de entorno**  
-  - En Render (o tu host): `STRIPE_WEBHOOK_SECRET=whsec_...`  
-  - Sin esto, los pagos en Stripe no activan el plan en la app.  
+La app **solo usa Wompi** para pagos (Nequi, PSE, tarjeta). No hay Stripe.
 
-- **Price IDs en los planes**  
-  - Stripe Dashboard → Products: crear producto/precio por plan (mensual/anual).  
-  - En tu app: Panel proveedor → Planes → editar cada plan y asignar `stripePriceId` y `stripePriceIdYearly` (según corresponda).  
-  - Guía: `docs/CONFIGURACION_STRIPE_CHECKOUT.md`  
+- **Cuenta Wompi:** crear y completar verificación en [Wompi](https://wompi.co) (o el portal que uses).
+- **Webhook / callback en producción:**  
+  - En el panel de Wompi: configurar URL de notificación (ej. `https://TU-API-RENDER/billing/webhooks/wompi` o el path que exponga tu API).  
+  - Asegurar que los eventos de pago aprobado lleguen a la API para activar el plan.
+- **En Render (o tu host):**  
+  - Variables de entorno Wompi: `WOMPI_*` según tu integración (clave privada, evento de confirmación, etc.).  
+  - Ver en código: `apps/api` y docs de Wompi para los nombres exactos.
+- **Planes en la app:**  
+  - Panel proveedor → Planes → precios y productos alineados con lo que ofreces en Wompi (no hay `stripePriceId`; los montos/planes se gestionan en tu BD y en el flujo Wompi).
 
-- **Claves Stripe en producción**  
-  - `STRIPE_SECRET_KEY=sk_live_...` (y no `sk_test_...` cuando quieras cobrar de verdad).  
+Cuando tengas la cuenta Wompi lista: configurar webhook/callback en producción + variables `WOMPI_*` en Render; después, una prueba de punta a punta (elegir plan → pagar con Wompi → ver plan activo).
 
 ---
 
 ## 🟠 Importante (próximas 2 semanas)
 
-### 3. Stripe – Validar que todo funciona
-
-- Hacer **una compra de prueba** de punta a punta:  
-  - Usuario sin plan → elige plan → Checkout Stripe → pago (tarjeta de test en modo test).  
-  - Comprobar que el webhook responde 200 y que el plan queda activo en la app.  
-- Guía: `docs/GUIA_TESTEO_PAGOS_STRIPE.md`  
-
-- **(Opcional)** Customer Portal de Stripe para que los clientes cambien tarjeta o vean facturas:  
-  - Stripe Dashboard → Settings → Billing → Customer portal.  
-  - La app ya tiene flujo para abrir el portal si está configurado.  
-
-### 4. DIAN (facturación electrónica Colombia)
-
-- Obtener **credenciales reales** por tenant (certificado .p12, Software ID, PIN).  
-- Validar en **habilitación** con 10-20 facturas de prueba.  
-- Guía: `docs/GUIA_VALIDACION_DIAN.md`  
-
-### 5. Pruebas de carga
-
-- Instalar k6 o Artillery y ejecutar escenarios (50 / 100 / 200 tenants).  
-- Guía: `docs/GUIA_PRUEBAS_CARGA.md`  
+| Tarea | Guía |
+|-------|------|
+| Probar flujo Wompi punta a punta | Checkout en app → pago (Nequi/PSE/tarjeta) → callback 200 → plan activo en la app. |
+| DIAN: credenciales reales y validación | `docs/GUIA_VALIDACION_DIAN.md` |
+| Pruebas de carga | `docs/GUIA_PRUEBAS_CARGA.md` (k6 o Artillery) |
 
 ---
 
-## 🟡 Configuración recomendada
+## 🟡 Recomendado (cuando puedas)
 
-### 6. Alertas por email
-
-- **SMTP** ya usado por la app: configurar `SMTP_*` en producción si no está.  
-- **Destinatarios:**  
-  - `ALERT_EMAIL=tu@email.com`  
-  - o `ALERT_EMAILS=admin@empresa.com,soporte@empresa.com`  
-- **(Opcional)** Recibir también alertas “warning”:  
-  - `ALERT_EMAIL_INCLUDE_WARNING=true`  
-- Las alertas **críticas** (BD, Redis, certificados DIAN, backups, pagos no reconocidos) ya se envían por email si SMTP y ALERT_EMAIL/ALERT_EMAILS están configurados.  
-- Guía: `docs/ALERTAS_CONFIGURACION.md`  
-
-### 7. Archivado automático
-
-- Para controlar crecimiento de la base de datos en producción:  
-  - `ARCHIVE_ENABLED=true`  
-  - `AUDIT_RETENTION_DAYS=730`  
-  - `SALES_RETENTION_YEARS=2`  
-- El `/health` en producción te recordará si no está activado.  
-
-### 8. Verificación multi-tenant (opcional)
-
-- Ejecutar una vez (o en CI):  
-  - `npm run verify:tenant-isolation`  
+- **Alertas por email:** guía rápida `docs/CONFIGURAR_ALERTAS_EMAIL_AHORA.md`; detallada `docs/ALERTAS_CONFIGURACION.md` (SMTP, ALERT_EMAIL, opcional `ALERT_EMAIL_INCLUDE_WARNING=true`).
+- **Archivado:** `ARCHIVE_ENABLED=true`, `AUDIT_RETENTION_DAYS=730`, `SALES_RETENTION_YEARS=2`.
+- **Multi-tenant:** ya tienes `npm run verify:tenant-isolation`; ejecutarlo de vez en cuando o en CI.
 
 ---
 
@@ -112,52 +75,60 @@
 
 ### Crítico
 
-- [ ] Migrar Render a plan starter (o superior)  
-- [ ] Configurar monitoreo externo (UptimeRobot) a `/health`  
-- [ ] Crear webhook Stripe en producción → URL + eventos  
-- [ ] Poner `STRIPE_WEBHOOK_SECRET` en variables de entorno de la API  
-- [ ] Tener productos/precios en Stripe y asignar Price IDs a los planes en la app  
-- [ ] Usar `STRIPE_SECRET_KEY` de live cuando vayas a cobrar real  
+- [ ] **Render:** pasar de Free a Starter (`docs/CHECKLIST_MIGRACION_RENDER_COMPLETO.md`, pasos 1–3).
+- [ ] **UptimeRobot:** monitor a `GET https://TU-API.onrender.com/health`, intervalo 5 min, alertas a tu email.
+- [ ] **Wompi (cuando cobres):** cuenta lista, webhook/callback en producción, variables `WOMPI_*` en Render, prueba de pago punta a punta.
 
 ### Importante
 
-- [ ] Hacer al menos una compra de prueba (checkout → webhook → plan activo)  
-- [ ] Validar DIAN en habilitación con certificados reales  
-- [ ] Ejecutar pruebas de carga y revisar resultados  
+- [ ] Probar flujo Wompi punta a punta (pago → plan activo).
+- [ ] Validar DIAN en habilitación con certificados reales.
+- [ ] Ejecutar pruebas de carga y revisar resultados.
 
 ### Configuración
 
-- [ ] SMTP + `ALERT_EMAIL` o `ALERT_EMAILS` para alertas por email  
-- [ ] (Opcional) `ALERT_EMAIL_INCLUDE_WARNING=true`  
-- [ ] (Opcional) `ARCHIVE_ENABLED=true` y retenciones  
+- [ ] SMTP + `ALERT_EMAIL` o `ALERT_EMAILS` para alertas por email.
+- [ ] (Opcional) `ALERT_EMAIL_INCLUDE_WARNING=true`.
+- [ ] (Opcional) `ARCHIVE_ENABLED=true` y retenciones.
 
 ---
 
 ## 📚 Documentos de referencia
 
 | Tema | Documento |
-|------|-----------|
+|------|------------|
 | Pendientes técnicos detallados | `docs/PENDIENTES_POR_IMPLEMENTAR.md` |
 | Migración Render + monitoreo | `docs/CHECKLIST_MIGRACION_RENDER_COMPLETO.md` |
-| Stripe Checkout y webhook | `docs/CONFIGURACION_STRIPE_CHECKOUT.md` |
-| Testeo de pagos Stripe | `docs/GUIA_TESTEO_PAGOS_STRIPE.md` |
+| Monitoreo (UptimeRobot) – guía rápida | `docs/CONFIGURAR_MONITOREO_AHORA.md` |
+| Configurar pagos (Wompi) | `docs/CONFIGURAR_PAGOS_WOMPI_STRIPE.md` (solo sección Wompi) |
 | Validación DIAN | `docs/GUIA_VALIDACION_DIAN.md` |
 | Pruebas de carga | `docs/GUIA_PRUEBAS_CARGA.md` |
+| Alertas por email – guía rápida | `docs/CONFIGURAR_ALERTAS_EMAIL_AHORA.md` |
 | Alertas (email, Slack, webhook) | `docs/ALERTAS_CONFIGURACION.md` |
 | Resumen ejecutivo del proyecto | `docs/RESUMEN_EJECUTIVO_FINAL.md` |
+
+*(Las guías de Stripe – checkout, webhook, testeo – quedan archivadas; la facturación en producción es solo Wompi.)*
 
 ---
 
 ## ✅ Lo que ya está hecho (no te falta implementar)
 
-- Connection pool, reconciliación Stripe cada hora, detección de pagos no reconocidos.  
-- Métricas de conexiones en `/health`, aviso de archivado en health.  
-- Validación de backups (checksums + restauración de prueba).  
-- Validación NIT en certificados DIAN, rate limiting por tenant y por IP (login, bootstrap, reset, accept-invite).  
-- Auditoría de queries sin tenantId (middleware Prisma).  
-- Dashboard de métricas de negocio en Panel proveedor.  
-- Límites de plan (maxUsers + enabledModules) y endpoint `GET /tenant/limits`.  
-- Alertas por email (críticas + opcional warning), varios destinatarios (`ALERT_EMAILS`).  
-- Checklist migración Render, guías DIAN, pruebas de carga, documentación de alertas.  
+- **Facturación solo Wompi:** flujo de pago en la app (Nequi, PSE, tarjeta); Stripe eliminado del código.
+- Connection pool, métricas en `/health`, aviso de archivado en health.
+- Validación de backups (checksums + restauración de prueba).
+- Validación NIT en certificados DIAN, rate limiting por tenant y por IP (login, bootstrap, reset, accept-invite).
+- Auditoría de queries sin tenantId (middleware Prisma).
+- Dashboard de métricas de negocio en Panel proveedor.
+- Límites de plan (maxUsers + enabledModules) y endpoint `GET /tenant/limits`.
+- Alertas por email (críticas + opcional warning), varios destinatarios (`ALERT_EMAILS`).
+- Checklist migración Render, guías DIAN, pruebas de carga, documentación de alertas.
 
-Todo lo anterior está en código y/o documentación; lo que falta es **configuración y pasos manuales** (Render, Stripe Dashboard, DIAN, SMTP, etc.).
+Todo lo anterior está en código y/o documentación; lo que falta es **configuración y pasos manuales** (Render, Wompi, DIAN, SMTP, etc.).
+
+---
+
+## Resumen: “qué sigue” en una frase
+
+**Siguiente paso concreto:**  
+1) Migrar Render a Starter y 2) Configurar UptimeRobot a `GET /health`, siguiendo `docs/CHECKLIST_MIGRACION_RENDER_COMPLETO.md`.  
+Cuando vayas a cobrar: configurar Wompi en producción (webhook/callback + variables `WOMPI_*` en Render) y hacer una prueba de pago punta a punta.

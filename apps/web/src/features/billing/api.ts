@@ -1,5 +1,5 @@
 import { apiClient } from '@infrastructure/api/client';
-import type { SubscriptionInfo, PortalSessionResponse, BillingPlan, ChangePlanResult } from './types';
+import type { SubscriptionInfo, BillingPlan, ChangePlanResult } from './types';
 
 export function getSubscription(authToken: string): Promise<SubscriptionInfo> {
   return apiClient.get('/billing/subscription', { authToken });
@@ -37,38 +37,7 @@ export function validateDowngrade(
   );
 }
 
-export function createCheckoutSession(
-  authToken: string,
-  planId: string,
-  billingInterval: 'monthly' | 'yearly',
-  returnUrl?: string,
-): Promise<PortalSessionResponse> {
-  return apiClient.post<PortalSessionResponse>(
-    '/billing/checkout-session',
-    { planId, billingInterval, ...(returnUrl && { returnUrl }) },
-    { authToken },
-  );
-}
-
-export function createPortalSession(
-  authToken: string,
-  returnUrl?: string,
-): Promise<PortalSessionResponse> {
-  const payload = returnUrl ? { returnUrl } : {};
-  return apiClient.post<PortalSessionResponse>(
-    '/billing/portal-session',
-    payload,
-    { authToken },
-  ).catch((error) => {
-    console.error('[Billing API] createPortalSession - Error:', {
-      message: error?.message,
-      status: error?.response?.status,
-      data: error?.response?.data,
-      error,
-    });
-    throw error;
-  });
-}
+// Stripe eliminado: facturación solo con Wompi.
 
 // --- Wompi (Colombia: Nequi, PSE, tarjetas) ---
 

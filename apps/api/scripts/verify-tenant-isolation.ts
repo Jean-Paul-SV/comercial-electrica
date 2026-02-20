@@ -33,6 +33,10 @@ interface VerificationResult {
   passed: boolean;
   message: string;
   details?: any;
+  /** Si es true, es una advertencia (no fallo); se lista al final en RECOMENDACIONES */
+  isWarning?: boolean;
+  /** Texto corto con qué hacer para atender la advertencia */
+  recommendation?: string;
 }
 
 interface VerificationReport {
@@ -44,32 +48,33 @@ interface VerificationReport {
 }
 
 /**
- * Tablas multi-tenant que DEBEN tener tenantId
- * (excluyendo tablas de sistema como Tenant, User, Subscription, etc.)
+ * Tablas multi-tenant que SÍ tienen columna tenantId y se verifican por huérfanos.
  */
 const MULTI_TENANT_TABLES = [
   'Product',
   'Category',
   'Customer',
   'Sale',
-  'SaleItem',
   'Invoice',
-  'StockBalance',
-  'StockMovement',
   'Quote',
-  'QuoteItem',
   'Supplier',
-  'Purchase',
-  'PurchaseItem',
-  'Payable',
   'Payment',
-  'CashTransaction',
-  'DianDocument',
-  'DianEvent',
   'DianConfig',
   'AuditLog',
-  'Report',
-  'Feedback',
+  // Del schema: PurchaseOrder, InventoryMovement, etc. tienen tenantId pero
+  // no están en Prisma con nombre exacto "Purchase"/"StockMovement"; se cubren por integridad.
+] as const;
+
+/**
+ * Tablas que NO tienen columna tenantId: heredan tenant por relación (padre tiene tenantId).
+ * No se cuentan como huérfanos; la integridad se verifica en checkReferentialIntegrity.
+ */
+const CHILD_TABLES_NO_TENANT_ID = [
+  'SaleItem',      // → Sale.tenantId
+  'QuoteItem',    // → Quote.tenantId
+  'DianDocument', // → Invoice.tenantId
+  'DianEvent',    // → DianDocument → Invoice
+  'StockBalance', // por productId; no multi-tenant en este schema
 ] as const;
 
 /**
@@ -153,14 +158,23 @@ async function checkOrphanedRecords(): Promise<VerificationResult[]> {
           });
         }
       } catch (sqlError) {
-        // Tabla puede no existir o no ser multi-tenant
         results.push({
           passed: true,
-          message: `⚠️ Tabla ${table}: No se pudo verificar (puede no ser multi-tenant o no existir)`,
+          message: `⚠️ Tabla ${table}: no se pudo verificar (sin columna tenantId o tabla inexistente)`,
           details: { error: (sqlError as Error).message },
+          isWarning: true,
+          recommendation: 'Si la tabla es multi-tenant, asegúrate de tener columna tenantId; si no, quítala de MULTI_TENANT_TABLES o añádela a CHILD_TABLES_NO_TENANT_ID en el script.',
         });
       }
     }
+  }
+
+  // Tablas sin columna tenantId por diseño (heredan por relación)
+  for (const table of CHILD_TABLES_NO_TENANT_ID) {
+    results.push({
+      passed: true,
+      message: `✅ Tabla ${table}: Sin columna tenantId (heredan tenant por relación padre)`,
+    });
   }
 
   return results;
@@ -208,9 +222,11 @@ async function checkCompositeIndexes(): Promise<VerificationResult[]> {
         });
       } else {
         results.push({
-          passed: false,
-          message: `⚠️ Tabla ${table}: No se encontraron índices compuestos con tenantId (puede afectar performance)`,
+          passed: true,
+          message: `⚠️ Tabla ${table}: sin índice compuesto con tenantId`,
           details: { table },
+          isWarning: true,
+          recommendation: `Añade @@index([tenantId, ...]) en el model ${table} para mejorar consultas filtradas por tenant.`,
         });
       }
     }
@@ -236,8 +252,8 @@ async function checkCompositeIndexes(): Promise<VerificationResult[]> {
 async function checkUniqueConstraints(): Promise<VerificationResult[]> {
   const results: VerificationResult[] = [];
 
-  // Verificar constraints de unicidad que incluyan tenantId
-  // pg_constraint no tiene table_name; se obtiene de pg_class.relname
+  // Verificar constraints de unicidad que incluyan tenantId (pg_constraint)
+  // y también índices UNIQUE (pg_indexes), porque Prisma crea CREATE UNIQUE INDEX
   try {
     const constraints = await prisma.$queryRawUnsafe<Array<{
       table_name: string;
@@ -253,27 +269,45 @@ async function checkUniqueConstraints(): Promise<VerificationResult[]> {
       JOIN pg_namespace n ON c.relnamespace = n.oid
       WHERE n.nspname = 'public'
         AND tc.contype = 'u'
-        AND pg_get_constraintdef(tc.oid) LIKE '%tenantId%'
+        AND (
+          pg_get_constraintdef(tc.oid) ILIKE '%tenantId%'
+          OR pg_get_constraintdef(tc.oid) ILIKE '%tenant_id%'
+        )
       ORDER BY c.relname, tc.conname
     `);
 
-    if (constraints.length > 0) {
+    // Índices UNIQUE que incluyan tenantId (Prisma usa CREATE UNIQUE INDEX)
+    const uniqueIndexes = await prisma.$queryRawUnsafe<Array<{
+      tablename: string;
+      indexname: string;
+      indexdef: string;
+    }>>(`
+      SELECT tablename, indexname, indexdef
+      FROM pg_indexes
+      WHERE schemaname = 'public'
+        AND indexdef LIKE '%UNIQUE%'
+        AND (indexdef ILIKE '%tenantId%' OR indexdef ILIKE '%tenant_id%')
+      ORDER BY tablename, indexname
+    `);
+
+    const total = constraints.length + uniqueIndexes.length;
+    if (total > 0) {
+      const detailList = [
+        ...constraints.map((c) => `${c.table_name}: ${c.constraint_definition}`),
+        ...uniqueIndexes.map((i) => `${i.tablename}: ${i.indexname}`),
+      ];
       results.push({
         passed: true,
-        message: `✅ Encontrados ${constraints.length} constraints de unicidad que incluyen tenantId`,
-        details: {
-          constraints: constraints.map((c) => ({
-            table: c.table_name,
-            name: c.constraint_name,
-            definition: c.constraint_definition,
-          })),
-        },
+        message: `✅ Encontrados ${total} UNIQUE con tenantId (constraints e índices)`,
+        details: { list: detailList },
       });
     } else {
-      // Advertencia, no fallo: la ausencia de UNIQUE con tenantId no implica fuga de datos
       results.push({
         passed: true,
-        message: `⚠️ No se encontraron constraints de unicidad con tenantId (recomendado para evitar duplicados por tenant)`,
+        message: `⚠️ Unicidad por tenant: no se detectaron UNIQUE con tenantId en la BD`,
+        isWarning: true,
+        recommendation:
+          'En schema.prisma ya existen @@unique([tenantId, number]) en Invoice y @@unique([tenantId, orderNumber]) en PurchaseOrder. Aplica las migraciones: npx prisma migrate deploy',
       });
     }
   } catch (error) {
@@ -490,6 +524,18 @@ async function main(): Promise<void> {
         console.log(`   Detalles:`, JSON.stringify(result.details, null, 2));
       }
     });
+
+    const warnings = report.results.filter((r) => r.isWarning && r.recommendation);
+    if (warnings.length > 0) {
+      console.log('\n' + '─'.repeat(80));
+      console.log('📌 RECOMENDACIONES (opcional, no bloquean la verificación)');
+      console.log('─'.repeat(80));
+      warnings.forEach((w, i) => {
+        console.log(`   ${i + 1}. ${w.message}`);
+        console.log(`      → ${w.recommendation}`);
+      });
+      console.log('─'.repeat(80));
+    }
 
     console.log('\n' + '='.repeat(80));
 

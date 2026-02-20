@@ -278,7 +278,7 @@ describe('BillingService', () => {
         api_version: '2023-10-16',
         created: Math.floor(Date.now() / 1000),
         type: 'charge.succeeded' as any,
-        data: { object: {} },
+        data: { object: {} as Stripe.Charge },
         livemode: false,
         pending_webhooks: 0,
         request: null,

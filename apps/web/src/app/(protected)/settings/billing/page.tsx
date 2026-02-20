@@ -23,8 +23,6 @@ import {
 import { CreditCard, Calendar, Package, AlertCircle, CheckCircle2, Sparkles, RefreshCw, Smartphone } from 'lucide-react';
 import {
   useSubscriptionInfo,
-  useCreatePortalSession,
-  useCreateCheckoutSession,
   useBillingPlans,
   useChangePlan,
   useValidateDowngrade,
@@ -261,8 +259,6 @@ function PlanCard({
 export default function BillingPage() {
   const { isPlatformAdmin, user } = useAuth();
   const subscriptionQuery = useSubscriptionInfo({ refetchWhenPendingPayment: true });
-  const createPortalMutation = useCreatePortalSession();
-  const createCheckoutMutation = useCreateCheckoutSession();
   const plansQuery = useBillingPlans();
   const changePlanMutation = useChangePlan();
   const submitFeedbackMutation = useSubmitFeedback();
@@ -286,21 +282,9 @@ export default function BillingPage() {
   /** Errores de validación al intentar downgrade (ej. demasiados usuarios). */
   const [changePlanErrors, setChangePlanErrors] = useState<string[]>([]);
 
+  /** Facturación solo Wompi: no hay portal externo. */
   const handleOpenPortal = () => {
-    const returnUrl =
-      typeof window !== 'undefined'
-        ? `${window.location.origin}/settings/billing`
-        : undefined;
-    createPortalMutation.mutate(returnUrl, {
-      onSuccess: (data) => {
-        if (data?.url) {
-          window.location.href = data.url;
-        }
-      },
-      onError: (e) => {
-        toast.error(getErrorMessage(e));
-      },
-    });
+    toast.info('La facturación es solo con Wompi. Usa el botón "Pagar con Wompi" en esta página.');
   };
 
   const handleConfirmDianPlan = () => {
@@ -525,11 +509,11 @@ export default function BillingPage() {
               {canManageBilling && (
                 <Button
                   onClick={handleOpenPortal}
-                  disabled={createPortalMutation.isPending}
+                  disabled={false /* Stripe eliminado */}
                   className="gap-2 shrink-0"
                 >
                   <CreditCard className="h-4 w-4" />
-                  {createPortalMutation.isPending ? 'Abriendo…' : 'Reactivar suscripción'}
+                  {false /* Stripe eliminado */ ? 'Abriendo…' : 'Reactivar suscripción'}
                 </Button>
               )}
             </div>
@@ -552,11 +536,11 @@ export default function BillingPage() {
               {canManageBilling && (
                 <Button
                   onClick={handleOpenPortal}
-                  disabled={createPortalMutation.isPending}
+                  disabled={false /* Stripe eliminado */}
                   className="shrink-0 gap-2 bg-amber-600 hover:bg-amber-700 text-white border-0"
                 >
                   <CreditCard className="h-4 w-4 shrink-0" />
-                  {createPortalMutation.isPending ? 'Abriendo…' : 'Completar pago'}
+                  {false /* Stripe eliminado */ ? 'Abriendo…' : 'Completar pago'}
                 </Button>
               )}
             </div>
@@ -569,11 +553,11 @@ export default function BillingPage() {
         <div className="flex justify-center sm:justify-start">
           <Button
             onClick={handleOpenPortal}
-            disabled={createPortalMutation.isPending}
+            disabled={false /* Stripe eliminado */}
             className="gap-2 bg-amber-600 hover:bg-amber-700 text-white border-0"
           >
             <CreditCard className="h-4 w-4 shrink-0" />
-            {createPortalMutation.isPending ? 'Abriendo…' : 'Completar pago'}
+            {false /* Stripe eliminado */ ? 'Abriendo…' : 'Completar pago'}
           </Button>
         </div>
       )}
@@ -971,13 +955,13 @@ export default function BillingPage() {
                   {isCancelled && canManageBilling && (
                     <Button
                       onClick={handleOpenPortal}
-                      disabled={createPortalMutation.isPending}
+                      disabled={false /* Stripe eliminado */}
                       variant="outline"
                       size="sm"
                       className="gap-2 mt-2"
                     >
                       <CreditCard className="h-4 w-4" />
-                      {createPortalMutation.isPending ? 'Abriendo…' : periodEnded ? 'Reactivar suscripción' : 'Agregar método de pago y reactivar'}
+                      {false /* Stripe eliminado */ ? 'Abriendo…' : periodEnded ? 'Reactivar suscripción' : 'Agregar método de pago y reactivar'}
                     </Button>
                   )}
                 </div>
@@ -1080,11 +1064,11 @@ export default function BillingPage() {
                   </p>
                   <Button
                     onClick={handleOpenPortal}
-                    disabled={createPortalMutation.isPending}
+                    disabled={false /* Stripe eliminado */}
                     className="gap-2 rounded-lg"
                   >
                     <CreditCard className="h-4 w-4 shrink-0" />
-                    {createPortalMutation.isPending
+                    {false /* Stripe eliminado */
                       ? 'Abriendo…'
                       : 'Gestionar método de pago y facturas'}
                   </Button>
@@ -1096,11 +1080,11 @@ export default function BillingPage() {
                   </p>
                   <Button
                     onClick={handleOpenPortal}
-                    disabled={createPortalMutation.isPending}
+                    disabled={false /* Stripe eliminado */}
                     className="gap-2 rounded-lg"
                   >
                     <CreditCard className="h-4 w-4 shrink-0" />
-                    {createPortalMutation.isPending
+                    {false /* Stripe eliminado */
                       ? 'Abriendo…'
                       : 'Gestionar método de pago y facturas'}
                   </Button>
@@ -1153,7 +1137,7 @@ export default function BillingPage() {
               ) : (
                 <>
                   <p>
-                    Serás redirigido a la página de pago seguro (Stripe Checkout), donde podrás agregar tu tarjeta y completar la compra. El plan se activará al instante.
+                    Elige el plan y usa "Pagar con Wompi" (Nequi, PSE o tarjeta) para completar la compra. El plan se activará al instante.
                   </p>
                   <p className="text-xs">
                     Una vez completado el pago, tendrás acceso inmediato a todas las funcionalidades del plan seleccionado.
@@ -1177,42 +1161,18 @@ export default function BillingPage() {
               Cancelar
             </Button>
             <Button
-              disabled={changePlanMutation.isPending || createCheckoutMutation.isPending}
+              disabled={changePlanMutation.isPending}
               onClick={() => {
                 if (!changePlanConfirm) return;
                 setChangePlanErrors([]);
 
                 if (!plan) {
-                  // Sin plan: ir directo a Stripe Checkout (página tipo Spotify: tarjeta + completar compra)
-                  const returnUrl = typeof window !== 'undefined' ? `${window.location.origin}/settings/billing` : undefined;
-                  createCheckoutMutation.mutate(
-                    {
-                      planId: changePlanConfirm.id,
-                      billingInterval: changePlanConfirm.billingInterval,
-                      returnUrl,
-                    },
-                    {
-                      onSuccess: (data) => {
-                        if (data?.url) {
-                          toast.success('Redirigiendo a la página de pago...');
-                          setChangePlanConfirm(null);
-                          window.location.href = data.url;
-                        } else {
-                          toast.error('No se pudo abrir la página de pago.');
-                        }
-                      },
-                      onError: (e: unknown) => {
-                        const err = e as { response?: { data?: { errors?: string[]; message?: string } } };
-                        const errors = Array.isArray(err.response?.data?.errors) ? err.response.data.errors : [];
-                        if (errors.length > 0) {
-                          setChangePlanErrors(errors);
-                        } else {
-                          toast.error(getErrorMessage(e));
-                          setChangePlanConfirm(null);
-                        }
-                      },
-                    },
-                  );
+                  // Sin plan: abrir diálogo Wompi con el plan seleccionado (facturación solo Wompi)
+                  setWompiPlanId(changePlanConfirm.id);
+                  setWompiBillingInterval(changePlanConfirm.billingInterval);
+                  setWompiTransactionId(null);
+                  setWompiDialogOpen(true);
+                  setChangePlanConfirm(null);
                   return;
                 }
 
@@ -1243,11 +1203,9 @@ export default function BillingPage() {
                 });
               }}
             >
-              {createCheckoutMutation.isPending
-                ? 'Redirigiendo a pago…'
-                : changePlanMutation.isPending 
-                  ? (plan ? 'Cambiando…' : 'Creando suscripción…') 
-                  : (plan ? 'Sí, cambiar de plan' : 'Completar compra')}
+              {changePlanMutation.isPending 
+                ? (plan ? 'Cambiando…' : 'Creando suscripción…') 
+                : (plan ? 'Sí, cambiar de plan' : 'Pagar con Wompi')}
             </Button>
           </DialogFooter>
         </DialogContent>

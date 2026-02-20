@@ -91,6 +91,19 @@ services:
   - Debe retornar `status: "ok"`
   - Verificar métricas de conexiones BD
 
+### Paso 3b (opcional): Nueva URL de API al pasar a Starter
+
+Cuando migres a Starter puedes **crear un nuevo Web Service** con el nombre deseado (ej. `orion-app-cloud-api`) para tener una URL nueva (`https://orion-app-cloud-api.onrender.com`). La URL `*.onrender.com` no se puede cambiar en un servicio ya creado.
+
+- [ ] Crear **nuevo** Web Service en Render (mismo repo, misma rama, mismo `rootDir`/build/start).
+- [ ] Conectar la **misma** base de datos existente (no crear DB nueva).
+- [ ] Copiar todas las variables de entorno del servicio actual.
+- [ ] Tras el primer deploy, anotar la **nueva URL** (ej. `https://orion-app-cloud-api.onrender.com`).
+- [ ] Actualizar **frontend** (Vercel): `NEXT_PUBLIC_API_BASE_URL` = nueva URL.
+- [ ] Actualizar **UptimeRobot**: monitor a `https://NUEVA-URL.onrender.com/health`.
+- [ ] Actualizar **Wompi** u otros webhooks si usan la URL de la API.
+- [ ] Cuando todo funcione con la nueva URL, eliminar o pausar el servicio viejo (`comercial-electrica-api`) si lo deseas.
+
 - [ ] **Probar endpoints críticos**
   ```bash
   # Login

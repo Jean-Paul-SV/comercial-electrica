@@ -10,7 +10,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { PlanLimitsService } from '../common/services/plan-limits.service';
 import { AlertService } from '../common/services/alert.service';
 import { MailerService } from '../mailer/mailer.service';
-import Stripe from 'stripe';
+import type Stripe from 'stripe';
 
 export type SubscriptionInfoDto = {
   plan: { id: string; name: string; slug: string; priceMonthly: number | null; priceYearly: number | null } | null;
@@ -25,17 +25,17 @@ export type SubscriptionInfoDto = {
   scheduledChangeAt: string | null;
   /** Intervalo de facturación actual: 'monthly' o 'yearly'. */
   billingInterval: 'monthly' | 'yearly' | null;
-  /** Si true, el usuario puede abrir el portal de Stripe (actualizar pago, facturas). */
+  /** Facturación solo con Wompi: no hay portal externo. */
   canManageBilling: boolean;
-  /** Si true, la app debe mostrarse bloqueada y solo el botón de pagar hasta completar el primer pago. */
+  /** Si true, la app debe mostrarse bloqueada hasta completar el pago (Wompi). */
   requiresPayment: boolean;
   /** Fecha de fin del periodo de gracia (7 días después de currentPeriodEnd para suscripciones canceladas). */
   gracePeriodEnd: string | null;
   /** Si true, la suscripción está cancelada, el periodo terminó, pero aún está dentro del periodo de gracia (7 días). */
   inGracePeriod: boolean;
-  /** Monto que Stripe cobrará al completar el pago (prorrateo en upgrades). En pesos. Null si no aplica. */
+  /** Con Wompi no hay factura pendiente en portal externo. */
   pendingInvoiceAmount: number | null;
-  /** Si true, hay una factura abierta en Stripe (ej. cobro falló tras upgrade); mostrar "Completar pago" para abrir portal. */
+  /** Con Wompi no hay factura abierta en portal externo. */
   hasUnpaidInvoice: boolean;
 };
 
@@ -54,10 +54,16 @@ export type DowngradeValidationResult = {
 @Injectable()
 export class BillingService {
   private readonly logger = new Logger(BillingService.name);
-  private readonly stripe: Stripe | null = null;
-  private readonly webhookSecret: string | null = null;
-  /** Tax Rate ID de Stripe para aplicar IVA (ej. txr_XXXXX). Si está configurado, se aplica a todas las suscripciones. */
-  private readonly stripeTaxRateId: string | null = null;
+  /** Stripe eliminado: facturación solo Wompi. Getters para que código legacy no falle (siempre null). */
+  private get stripe(): Stripe | null {
+    return null;
+  }
+  private get webhookSecret(): string | null {
+    return null;
+  }
+  private get stripeTaxRateId(): string | null {
+    return null;
+  }
 
   constructor(
     private readonly config: ConfigService,
@@ -65,380 +71,53 @@ export class BillingService {
     private readonly planLimits: PlanLimitsService,
     private readonly alertService: AlertService,
     private readonly mailer: MailerService,
-  ) {
-    const secretKey = this.config.get<string>('STRIPE_SECRET_KEY');
-    this.webhookSecret =
-      this.config.get<string>('STRIPE_WEBHOOK_SECRET') ?? null;
-    this.stripeTaxRateId =
-      this.config.get<string>('STRIPE_TAX_RATE_ID') ?? null;
-    if (secretKey) {
-      this.stripe = new Stripe(secretKey);
-    } else {
-      this.logger.warn(
-        'STRIPE_SECRET_KEY no configurado. Webhooks de facturación no procesarán eventos.',
-      );
-    }
-  }
+  ) {}
+
+  /** Stripe eliminado: facturación solo Wompi. */
+  private _noStripe(): void {}
 
   /**
-   * Verifica si el webhook está configurado correctamente.
+   * (Stripe eliminado.) Mantenido por compatibilidad; no hace nada.
    */
-  isWebhookConfigured(): boolean {
-    return !!(this.webhookSecret && this.stripe);
+  async handleInvoicePaymentFailed(_invoice: unknown): Promise<void> {
+    return;
   }
 
-  /**
-   * Verifica la firma del webhook y devuelve el evento Stripe o null si falla.
-   */
-  constructEvent(
-    payload: Buffer | string,
-    signature: string | undefined,
-  ): Stripe.Event | null {
-    if (!this.webhookSecret || !signature || !this.stripe) {
-      return null;
-    }
-    try {
-      return this.stripe.webhooks.constructEvent(
-        payload,
-        signature,
-        this.webhookSecret,
-      );
-    } catch (err) {
-      this.logger.warn(
-        `Firma de webhook Stripe inválida: ${(err as Error).message}`,
-      );
-      return null;
-    }
+  /** (Stripe eliminado.) No-op. */
+  async handleInvoicePaid(_invoice: unknown): Promise<void> {
+    return;
   }
 
-  /**
-   * Procesa evento invoice.paid: prorroga el periodo de la suscripción
-   * si encontramos una Subscription con stripeSubscriptionId igual al subscription del invoice.
-   */
-  async handleInvoicePaid(invoice: Stripe.Invoice): Promise<void> {
-    const subscriptionId =
-      typeof invoice.subscription === 'string'
-        ? invoice.subscription
-        : invoice.subscription?.id;
-    if (!subscriptionId) {
-      this.logger.debug('invoice.paid sin subscription, ignorando');
-      return;
-    }
-
-    const subscription = await this.prisma.subscription.findUnique({
-      where: { stripeSubscriptionId: subscriptionId },
-      include: { tenant: true },
-    });
-    if (!subscription) {
-      this.logger.warn(
-        `invoice.paid: no se encontró Subscription con stripeSubscriptionId=${subscriptionId}. ¿Webhook apuntando al entorno correcto?`,
-      );
-      return;
-    }
-
-    // Obtener fechas de periodo desde la factura o la suscripción en Stripe
-    let periodStart = subscription.currentPeriodStart;
-    let periodEnd = subscription.currentPeriodEnd;
-
-    // Si la factura tiene periodo, usarlo (más preciso)
-    if (invoice.period_start && invoice.period_end) {
-      periodStart = new Date(invoice.period_start * 1000);
-      periodEnd = new Date(invoice.period_end * 1000);
-    } else if (this.stripe) {
-      // Si no, obtener la suscripción desde Stripe para obtener fechas actualizadas
-      try {
-        const stripeSub = await this.stripe.subscriptions.retrieve(subscriptionId);
-        if (stripeSub.current_period_start && stripeSub.current_period_end) {
-          periodStart = new Date(stripeSub.current_period_start * 1000);
-          periodEnd = new Date(stripeSub.current_period_end * 1000);
-        }
-      } catch (err) {
-        this.logger.warn(
-          `No se pudo obtener suscripción Stripe ${subscriptionId} para actualizar fechas: ${(err as Error).message}`,
-        );
-        // Fallback: agregar 30 días si no hay periodo actual
-        if (!periodEnd) {
-          periodEnd = new Date();
-          periodEnd.setDate(periodEnd.getDate() + 30);
-        }
-      }
-    } else {
-      // Fallback: agregar 30 días si no hay Stripe configurado
-      if (!periodEnd) {
-        periodEnd = new Date();
-        periodEnd.setDate(periodEnd.getDate() + 30);
-      } else {
-        periodEnd = new Date(periodEnd);
-        periodEnd.setDate(periodEnd.getDate() + 30);
-      }
-    }
-
-    // Asegurar que periodEnd siempre tenga un valor
-    if (!periodEnd) {
-      periodEnd = new Date();
-      periodEnd.setDate(periodEnd.getDate() + 30);
-    }
-
-    const wasCancelled = subscription.status === 'CANCELLED';
-
-    await this.prisma.subscription.update({
-      where: { id: subscription.id },
-      data: {
-        currentPeriodStart: periodStart ?? undefined,
-        currentPeriodEnd: periodEnd ?? undefined,
-        status: 'ACTIVE',
-        lastPaymentFailedAt: null,
-        updatedAt: new Date(),
-      },
-    });
-
-    // Si se reactivó desde cancelada, también reactivar el tenant si estaba inactivo
-    if (wasCancelled && !subscription.tenant.isActive) {
-      await this.prisma.tenant.update({
-        where: { id: subscription.tenantId },
-        data: { isActive: true, updatedAt: new Date() },
-      });
-      this.logger.log(
-        `Suscripción ${subscription.id} (tenant ${subscription.tenantId}) reactivada desde CANCELLED por invoice.paid. Tenant también reactivado.`,
-      );
-    } else {
-      this.logger.log(
-        `Suscripción ${subscription.id} (tenant ${subscription.tenantId}) prorrogada hasta ${periodEnd.toISOString()} por invoice.paid`,
-      );
-    }
+  /** (Stripe eliminado.) No-op. */
+  async handleSubscriptionDeleted(_sub: unknown): Promise<void> {
+    return;
   }
 
-  /** Días dentro de los cuales un segundo pago fallido suspende la suscripción. */
-  private readonly paymentFailureSuspendDays = 30;
-
-  /**
-   * Procesa evento invoice.payment_failed: registra el fallo y, si ya hubo uno en los últimos 30 días,
-   * marca la suscripción como SUSPENDED y el tenant como inactivo.
-   */
-  async handleInvoicePaymentFailed(invoice: Stripe.Invoice): Promise<void> {
-    const subscriptionId =
-      typeof invoice.subscription === 'string'
-        ? invoice.subscription
-        : invoice.subscription?.id;
-    if (!subscriptionId) {
-      this.logger.debug('invoice.payment_failed sin subscription, ignorando');
-      return;
-    }
-
-    const subscription = await this.prisma.subscription.findUnique({
-      where: { stripeSubscriptionId: subscriptionId },
-      include: { tenant: true },
-    });
-    if (!subscription) {
-      this.logger.debug(
-        `No se encontró Subscription con stripeSubscriptionId=${subscriptionId}`,
-      );
-      return;
-    }
-
-    const now = new Date();
-    const previousFailedAt = subscription.lastPaymentFailedAt;
-
-    const shouldSuspend =
-      previousFailedAt &&
-      (now.getTime() - previousFailedAt.getTime()) / (1000 * 60 * 60 * 24) <
-        this.paymentFailureSuspendDays;
-
-    await this.prisma.$transaction([
-      this.prisma.subscription.update({
-        where: { id: subscription.id },
-        data: {
-          lastPaymentFailedAt: now,
-          ...(shouldSuspend ? { status: 'SUSPENDED' as const } : {}),
-          updatedAt: now,
-        },
-      }),
-      ...(shouldSuspend
-        ? [
-            this.prisma.tenant.update({
-              where: { id: subscription.tenantId },
-              data: { isActive: false, updatedAt: now },
-            }),
-          ]
-        : []),
-    ]);
-
-    if (shouldSuspend) {
-      this.logger.warn(
-        `Suscripción ${subscription.id} (tenant ${subscription.tenantId}) suspendida por segundo pago fallido en 30 días`,
-      );
-    } else {
-      this.logger.warn(
-        `Pago fallido registrado para suscripción ${subscription.id} (tenant ${subscription.tenantId}). Segundo fallo en 30 días suspenderá la cuenta.`,
-      );
-    }
+  /** (Stripe eliminado.) No-op. */
+  async handleSubscriptionUpdated(_sub: unknown): Promise<void> {
+    return;
   }
 
-  /**
-   * Procesa evento customer.subscription.deleted: marcar Subscription como CANCELLED
-   * y limpiar cambio de plan programado si existía.
-   */
-  async handleSubscriptionDeleted(sub: Stripe.Subscription): Promise<void> {
-    const subscriptionId = sub.id;
-    const updated = await this.prisma.subscription.updateMany({
-      where: { stripeSubscriptionId: subscriptionId },
-      data: {
-        status: 'CANCELLED',
-        scheduledPlanId: null,
-        scheduledChangeAt: null,
-        updatedAt: new Date(),
-      },
-    });
-    if (updated.count > 0) {
-      this.logger.log(
-        `Suscripción con stripeSubscriptionId=${subscriptionId} marcada como CANCELLED`,
-      );
-    }
-  }
-
-  /**
-   * Procesa evento customer.subscription.updated: sincroniza estado y fechas de periodo desde Stripe.
-   * Detecta cuando una suscripción cancelada se reactiva (p. ej. al agregar método de pago).
-   */
-  async handleSubscriptionUpdated(sub: Stripe.Subscription): Promise<void> {
-    const subscriptionId = sub.id;
-    const subscription = await this.prisma.subscription.findUnique({
-      where: { stripeSubscriptionId: subscriptionId },
-      include: { tenant: true },
-    });
-    
-    if (!subscription) {
-      this.logger.debug(
-        `No se encontró Subscription con stripeSubscriptionId=${subscriptionId} para actualizar`,
-      );
-      return;
-    }
-
-    // Mapear estados de Stripe a nuestros estados
-    let newStatus: 'ACTIVE' | 'CANCELLED' | 'SUSPENDED' | 'PENDING_PAYMENT' = subscription.status as any;
-    if (sub.status === 'active') {
-      newStatus = 'ACTIVE';
-    } else if (sub.status === 'canceled' || sub.status === 'unpaid') {
-      newStatus = 'CANCELLED';
-    } else if (sub.status === 'past_due' || sub.status === 'incomplete') {
-      newStatus = 'PENDING_PAYMENT';
-    } else if (sub.status === 'trialing') {
-      newStatus = 'ACTIVE'; // Tratar trial como activo
-    }
-
-    // Obtener fechas de periodo desde Stripe
-    const currentPeriodStart = sub.current_period_start
-      ? new Date(sub.current_period_start * 1000)
-      : subscription.currentPeriodStart;
-    const currentPeriodEnd = sub.current_period_end
-      ? new Date(sub.current_period_end * 1000)
-      : subscription.currentPeriodEnd;
-
-    const wasCancelled = subscription.status === 'CANCELLED';
-    const isNowActive = newStatus === 'ACTIVE';
-
-    await this.prisma.subscription.update({
-      where: { id: subscription.id },
-      data: {
-        status: newStatus,
-        currentPeriodStart,
-        currentPeriodEnd,
-        lastPaymentFailedAt: isNowActive ? null : subscription.lastPaymentFailedAt,
-        updatedAt: new Date(),
-      },
-    });
-
-    // Si se reactivó desde cancelada, también reactivar el tenant si estaba inactivo
-    if (wasCancelled && isNowActive && !subscription.tenant.isActive) {
-      await this.prisma.tenant.update({
-        where: { id: subscription.tenantId },
-        data: { isActive: true, updatedAt: new Date() },
-      });
-      this.logger.log(
-        `Suscripción ${subscription.id} (tenant ${subscription.tenantId}) reactivada desde CANCELLED a ACTIVE. Tenant también reactivado.`,
-      );
-    } else {
-      this.logger.log(
-        `Suscripción ${subscription.id} (tenant ${subscription.tenantId}) actualizada: ${subscription.status} → ${newStatus}`,
-      );
-    }
-  }
-
-  /**
-   * Crea en Stripe un cliente y una suscripción con el precio indicado.
-   * Devuelve el ID de la suscripción Stripe o null si Stripe no está configurado o falla.
-   */
+  /** (Stripe eliminado.) Siempre null; facturación solo Wompi. */
   async createStripeSubscription(
-    tenantId: string,
-    stripePriceId: string,
-    customerEmail: string,
-    customerName?: string,
+    _tenantId: string,
+    _priceId: string,
+    _adminEmail: string,
+    _customerName: string,
   ): Promise<string | null> {
-    if (!this.stripe) return null;
-    try {
-      const customer = await this.stripe.customers.create({
-        email: customerEmail,
-        name: customerName ?? undefined,
-        metadata: { tenantId },
-      });
-      const subscriptionParams: Stripe.SubscriptionCreateParams = {
-        customer: customer.id,
-        items: [{ price: stripePriceId }],
-        metadata: { tenantId },
-        payment_behavior: 'default_incomplete',
-        payment_settings: { save_default_payment_method: 'on_subscription' },
-        expand: ['latest_invoice.payment_intent'],
-      };
-      // Impuestos: solo si hay Tax Rate configurado (evitar automatic_tax sin dirección fiscal en test)
-      if (this.stripeTaxRateId) {
-        subscriptionParams.default_tax_rates = [this.stripeTaxRateId];
-      }
-      const subscription = await this.stripe.subscriptions.create(subscriptionParams);
-      this.logger.log(
-        `Stripe suscripción creada: ${subscription.id} para tenant ${tenantId}`,
-      );
-      return subscription.id;
-    } catch (err) {
-      this.logger.error(
-        `Error creando suscripción Stripe para tenant ${tenantId}: ${(err as Error).message}`,
-      );
-      return null;
-    }
+    return null;
   }
 
-  /**
-   * Actualiza la suscripción en Stripe para un upgrade (ej. Básico anual → Premium anual).
-   * Reglas:
-   * - Misma suscripción (solo se cambia el ítem/precio).
-   * - NO se modifica billing_cycle_anchor (la fecha de renovación se mantiene).
-   * - Prorrateo: crédito por tiempo no usado del plan anterior + cargo proporcional del nuevo hasta la misma renovación.
-   * - Factura inmediata: solo esa diferencia (usamos always_invoice para que Stripe genere y cobre ya; con create_prorations
-   *   las prorations irían a la próxima factura y se mezclarían con el año completo).
-   * - Si el cobro falla (tarjeta), Stripe reintentará; el webhook invoice.payment_failed ya está manejado.
-   * - Diferencia negativa: Stripe devuelve factura con total 0 o crédito; no bloqueamos.
-   */
-  private async updateSubscriptionForUpgrade(
-    stripeSubscriptionId: string,
-    itemId: string,
-    newPriceId: string,
-    newPlanId: string,
-    billingInterval: string,
-    previousPriceId: string,
+  /** (Stripe eliminado.) No-op. */
+  async updateSubscriptionForUpgrade(
+    _stripeSubscriptionId: string,
+    _itemId: string,
+    _effectivePriceId: string,
+    _newPlanId: string,
+    _billingInterval: 'monthly' | 'yearly',
+    _currentPriceId: string,
   ): Promise<void> {
-    const updateParams: Stripe.SubscriptionUpdateParams = {
-      items: [{ id: itemId, price: newPriceId }],
-      // create_prorations crea las líneas pero NO factura ya (irían a la próxima factura = renovación, mezclando con el año completo).
-      // always_invoice: genera la factura inmediata solo con la diferencia (crédito + cargo prorrateado) y intenta cobrar ya;
-      // la próxima factura en la renovación será solo el precio anual completo. No pasamos billing_cycle_anchor para preservarlo.
-      proration_behavior: 'always_invoice',
-    };
-    if (this.stripeTaxRateId) {
-      updateParams.default_tax_rates = [this.stripeTaxRateId];
-    }
-    await this.stripe!.subscriptions.update(stripeSubscriptionId, updateParams);
-    this.logger.log(
-      `Suscripción Stripe ${stripeSubscriptionId} actualizada (upgrade): plan ${newPlanId}, billingInterval ${billingInterval}, price ${newPriceId} (antes: ${previousPriceId}). Factura inmediata con prorrateo; renovación sin reinicio.`,
-    );
+    return;
   }
 
   /**
@@ -477,101 +156,6 @@ export class BillingService {
       priceYearly: p.priceYearly != null ? Number(p.priceYearly) : null,
       maxUsers: p.maxUsers,
     }));
-  }
-
-  /**
-   * Crea una sesión de Stripe Checkout para comprar un plan (flujo tipo Spotify).
-   * El usuario es redirigido a la página de Stripe donde introduce tarjeta y completa la compra.
-   * La suscripción en nuestra BD se crea/actualiza en el webhook checkout.session.completed.
-   * Solo para tenants sin plan o sin suscripción activa en Stripe.
-   */
-  async createCheckoutSessionForPlan(
-    tenantId: string,
-    planId: string,
-    billingInterval: 'monthly' | 'yearly',
-    returnUrl: string,
-  ): Promise<{ url: string }> {
-    if (!this.stripe) {
-      throw new BadRequestException(
-        'La gestión de facturación no está configurada. Contacte a soporte.',
-      );
-    }
-
-    const plan = await this.prisma.plan.findUnique({
-      where: { id: planId },
-      select: {
-        id: true,
-        name: true,
-        stripePriceId: true,
-        stripePriceIdYearly: true,
-        features: { select: { moduleCode: true } },
-      },
-    });
-    if (!plan) {
-      throw new NotFoundException('Plan no encontrado.');
-    }
-
-    const useYearly = billingInterval === 'yearly' && plan.stripePriceIdYearly;
-    const stripePriceId = useYearly ? plan.stripePriceIdYearly : plan.stripePriceId;
-    if (!stripePriceId) {
-      throw new BadRequestException(
-        `El plan no tiene precio configurado en Stripe para facturación ${billingInterval}. Contacte a soporte.`,
-      );
-    }
-
-    const tenant = await this.prisma.tenant.findUnique({
-      where: { id: tenantId },
-      select: {
-        name: true,
-        subscription: { select: { stripeSubscriptionId: true } },
-        users: {
-          where: { role: 'ADMIN' },
-          take: 1,
-          select: { email: true },
-        },
-      },
-    });
-    if (!tenant) {
-      throw new NotFoundException('Empresa no encontrada.');
-    }
-
-    const customerEmail = tenant.users[0]?.email;
-    if (!customerEmail) {
-      throw new BadRequestException(
-        'No se encontró un email de administrador para esta empresa. Contacte a soporte.',
-      );
-    }
-
-    const sessionParams: Stripe.Checkout.SessionCreateParams = {
-      mode: 'subscription',
-      line_items: [{ price: stripePriceId, quantity: 1 }],
-      customer_email: customerEmail,
-      metadata: {
-        tenantId,
-        planId: plan.id,
-        billingInterval,
-      },
-      subscription_data: {
-        metadata: { tenantId, planId: plan.id },
-        trial_period_days: undefined,
-      },
-      success_url: `${returnUrl}?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: returnUrl,
-      allow_promotion_codes: true,
-    };
-
-    // Impuestos: solo si hay Tax Rate configurado. Si no, no activar automatic_tax (Stripe exige dirección fiscal en test).
-    if (this.stripeTaxRateId) {
-      sessionParams.tax_id_collection = { enabled: false };
-      sessionParams.subscription_data!.default_tax_rates = [this.stripeTaxRateId];
-    }
-    // Si no hay STRIPE_TAX_RATE_ID, no se setea automatic_tax para evitar error 400 por "valid head office address" en test.
-
-    const session = await this.stripe.checkout.sessions.create(sessionParams);
-    this.logger.log(
-      `Checkout Session creada para tenant ${tenantId} plan ${planId}: ${session.id}`,
-    );
-    return { url: session.url! };
   }
 
   /**
@@ -930,7 +514,7 @@ export class BillingService {
               itemId,
               effectivePriceId,
               newPlan.id,
-              effectiveBillingInterval ?? 'yearly',
+              (effectiveBillingInterval === 'monthly' ? 'monthly' : 'yearly') as 'monthly' | 'yearly',
               currentPriceId,
             );
           } else if (currentPriceId === effectivePriceId) {
@@ -1120,52 +704,15 @@ export class BillingService {
   }
 
   /**
-   * Si nuestra BD tiene PENDING_PAYMENT pero Stripe ya tiene la suscripción activa
-   * (p. ej. el webhook falló o llegó después), actualiza la BD para desbloquear al usuario.
+   * (Stripe eliminado.) Sincronización con Stripe ya no aplica; facturación solo Wompi.
    */
-  private async syncSubscriptionStatusFromStripe(subscription: {
-    id: string;
-    tenantId: string;
-    status: string;
-    stripeSubscriptionId: string | null;
-  }): Promise<void> {
-    if (
-      String(subscription.status) !== 'PENDING_PAYMENT' ||
-      !this.stripe ||
-      !subscription.stripeSubscriptionId
-    ) {
-      return;
-    }
-    try {
-      const stripeSub = await this.stripe.subscriptions.retrieve(
-        subscription.stripeSubscriptionId,
-      );
-      if (stripeSub.status !== 'active') return;
-      const periodEnd = stripeSub.current_period_end
-        ? new Date(stripeSub.current_period_end * 1000)
-        : new Date();
-      await this.prisma.subscription.update({
-        where: { id: subscription.id },
-        data: {
-          status: 'ACTIVE',
-          currentPeriodEnd: periodEnd,
-          lastPaymentFailedAt: null,
-          updatedAt: new Date(),
-        },
-      });
-      this.logger.log(
-        `Suscripción ${subscription.id} (tenant ${subscription.tenantId}) actualizada a ACTIVE por sincronización con Stripe (webhook posiblemente no procesado).`,
-      );
-    } catch (err) {
-      this.logger.warn(
-        `No se pudo sincronizar estado con Stripe para suscripción ${subscription.id}: ${(err as Error).message}`,
-      );
-    }
+  private async _syncStripeNoOp(): Promise<void> {
+    return;
   }
 
   /**
    * Devuelve la información de plan y suscripción del tenant para mostrar en la UI de facturación.
-   * Si está PENDING_PAYMENT, consulta Stripe y actualiza la BD si el pago ya se completó (fallback al webhook).
+   * Facturación solo con Wompi (sin portal externo).
    */
   async getSubscriptionForTenant(
     tenantId: string,
@@ -1186,23 +733,8 @@ export class BillingService {
     if (!subscription) {
       throw new NotFoundException('No hay suscripción para esta cuenta.');
     }
-    await this.syncSubscriptionStatusFromStripe(subscription);
-    if (String(subscription.status) === 'PENDING_PAYMENT') {
-      subscription =
-        (await this.prisma.subscription.findUnique({
-          where: { tenantId },
-          include: {
-            plan: { select: { id: true, name: true, slug: true, priceMonthly: true, priceYearly: true } },
-            scheduledPlan: { select: { id: true, name: true, slug: true } },
-          },
-        })) ?? subscription;
-    }
-    // Permitir gestionar billing si hay Stripe configurado y:
-    // 1. Hay una suscripción activa con stripeSubscriptionId, O
-    // 2. Hay un plan asignado (incluso si está cancelada, para poder reactivar)
-    const canManageBilling =
-      !!this.stripe &&
-      (!!subscription.stripeSubscriptionId || !!subscription.planId);
+    // Facturación solo Wompi: no hay portal externo
+    const canManageBilling = false;
     const requiresPayment = String(subscription.status) === 'PENDING_PAYMENT';
     
     // Periodo de gracia: 7 días después de que termine el periodo para suscripciones canceladas
@@ -1226,36 +758,9 @@ export class BillingService {
     // Estar en periodo de gracia: cancelada, periodo terminado, pero aún dentro de los 7 días
     const inGracePeriod = isCancelled && periodEnded && !gracePeriodEnded;
 
-    // Monto a pagar y si hay factura abierta: solo la factura open más reciente del cliente, amount_due.
-    // NO usar: upcoming invoice, customer.balance, suma de facturas, amount_remaining ni subscription.total_spent.
-    // Así el banner coincide con lo que Stripe muestra en Checkout/Portal.
-    let pendingInvoiceAmount: number | null = null;
-    let hasUnpaidInvoice = false;
-    if (this.stripe && subscription.stripeSubscriptionId) {
-      try {
-        const stripeSubscription = await this.stripe.subscriptions.retrieve(
-          subscription.stripeSubscriptionId,
-        );
-        const customerId =
-          typeof stripeSubscription.customer === 'string'
-            ? stripeSubscription.customer
-            : stripeSubscription.customer.id;
-        const openInvoices = await this.stripe.invoices.list({
-          customer: customerId,
-          status: 'open',
-          limit: 1,
-        });
-        if (openInvoices.data.length > 0) {
-          const inv = openInvoices.data[0];
-          if (inv.status === 'open' && inv.amount_due != null && inv.amount_due >= 0) {
-            hasUnpaidInvoice = true;
-            pendingInvoiceAmount = inv.amount_due;
-          }
-        }
-      } catch {
-        // Si Stripe falla o no hay customer, no mostrar monto ni banner
-      }
-    }
+    // Facturación solo Wompi: no hay facturas abiertas en portal externo
+    const pendingInvoiceAmount: number | null = null;
+    const hasUnpaidInvoice = false;
 
     return {
       plan: subscription.plan
@@ -1297,361 +802,50 @@ export class BillingService {
    * Devuelve la URL de Checkout a la que redirigir al usuario.
    */
   async createCheckoutSession(
-    tenantId: string,
-    returnUrl: string,
+    _tenantId: string,
+    _returnUrl: string,
   ): Promise<{ url: string }> {
-    if (!this.stripe) {
-      throw new BadRequestException(
-        'La gestión de facturación no está configurada. Contacte a soporte.',
-      );
-    }
-    
-    const subscription = await this.prisma.subscription.findUnique({
-      where: { tenantId },
-      include: {
-        plan: {
-          select: {
-            id: true,
-            name: true,
-            stripePriceId: true,
-            stripePriceIdYearly: true,
-          },
-        },
-        tenant: {
-          select: {
-            billingInterval: true,
-            users: {
-              where: { role: 'ADMIN' },
-              take: 1,
-              select: { email: true },
-            },
-          },
-        },
-      },
-    });
-    
-    if (!subscription || !subscription.stripeSubscriptionId) {
-      throw new BadRequestException(
-        'No hay suscripción Stripe para esta cuenta. Contacte a soporte.',
-      );
-    }
-
-    // Evitar abrir un nuevo checkout si la suscripción ya está activa (evitar doble cobro)
-    if (String(subscription.status) === 'ACTIVE') {
-      throw new BadRequestException(
-        'Tu suscripción ya está activa. No es necesario completar el pago.',
-      );
-    }
-    
-    // Obtener la suscripción de Stripe para obtener el customer y la factura pendiente
-    const stripeSubscription = await this.stripe.subscriptions.retrieve(
-      subscription.stripeSubscriptionId,
-      { expand: ['latest_invoice', 'latest_invoice.payment_intent'] },
-    );
-    
-    const customerId = typeof stripeSubscription.customer === 'string'
-      ? stripeSubscription.customer
-      : stripeSubscription.customer.id;
-    
-    // Si la suscripción está incompleta, usar el payment_intent de la factura para completar el pago
-    if (stripeSubscription.status === 'incomplete' || stripeSubscription.status === 'incomplete_expired') {
-      const latestInvoice = stripeSubscription.latest_invoice;
-      if (latestInvoice && typeof latestInvoice !== 'string') {
-        // Obtener la factura completa con el payment_intent
-        const invoice = await this.stripe.invoices.retrieve(latestInvoice.id, {
-          expand: ['payment_intent'],
-        });
-        
-        if (invoice.payment_intent) {
-          const paymentIntentId = typeof invoice.payment_intent === 'string'
-            ? invoice.payment_intent
-            : invoice.payment_intent.id;
-          
-          const paymentIntent = await this.stripe.paymentIntents.retrieve(paymentIntentId);
-          
-          if (paymentIntent.status === 'requires_payment_method' || paymentIntent.status === 'requires_action') {
-            // Crear Checkout Session para completar el payment intent existente
-            try {
-              const checkoutSession = await this.stripe.checkout.sessions.create({
-                customer: customerId,
-                payment_intent_data: {
-                  metadata: { tenantId },
-                },
-                mode: 'payment',
-                line_items: [{
-                  price_data: {
-                    currency: invoice.currency || 'cop',
-                    product_data: {
-                      name: (subscription.plan as any)?.name || 'Suscripción',
-                    },
-                    unit_amount: invoice.amount_due,
-                  },
-                  quantity: 1,
-                }],
-                success_url: `${returnUrl}?session_id={CHECKOUT_SESSION_ID}`,
-                cancel_url: returnUrl,
-                metadata: { tenantId, subscriptionId: subscription.stripeSubscriptionId },
-              });
-              
-              this.logger.log(
-                `Checkout Session creada para completar suscripción incompleta de tenant ${tenantId}: ${checkoutSession.id}`,
-              );
-              
-              return { url: checkoutSession.url! };
-            } catch (err) {
-              this.logger.error(
-                `Error al crear Checkout Session para suscripción incompleta: ${(err as Error).message}`,
-                err instanceof Error ? err.stack : undefined,
-              );
-              // Continuar con el flujo alternativo
-            }
-          }
-        }
-      }
-    }
-    
-    // Si hay una factura pendiente con payment_intent (para suscripciones activas con pago fallido)
-    const latestInvoice = stripeSubscription.latest_invoice;
-    if (latestInvoice && typeof latestInvoice !== 'string' && latestInvoice.payment_intent) {
-      const paymentIntent = typeof latestInvoice.payment_intent === 'string'
-        ? await this.stripe.paymentIntents.retrieve(latestInvoice.payment_intent)
-        : latestInvoice.payment_intent;
-      
-      if (paymentIntent.status === 'requires_payment_method' || paymentIntent.status === 'requires_action') {
-        // Crear Checkout Session para completar el payment intent
-        try {
-          const checkoutSession = await this.stripe.checkout.sessions.create({
-            customer: customerId,
-            payment_intent_data: {
-              metadata: { tenantId },
-            },
-            mode: 'payment',
-            line_items: [{
-              price_data: {
-                currency: typeof paymentIntent === 'string' ? 'usd' : paymentIntent.currency,
-                product_data: {
-                  name: (subscription.plan as any)?.name || 'Suscripción',
-                },
-                unit_amount: typeof paymentIntent === 'string' ? 0 : paymentIntent.amount,
-              },
-              quantity: 1,
-            }],
-            success_url: `${returnUrl}?session_id={CHECKOUT_SESSION_ID}`,
-            cancel_url: returnUrl,
-            metadata: { tenantId, subscriptionId: subscription.stripeSubscriptionId },
-          });
-          
-          this.logger.log(
-            `Checkout Session creada para completar payment intent de tenant ${tenantId}: ${checkoutSession.id}`,
-          );
-          
-          return { url: checkoutSession.url! };
-        } catch (err) {
-          this.logger.error(
-            `Error al crear Checkout Session para payment intent: ${(err as Error).message}`,
-            err instanceof Error ? err.stack : undefined,
-          );
-        }
-      }
-    }
-    
-    // Si no hay payment intent o falló, usar la suscripción existente incompleta
-    // Si la suscripción está incompleta, usar Checkout para completar el pago
-    if (stripeSubscription.status === 'incomplete' || stripeSubscription.status === 'incomplete_expired') {
-      // Obtener el payment_intent de la factura pendiente
-      const latestInvoice = stripeSubscription.latest_invoice;
-      if (latestInvoice && typeof latestInvoice !== 'string') {
-        const invoice = await this.stripe.invoices.retrieve(latestInvoice.id, {
-          expand: ['payment_intent'],
-        });
-        
-        if (invoice.payment_intent) {
-          const paymentIntentId = typeof invoice.payment_intent === 'string'
-            ? invoice.payment_intent
-            : invoice.payment_intent.id;
-          
-          // Crear Checkout Session para completar el payment intent existente
-          try {
-            const checkoutSession = await this.stripe.checkout.sessions.create({
-              customer: customerId,
-              payment_intent_data: {
-                metadata: { tenantId },
-              },
-              mode: 'payment',
-              line_items: [{
-                price_data: {
-                  currency: invoice.currency || 'cop',
-                  product_data: {
-                    name: (subscription.plan as any)?.name || 'Suscripción',
-                  },
-                  unit_amount: invoice.amount_due,
-                },
-                quantity: 1,
-              }],
-              success_url: `${returnUrl}?session_id={CHECKOUT_SESSION_ID}`,
-              cancel_url: returnUrl,
-              metadata: { tenantId, subscriptionId: subscription.stripeSubscriptionId },
-            });
-            
-            this.logger.log(
-              `Checkout Session creada para completar suscripción incompleta de tenant ${tenantId}: ${checkoutSession.id}`,
-            );
-            
-            return { url: checkoutSession.url! };
-          } catch (err) {
-            this.logger.error(
-              `Error al crear Checkout Session para suscripción incompleta: ${(err as Error).message}`,
-              err instanceof Error ? err.stack : undefined,
-            );
-          }
-        }
-      }
-    }
-    
-    // Si llegamos aquí no se pudo usar el payment_intent de la suscripción incompleta.
-    // La API de Stripe Checkout no permite adjuntar una suscripción existente; solo payment_intent.
     throw new BadRequestException(
-      'No se pudo crear la sesión de pago para completar tu suscripción. Intenta de nuevo en unos momentos o contacta a soporte.',
+      'La facturación es solo con Wompi. Usa el botón "Pagar con Wompi" en esta página.',
     );
   }
 
-  /**
-   * Crea una sesión del Stripe Customer Portal para que el cliente gestione método de pago y facturas.
-   * Si la suscripción está incompleta, crea una Checkout Session en su lugar.
-   * Devuelve la URL a la que redirigir al usuario.
-   */
+  /** (Stripe eliminado.) createPortalSession: facturación solo Wompi. */
   async createPortalSession(
-    tenantId: string,
-    returnUrl: string,
+    _tenantId: string,
+    _returnUrl: string,
   ): Promise<{ url: string }> {
-    if (!this.stripe) {
-      this.logger.error(
-        `createPortalSession llamado pero STRIPE_SECRET_KEY no está configurada. Tenant: ${tenantId}`,
-      );
-      throw new BadRequestException(
-        'La gestión de facturación no está configurada. Contacte a soporte.',
-      );
-    }
-    this.logger.debug(
-      `Creando sesión del portal para tenant ${tenantId}, returnUrl: ${returnUrl}`,
+    throw new BadRequestException(
+      'La facturación es solo con Wompi. Usa "Pagar con Wompi" en esta página.',
     );
-    const subscription = await this.prisma.subscription.findUnique({
-      where: { tenantId },
-    });
-    if (!subscription) {
-      throw new BadRequestException(
-        'No hay suscripción para esta cuenta. Contacte a soporte para gestionar el pago.',
-      );
-    }
-    
-    // Si la suscripción está pendiente de pago, usar Checkout en lugar del Portal
-    if (String(subscription.status) === 'PENDING_PAYMENT' && subscription.stripeSubscriptionId) {
-      this.logger.log(
-        `Suscripción pendiente de pago para tenant ${tenantId}, creando Checkout Session`,
-      );
-      return this.createCheckoutSession(tenantId, returnUrl);
-    }
-    
-    let stripeCustomerId: string;
-    
-    // Intentar obtener el customerId desde la suscripción Stripe si existe
-    if (subscription.stripeSubscriptionId) {
-      try {
-        const stripeSubscription = await this.stripe.subscriptions.retrieve(
-          subscription.stripeSubscriptionId,
-        );
-        stripeCustomerId =
-          typeof stripeSubscription.customer === 'string'
-            ? stripeSubscription.customer
-            : stripeSubscription.customer.id;
-      } catch (err) {
-        const errorMessage = (err as Error).message || String(err);
-        this.logger.error(
-          `No se pudo obtener suscripción Stripe ${subscription.stripeSubscriptionId}: ${errorMessage}`,
-          err instanceof Error ? err.stack : undefined,
-        );
-        // Si la suscripción fue eliminada en Stripe, intentar buscar el customer por metadata
-        try {
-          const customers = await this.stripe.customers.search({
-            query: `metadata['tenantId']:'${tenantId}'`,
-            limit: 1,
-          });
-          if (customers.data.length > 0) {
-            stripeCustomerId = customers.data[0].id;
-          } else {
-            throw new BadRequestException(
-              'No se encontró información de facturación. Contacte a soporte para reactivar su suscripción.',
-            );
-          }
-        } catch (searchErr) {
-          const searchErrorMessage = (searchErr as Error).message || String(searchErr);
-          this.logger.error(
-            `Error al buscar cliente Stripe por metadata para tenant ${tenantId}: ${searchErrorMessage}`,
-            searchErr instanceof Error ? searchErr.stack : undefined,
-          );
-          // Distinguir entre errores de autenticación y otros
-          if (searchErr instanceof Error && searchErr.message.includes('api_key')) {
-            throw new BadRequestException(
-              'Error de configuración del servicio de facturación. Contacte a soporte.',
-            );
-          }
-          throw new BadRequestException(
-            'No se pudo conectar con el servicio de facturación. Intente más tarde o contacte a soporte.',
-          );
-        }
-      }
-    } else {
-      // Si no hay stripeSubscriptionId, buscar el customer por metadata
-      try {
-        const customers = await this.stripe.customers.search({
-          query: `metadata['tenantId']:'${tenantId}'`,
-          limit: 1,
-        });
-        if (customers.data.length > 0) {
-          stripeCustomerId = customers.data[0].id;
-        } else {
-          throw new BadRequestException(
-            'No hay suscripción con Stripe para esta cuenta. Contacte a soporte para gestionar el pago.',
-          );
-        }
-      } catch (err) {
-        const errorMessage = (err as Error).message || String(err);
-        this.logger.error(
-          `Error al buscar cliente Stripe por metadata para tenant ${tenantId}: ${errorMessage}`,
-          err instanceof Error ? err.stack : undefined,
-        );
-        // Distinguir entre errores de autenticación y otros
-        if (err instanceof Error && err.message.includes('api_key')) {
-          throw new BadRequestException(
-            'Error de configuración del servicio de facturación. Contacte a soporte.',
-          );
-        }
-        throw new BadRequestException(
-          'No se pudo conectar con el servicio de facturación. Intente más tarde o contacte a soporte.',
-        );
-      }
-    }
-    try {
-      const session = await this.stripe.billingPortal.sessions.create({
-        customer: stripeCustomerId,
-        return_url: returnUrl,
-      });
-      return { url: session.url };
-    } catch (err) {
-      const errorMessage = (err as Error).message || String(err);
-      this.logger.error(
-        `Error al crear sesión del portal de Stripe para customer ${stripeCustomerId}: ${errorMessage}`,
-        err instanceof Error ? err.stack : undefined,
-      );
-      if (err instanceof Error && err.message.includes('api_key')) {
-        throw new BadRequestException(
-          'Error de configuración del servicio de facturación. Contacte a soporte.',
-        );
-      }
-      throw new BadRequestException(
-        'No se pudo crear la sesión de facturación. Intente más tarde o contacte a soporte.',
-      );
-    }
+  }
+
+  private _createPortalSessionBodyRemoved(_tenantId: string): void {
+    return;
+  }
+
+  private _stripeLegacyPlaceholder(): void {
+    return;
+  }
+
+  /**
+   * (Stripe eliminado.) Código legacy de createPortalSession/createCheckoutSession eliminado.
+   */
+  private _stripeDeadCodeRemoved(): void {
+    return;
+  }
+
+  /** (Código Stripe de createCheckoutSession/createPortalSession eliminado.) */
+  private _stripDeadEnd(): void {
+    return;
+  }
+
+  private _stripeLegacyRemoved(): void {
+    return;
+  }
+
+  /** Duplicate createPortalSession (Stripe) removed; first createPortalSession above throws. */
+  private _duplicatePortalRemoved(): void {
   }
 
   /**

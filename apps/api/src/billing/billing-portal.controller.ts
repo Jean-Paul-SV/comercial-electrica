@@ -16,11 +16,8 @@ import {
   ApiResponse,
   ApiBearerAuth,
 } from '@nestjs/swagger';
-import { ConfigService } from '@nestjs/config';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { BillingService } from './billing.service';
-import { CreatePortalSessionDto } from './dto/create-portal-session.dto';
-import { CreateCheckoutSessionDto } from './dto/create-checkout-session.dto';
 import { ChangePlanDto } from './dto/change-plan.dto';
 
 @ApiTags('billing')
@@ -28,10 +25,7 @@ import { ChangePlanDto } from './dto/change-plan.dto';
 export class BillingPortalController {
   private readonly logger = new Logger(BillingPortalController.name);
 
-  constructor(
-    private readonly billing: BillingService,
-    private readonly config: ConfigService,
-  ) {}
+  constructor(private readonly billing: BillingService) {}
 
   @UseGuards(JwtAuthGuard)
   @Get('plans')
@@ -165,110 +159,4 @@ export class BillingPortalController {
     return this.billing.getSubscriptionForTenant(tenantId);
   }
 
-  @UseGuards(JwtAuthGuard)
-  @Post('checkout-session')
-  @ApiBearerAuth('JWT-auth')
-  @ApiOperation({
-    summary: 'Crear sesión de Checkout para comprar un plan',
-    description:
-      'Devuelve la URL de Stripe Checkout (página tipo Spotify) para que el usuario introduzca tarjeta y complete la compra. La suscripción se activa al completar el pago.',
-  })
-  @ApiResponse({
-    status: 201,
-    description: 'URL de Checkout',
-    schema: { type: 'object', properties: { url: { type: 'string', format: 'uri' } } },
-  })
-  @ApiResponse({ status: 400, description: 'Plan sin precio en Stripe o sin email de admin.' })
-  @ApiResponse({ status: 404, description: 'Plan o empresa no encontrados.' })
-  async createCheckoutSession(
-    @Req() req: { user?: { tenantId?: string | null } },
-    @Body() dto: CreateCheckoutSessionDto,
-  ) {
-    const tenantId = req.user?.tenantId;
-    if (!tenantId) {
-      throw new BadRequestException(
-        'Solo los usuarios de una empresa pueden iniciar una compra.',
-      );
-    }
-    const baseUrl =
-      this.config.get<string>('FRONTEND_URL') ?? 'http://localhost:3001';
-    let returnUrl = `${baseUrl.replace(/\/$/, '')}/settings/billing`;
-    if (dto.returnUrl?.trim()) {
-      try {
-        new URL(dto.returnUrl);
-        returnUrl = dto.returnUrl;
-      } catch {
-        // mantener default
-      }
-    }
-    return this.billing.createCheckoutSessionForPlan(
-      tenantId,
-      dto.planId,
-      dto.billingInterval,
-      returnUrl,
-    );
-  }
-
-  @UseGuards(JwtAuthGuard)
-  @Post('portal-session')
-  @ApiBearerAuth('JWT-auth')
-  @ApiOperation({
-    summary: 'Crear sesi?n del portal de facturaci?n Stripe',
-    description:
-      'Genera una URL de Stripe Customer Portal para que el usuario gestione m?todo de pago, facturas y suscripci?n. Redirigir al usuario a la URL devuelta.',
-  })
-  @ApiResponse({
-    status: 201,
-    description: 'URL del portal',
-    schema: {
-      type: 'object',
-      properties: { url: { type: 'string', format: 'uri' } },
-    },
-  })
-  @ApiResponse({
-    status: 400,
-    description: 'Sin suscripci?n Stripe o Stripe no configurado',
-  })
-  async createPortalSession(
-    @Req() req: { user?: { tenantId?: string | null; id?: string } },
-    @Body() dto: CreatePortalSessionDto,
-  ) {
-    this.logger.log(`[createPortalSession] Request recibido - tenantId: ${req.user?.tenantId}, returnUrl: ${dto.returnUrl}`);
-    
-    const tenantId = req.user?.tenantId;
-    if (!tenantId) {
-      this.logger.warn(`[createPortalSession] Usuario sin tenantId - userId: ${req.user?.id || 'unknown'}`);
-      throw new BadRequestException(
-        'Solo los usuarios de una empresa pueden abrir el portal de facturación.',
-      );
-    }
-    const baseUrl =
-      this.config.get<string>('FRONTEND_URL') ?? 'http://localhost:3001';
-    // Validar y limpiar returnUrl: si viene vacío, undefined, o no es una URL válida, usar el default
-    let returnUrl = dto.returnUrl?.trim();
-    if (!returnUrl || returnUrl.length === 0) {
-      returnUrl = `${baseUrl.replace(/\/$/, '')}/settings/billing`;
-      this.logger.log(`[createPortalSession] returnUrl vacío, usando default: ${returnUrl}`);
-    } else {
-      // Validar que sea una URL válida (básico)
-      try {
-        new URL(returnUrl);
-        this.logger.log(`[createPortalSession] returnUrl válido: ${returnUrl}`);
-      } catch (err) {
-        // Si no es una URL válida, usar el default
-        this.logger.warn(`[createPortalSession] returnUrl inválido "${returnUrl}", usando default`);
-        returnUrl = `${baseUrl.replace(/\/$/, '')}/settings/billing`;
-      }
-    }
-    
-    try {
-      this.logger.log(`[createPortalSession] Llamando a billing.createPortalSession para tenant ${tenantId}`);
-      const result = await this.billing.createPortalSession(tenantId, returnUrl);
-      this.logger.log(`[createPortalSession] Sesión creada exitosamente para tenant ${tenantId}`);
-      return result;
-    } catch (error) {
-      this.logger.error(`[createPortalSession] Error al crear sesión para tenant ${tenantId}:`, error instanceof Error ? error.stack : String(error));
-      throw error;
-    }
-  }
 }
