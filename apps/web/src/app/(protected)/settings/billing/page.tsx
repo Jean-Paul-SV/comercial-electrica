@@ -427,8 +427,6 @@ export default function BillingPage() {
   const hasUnpaidInvoice = data?.hasUnpaidInvoice === true;
   const gracePeriodEnd = data?.gracePeriodEnd ?? null;
   const inGracePeriod = data?.inGracePeriod === true;
-  const pendingInvoiceAmount = data?.pendingInvoiceAmount ?? null;
-
   // Calcular precio efectivo del plan actual
   const currentPrice = plan
     ? billingInterval === 'yearly' && plan.priceYearly != null
@@ -513,11 +511,6 @@ export default function BillingPage() {
                 <p className="text-sm text-foreground flex items-start gap-3 font-medium">
                   <AlertCircle className="h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
                   Tienes una factura pendiente de pago. Completa el pago para mantener tu suscripción al día.
-                  {pendingInvoiceAmount != null && (
-                    <span className="block mt-1 font-semibold text-amber-700 dark:text-amber-500">
-                      Total a pagar: {formatPrice(pendingInvoiceAmount)}
-                    </span>
-                  )}
                 </p>
               </div>
               {canManageBilling && (
@@ -637,7 +630,8 @@ export default function BillingPage() {
             </div>
           )}
 
-          {subscription && (
+          {/* Solo mostrar estado y renovación cuando hay un plan asignado; si no hay plan, no tiene sentido mostrar "Activa" ni fecha de renovación */}
+          {subscription && plan && (
             <div
               className={`flex items-start gap-4 rounded-xl border p-4 sm:p-5 ${
                 isActive
