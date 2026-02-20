@@ -561,11 +561,7 @@ export default function BillingPage() {
                     <div>
                       <p className="font-medium text-foreground">¡Ya cuentas con facturación electrónica (DIAN)!</p>
                       <p className="text-muted-foreground mt-1">
-                        Tu configuración está completa y lista para emitir facturas electrónicas a la DIAN. Puedes gestionar tu configuración en{' '}
-                        <Link href="/settings/electronic-invoicing" className="text-primary underline hover:no-underline font-medium">
-                          Configuración de facturación electrónica
-                        </Link>
-                        .
+                        Tu facturación electrónica ha sido activada y está lista para emitir facturas a la DIAN.
                       </p>
                     </div>
                   </div>
@@ -582,13 +578,9 @@ export default function BillingPage() {
                       . Hasta entonces podrás usar documentos internos.
                     </p>
                   </div>
-                  <DianActivationDisclaimer variant="card" className="mt-4" />
                 </>
               )}
             </>
-          )}
-          {plan && isPlanWithDian(plan.slug) && isDianConfiguredByProvider(plan.slug) && isActive && (
-            <DianActivationDisclaimer variant="card" className="mt-4" />
           )}
         </CardHeader>
         <CardContent className="pt-6 space-y-5">
@@ -788,7 +780,7 @@ export default function BillingPage() {
             {plan ? (
               <>
                 <p className="text-sm text-muted-foreground leading-relaxed">
-                  Si eliges un plan <strong>más costoso</strong>, el cambio es inmediato y se cobra solo la diferencia proporcional en tu próxima factura.
+                  Si eliges un plan <strong>más costoso</strong>, el cambio es inmediato y <strong>se cobrará el adicional proporcional</strong> por los días restantes del periodo actual en tu próxima factura.
                   Si eliges un plan <strong>más económico</strong>, el cambio se aplica al final de tu periodo actual (sin reembolso).
                 </p>
                 <p className="text-xs text-muted-foreground leading-relaxed">
@@ -844,7 +836,7 @@ export default function BillingPage() {
                     Actualiza tu método de pago y descarga facturas en el portal seguro de Stripe.
                   </p>
                   <p className="text-xs text-amber-600 dark:text-amber-500 font-medium">
-                    ⚠️ Las suscripciones anuales no pueden cancelarse hasta el final del periodo contratado.
+                    ⚠️ Las suscripciones anuales no pueden cancelarse hasta el final del periodo contratado. Asegúrate de que tu tarjeta tenga saldo suficiente en la fecha de renovación anual para evitar que el cobro falle y se suspenda el acceso.
                   </p>
                   <Button
                     onClick={handleOpenPortal}
@@ -909,7 +901,7 @@ export default function BillingPage() {
               {plan ? (
                 <>
                   <p>
-                    Si el nuevo plan es <strong>más costoso</strong>: el cambio es inmediato. En tu próxima factura verás un descuento por lo no usado del plan actual y el cobro del nuevo plan solo por los días restantes. Podrás usar las nuevas funciones de inmediato.
+                    Si el nuevo plan es <strong>más costoso</strong>: el cambio es inmediato y <strong>se cobrará el adicional proporcional</strong> por los días restantes del periodo actual. En tu próxima factura verás un crédito por lo no usado del plan actual y el cobro del nuevo plan solo por los días restantes. Podrás usar las nuevas funciones de inmediato.
                   </p>
                   <p>
                     Si el nuevo plan es <strong>más económico</strong>: el cambio se aplicará al final de tu periodo actual (en la próxima fecha de renovación). No hay reembolso; hasta entonces mantienes tu plan actual.

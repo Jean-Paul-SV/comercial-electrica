@@ -125,7 +125,7 @@ export default function CategoriesPage() {
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight flex items-center gap-2">
-            <Tag className="h-5 w-5" />
+            <Tag className="h-5 w-5 shrink-0 text-primary" />
             Categorías
           </h1>
           <p className="text-sm text-muted-foreground">

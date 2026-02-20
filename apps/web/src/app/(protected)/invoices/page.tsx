@@ -187,7 +187,7 @@ export default function InvoicesPage() {
       <Card>
         <CardHeader className="pb-4">
           <CardTitle className="flex items-center gap-2 text-lg">
-            <FileText className="h-5 w-5" />
+            <FileText className="h-5 w-5 shrink-0 text-primary" />
             Listado de facturas
           </CardTitle>
           <CardDescription>
