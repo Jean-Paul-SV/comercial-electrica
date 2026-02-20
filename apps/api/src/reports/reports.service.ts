@@ -20,6 +20,7 @@ import { CustomerClustersDto } from './dto/customer-clusters.dto';
 import { TrendingProductsDto } from './dto/trending-products.dto';
 import { Prisma } from '@prisma/client';
 import { CacheService } from '../common/services/cache.service';
+import { BillingService } from '../billing/billing.service';
 
 const LOW_STOCK_THRESHOLD = 10;
 const QUOTES_EXPIRING_DAYS = 7;
@@ -48,6 +49,7 @@ export class ReportsService {
     private readonly prisma: PrismaService,
     private readonly cache: CacheService,
     private readonly config: ConfigService,
+    private readonly billing: BillingService,
   ) {}
 
   private async wrapReport<T>(fn: () => Promise<T>): Promise<T> {
@@ -1131,6 +1133,33 @@ export class ReportsService {
           entityIds: dueSoonInvoices.map((i) => i.id),
           detectedAt,
         });
+      }
+
+      // Recordatorio de pago del plan: requierePayment (suscripción pendiente) o factura abierta en Stripe
+      try {
+        const subscription = await this.billing.getSubscriptionForTenant(
+          tenantId,
+        );
+        if (subscription.requiresPayment || subscription.hasUnpaidInvoice) {
+          alerts.push({
+            code: 'BILLING_PAYMENT_PENDING',
+            severity: 'critical',
+            priority: 1,
+            title: 'Pago del plan pendiente',
+            message:
+              subscription.requiresPayment
+                ? 'Completa el pago de tu suscripción para seguir usando todos los módulos.'
+                : 'Tienes una factura pendiente de pago. Completa el pago para mantener tu suscripción al día.',
+            area: 'billing',
+            count: 0,
+            actionLabel: 'Completar pago',
+            actionHref: '/settings/billing',
+            entityIds: [],
+            detectedAt,
+          });
+        }
+      } catch {
+        // Si billing no está disponible o el tenant no tiene suscripción, no añadir alerta
       }
 
       alerts.sort((a, b) => a.priority - b.priority);
