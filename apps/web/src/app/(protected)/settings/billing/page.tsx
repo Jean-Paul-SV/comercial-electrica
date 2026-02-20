@@ -532,123 +532,18 @@ export default function BillingPage() {
         </Card>
       )}
 
-      {/* Aviso pago pendiente + CTA: desglose para que vean descuento/total antes de ir a Stripe */}
-      {requiresPayment && (
-        <Card className="overflow-hidden rounded-2xl border-amber-500/30 bg-gradient-to-br from-amber-500/10 to-amber-600/5 shadow-sm">
-          <CardContent className="p-5 sm:p-6">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex flex-col gap-3">
-                <p className="text-sm text-foreground flex items-start gap-3 font-medium">
-                  <AlertCircle className="h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
-                  Pago pendiente. Completa el pago para desbloquear tu cuenta y acceder a todos los módulos.
-                </p>
-                {currentPrice != null && plan && (
-                  <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2.5 text-sm space-y-1">
-                    {pendingInvoiceAmount != null && pendingInvoiceAmount < currentPrice ? (
-                      <>
-                        <div className="flex justify-between text-muted-foreground">
-                          <span>Precio del plan</span>
-                          <span>
-                            {formatPrice(currentPrice)}
-                            {billingInterval && (
-                              <span className="text-xs ml-1">/{billingInterval === 'yearly' ? 'año' : 'mes'}</span>
-                            )}
-                          </span>
-                        </div>
-                        <div className="flex justify-between text-muted-foreground">
-                          <span>Descuento por cambio de plan (prorrateo)</span>
-                          <span className="text-emerald-600 dark:text-emerald-400">
-                            -{formatPrice(currentPrice - pendingInvoiceAmount)}
-                          </span>
-                        </div>
-                        <div className="flex justify-between font-semibold text-amber-700 dark:text-amber-500 pt-0.5 border-t border-amber-500/20">
-                          <span>Lo que pagarás al completar</span>
-                          <span>{formatPrice(pendingInvoiceAmount)}</span>
-                        </div>
-                      </>
-                    ) : pendingInvoiceAmount != null && pendingInvoiceAmount !== currentPrice ? (
-                      <div className="flex justify-between font-semibold text-amber-700 dark:text-amber-500">
-                        <span>Lo que pagarás al completar</span>
-                        <span>{formatPrice(pendingInvoiceAmount)}</span>
-                      </div>
-                    ) : (
-                      <>
-                        {billingInterval === 'yearly' &&
-                        plan.priceMonthly != null &&
-                        plan.priceYearly != null &&
-                        plan.priceMonthly * 12 > plan.priceYearly ? (
-                          <>
-                            <div className="flex justify-between text-muted-foreground">
-                              <span>12 meses en mensual</span>
-                              <span>{formatPrice(plan.priceMonthly * 12)}</span>
-                            </div>
-                            <div className="flex justify-between text-muted-foreground">
-                              <span>Descuento por pago anual</span>
-                              <span className="text-emerald-600 dark:text-emerald-400">
-                                -{formatPrice(plan.priceMonthly * 12 - plan.priceYearly)}
-                              </span>
-                            </div>
-                          </>
-                        ) : null}
-                        <div className="flex justify-between font-semibold text-amber-700 dark:text-amber-500 pt-0.5 border-t border-amber-500/20">
-                          <span>Lo que pagarás al completar</span>
-                          <span>
-                            {formatPrice(pendingInvoiceAmount ?? currentPrice)}
-                            {billingInterval && (
-                              <span className="text-xs font-normal ml-1">
-                                /{billingInterval === 'yearly' ? 'año' : 'mes'}
-                              </span>
-                            )}
-                          </span>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                )}
-                {currentPrice != null && !plan && (
-                  <p className="font-semibold text-amber-700 dark:text-amber-500">
-                    Total a pagar: {formatPrice(currentPrice)}
-                    {billingInterval && (
-                      <span className="text-xs font-normal ml-1">
-                        /{billingInterval === 'yearly' ? 'año' : 'mes'}
-                      </span>
-                    )}
-                  </p>
-                )}
-                <p className="text-xs text-muted-foreground flex items-center gap-2">
-                  {subscriptionQuery.isFetching ? (
-                    <>
-                      <RefreshCw className="h-3.5 w-3.5 animate-spin shrink-0" aria-hidden />
-                      Comprobando pago…
-                    </>
-                  ) : (
-                    <>
-                      Si acabas de pagar, se actualizará en unos segundos. Si tarda,{' '}
-                      <button
-                        type="button"
-                        onClick={() => subscriptionQuery.refetch()}
-                        className="underline font-medium text-foreground hover:no-underline"
-                      >
-                        actualiza la página
-                      </button>
-                      .
-                    </>
-                  )}
-                </p>
-              </div>
-              {canManageBilling && (
-                <Button
-                  onClick={handleOpenPortal}
-                  disabled={createPortalMutation.isPending}
-                  className="shrink-0 gap-2 bg-amber-600 hover:bg-amber-700 text-white border-0"
-                >
-                  <CreditCard className="h-4 w-4 shrink-0" />
-                  {createPortalMutation.isPending ? 'Abriendo…' : 'Completar pago'}
-                </Button>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+      {/* Pago pendiente: solo botón Completar pago */}
+      {requiresPayment && canManageBilling && (
+        <div className="flex justify-center sm:justify-start">
+          <Button
+            onClick={handleOpenPortal}
+            disabled={createPortalMutation.isPending}
+            className="gap-2 bg-amber-600 hover:bg-amber-700 text-white border-0"
+          >
+            <CreditCard className="h-4 w-4 shrink-0" />
+            {createPortalMutation.isPending ? 'Abriendo…' : 'Completar pago'}
+          </Button>
+        </div>
       )}
 
       {/* Plan actual + Estado */}
