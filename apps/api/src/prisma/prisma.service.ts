@@ -1,5 +1,6 @@
 import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
+import { useTenantQueryAuditMiddleware } from './tenant-query-audit.middleware';
 
 @Injectable()
 export class PrismaService
@@ -51,6 +52,7 @@ export class PrismaService
   }
 
   async onModuleInit() {
+    useTenantQueryAuditMiddleware(this);
     await this.$connect();
   }
 

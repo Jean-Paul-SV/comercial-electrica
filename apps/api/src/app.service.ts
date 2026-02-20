@@ -140,6 +140,16 @@ export class AppService {
       }
     }
 
+    // En producción, sugerir habilitar archivado si está desactivado
+    if (
+      process.env.NODE_ENV === 'production' &&
+      process.env.ARCHIVE_ENABLED !== 'true'
+    ) {
+      warnings.push(
+        'ℹ️ Archivado automático desactivado (ARCHIVE_ENABLED≠true). Para controlar crecimiento de BD, configurar ARCHIVE_ENABLED=true, AUDIT_RETENTION_DAYS y SALES_RETENTION_YEARS. Ver env.example.',
+      );
+    }
+
     const hasCriticalIssues =
       dbStatus !== 'connected' ||
       Object.values(queues).some((q) => (q as any).failed > 10);

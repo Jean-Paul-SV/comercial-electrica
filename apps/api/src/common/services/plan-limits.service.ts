@@ -1,12 +1,16 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { TenantModulesService } from '../../auth/tenant-modules.service';
 
 /**
  * Servicio para validar límites de plan (maxUsers, módulos, etc.)
  */
 @Injectable()
 export class PlanLimitsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly tenantModules: TenantModulesService,
+  ) {}
 
   /**
    * Obtiene el límite de usuarios del plan del tenant.
@@ -71,19 +75,23 @@ export class PlanLimitsService {
 
   /**
    * Obtiene información de límites del tenant para mostrar en UI.
+   * Incluye límites de usuarios y módulos habilitados.
    */
   async getTenantLimits(tenantId: string | null): Promise<{
     maxUsers: number | null;
     currentUsers: number;
     canAddUsers: boolean;
+    enabledModules: string[];
   }> {
     const maxUsers = await this.getMaxUsersForTenant(tenantId);
     const currentUsers = await this.getCurrentUserCount(tenantId);
+    const enabledModules = await this.tenantModules.getEnabledModules(tenantId);
 
     return {
       maxUsers,
       currentUsers,
       canAddUsers: maxUsers === null || currentUsers < maxUsers,
+      enabledModules,
     };
   }
 

@@ -40,6 +40,7 @@ import { TenantContextInterceptor } from './auth/tenant-context.interceptor';
 import { MailerModule } from './mailer/mailer.module';
 import { PayuModule } from './payu/payu.module';
 import { ConfigValidationModule } from './common/config/config-validation.module';
+import { TenantModule } from './tenant/tenant.module';
 
 @Module({
   imports: [
@@ -92,6 +93,16 @@ import { ConfigValidationModule } from './common/config/config-validation.module
         ttl: 60000, // 1 minuto
         limit: 10, // 10 exports por minuto por usuario (protección contra abuso)
       },
+      {
+        name: 'publicIp',
+        ttl: 60000, // 1 minuto
+        limit: 30, // 30 req/min por IP en endpoints públicos (registro, reset, etc.)
+      },
+      {
+        name: 'bootstrap',
+        ttl: 3600000, // 1 hora
+        limit: 5, // 5 intentos por hora por IP (solo para bootstrap-admin)
+      },
     ]),
     ScheduleModule.forRoot(),
     MailerModule,
@@ -121,6 +132,7 @@ import { ConfigValidationModule } from './common/config/config-validation.module
     BillingModule,
     FeedbackModule,
     UsageModule,
+    TenantModule,
     ConfigValidationModule, // Validar configuración después de ConfigModule
   ],
   controllers: [AppController],

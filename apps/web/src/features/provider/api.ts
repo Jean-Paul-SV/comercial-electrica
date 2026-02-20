@@ -242,3 +242,33 @@ export function getBackupsAlerts(authToken: string): Promise<BackupAlert[]> {
     authToken,
   });
 }
+
+/** Métricas de negocio (MRR, churn, LTV, CAC, conversión, ARPU). Solo admin plataforma. */
+export type BusinessMetrics = {
+  mrr: {
+    current: number;
+    previous: number;
+    growth: number;
+    byPlan: Array<{ planId: string; planName: string; mrr: number; customers: number }>;
+  };
+  churn: { rate: number; count: number; revenueLost: number };
+  ltv: {
+    average: number;
+    byPlan: Array<{ planId: string; planName: string; ltv: number }>;
+  };
+  cac: { average: number | null; note: string };
+  conversion: { trialToPaid: number | null; checkoutToPaid: number };
+  customers: {
+    total: number;
+    active: number;
+    churned: number;
+    newThisMonth: number;
+  };
+  arpu: { monthly: number };
+};
+
+export function getBusinessMetrics(authToken: string): Promise<BusinessMetrics> {
+  return apiClient.get<BusinessMetrics>('/provider/metrics/business', {
+    authToken,
+  });
+}

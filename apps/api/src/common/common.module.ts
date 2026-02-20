@@ -1,4 +1,4 @@
-import { Global, Module } from '@nestjs/common';
+import { Global, Module, forwardRef } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { AuditService } from './services/audit.service';
 import { ValidationLimitsService } from './services/validation-limits.service';
@@ -15,6 +15,7 @@ import { PlanLimitsMonitorScheduler } from './schedulers/plan-limits-monitor.sch
 import { MailerModule } from '../mailer/mailer.module';
 import { QueueModule } from '../queue/queue.module';
 import { PrismaModule } from '../prisma/prisma.module';
+import { AuthModule } from '../auth/auth.module';
 
 /**
  * Módulo común que exporta servicios compartidos
@@ -22,7 +23,13 @@ import { PrismaModule } from '../prisma/prisma.module';
  */
 @Global()
 @Module({
-  imports: [ConfigModule, MailerModule, QueueModule, PrismaModule],
+  imports: [
+    ConfigModule,
+    MailerModule,
+    QueueModule,
+    PrismaModule,
+    forwardRef(() => AuthModule),
+  ],
   providers: [
     AuditService,
     ValidationLimitsService,

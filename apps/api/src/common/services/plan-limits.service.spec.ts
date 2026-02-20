@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { PlanLimitsService } from './plan-limits.service';
 import { PrismaService } from '../../prisma/prisma.service';
+import { TenantModulesService } from '../../auth/tenant-modules.service';
 import { BadRequestException } from '@nestjs/common';
 
 describe('PlanLimitsService', () => {
@@ -16,6 +17,10 @@ describe('PlanLimitsService', () => {
     },
   };
 
+  const mockTenantModulesService = {
+    getEnabledModules: jest.fn().mockResolvedValue([]),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -23,6 +28,10 @@ describe('PlanLimitsService', () => {
         {
           provide: PrismaService,
           useValue: mockPrismaService,
+        },
+        {
+          provide: TenantModulesService,
+          useValue: mockTenantModulesService,
         },
       ],
     }).compile();
@@ -124,6 +133,25 @@ describe('PlanLimitsService', () => {
       await expect(service.validateUserLimit('tenant-123')).rejects.toThrow(
         'límite de usuarios',
       );
+    });
+  });
+
+  describe('getTenantLimits', () => {
+    it('debe retornar maxUsers, currentUsers, canAddUsers y enabledModules', async () => {
+      mockPrismaService.tenant.findUnique.mockResolvedValue({
+        plan: { maxUsers: 5 },
+      });
+      mockPrismaService.user.count.mockResolvedValue(2);
+      mockTenantModulesService.getEnabledModules.mockResolvedValue(['core', 'inventory']);
+
+      const result = await service.getTenantLimits('tenant-123');
+      expect(result).toEqual({
+        maxUsers: 5,
+        currentUsers: 2,
+        canAddUsers: true,
+        enabledModules: ['core', 'inventory'],
+      });
+      expect(mockTenantModulesService.getEnabledModules).toHaveBeenCalledWith('tenant-123');
     });
   });
 

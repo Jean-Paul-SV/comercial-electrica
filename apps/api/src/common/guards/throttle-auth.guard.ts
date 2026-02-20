@@ -60,6 +60,26 @@ export class ThrottleAuthGuard extends ThrottlerGuard {
       return super.canActivate(context);
     }
 
+    // Bootstrap admin: límite muy estricto por IP (evitar abuso)
+    const isBootstrap =
+      req.method === 'POST' &&
+      (normalizedPath === 'auth/bootstrap-admin' ||
+        normalizedPath === '/auth/bootstrap-admin');
+    if (isBootstrap) {
+      return super.canActivate(context);
+    }
+
+    // Reset password y accept-invite (públicos con token): límite por IP
+    const isPublicToken =
+      req.method === 'POST' &&
+      (normalizedPath === 'auth/reset-password' ||
+        normalizedPath === '/auth/reset-password' ||
+        normalizedPath === 'auth/accept-invite' ||
+        normalizedPath === '/auth/accept-invite');
+    if (isPublicToken) {
+      return super.canActivate(context);
+    }
+
     // Reportes y export: límite dinámico según plan del tenant
     const isExpensiveReport =
       req.method === 'GET' &&

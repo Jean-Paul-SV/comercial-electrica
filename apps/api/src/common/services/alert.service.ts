@@ -37,8 +37,12 @@ export class AlertService {
       );
     }
 
-    // Email (solo para críticas)
-    if (payload.severity === 'critical' && this.mailer.isConfigured()) {
+    // Email: críticas siempre; warning si ALERT_EMAIL_INCLUDE_WARNING=true
+    const sendEmail =
+      this.mailer.isConfigured() &&
+      (payload.severity === 'critical' ||
+        (payload.severity === 'warning' && this.isEmailWarningEnabled()));
+    if (sendEmail) {
       promises.push(
         this.sendToEmail(payload).catch((err) => {
           this.logger.error('Error enviando alerta por email:', err);
@@ -118,12 +122,37 @@ export class AlertService {
   }
 
   /**
-   * Envía alerta por email (solo críticas).
+   * Devuelve true si se deben enviar por email también las alertas de severidad "warning".
+   */
+  private isEmailWarningEnabled(): boolean {
+    return this.config.get<string>('ALERT_EMAIL_INCLUDE_WARNING') === 'true';
+  }
+
+  /**
+   * Obtiene la lista de destinatarios de email para alertas.
+   * ALERT_EMAILS (varios separados por coma) tiene prioridad sobre ALERT_EMAIL (uno solo).
+   */
+  private getAlertEmailRecipients(): string[] {
+    const multiple = this.config.get<string>('ALERT_EMAILS');
+    if (multiple && multiple.trim()) {
+      return multiple
+        .split(',')
+        .map((e) => e.trim())
+        .filter(Boolean);
+    }
+    const single = this.config.get<string>('ALERT_EMAIL');
+    return single && single.trim() ? [single.trim()] : [];
+  }
+
+  /**
+   * Envía alerta por email (críticas siempre; warning si ALERT_EMAIL_INCLUDE_WARNING=true).
    */
   private async sendToEmail(payload: AlertPayload): Promise<void> {
-    const alertEmail = this.config.get<string>('ALERT_EMAIL');
-    if (!alertEmail) {
-      this.logger.warn('ALERT_EMAIL no configurado, omitiendo envío por email');
+    const recipients = this.getAlertEmailRecipients();
+    if (recipients.length === 0) {
+      this.logger.warn(
+        'ALERT_EMAIL o ALERT_EMAILS no configurado, omitiendo envío por email',
+      );
       return;
     }
 
@@ -156,7 +185,7 @@ Orion Alert System
     `.trim();
 
     await this.mailer.sendMail({
-      to: alertEmail,
+      to: recipients.join(', '),
       subject,
       html,
       text,

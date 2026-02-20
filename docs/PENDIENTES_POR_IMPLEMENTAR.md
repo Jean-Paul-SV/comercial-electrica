@@ -101,21 +101,16 @@ Este documento lista **todas las tareas pendientes** organizadas por prioridad y
 ### 🟡 Prioridad 3: Optimizaciones y Mejoras
 
 #### 5. Habilitar Archivado Automático
-- **Estado:** ⏳ Pendiente habilitación
+- **Estado:** ⏳ Pendiente habilitación (código listo)
 - **Prioridad:** 🟡 MEDIO
-- **Tiempo estimado:** 5 minutos
-- **Costo:** $0 (ya implementado)
 - **Acción requerida:**
   ```env
   ARCHIVE_ENABLED=true
   AUDIT_RETENTION_DAYS=730
   SALES_RETENTION_YEARS=2
   ```
-- **Por qué es útil:**
-  - Controla crecimiento de base de datos
-  - Reduce costos de almacenamiento
-  - Mejora performance de queries históricas
-- **Nota:** Ya está implementado, solo requiere habilitar
+- **Por qué es útil:** Controla crecimiento de BD, reduce costos, mejora performance.
+- **Nota:** El health check (`/health`) en producción muestra un aviso informativo si `ARCHIVE_ENABLED` no está en `true`.
 
 #### 6. Implementar Exportación a S3 para Archivado
 - **Estado:** ⏳ No implementado
@@ -159,29 +154,28 @@ Este documento lista **todas las tareas pendientes** organizadas por prioridad y
   - Colas se bloquean
 
 #### 9. Implementar Dashboard de Métricas en Frontend
-- **Estado:** ⏳ No implementado
+- **Estado:** ✅ COMPLETADO
 - **Prioridad:** 🟡 MEDIO
-- **Tiempo estimado:** 1 semana
-- **Costo:** $0
 - **Descripción:**
-  - Dashboard para plataforma admin con métricas
-  - Métricas de conexiones BD
-  - Métricas de uso por tenant
-  - Métricas de negocio (MRR, churn, etc.)
-- **Endpoint disponible:** `/provider/metrics/business`
+  - ✅ Dashboard en Panel proveedor → **Métricas de negocio** (`/provider/metrics`)
+  - ✅ Consume `/provider/metrics/business`: MRR, churn, LTV, CAC, conversión, ARPU, clientes
+  - ✅ Enlace en menú lateral del panel proveedor
 
 #### 10. Implementar Validación de Límites de Plan en Creación de Usuarios
-- **Estado:** ⏳ Parcialmente implementado
+- **Estado:** ✅ COMPLETADO
 - **Prioridad:** 🟡 MEDIO
 - **Tiempo estimado:** 2-3 días
 - **Costo:** $0
 - **Descripción:**
-  - Validar `maxUsers` al crear/invitar usuarios
-  - Validar módulos habilitados por plan
-  - Endpoint para verificar límites del tenant
-- **Archivos a modificar:**
-  - `apps/api/src/auth/auth.service.ts` (métodos `register()` y `inviteUser()`)
-  - Crear endpoint `GET /tenant/limits`
+  - ✅ Validar `maxUsers` al crear/invitar usuarios (ya implementado en `register()` y `inviteUser()`)
+  - ✅ Validar módulos habilitados por plan (ya implementado con `ModulesGuard`)
+  - ✅ Endpoint para verificar límites del tenant (`GET /tenant/limits` y `GET /auth/limits`)
+- **Archivos implementados:**
+  - ✅ `apps/api/src/auth/auth.service.ts` (métodos `register()` y `inviteUser()` ya validan límites)
+  - ✅ `apps/api/src/common/services/plan-limits.service.ts` (mejorado para incluir `enabledModules`)
+  - ✅ `apps/api/src/tenant/tenant.controller.ts` (nuevo endpoint `GET /tenant/limits`)
+  - ✅ `apps/api/src/tenant/tenant.module.ts` (nuevo módulo)
+  - ✅ `apps/api/src/auth/auth.controller.ts` (endpoint `GET /auth/limits` actualizado)
 
 ---
 
@@ -247,24 +241,21 @@ Este documento lista **todas las tareas pendientes** organizadas por prioridad y
   - Notificación antes de rotación
 
 #### 16. Implementar Auditoría de Queries Sin TenantId
-- **Estado:** ⏳ No implementado
+- **Estado:** ✅ COMPLETADO
 - **Prioridad:** 🟡 MEDIO
-- **Tiempo estimado:** 1 semana
-- **Costo:** $0
 - **Descripción:**
-  - Interceptor de Prisma que detecta queries sin `tenantId`
-  - Alertas cuando se detectan
-  - Logging de queries sospechosas
+  - ✅ Middleware de Prisma que detecta findMany/findFirst/updateMany/deleteMany sin `tenantId` en modelos con alcance por tenant
+  - ✅ Logging en nivel WARN cuando el request tiene tenantId pero la query no filtra por tenantId
+  - ✅ Archivo: `apps/api/src/prisma/tenant-query-audit.middleware.ts`; registrado en `PrismaService.onModuleInit()`
 
 #### 17. Implementar Rate Limiting por IP Adicional
-- **Estado:** ⏳ Parcialmente implementado (solo login)
+- **Estado:** ✅ COMPLETADO
 - **Prioridad:** 🟡 MEDIO
-- **Tiempo estimado:** 2-3 días
-- **Costo:** $0
 - **Descripción:**
-  - Rate limiting por IP en endpoints públicos
-  - Protección contra DDoS
-  - Configuración por endpoint
+  - ✅ Login: 50/min por IP (existente)
+  - ✅ Forgot-password: 3/15 min (existente)
+  - ✅ Bootstrap-admin: 5/hora por IP
+  - ✅ Reset-password y accept-invite: 30/min por IP (nuevo throttle `publicIp`)
 
 ---
 
@@ -354,7 +345,7 @@ Este documento lista **todas las tareas pendientes** organizadas por prioridad y
 - [ ] Implementar particionado de tablas (1 semana)
 - [ ] Migrar a Redis replicado (2-3 días)
 - [ ] Crear dashboard de métricas (1 semana)
-- [ ] Validar límites de plan en creación usuarios (2-3 días)
+- [x] Validar límites de plan en creación usuarios (2-3 días) ✅ COMPLETADO
 
 ---
 
@@ -381,13 +372,13 @@ Este documento lista **todas las tareas pendientes** organizadas por prioridad y
 3. Validación DIAN habilitación
 4. Ejecutar pruebas de carga
 
-### ⏳ Pendiente Implementación (9)
+### ⏳ Pendiente Implementación (8)
 
 5. Exportación S3 para archivado
 6. Particionado de tablas
 7. Replicación Redis
 8. Dashboard métricas frontend
-9. Validación límites plan
+9. ~~Validación límites plan~~ ✅ COMPLETADO
 10. PgBouncer (futuro)
 11. Caché avanzado (futuro)
 12. CDN (futuro)

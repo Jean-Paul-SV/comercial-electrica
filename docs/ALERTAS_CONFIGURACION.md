@@ -27,8 +27,12 @@ ALERTS_ENABLED=true
 # Slack (opcional)
 SLACK_WEBHOOK_URL=https://hooks.slack.com/services/YOUR/WEBHOOK/URL
 
-# Email (opcional, solo para alertas críticas)
+# Email (opcional): críticas siempre; warning si ALERT_EMAIL_INCLUDE_WARNING=true
 ALERT_EMAIL=admin@tudominio.com
+# Varios destinatarios (opcional, separados por coma)
+# ALERT_EMAILS=admin@tudominio.com,soporte@tudominio.com
+# Incluir también warning por email (default: solo critical)
+# ALERT_EMAIL_INCLUDE_WARNING=false
 
 # Webhook externo (opcional)
 ALERT_WEBHOOK_URL=https://api.tu-sistema.com/webhooks/alerts
@@ -92,9 +96,11 @@ ALERT_EMAIL=admin@tudominio.com
 
 ### 2. Comportamiento
 
-- **Solo alertas críticas:** Las alertas con `severity='critical'` se envían por email
-- **Formato HTML:** Incluye detalles completos y metadata
-- **Fallback:** Si SMTP no está configurado, solo se registra en logs
+- **Críticas:** Las alertas con `severity='critical'` siempre se envían por email (si `ALERT_EMAIL` o `ALERT_EMAILS` está configurado y SMTP activo).
+- **Warning (opcional):** Si `ALERT_EMAIL_INCLUDE_WARNING=true`, también se envían por email las de `severity='warning'`.
+- **Varios destinatarios:** Usa `ALERT_EMAILS=email1@x.com,email2@x.com`; tiene prioridad sobre `ALERT_EMAIL`.
+- **Formato HTML:** Incluye detalles completos y metadata.
+- **Fallback:** Si SMTP no está configurado, solo se registra en logs.
 
 ---
 

@@ -189,6 +189,15 @@ export function useUsageEventsByDay(query?: UsageByDayQuery) {
   });
 }
 
+export function useBusinessMetrics() {
+  const { token } = useAuth();
+  return useQuery({
+    queryKey: ['provider', 'metrics', 'business'],
+    queryFn: () => api.getBusinessMetrics(token!),
+    enabled: Boolean(token),
+  });
+}
+
 export function useUpdateFeedbackStatus() {
   const { token } = useAuth();
   const queryClient = useQueryClient();

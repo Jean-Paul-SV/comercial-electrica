@@ -41,6 +41,7 @@ import { BadRequestException } from '@nestjs/common';
 export class AuthController {
   constructor(private readonly auth: AuthService) {}
 
+  @Throttle({ bootstrap: { limit: 5, ttl: 3600000 } })
   @Post('bootstrap-admin')
   @ApiOperation({
     summary: 'Crear primer usuario administrador',
@@ -97,6 +98,7 @@ export class AuthController {
     return this.auth.forgotPassword(dto);
   }
 
+  @Throttle({ publicIp: { limit: 30, ttl: 60000 } })
   @Post('reset-password')
   @ApiOperation({
     summary: 'Restablecer contraseña con el token',
@@ -109,6 +111,7 @@ export class AuthController {
     return this.auth.resetPassword(dto);
   }
 
+  @Throttle({ publicIp: { limit: 30, ttl: 60000 } })
   @Post('accept-invite')
   @ApiOperation({
     summary: 'Aceptar invitación y establecer contraseña',
@@ -262,7 +265,7 @@ export class AuthController {
   @ApiOperation({
     summary: 'Obtener límites del plan del tenant',
     description:
-      'Devuelve límites de usuarios (maxUsers, currentUsers, canAddUsers) del plan del tenant actual.',
+      'Devuelve límites de usuarios (maxUsers, currentUsers, canAddUsers) y módulos habilitados (enabledModules) del plan del tenant actual.',
   })
   @ApiResponse({
     status: 200,
@@ -273,6 +276,11 @@ export class AuthController {
         maxUsers: { type: 'number', nullable: true },
         currentUsers: { type: 'number' },
         canAddUsers: { type: 'boolean' },
+        enabledModules: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Lista de códigos de módulos habilitados para el tenant',
+        },
       },
     },
   })
