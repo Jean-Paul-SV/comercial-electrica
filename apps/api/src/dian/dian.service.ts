@@ -36,7 +36,11 @@ import * as forge from 'node-forge';
 import PDFDocument from 'pdfkit';
 import QRCode from 'qrcode';
 import { SignedXml } from 'xml-crypto';
-import { decryptCertPayload, encryptCertPayload } from './cert-encryption.util';
+import {
+  decryptCertPayload,
+  encryptCertPayload,
+  decryptCertPayloadWithFallback,
+} from './cert-encryption.util';
 import type { UpdateDianConfigDto } from './dto/dian-config.dto';
 
 /** Algoritmos DIAN: RSA-SHA256, SHA256, C14N exclusivo. Ref: Anexo Técnico FE 1.9 */
@@ -231,6 +235,16 @@ export class DianService {
       !!tenantConfig.certPassword &&
       (tenantConfig.certValidUntil == null ||
         tenantConfig.certValidUntil >= new Date());
+
+    // C3.1: Validar certificado vencido antes de procesar
+    if (tenantId && tenantConfig?.certValidUntil) {
+      const now = new Date();
+      if (tenantConfig.certValidUntil < now) {
+        throw new BadRequestException(
+          `Certificado DIAN vencido desde ${tenantConfig.certValidUntil.toISOString().split('T')[0]}. Renueve el certificado en Facturación electrónica para continuar enviando documentos.`,
+        );
+      }
+    }
 
     if (tenantId && !useTenant && tenantConfig) {
       throw new BadRequestException(
@@ -1747,6 +1761,50 @@ export class DianService {
   }
 
   /** Valida .p12 y extrae fecha de vencimiento del certificado. */
+  /**
+   * Extrae el NIT del certificado X.509 (formato PEM).
+   * En certificados DIAN de Colombia, el NIT generalmente está en:
+   * - subject.serialNumber (más común)
+   * - subject.getField('serialNumber')
+   * - O en un campo personalizado del subject
+   */
+  private extractNitFromCertificate(certPem: string): string | null {
+    try {
+      const cert = forge.pki.certificateFromPem(certPem);
+      const subject = cert.subject;
+      
+      // Intentar obtener NIT del serialNumber del subject
+      const serialNumber = subject.getField('serialNumber');
+      if (serialNumber && serialNumber.value) {
+        // El NIT puede venir con formato "NIT 123456789-0" o solo "123456789-0"
+        const nitValue = String(serialNumber.value).trim();
+        // Extraer solo números y guiones (remover "NIT" si está presente)
+        const nit = nitValue.replace(/^NIT\s*/i, '').trim();
+        if (nit.length > 0) {
+          return nit;
+        }
+      }
+      
+      // Intentar buscar en otros campos del subject
+      const commonName = subject.getField('CN');
+      if (commonName && commonName.value) {
+        const cnValue = String(commonName.value);
+        // Buscar patrón de NIT en el CN (ej: "EMPRESA S.A.S. NIT 123456789-0")
+        const nitMatch = cnValue.match(/NIT\s*([\d.-]+)/i);
+        if (nitMatch && nitMatch[1]) {
+          return nitMatch[1].trim();
+        }
+      }
+      
+      return null;
+    } catch (error) {
+      this.logger.warn(
+        `Error extrayendo NIT del certificado: ${(error as Error).message}`,
+      );
+      return null;
+    }
+  }
+
   private getCertValidUntilFromP12(
     p12Buffer: Buffer,
     password: string,
@@ -1812,21 +1870,41 @@ export class DianService {
       );
     }
 
-    // Validar que el certificado corresponde al NIT del tenant (si está configurado)
+    // A3: Validar que el certificado corresponde al NIT del tenant (si está configurado)
     const config = await this.prisma.dianConfig.findUnique({
       where: { tenantId },
       select: { issuerNit: true },
     });
     if (config?.issuerNit) {
-      // Intentar extraer NIT del certificado para validar
       try {
         const { certPem } = this.loadCertFromP12Buffer(certBuffer, password);
-        // El certificado contiene información del emisor, pero validar NIT requiere parsear el certificado
-        // Por ahora solo validamos formato y vencimiento
-        this.logger.debug(
-          `Certificado validado para tenant ${tenantId}. NIT del tenant: ${config.issuerNit}`,
-        );
+        const certNit = this.extractNitFromCertificate(certPem);
+        
+        if (certNit) {
+          // Normalizar NITs (remover guiones, espacios, puntos)
+          const normalizeNit = (nit: string) => nit.replace(/[\s.-]/g, '');
+          const tenantNitNormalized = normalizeNit(config.issuerNit);
+          const certNitNormalized = normalizeNit(certNit);
+          
+          if (tenantNitNormalized !== certNitNormalized) {
+            throw new BadRequestException(
+              `El NIT del certificado (${certNit}) no coincide con el NIT configurado del tenant (${config.issuerNit}). El certificado debe pertenecer a la misma empresa.`,
+            );
+          }
+          
+          this.logger.log(
+            `✅ Certificado validado para tenant ${tenantId}. NIT del certificado coincide con NIT del tenant: ${config.issuerNit}`,
+          );
+        } else {
+          this.logger.warn(
+            `No se pudo extraer NIT del certificado para tenant ${tenantId}. Se acepta el certificado pero se recomienda verificar manualmente.`,
+          );
+        }
       } catch (err) {
+        // Si es BadRequestException, re-lanzar (es un error de validación)
+        if (err instanceof BadRequestException) {
+          throw err;
+        }
         this.logger.warn(
           `No se pudo validar NIT del certificado para tenant ${tenantId}: ${err instanceof Error ? err.message : String(err)}`,
         );
@@ -1886,11 +1964,57 @@ export class DianService {
     let certPassword: string | null = null;
     if (row.certEncrypted && row.certPasswordEncrypted && encKey) {
       try {
-        certBuffer = decryptCertPayload(row.certEncrypted, encKey);
-        certPassword = decryptCertPayload(
-          row.certPasswordEncrypted,
-          encKey,
-        ).toString('utf-8');
+        // C3.3: Soporte para múltiples claves durante rotación
+        // Si hay una clave antigua configurada, intentar con ambas
+        const oldKey = this.config
+          .get<string>('DIAN_CERT_ENCRYPTION_KEY_OLD', '')
+          ?.trim();
+        const keysToTry = oldKey ? [encKey, oldKey] : [encKey];
+
+        try {
+          // C3.3: Intentar con múltiples claves si hay clave antigua configurada
+          if (oldKey && keysToTry.length > 1) {
+            try {
+              const certResult = decryptCertPayloadWithFallback(
+                row.certEncrypted,
+                keysToTry,
+              );
+              const passwordResult = decryptCertPayloadWithFallback(
+                row.certPasswordEncrypted,
+                keysToTry,
+              );
+              certBuffer = certResult.buffer;
+              certPassword = passwordResult.buffer.toString('utf-8');
+
+              // Si se usó la clave antigua, loguear para monitoreo
+              if (
+                (certResult.keyIndex > 0 || passwordResult.keyIndex > 0) &&
+                oldKey
+              ) {
+                this.logger.warn(
+                  `Certificado del tenant ${tenantId} descifrado con clave antigua. Considerar rotar a la nueva clave.`,
+                );
+              }
+            } catch (fallbackErr) {
+              // Si falla multi-key, intentar con clave principal
+              certBuffer = decryptCertPayload(row.certEncrypted, encKey);
+              certPassword = decryptCertPayload(
+                row.certPasswordEncrypted,
+                encKey,
+              ).toString('utf-8');
+            }
+          } else {
+            // Método simple con una sola clave
+            certBuffer = decryptCertPayload(row.certEncrypted, encKey);
+            certPassword = decryptCertPayload(
+              row.certPasswordEncrypted,
+              encKey,
+            ).toString('utf-8');
+          }
+        } catch (fallbackErr) {
+          // Si todo falla, re-lanzar el error
+          throw fallbackErr;
+        }
       } catch (e) {
         this.logger.warn(
           `No se pudo descifrar certificado del tenant ${tenantId}: ${e instanceof Error ? e.message : String(e)}`,
@@ -1990,6 +2114,8 @@ export class DianService {
   /**
    * Llama al Web Service de consulta de estado DIAN (GetStatus) y actualiza el documento en BD.
    * Ref: documentación técnica DIAN - operación GetStatus por CUFE o trackId.
+   * 
+   * C3.2: Usa credenciales del tenant si están disponibles, sino usa credenciales globales.
    */
   async syncDocumentStatusFromDian(
     dianDocumentId: string,
@@ -2009,9 +2135,23 @@ export class DianService {
     const url = this.getDianQueryStatusUrl();
     if (!url) return;
 
-    const softwareId = this.softwareId;
-    const softwarePin = this.softwarePin;
-    if (!softwareId || !softwarePin) return;
+    // C3.2: Intentar usar credenciales del tenant primero, sino usar globales
+    const tenantConfig = await this.prisma.dianConfig.findUnique({
+      where: { tenantId },
+      select: { softwareId: true, softwarePin: true },
+    });
+
+    const softwareId =
+      tenantConfig?.softwareId?.trim() || this.softwareId;
+    const softwarePin =
+      tenantConfig?.softwarePin?.trim() || this.softwarePin;
+
+    if (!softwareId || !softwarePin) {
+      this.logger.warn(
+        `syncDocumentStatusFromDian: no hay credenciales DIAN (ni tenant ni globales) para consultar estado`,
+      );
+      return;
+    }
 
     const useSoap =
       this.config.get<string>('DIAN_USE_SOAP', 'true') !== 'false';

@@ -283,6 +283,10 @@ model Subscription {
   /// Plan programado para downgrade; se aplica en scheduledChangeAt (fin del ciclo).
   scheduledPlanId       String?            @db.Uuid
   scheduledChangeAt     DateTime?         @db.Timestamptz
+  /// Si true, indica que la BD y Stripe están desincronizados y necesita reconciliación.
+  needsStripeSync       Boolean           @default(false)
+  /// Mensaje de error de la última sincronización fallida con Stripe (para debugging).
+  stripeSyncError       String?           @db.Text
   createdAt             DateTime           @default(now())
   updatedAt             DateTime           @updatedAt
 
@@ -294,6 +298,7 @@ model Subscription {
   @@index([currentPeriodEnd])
   @@index([stripeSubscriptionId])
   @@index([scheduledChangeAt])
+  @@index([needsStripeSync])
 }
 
 model StripeEvent {

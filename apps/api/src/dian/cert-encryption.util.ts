@@ -69,3 +69,35 @@ export function decryptCertPayload(
   decipher.setAuthTag(authTag);
   return Buffer.concat([decipher.update(ciphertext), decipher.final()]);
 }
+
+/**
+ * C3.3: Intenta descifrar con múltiples claves (útil durante rotación).
+ * Intenta con cada clave en orden hasta que una funcione.
+ * 
+ * @param encryptedBase64 Payload cifrado
+ * @param keys Array de claves a intentar (en orden de prioridad)
+ * @returns Buffer descifrado y el índice de la clave que funcionó
+ */
+export function decryptCertPayloadWithFallback(
+  encryptedBase64: string,
+  keys: string[],
+): { buffer: Buffer; keyIndex: number } {
+  if (keys.length === 0) {
+    throw new Error('Se requiere al menos una clave para descifrar');
+  }
+
+  let lastError: Error | null = null;
+  for (let i = 0; i < keys.length; i++) {
+    try {
+      const buffer = decryptCertPayload(encryptedBase64, keys[i]);
+      return { buffer, keyIndex: i };
+    } catch (err) {
+      lastError = err as Error;
+      // Continuar con la siguiente clave
+    }
+  }
+
+  throw new Error(
+    `No se pudo descifrar con ninguna de las ${keys.length} claves proporcionadas. Último error: ${lastError?.message}`,
+  );
+}

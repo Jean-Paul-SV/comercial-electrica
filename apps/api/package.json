@@ -27,7 +27,9 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "test:e2e:serial": "jest --config ./test/jest-e2e.json --runInBand",
-    "db:purge": "cd ../.. && node scripts/purgar-db-test.js"
+    "db:purge": "cd ../.. && node scripts/purgar-db-test.js",
+    "rotate-dian-key": "ts-node scripts/rotate-dian-cert-key.ts",
+    "verify:tenant-isolation": "dotenv -e ../../.env -- ts-node scripts/verify-tenant-isolation.ts"
   },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"

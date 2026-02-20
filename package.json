@@ -23,7 +23,8 @@
     "prisma:migrate:status": "npm run prisma:migrate:status -w api",
     "test": "echo \"No tests yet\"",
     "test:api": "node scripts/test-api.js",
-    "test:e2e": "npm run test:e2e -w api"
+    "test:e2e": "npm run test:e2e -w api",
+    "verify:tenant-isolation": "npm run verify:tenant-isolation -w api"
   },
   "keywords": [
     "inventario",

@@ -86,25 +86,63 @@ export class ThrottleAuthGuard extends ThrottlerGuard {
     const path = (req.originalUrl ?? req.url ?? '').split('?')[0];
     const normalizedPath = path.replace(/^\/+/, '') || '/';
 
-    // Para reportes y exports, usar límite según plan
+    // Endpoints costosos que requieren rate limiting por tenant
     const isExpensiveReport =
       req.method === 'GET' &&
       (normalizedPath.startsWith('reports/') ||
         normalizedPath === 'reports/export');
+    
+    const isExpensiveExport =
+      req.method === 'GET' &&
+      (normalizedPath.includes('/export') ||
+        normalizedPath.includes('/download'));
+    
+    const isDianProcessing =
+      req.method === 'POST' &&
+      (normalizedPath.startsWith('dian/') ||
+        normalizedPath.includes('/process') ||
+        normalizedPath.includes('/send'));
+    
+    const isBackupCreation =
+      req.method === 'POST' && normalizedPath === 'backups';
+    
+    const isBulkOperation =
+      req.method === 'POST' &&
+      (normalizedPath.includes('/bulk') ||
+        normalizedPath.includes('/batch'));
 
-    if (isExpensiveReport && req.user?.tenantId) {
+    const isExpensiveOperation =
+      isExpensiveReport ||
+      isExpensiveExport ||
+      isDianProcessing ||
+      isBackupCreation ||
+      isBulkOperation;
+
+    if (isExpensiveOperation && req.user?.tenantId) {
       try {
         const planLimitsService = this.getPlanLimitsService();
         const planLimit = await planLimitsService.getRateLimitForTenant(
           req.user.tenantId,
         );
 
-        // Para exports, usar 1/3 del límite de reportes
-        if (
-          normalizedPath === 'reports/export' ||
-          normalizedPath.includes('/export')
-        ) {
+        // Para exports y downloads, usar 1/3 del límite de reportes
+        if (isExpensiveExport) {
           return Math.max(1, Math.floor(planLimit / 3));
+        }
+
+        // Para procesamiento DIAN, usar límite más estricto (1/2 del límite del plan)
+        if (isDianProcessing) {
+          return Math.max(5, Math.floor(planLimit / 2));
+        }
+
+        // Para backups, usar límite muy estricto (1/10 del límite del plan)
+        if (isBackupCreation) {
+          return Math.max(1, Math.floor(planLimit / 10));
+        }
+
+        // Para operaciones bulk, usar límite estricto (1/5 del límite del plan)
+        if (isBulkOperation) {
+          return Math.max(2, Math.floor(planLimit / 5));
         }
 
         // Para reportes normales, usar el límite del plan
@@ -144,10 +182,25 @@ export class ThrottleAuthGuard extends ThrottlerGuard {
       return Promise.resolve(`forgot:${email}`);
     }
 
-    // Reportes: por userId
+    // Endpoints costosos: por tenantId para rate limiting por tenant
     const user = req.user as
       | { sub?: string; tenantId?: string | null }
       | undefined;
+    
+    const isExpensivePath =
+      path.startsWith('reports/') ||
+      path.includes('/export') ||
+      path.includes('/download') ||
+      path.startsWith('dian/') ||
+      path === 'backups' ||
+      path.includes('/bulk') ||
+      path.includes('/batch');
+    
+    if (user?.tenantId && isExpensivePath) {
+      return Promise.resolve(`tenant:${user.tenantId}`);
+    }
+    
+    // Reportes legacy: por userId si no hay tenantId
     if (user?.sub && path.startsWith('reports/')) {
       const tenantKey = user.tenantId ?? user.sub;
       return Promise.resolve(`tenant:${tenantKey}`);

@@ -6,10 +6,12 @@ import { CacheService } from './services/cache.service';
 import { StorageService } from './services/storage.service';
 import { TenantContextService } from './services/tenant-context.service';
 import { PlanLimitsService } from './services/plan-limits.service';
+import { PlanLimitsMonitorService } from './services/plan-limits-monitor.service';
 import { AlertService } from './services/alert.service';
 import { QueryPerformanceService } from './services/query-performance.service';
 import { HealthMonitorService } from './services/health-monitor.service';
 import { HealthMonitorScheduler } from './schedulers/health-monitor.scheduler';
+import { PlanLimitsMonitorScheduler } from './schedulers/plan-limits-monitor.scheduler';
 import { MailerModule } from '../mailer/mailer.module';
 import { QueueModule } from '../queue/queue.module';
 import { PrismaModule } from '../prisma/prisma.module';
@@ -28,10 +30,12 @@ import { PrismaModule } from '../prisma/prisma.module';
     StorageService,
     TenantContextService,
     PlanLimitsService,
+    PlanLimitsMonitorService,
     AlertService,
     QueryPerformanceService,
     HealthMonitorService,
     HealthMonitorScheduler,
+    PlanLimitsMonitorScheduler,
   ],
   exports: [
     AuditService,

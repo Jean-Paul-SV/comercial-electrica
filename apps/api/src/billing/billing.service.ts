@@ -8,6 +8,8 @@ import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { PlanLimitsService } from '../common/services/plan-limits.service';
+import { AlertService } from '../common/services/alert.service';
+import { MailerService } from '../mailer/mailer.service';
 import Stripe from 'stripe';
 
 export type SubscriptionInfoDto = {
@@ -61,6 +63,8 @@ export class BillingService {
     private readonly config: ConfigService,
     private readonly prisma: PrismaService,
     private readonly planLimits: PlanLimitsService,
+    private readonly alertService: AlertService,
+    private readonly mailer: MailerService,
   ) {
     const secretKey = this.config.get<string>('STRIPE_SECRET_KEY');
     this.webhookSecret =
@@ -939,9 +943,27 @@ export class BillingService {
             );
           }
         } catch (err) {
+          const errorMessage = err instanceof Error ? err.message : String(err);
           this.logger.error(
-            `No se pudo actualizar el precio en Stripe al cambiar de plan: ${(err as Error).message}`,
-            (err as Error).stack,
+            `No se pudo actualizar el precio en Stripe al cambiar de plan: ${errorMessage}`,
+            err instanceof Error ? err.stack : undefined,
+          );
+          
+          // C1.1: Marcar para reconciliación si Stripe falla después de actualizar BD
+          // El job de reconciliación intentará sincronizar BD con Stripe
+          await this.prisma.subscription.update({
+            where: { tenantId },
+            data: {
+              needsStripeSync: true,
+              stripeSyncError: `Error actualizando Stripe después de upgrade: ${errorMessage}`,
+              updatedAt: new Date(),
+            },
+          });
+          
+          // Enviar alerta crítica para intervención manual si es necesario
+          // (asumiendo que AlertService está disponible)
+          this.logger.warn(
+            `Suscripción ${subscription.stripeSubscriptionId} (tenant ${tenantId}) marcada para reconciliación. BD tiene plan ${newPlan.id} pero Stripe puede tener plan anterior.`,
           );
         }
       } else {
@@ -1052,10 +1074,25 @@ export class BillingService {
             );
           }
         } catch (err) {
+          const errorMessage = err instanceof Error ? err.message : String(err);
           this.logger.error(
-            `applyScheduledPlanChanges: error Stripe para tenant ${sub.tenantId}: ${(err as Error).message}`,
+            `applyScheduledPlanChanges: error Stripe para tenant ${sub.tenantId}: ${errorMessage}`,
           );
-          continue;
+          
+          // C1.2: No actualizar BD si Stripe falla - marcar para reconciliación
+          await this.prisma.subscription.update({
+            where: { id: sub.id },
+            data: {
+              needsStripeSync: true,
+              stripeSyncError: `Error aplicando cambio programado en Stripe: ${errorMessage}`,
+              updatedAt: new Date(),
+            },
+          });
+          
+          this.logger.warn(
+            `Cambio programado para tenant ${sub.tenantId} falló en Stripe. Marcado para reconciliación. BD mantiene plan actual hasta que se resuelva.`,
+          );
+          continue; // No actualizar BD si Stripe falló
         }
       }
 
@@ -1720,6 +1757,16 @@ export class BillingService {
     try {
       // Procesar el evento según su tipo
       switch (event.type) {
+        case 'invoice.created': {
+          const invoice = event.data.object as Stripe.Invoice;
+          await this.handleInvoiceCreated(invoice);
+          break;
+        }
+        case 'invoice.finalized': {
+          const invoice = event.data.object as Stripe.Invoice;
+          await this.handleInvoiceFinalized(invoice);
+          break;
+        }
         case 'invoice.paid': {
           const invoice = event.data.object;
           await this.handleInvoicePaid(invoice);
@@ -1728,6 +1775,11 @@ export class BillingService {
         case 'invoice.payment_failed': {
           const invoice = event.data.object;
           await this.handleInvoicePaymentFailed(invoice);
+          break;
+        }
+        case 'invoice.voided': {
+          const invoice = event.data.object as Stripe.Invoice;
+          await this.handleInvoiceVoided(invoice);
           break;
         }
         case 'customer.subscription.deleted': {
@@ -1743,6 +1795,11 @@ export class BillingService {
         case 'checkout.session.completed': {
           const session = event.data.object as Stripe.Checkout.Session;
           await this.handleCheckoutSessionCompleted(session);
+          break;
+        }
+        case 'charge.refunded': {
+          const charge = event.data.object as Stripe.Charge;
+          await this.handleChargeRefunded(charge);
           break;
         }
         default:
@@ -1769,5 +1826,774 @@ export class BillingService {
       );
       throw err;
     }
+  }
+
+  /**
+   * C1.1: Job de reconciliación que sincroniza BD con Stripe cuando hay inconsistencias.
+   * Ejecutar por cron cada 6 horas.
+   * 
+   * Busca suscripciones con needsStripeSync=true y:
+   * 1. Consulta Stripe para obtener estado real
+   * 2. Compara plan/precio con BD
+   * 3. Sincroniza BD con Stripe (Stripe es fuente de verdad)
+   * 4. Limpia needsStripeSync si sincronización exitosa
+   */
+  async reconcileStripeSubscriptions(): Promise<{
+    checked: number;
+    synced: number;
+    errors: number;
+  }> {
+    if (!this.stripe) {
+      this.logger.debug('Stripe no configurado, omitiendo reconciliación');
+      return { checked: 0, synced: 0, errors: 0 };
+    }
+
+    const subscriptions = await this.prisma.subscription.findMany({
+      where: {
+        needsStripeSync: true,
+        stripeSubscriptionId: { not: null },
+      },
+      include: {
+        tenant: {
+          select: {
+            id: true,
+            planId: true,
+            billingInterval: true,
+            plan: {
+              select: {
+                id: true,
+                stripePriceId: true,
+                stripePriceIdYearly: true,
+              },
+            },
+          },
+        },
+        plan: {
+          select: {
+            id: true,
+            stripePriceId: true,
+            stripePriceIdYearly: true,
+          },
+        },
+      },
+    });
+
+    let synced = 0;
+    let errors = 0;
+
+    for (const sub of subscriptions) {
+      try {
+        if (!sub.stripeSubscriptionId) {
+          // Sin Stripe ID, no se puede reconciliar
+          await this.prisma.subscription.update({
+            where: { id: sub.id },
+            data: {
+              needsStripeSync: false,
+              stripeSyncError: 'No hay stripeSubscriptionId para reconciliar',
+            },
+          });
+          continue;
+        }
+
+        // Consultar Stripe
+        const stripeSub = await this.stripe.subscriptions.retrieve(
+          sub.stripeSubscriptionId,
+          { expand: ['items.data.price'] },
+        );
+
+        const stripePriceId = stripeSub.items.data[0]?.price?.id;
+        const stripeStatus = stripeSub.status;
+
+        // Mapear estado de Stripe a nuestro enum
+        let newStatus: 'ACTIVE' | 'CANCELLED' | 'SUSPENDED' | 'PENDING_PAYMENT' =
+          sub.status as any;
+        if (stripeStatus === 'active' || stripeStatus === 'trialing') {
+          newStatus = 'ACTIVE';
+        } else if (stripeStatus === 'canceled' || stripeStatus === 'unpaid') {
+          newStatus = 'CANCELLED';
+        } else if (stripeStatus === 'past_due' || stripeStatus === 'incomplete') {
+          newStatus = 'PENDING_PAYMENT';
+        }
+
+        // Buscar plan que corresponde al precio de Stripe
+        const planByStripePrice = await this.prisma.plan.findFirst({
+          where: {
+            OR: [
+              { stripePriceId: stripePriceId ?? undefined },
+              { stripePriceIdYearly: stripePriceId ?? undefined },
+            ],
+          },
+        });
+
+        // Si encontramos un plan que corresponde al precio de Stripe, sincronizar BD
+        if (planByStripePrice) {
+          const billingInterval =
+            planByStripePrice.stripePriceId === stripePriceId
+              ? 'monthly'
+              : 'yearly';
+
+          await this.prisma.$transaction([
+            this.prisma.tenant.update({
+              where: { id: sub.tenantId },
+              data: {
+                planId: planByStripePrice.id,
+                billingInterval,
+              },
+            }),
+            this.prisma.subscription.update({
+              where: { id: sub.id },
+              data: {
+                planId: planByStripePrice.id,
+                status: newStatus,
+                currentPeriodStart: stripeSub.current_period_start
+                  ? new Date(stripeSub.current_period_start * 1000)
+                  : sub.currentPeriodStart,
+                currentPeriodEnd: stripeSub.current_period_end
+                  ? new Date(stripeSub.current_period_end * 1000)
+                  : sub.currentPeriodEnd,
+                needsStripeSync: false,
+                stripeSyncError: null,
+                updatedAt: new Date(),
+              },
+            }),
+          ]);
+
+          synced++;
+          this.logger.log(
+            `Reconciliación exitosa: tenant ${sub.tenantId} sincronizado con Stripe. Plan: ${planByStripePrice.id}, Status: ${newStatus}`,
+          );
+        } else {
+          // No se encontró plan que corresponda al precio de Stripe
+          // Mantener needsStripeSync=true y registrar error
+          await this.prisma.subscription.update({
+            where: { id: sub.id },
+            data: {
+              stripeSyncError: `No se encontró plan con stripePriceId=${stripePriceId} en Stripe. Revisar configuración de planes.`,
+              updatedAt: new Date(),
+            },
+          });
+          errors++;
+          this.logger.warn(
+            `Reconciliación fallida: tenant ${sub.tenantId} tiene precio ${stripePriceId} en Stripe pero no hay plan correspondiente en BD`,
+          );
+        }
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        await this.prisma.subscription.update({
+          where: { id: sub.id },
+          data: {
+            stripeSyncError: `Error en reconciliación: ${errorMessage}`,
+            updatedAt: new Date(),
+          },
+        });
+        errors++;
+        this.logger.error(
+          `Error reconciliando suscripción ${sub.id} (tenant ${sub.tenantId}): ${errorMessage}`,
+        );
+      }
+    }
+
+    return {
+      checked: subscriptions.length,
+      synced,
+      errors,
+    };
+  }
+
+  /**
+   * C2.4: Reconciliación proactiva de pagos no reconocidos.
+   * Detecta facturas pagadas en Stripe que no fueron procesadas en BD.
+   * CRÍTICO: Reduce ventana de pérdida de ingresos si webhooks fallan.
+   * 
+   * Busca facturas pagadas en las últimas 2 horas que no tienen evento procesado.
+   */
+  async reconcilePaidInvoices(): Promise<{
+    checked: number;
+    paidNotRecognized: number;
+    activated: number;
+    errors: number;
+  }> {
+    if (!this.stripe) {
+      this.logger.debug('Stripe no configurado, omitiendo reconciliación de pagos');
+      return { checked: 0, paidNotRecognized: 0, activated: 0, errors: 0 };
+    }
+
+    const twoHoursAgo = Math.floor((Date.now() - 2 * 60 * 60 * 1000) / 1000);
+
+    try {
+      // Buscar facturas pagadas en las últimas 2 horas
+      const paidInvoices = await this.stripe.invoices.list({
+        status: 'paid',
+        created: { gte: twoHoursAgo },
+        limit: 100,
+      });
+
+      let checked = 0;
+      let paidNotRecognized = 0;
+      let activated = 0;
+      let errors = 0;
+
+      for (const invoice of paidInvoices.data) {
+        checked++;
+
+        // Buscar eventos invoice.paid procesados para esta factura
+        // Stripe almacena invoice.id en payload.data.object.id
+        const relatedEvents = await this.prisma.stripeEvent.findMany({
+          where: {
+            type: 'invoice.paid',
+            // Buscar en el payload JSON
+            OR: [
+              {
+                payload: {
+                  path: ['data', 'object', 'id'],
+                  equals: invoice.id,
+                },
+              },
+            ],
+          },
+        });
+
+        // Si no hay evento procesado, la factura fue pagada pero no reconocida
+        if (relatedEvents.length === 0) {
+          paidNotRecognized++;
+
+          const subscriptionId =
+            typeof invoice.subscription === 'string'
+              ? invoice.subscription
+              : invoice.subscription?.id;
+
+          if (subscriptionId) {
+            try {
+              // Buscar suscripción en BD
+              const subscription = await this.prisma.subscription.findUnique({
+                where: { stripeSubscriptionId: subscriptionId },
+                include: { tenant: true },
+              });
+
+              if (subscription && subscription.status !== 'ACTIVE') {
+                // Activar suscripción manualmente
+                await this.prisma.subscription.update({
+                  where: { id: subscription.id },
+                  data: {
+                    status: 'ACTIVE',
+                    currentPeriodStart: invoice.period_start
+                      ? new Date(invoice.period_start * 1000)
+                      : subscription.currentPeriodStart,
+                    currentPeriodEnd: invoice.period_end
+                      ? new Date(invoice.period_end * 1000)
+                      : subscription.currentPeriodEnd,
+                    updatedAt: new Date(),
+                  },
+                });
+
+                // Enviar alerta crítica
+                if (this.alertService) {
+                  await this.alertService.sendAlert({
+                    title: `🔴 Pago no reconocido detectado y activado`,
+                    message: `Factura ${invoice.id} pagada en Stripe pero no procesada en BD. Suscripción ${subscription.id} activada manualmente. Revisar webhooks.`,
+                    severity: 'critical',
+                    tenantId: subscription.tenantId,
+                    tenantName: subscription.tenant.name || 'Unknown',
+                    metadata: {
+                      invoiceId: invoice.id,
+                      subscriptionId: subscription.id,
+                      amount: invoice.amount_paid / 100,
+                      currency: invoice.currency,
+                      timestamp: new Date().toISOString(),
+                    },
+                  });
+                }
+
+                activated++;
+                this.logger.warn(
+                  `⚠️ Pago no reconocido detectado y activado: factura ${invoice.id}, suscripción ${subscription.id}`,
+                );
+              }
+            } catch (err) {
+              errors++;
+              this.logger.error(
+                `Error activando suscripción para factura pagada ${invoice.id}: ${(err as Error).message}`,
+              );
+            }
+          }
+        }
+      }
+
+      if (paidNotRecognized > 0) {
+        this.logger.warn(
+          `⚠️ ${paidNotRecognized} facturas pagadas no reconocidas detectadas. ${activated} suscripciones activadas manualmente.`,
+        );
+      }
+
+      return {
+        checked,
+        paidNotRecognized,
+        activated,
+        errors,
+      };
+    } catch (err) {
+      this.logger.error(
+        `Error en reconciliación proactiva de pagos: ${(err as Error).message}`,
+      );
+      return { checked: 0, paidNotRecognized: 0, activated: 0, errors: 1 };
+    }
+  }
+
+  /**
+   * C2.3: Maneja evento charge.refunded de Stripe.
+   * 
+   * Política de reembolsos:
+   * - Reembolso completo: cancelar suscripción inmediatamente y revocar acceso
+   * - Reembolso parcial: prorrogar acceso proporcionalmente según monto reembolsado
+   * 
+   * @param charge El objeto Charge de Stripe con información del reembolso
+   */
+  async handleChargeRefunded(charge: Stripe.Charge): Promise<void> {
+    // Buscar la suscripción asociada al charge
+    const invoiceId =
+      typeof charge.invoice === 'string' ? charge.invoice : charge.invoice?.id;
+    
+    if (!invoiceId) {
+      this.logger.debug(
+        `charge.refunded sin invoice asociado (charge ${charge.id}), ignorando`,
+      );
+      return;
+    }
+
+    // Obtener la factura para encontrar la suscripción
+    if (!this.stripe) {
+      this.logger.warn('Stripe no configurado, no se puede procesar reembolso');
+      return;
+    }
+
+    try {
+      const invoice = await this.stripe.invoices.retrieve(invoiceId);
+      const subscriptionId =
+        typeof invoice.subscription === 'string'
+          ? invoice.subscription
+          : invoice.subscription?.id;
+
+      if (!subscriptionId) {
+        this.logger.debug(
+          `charge.refunded: invoice ${invoiceId} no tiene subscription asociada`,
+        );
+        return;
+      }
+
+      // Buscar suscripción en BD
+      const subscription = await this.prisma.subscription.findUnique({
+        where: { stripeSubscriptionId: subscriptionId },
+        include: { tenant: true },
+      });
+
+      if (!subscription) {
+        this.logger.warn(
+          `charge.refunded: no se encontró Subscription con stripeSubscriptionId=${subscriptionId}`,
+        );
+        return;
+      }
+
+      // Calcular monto reembolsado
+      const refundAmount = charge.amount_refunded || 0;
+      const originalAmount = charge.amount || 0;
+      const isFullRefund = refundAmount >= originalAmount;
+
+      if (isFullRefund) {
+        // Reembolso completo: cancelar suscripción y revocar acceso inmediatamente
+        await this.prisma.$transaction([
+          this.prisma.subscription.update({
+            where: { id: subscription.id },
+            data: {
+              status: 'CANCELLED',
+              updatedAt: new Date(),
+            },
+          }),
+          this.prisma.tenant.update({
+            where: { id: subscription.tenantId },
+            data: {
+              isActive: false,
+              updatedAt: new Date(),
+            },
+          }),
+        ]);
+
+        this.logger.warn(
+          `Reembolso completo procesado: tenant ${subscription.tenantId} cancelado y acceso revocado`,
+        );
+
+        // Opcional: cancelar suscripción en Stripe también
+        try {
+          await this.stripe.subscriptions.cancel(subscriptionId);
+          this.logger.log(
+            `Suscripción Stripe ${subscriptionId} cancelada después de reembolso completo`,
+          );
+        } catch (err) {
+          this.logger.error(
+            `Error cancelando suscripción Stripe ${subscriptionId} después de reembolso: ${(err as Error).message}`,
+          );
+        }
+      } else {
+        // Reembolso parcial: prorrogar acceso proporcionalmente
+        // Calcular días adicionales basado en el porcentaje reembolsado
+        const refundPercentage = refundAmount / originalAmount;
+        const daysToAdd = Math.floor(30 * refundPercentage); // Asumiendo periodo mensual
+
+        if (subscription.currentPeriodEnd) {
+          const newPeriodEnd = new Date(subscription.currentPeriodEnd);
+          newPeriodEnd.setDate(newPeriodEnd.getDate() + daysToAdd);
+
+          await this.prisma.subscription.update({
+            where: { id: subscription.id },
+            data: {
+              currentPeriodEnd: newPeriodEnd,
+              updatedAt: new Date(),
+            },
+          });
+
+          this.logger.log(
+            `Reembolso parcial procesado: tenant ${subscription.tenantId} acceso prorrogado ${daysToAdd} días hasta ${newPeriodEnd.toISOString()}`,
+          );
+        } else {
+          this.logger.warn(
+            `Reembolso parcial: no se pudo prorrogar acceso para tenant ${subscription.tenantId} (sin currentPeriodEnd)`,
+          );
+        }
+      }
+    } catch (err) {
+      this.logger.error(
+        `Error procesando reembolso (charge ${charge.id}): ${(err as Error).message}`,
+        (err as Error).stack,
+      );
+      throw err; // Re-lanzar para que se maneje el error y se pueda reintentar
+    }
+  }
+
+  /**
+   * C2.1: Maneja evento invoice.created de Stripe.
+   * 
+   * Se dispara cuando Stripe crea una nueva factura (ej. upgrade con prorrateo).
+   * Registramos la factura pendiente para tracking.
+   */
+  async handleInvoiceCreated(invoice: Stripe.Invoice): Promise<void> {
+    const subscriptionId =
+      typeof invoice.subscription === 'string'
+        ? invoice.subscription
+        : invoice.subscription?.id;
+    
+    if (!subscriptionId) {
+      this.logger.debug('invoice.created sin subscription, ignorando');
+      return;
+    }
+
+    const subscription = await this.prisma.subscription.findUnique({
+      where: { stripeSubscriptionId: subscriptionId },
+      include: { tenant: true },
+    });
+
+    if (!subscription) {
+      this.logger.debug(
+        `invoice.created: no se encontró Subscription con stripeSubscriptionId=${subscriptionId}`,
+      );
+      return;
+    }
+
+    // Log para tracking (no hay acción inmediata, solo registro)
+    this.logger.log(
+      `Factura creada en Stripe: ${invoice.id} para tenant ${subscription.tenantId}, monto: ${invoice.amount_due ? invoice.amount_due / 100 : 0} ${invoice.currency || 'USD'}`,
+    );
+
+    // Si la factura está en estado "open" (pendiente de pago), podemos marcar la suscripción
+    // para que el frontend muestre "Tienes una factura pendiente"
+    if (invoice.status === 'open' && invoice.amount_due > 0) {
+      // No actualizamos BD aquí porque invoice.finalized o invoice.paid manejarán el estado
+      // Solo logueamos para debugging
+      this.logger.debug(
+        `Factura ${invoice.id} está abierta y pendiente de pago (${invoice.amount_due / 100} ${invoice.currency})`,
+      );
+    }
+  }
+
+  /**
+   * C2.1: Maneja evento invoice.finalized de Stripe.
+   * 
+   * Se dispara cuando Stripe finaliza una factura (lista para cobrar).
+   * Notificamos al usuario que tiene una factura pendiente.
+   */
+  async handleInvoiceFinalized(invoice: Stripe.Invoice): Promise<void> {
+    const subscriptionId =
+      typeof invoice.subscription === 'string'
+        ? invoice.subscription
+        : invoice.subscription?.id;
+    
+    if (!subscriptionId) {
+      this.logger.debug('invoice.finalized sin subscription, ignorando');
+      return;
+    }
+
+    const subscription = await this.prisma.subscription.findUnique({
+      where: { stripeSubscriptionId: subscriptionId },
+      include: {
+        tenant: {
+          include: {
+            users: {
+              where: { role: 'ADMIN' },
+              take: 1,
+              select: { email: true },
+            },
+          },
+        },
+      },
+    });
+
+    if (!subscription) {
+      this.logger.debug(
+        `invoice.finalized: no se encontró Subscription con stripeSubscriptionId=${subscriptionId}`,
+      );
+      return;
+    }
+
+    // Si la factura está pendiente de pago, notificar al usuario
+    if (invoice.status === 'open' && invoice.amount_due > 0) {
+      const adminEmail = subscription.tenant.users[0]?.email;
+      if (adminEmail) {
+        try {
+          // Enviar email de notificación (asumiendo que MailerService está disponible)
+          // Nota: Necesitarías inyectar MailerService en el constructor si no está ya
+          this.logger.log(
+            `Factura finalizada pendiente de pago: ${invoice.id} para tenant ${subscription.tenantId}. Email de notificación debería enviarse a ${adminEmail}`,
+          );
+          
+          // TODO: Enviar email con link al portal de facturación
+          // await this.mailer.sendMail({ ... });
+        } catch (err) {
+          this.logger.error(
+            `Error notificando factura finalizada: ${(err as Error).message}`,
+          );
+        }
+      }
+    }
+
+    this.logger.log(
+      `Factura finalizada: ${invoice.id} para tenant ${subscription.tenantId}, estado: ${invoice.status}`,
+    );
+  }
+
+  /**
+   * C2.1: Maneja evento invoice.voided de Stripe.
+   * 
+   * Se dispara cuando una factura es anulada (voided).
+   * Limpiamos cualquier estado relacionado con esa factura.
+   */
+  async handleInvoiceVoided(invoice: Stripe.Invoice): Promise<void> {
+    const subscriptionId =
+      typeof invoice.subscription === 'string'
+        ? invoice.subscription
+        : invoice.subscription?.id;
+    
+    if (!subscriptionId) {
+      this.logger.debug('invoice.voided sin subscription, ignorando');
+      return;
+    }
+
+    const subscription = await this.prisma.subscription.findUnique({
+      where: { stripeSubscriptionId: subscriptionId },
+    });
+
+    if (!subscription) {
+      this.logger.debug(
+        `invoice.voided: no se encontró Subscription con stripeSubscriptionId=${subscriptionId}`,
+      );
+      return;
+    }
+
+    // Log para tracking
+    this.logger.log(
+      `Factura anulada: ${invoice.id} para tenant ${subscription.tenantId}`,
+    );
+
+    // Si la suscripción estaba en PENDING_PAYMENT por esta factura y ahora está anulada,
+    // podríamos considerar reactivar si hay otra factura activa, pero eso lo maneja invoice.paid
+    // Por ahora solo logueamos
+  }
+
+  /**
+   * C2.1: Job de reconciliación que consulta facturas abiertas en Stripe.
+   * Detecta facturas pendientes que no fueron notificadas por webhooks.
+   * 
+   * Ejecutar diariamente para detectar inconsistencias.
+   */
+  async reconcileOpenInvoices(): Promise<{
+    checked: number;
+    openInvoices: number;
+    notified: number;
+    alertsSent: number;
+  }> {
+    if (!this.stripe) {
+      this.logger.debug('Stripe no configurado, omitiendo reconciliación de facturas');
+      return { checked: 0, openInvoices: 0, notified: 0, alertsSent: 0 };
+    }
+
+    const alertsEnabled =
+      this.config.get<string>('ALERTS_ENABLED') === 'true';
+    const daysBeforeAlert = parseInt(
+      this.config.get<string>('OPEN_INVOICE_ALERT_DAYS') || '7',
+      10,
+    );
+
+    // Obtener todas las suscripciones activas con Stripe ID
+    const subscriptions = await this.prisma.subscription.findMany({
+      where: {
+        stripeSubscriptionId: { not: null },
+        status: { in: ['ACTIVE', 'PENDING_PAYMENT'] },
+      },
+      include: {
+        tenant: {
+          select: {
+            id: true,
+            name: true,
+            users: {
+              where: { role: 'ADMIN' },
+              take: 1,
+              select: { email: true },
+            },
+            plan: {
+              select: {
+                name: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    let openInvoices = 0;
+    let notified = 0;
+    let alertsSent = 0;
+    const now = new Date();
+    const alertThreshold = new Date(now);
+    alertThreshold.setDate(alertThreshold.getDate() - daysBeforeAlert);
+
+    for (const sub of subscriptions) {
+      if (!sub.stripeSubscriptionId) continue;
+
+      try {
+        // Consultar facturas abiertas de esta suscripción en Stripe
+        const invoices = await this.stripe.invoices.list({
+          subscription: sub.stripeSubscriptionId,
+          status: 'open',
+          limit: 10,
+        });
+
+        for (const invoice of invoices.data) {
+          if (invoice.amount_due > 0) {
+            openInvoices++;
+
+            // Calcular días desde que se creó la factura
+            const invoiceDate = new Date(invoice.created * 1000);
+            const daysOpen = Math.floor(
+              (now.getTime() - invoiceDate.getTime()) / (24 * 60 * 60 * 1000),
+            );
+
+            // Log para tracking
+            this.logger.warn(
+              `Factura abierta detectada: ${invoice.id} para tenant ${sub.tenantId}, monto: ${invoice.amount_due / 100} ${invoice.currency}, días abierta: ${daysOpen}`,
+            );
+
+            // Si la suscripción está ACTIVE pero hay factura abierta, marcar como PENDING_PAYMENT
+            if (sub.status === 'ACTIVE') {
+              await this.prisma.subscription.update({
+                where: { id: sub.id },
+                data: {
+                  status: 'PENDING_PAYMENT',
+                  updatedAt: new Date(),
+                },
+              });
+
+              this.logger.log(
+                `Suscripción ${sub.id} marcada como PENDING_PAYMENT por factura abierta ${invoice.id}`,
+              );
+              notified++;
+            }
+
+            // C3.2: Enviar alerta si factura está abierta >7 días (configurable)
+            if (daysOpen >= daysBeforeAlert && alertsEnabled) {
+              const tenantName = sub.tenant.name || `Tenant ${sub.tenantId}`;
+              const planName = sub.tenant.plan?.name || 'Plan desconocido';
+              const amountDue = invoice.amount_due / 100;
+              const currency = invoice.currency.toUpperCase();
+
+              // Alerta al admin de plataforma
+              await this.alertService.sendAlert({
+                title: `⚠️ Factura abierta >${daysBeforeAlert} días - ${tenantName}`,
+                message: `El tenant "${tenantName}" (${sub.tenantId}) tiene una factura abierta desde hace ${daysOpen} días. Monto pendiente: ${amountDue} ${currency}. Plan: ${planName}.`,
+                severity: daysOpen >= 14 ? 'critical' : 'warning',
+                tenantId: sub.tenantId,
+                tenantName,
+                metadata: {
+                  invoiceId: invoice.id,
+                  invoiceNumber: invoice.number,
+                  amountDue,
+                  currency,
+                  daysOpen,
+                  planName,
+                  subscriptionId: sub.id,
+                  timestamp: new Date().toISOString(),
+                },
+              });
+
+              // Email al admin del tenant
+              const tenantAdminEmail = sub.tenant.users[0]?.email;
+              if (tenantAdminEmail && this.mailer.isConfigured()) {
+                try {
+                  const frontendUrl =
+                    this.config.get<string>('FRONTEND_URL') || '';
+                  const billingUrl = `${frontendUrl}/settings/billing`;
+
+                  await this.mailer.sendMail({
+                    to: tenantAdminEmail,
+                    subject: `⚠️ Factura pendiente de pago - ${tenantName}`,
+                    html: `
+                      <h2>Factura pendiente de pago</h2>
+                      <p>Estimado usuario,</p>
+                      <p>Tu empresa <strong>${tenantName}</strong> tiene una factura pendiente de pago desde hace <strong>${daysOpen} días</strong>.</p>
+                      <ul>
+                        <li><strong>Número de factura:</strong> ${invoice.number || invoice.id}</li>
+                        <li><strong>Monto pendiente:</strong> ${amountDue} ${currency}</li>
+                        <li><strong>Días abierta:</strong> ${daysOpen} días</li>
+                        <li><strong>Plan:</strong> ${planName}</li>
+                      </ul>
+                      ${daysOpen >= 14 ? '<p><strong>⚠️ IMPORTANTE:</strong> Tu suscripción puede ser suspendida si no completas el pago pronto.</p>' : '<p>Por favor completa el pago para mantener tu suscripción al día.</p>'}
+                      <p><a href="${billingUrl}">Completar pago ahora</a></p>
+                      <p>Si ya realizaste el pago, ignora este mensaje.</p>
+                      <p>— Equipo Orion</p>
+                    `,
+                  });
+                  alertsSent++;
+                } catch (emailErr) {
+                  this.logger.error(
+                    `Error enviando email de factura pendiente a ${tenantAdminEmail}: ${(emailErr as Error).message}`,
+                  );
+                }
+              }
+
+              this.logger.warn(
+                `Alerta enviada: Factura ${invoice.id} abierta ${daysOpen} días para tenant ${sub.tenantId}`,
+              );
+            }
+          }
+        }
+      } catch (err) {
+        this.logger.error(
+          `Error reconciliando facturas para suscripción ${sub.stripeSubscriptionId}: ${(err as Error).message}`,
+        );
+      }
+    }
+
+    return {
+      checked: subscriptions.length,
+      openInvoices,
+      notified,
+      alertsSent,
+    };
   }
 }

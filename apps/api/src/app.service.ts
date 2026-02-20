@@ -39,12 +39,46 @@ export class AppService {
       | { status: 'disconnected' }
     > = {};
 
-    // Verificar base de datos con medición de tiempo
+    // Verificar base de datos con medición de tiempo y métricas de conexiones
+    let dbConnections: {
+      active: number;
+      idle: number;
+      total: number;
+    } | null = null;
     try {
       const dbStart = Date.now();
       await this.prisma.$queryRaw`SELECT 1`;
       dbResponseTime = Date.now() - dbStart;
       dbStatus = 'connected';
+
+      // Obtener métricas de conexiones (si está disponible)
+      try {
+        const connectionStats = await this.prisma.$queryRaw<
+          Array<{
+            state: string;
+            count: bigint;
+          }>
+        >`
+          SELECT state, COUNT(*)::bigint as count
+          FROM pg_stat_activity
+          WHERE datname = current_database()
+          GROUP BY state
+        `;
+        const active = Number(
+          connectionStats.find((s) => s.state === 'active')?.count || 0,
+        );
+        const idle = Number(
+          connectionStats.find((s) => s.state === 'idle')?.count || 0,
+        );
+        dbConnections = {
+          active,
+          idle,
+          total: active + idle,
+        };
+      } catch (connError) {
+        // Si falla obtener conexiones, continuar sin esa métrica
+        this.logger.debug('No se pudieron obtener métricas de conexiones:', connError);
+      }
     } catch (error) {
       dbStatus = 'disconnected';
       this.logger.error('Database health check failed:', error);
@@ -90,6 +124,22 @@ export class AppService {
     const uptime = (Date.now() - this.startTime) / 1000;
 
     // Verificar si hay problemas críticos
+    const warnings: string[] = [];
+    
+    // Alerta si conexiones BD están altas (80%+ del pool)
+    if (dbConnections) {
+      const connectionLimit = parseInt(
+        process.env.DATABASE_CONNECTION_LIMIT || '50',
+        10,
+      );
+      const connectionUsagePercent = (dbConnections.total / connectionLimit) * 100;
+      if (connectionUsagePercent > 80) {
+        warnings.push(
+          `⚠️ Alto uso de conexiones BD: ${dbConnections.total}/${connectionLimit} (${Math.round(connectionUsagePercent)}%). ${dbConnections.active} activas, ${dbConnections.idle} idle. Considerar aumentar pool o usar PgBouncer.`,
+        );
+      }
+    }
+
     const hasCriticalIssues =
       dbStatus !== 'connected' ||
       Object.values(queues).some((q) => (q as any).failed > 10);
@@ -98,7 +148,8 @@ export class AppService {
       dbStatus === 'connected' &&
       redisStatus === 'connected' &&
       Object.values(queues).every((q) => q.status === 'connected') &&
-      !hasCriticalIssues;
+      !hasCriticalIssues &&
+      warnings.length === 0;
 
     return {
       status: overallOk ? 'ok' : hasCriticalIssues ? 'error' : 'degraded',
@@ -110,6 +161,7 @@ export class AppService {
         database: {
           status: dbStatus,
           responseTime: dbResponseTime ? `${dbResponseTime}ms` : null,
+          connections: dbConnections || undefined,
         },
         redis: {
           status: redisStatus,
@@ -126,8 +178,10 @@ export class AppService {
             Object.values(queues).some((q) => (q as any).failed > 10)
               ? 'Algunas colas tienen muchos trabajos fallidos'
               : null,
-          ].filter(Boolean)
-        : [],
+          ]
+            .filter(Boolean)
+            .concat(warnings)
+        : warnings,
     };
   }
 

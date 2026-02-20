@@ -39,6 +39,7 @@ import { UsageService } from '../usage/usage.service';
 import { ListUsageQueryDto } from '../usage/dto/list-usage-query.dto';
 import { UsageByDayQueryDto } from '../usage/dto/usage-by-day-query.dto';
 import { BackupsService } from '../backups/backups.service';
+import { BusinessMetricsService } from '../metrics/business-metrics.service';
 
 @ApiTags('provider')
 @ApiBearerAuth()
@@ -51,6 +52,7 @@ export class ProviderController {
     private readonly feedbackService: FeedbackService,
     private readonly usageService: UsageService,
     private readonly backupsService: BackupsService,
+    private readonly businessMetrics: BusinessMetricsService,
   ) {}
 
   @Get('tenants/summary')
@@ -386,5 +388,19 @@ export class ProviderController {
   @ApiResponse({ status: 200, description: 'Lista de alertas.' })
   getBackupsAlerts() {
     return this.backupsService.getBackupsAlerts();
+  }
+
+  @Get('metrics/business')
+  @ApiOperation({
+    summary: 'Métricas de negocio (MRR, churn, LTV, CAC)',
+    description:
+      'C3.1: Métricas críticas requeridas por comité de inversión. Incluye MRR, churn rate, LTV, CAC, conversión y ARPU.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Métricas de negocio calculadas.',
+  })
+  getBusinessMetrics() {
+    return this.businessMetrics.calculateBusinessMetrics();
   }
 }

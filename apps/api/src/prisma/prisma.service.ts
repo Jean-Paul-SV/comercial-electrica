@@ -27,9 +27,13 @@ export class PrismaService
     }
 
     // Configurar connection pooling según entorno
-    // En producción: connection_limit=20-50, pool_timeout=20
+    // CRÍTICO: Pool de 20 es insuficiente para 50+ clientes concurrentes
+    // En producción: connection_limit=50-100 (configurable via env), pool_timeout=20
     // En desarrollo: connection_limit=5, pool_timeout=10
-    const connectionLimit = isProd ? 20 : 5;
+    // Para 100+ clientes, considerar PgBouncer para connection pooling externo
+    const connectionLimit = isProd
+      ? parseInt(process.env.DATABASE_CONNECTION_LIMIT || '50', 10)
+      : 5;
     const poolTimeout = isProd ? 20 : 10;
 
     const urlWithPool = url.includes('?')

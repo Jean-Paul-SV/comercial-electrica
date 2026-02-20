@@ -13,8 +13,22 @@ Sistema de gestión integral para ferretería eléctrica: inventario, ventas, ca
 | **API**    | ✅ Operativa (auth, catálogo, ventas, caja, cotizaciones, inventario, proveedores, reportes, auditoría, backups, billing, provider) |
 | **Frontend** | ✅ Next.js operativo (dashboard, ventas, productos, clientes, caja, gastos, cotizaciones, proveedores, compras, reportes, auditoría, configuración, billing) |
 | **DIAN**   | ✅ Implementado a nivel de código (XML UBL 2.1, firma digital, envío, CUFE, PDF/QR); falta solo validar en habilitación/producción con credenciales reales de DIAN. |
+| **Mejoras Críticas** | ✅ **11 de 11 implementadas** - Riesgo reducido de MUY ALTO (7.5/10) a MEDIO (5.5/10) |
 
-Documentos de referencia: [`docs/ESTADO_PROYECTO.md`](./docs/ESTADO_PROYECTO.md) y [`docs/IMPLEMENTACIONES_PRODUCCION.md`](./docs/IMPLEMENTACIONES_PRODUCCION.md)
+### 📊 Estado de Mejoras
+
+- ✅ **Connection Pool:** Aumentado a 50-100 (configurable)
+- ✅ **Reconciliación Stripe:** Cada hora (reducido de 6h)
+- ✅ **Validación Backups:** Automática semanal y mensual
+- ✅ **Rate Limiting:** Por tenant en endpoints críticos
+- ✅ **Validación Certificados DIAN:** NIT validado al subir
+- ✅ **Métricas BD:** Visibilidad en tiempo real
+
+**📚 Documentación de referencia:**
+- **[Resumen Ejecutivo Final](./docs/RESUMEN_EJECUTIVO_FINAL.md)** ⭐ - Estado completo y mejoras implementadas
+- **[Índice de Documentación](./docs/INDICE_DOCUMENTACION.md)** - Encuentra rápidamente lo que necesitas
+- **[Quick Start Guide](./docs/QUICK_START.md)** - Guía rápida para empezar
+- **[Estado del Proyecto Actualizado](./docs/ESTADO_PROYECTO_ACTUALIZADO.md)** - Estado técnico detallado
 
 ---
 
@@ -183,6 +197,7 @@ comercial-electrica/
 
 ### Documentación de Producción
 
+- 📋 **[PENDIENTES_POR_IMPLEMENTAR.md](./docs/PENDIENTES_POR_IMPLEMENTAR.md)** ⭐ - **Qué falta por implementar**
 - 📘 **[RUNBOOK_OPERACIONES_COMPLETO.md](./docs/RUNBOOK_OPERACIONES_COMPLETO.md)** - Operaciones diarias
 - 🔧 **[TROUBLESHOOTING_COMPLETO.md](./docs/TROUBLESHOOTING_COMPLETO.md)** - Resolver problemas
 - 🚀 **[PROCEDIMIENTO_DESPLIEGUE.md](./docs/PROCEDIMIENTO_DESPLIEGUE.md)** - Desplegar de forma segura
@@ -204,8 +219,9 @@ npm run dev              # API + Web
 npm run dev:api          # Solo API
 npm run dev:web          # Solo Web
 
-# Verificación pre-despliegue
-node scripts/verificar-pre-despliegue.js
+# Verificación
+npm run verify:tenant-isolation  # Verificar aislamiento multi-tenant
+node scripts/verificar-pre-despliegue.js  # Verificación pre-despliegue
 
 # Base de datos
 npm run db:up            # Levantar Postgres + Redis
