@@ -1189,40 +1189,34 @@ export class BillingService {
     // Estar en periodo de gracia: cancelada, periodo terminado, pero aún dentro de los 7 días
     const inGracePeriod = isCancelled && periodEnded && !gracePeriodEnded;
 
-    // Si hay pago pendiente o suscripción en Stripe, obtener monto a cobrar y si hay factura abierta
+    // Monto a pagar y si hay factura abierta: solo la factura open más reciente del cliente, amount_due.
+    // NO usar: upcoming invoice, customer.balance, suma de facturas, amount_remaining ni subscription.total_spent.
+    // Así el banner coincide con lo que Stripe muestra en Checkout/Portal.
     let pendingInvoiceAmount: number | null = null;
     let hasUnpaidInvoice = false;
     if (this.stripe && subscription.stripeSubscriptionId) {
-      if (requiresPayment) {
-        try {
-          const upcoming = await this.stripe.invoices.retrieveUpcoming({
-            subscription: subscription.stripeSubscriptionId,
-          });
-          if (upcoming.amount_due != null && upcoming.amount_due >= 0) {
-            pendingInvoiceAmount = upcoming.amount_due;
-          }
-        } catch {
-          // Si no hay upcoming, ignorar
-        }
-      }
-      // Si la suscripción está ACTIVE pero hay factura abierta en Stripe (ej. cobro falló tras upgrade), permitir pagar desde el portal
-      if (String(subscription.status) === 'ACTIVE') {
-        try {
-          const openInvoices = await this.stripe.invoices.list({
-            subscription: subscription.stripeSubscriptionId,
-            status: 'open',
-            limit: 1,
-          });
-          if (openInvoices.data.length > 0) {
+      try {
+        const stripeSubscription = await this.stripe.subscriptions.retrieve(
+          subscription.stripeSubscriptionId,
+        );
+        const customerId =
+          typeof stripeSubscription.customer === 'string'
+            ? stripeSubscription.customer
+            : stripeSubscription.customer.id;
+        const openInvoices = await this.stripe.invoices.list({
+          customer: customerId,
+          status: 'open',
+          limit: 1,
+        });
+        if (openInvoices.data.length > 0) {
+          const inv = openInvoices.data[0];
+          if (inv.status === 'open' && inv.amount_due != null && inv.amount_due >= 0) {
             hasUnpaidInvoice = true;
-            const inv = openInvoices.data[0];
-            if (inv.amount_due != null && pendingInvoiceAmount == null) {
-              pendingInvoiceAmount = inv.amount_due;
-            }
+            pendingInvoiceAmount = inv.amount_due;
           }
-        } catch {
-          // Ignorar
         }
+      } catch {
+        // Si Stripe falla o no hay customer, no mostrar monto ni banner
       }
     }
 

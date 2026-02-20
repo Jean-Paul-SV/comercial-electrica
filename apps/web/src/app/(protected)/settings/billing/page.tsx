@@ -591,6 +591,9 @@ export default function BillingPage() {
               )}
             </>
           )}
+          {plan && isPlanWithDian(plan.slug) && isDianConfiguredByProvider(plan.slug) && isActive && (
+            <DianActivationDisclaimer variant="card" className="mt-4" />
+          )}
         </CardHeader>
         <CardContent className="pt-6 space-y-5">
           {plan ? (
@@ -806,7 +809,7 @@ export default function BillingPage() {
               </>
             )}
             {plansQuery.data?.some((p) => isPlanWithDian(p.slug)) && (
-              <DianActivationDisclaimer variant="inline" className="text-xs mt-2" />
+              <DianActivationDisclaimer variant="card" className="mt-4" />
             )}
             {plansQuery.isLoading ? (
               <div className="grid gap-4 sm:grid-cols-2 mt-4">
