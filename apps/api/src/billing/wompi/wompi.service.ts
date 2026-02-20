@@ -190,7 +190,7 @@ export class WompiService {
     const signature = this.buildSignature(reference, amountInCents, 'COP');
 
     const paymentMethod: Record<string, unknown> = {
-      ...(dto.payment_method as Record<string, unknown>),
+      ...(dto.payment_method as unknown as Record<string, unknown>),
     };
     const payload: WompiTransactionPayload = {
       acceptance_token: dto.acceptance_token,
