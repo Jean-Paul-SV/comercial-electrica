@@ -21,6 +21,8 @@ export type SubscriptionInfo = {
   inGracePeriod: boolean;
   /** Monto que Stripe cobrará al completar el pago (prorrateo en upgrades). En pesos. Null si no aplica. */
   pendingInvoiceAmount: number | null;
+  /** Si true, hay factura abierta en Stripe; mostrar "Completar pago" para abrir portal. */
+  hasUnpaidInvoice: boolean;
 };
 
 export type ChangePlanResult = {

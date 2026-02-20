@@ -34,6 +34,11 @@ function isPlanWithDian(slug: string): boolean {
   return slug === 'enterprise' || slug.includes('con-dian');
 }
 
+/** Planes donde la DIAN la configura el proveedor desde su panel; no mostrar enlace ni aviso de activación al tenant. */
+function isDianConfiguredByProvider(slug: string): boolean {
+  return slug === 'enterprise' || slug === 'basico-con-dian' || slug === 'premium-con-dian';
+}
+
 const STATUS_LABELS: Record<string, string> = {
   ACTIVE: 'Activa',
   PENDING_PAYMENT: 'Pago pendiente',
@@ -419,6 +424,7 @@ export default function BillingPage() {
   const billingInterval = data?.billingInterval ?? null;
   const canManageBilling = data?.canManageBilling ?? false;
   const requiresPayment = data?.requiresPayment === true;
+  const hasUnpaidInvoice = data?.hasUnpaidInvoice === true;
   const gracePeriodEnd = data?.gracePeriodEnd ?? null;
   const inGracePeriod = data?.inGracePeriod === true;
   const pendingInvoiceAmount = data?.pendingInvoiceAmount ?? null;
@@ -487,6 +493,38 @@ export default function BillingPage() {
                 >
                   <CreditCard className="h-4 w-4" />
                   {createPortalMutation.isPending ? 'Abriendo…' : 'Reactivar suscripción'}
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* "Completa tu pago" solo aparece si requiresPayment (PENDING_PAYMENT) o hasUnpaidInvoice (factura abierta en Stripe). Si el estado es Activa y no hay factura abierta, esta sección no se muestra. */}
+      {/* Factura abierta en Stripe (plan Activo pero cobro pendiente): permitir completar pago desde el portal */}
+      {hasUnpaidInvoice && !requiresPayment && (
+        <Card className="overflow-hidden rounded-2xl border-amber-500/30 bg-gradient-to-br from-amber-500/10 to-amber-600/5 shadow-sm">
+          <CardContent className="p-5 sm:p-6">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-col gap-2">
+                <p className="text-sm text-foreground flex items-start gap-3 font-medium">
+                  <AlertCircle className="h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
+                  Tienes una factura pendiente de pago. Completa el pago para mantener tu suscripción al día.
+                  {pendingInvoiceAmount != null && (
+                    <span className="block mt-1 font-semibold text-amber-700 dark:text-amber-500">
+                      Total a pagar: {formatPrice(pendingInvoiceAmount)}
+                    </span>
+                  )}
+                </p>
+              </div>
+              {canManageBilling && (
+                <Button
+                  onClick={handleOpenPortal}
+                  disabled={createPortalMutation.isPending}
+                  className="shrink-0 gap-2 bg-amber-600 hover:bg-amber-700 text-white border-0"
+                >
+                  <CreditCard className="h-4 w-4 shrink-0" />
+                  {createPortalMutation.isPending ? 'Abriendo…' : 'Completar pago'}
                 </Button>
               )}
             </div>
@@ -623,7 +661,7 @@ export default function BillingPage() {
           <CardDescription className="text-sm mt-0.5">
             Tu plan incluye los módulos activos para tu empresa.
           </CardDescription>
-          {plan && isPlanWithDian(plan.slug) && dianStatus && isActive && (
+          {plan && isPlanWithDian(plan.slug) && !isDianConfiguredByProvider(plan.slug) && dianStatus && isActive && (
             <>
               {dianStatus.readyForSend ? (
                 <div className="mt-4 rounded-lg border border-emerald-500/30 bg-emerald-500/5 px-4 py-3 text-sm">

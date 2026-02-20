@@ -33,6 +33,8 @@ export type SubscriptionInfoDto = {
   inGracePeriod: boolean;
   /** Monto que Stripe cobrará al completar el pago (prorrateo en upgrades). En pesos. Null si no aplica. */
   pendingInvoiceAmount: number | null;
+  /** Si true, hay una factura abierta en Stripe (ej. cobro falló tras upgrade); mostrar "Completar pago" para abrir portal. */
+  hasUnpaidInvoice: boolean;
 };
 
 export type ChangePlanResultDto = {
@@ -1187,19 +1189,40 @@ export class BillingService {
     // Estar en periodo de gracia: cancelada, periodo terminado, pero aún dentro de los 7 días
     const inGracePeriod = isCancelled && periodEnded && !gracePeriodEnded;
 
-    // Si hay pago pendiente y tenemos suscripción en Stripe, obtener el monto real a cobrar (prorrateo en upgrades)
+    // Si hay pago pendiente o suscripción en Stripe, obtener monto a cobrar y si hay factura abierta
     let pendingInvoiceAmount: number | null = null;
-    if (requiresPayment && this.stripe && subscription.stripeSubscriptionId) {
-      try {
-        const upcoming = await this.stripe.invoices.retrieveUpcoming({
-          subscription: subscription.stripeSubscriptionId,
-        });
-        // amount_due en Stripe: para COP (zero-decimal) está en pesos
-        if (upcoming.amount_due != null && upcoming.amount_due >= 0) {
-          pendingInvoiceAmount = upcoming.amount_due;
+    let hasUnpaidInvoice = false;
+    if (this.stripe && subscription.stripeSubscriptionId) {
+      if (requiresPayment) {
+        try {
+          const upcoming = await this.stripe.invoices.retrieveUpcoming({
+            subscription: subscription.stripeSubscriptionId,
+          });
+          if (upcoming.amount_due != null && upcoming.amount_due >= 0) {
+            pendingInvoiceAmount = upcoming.amount_due;
+          }
+        } catch {
+          // Si no hay upcoming, ignorar
         }
-      } catch {
-        // Si no hay upcoming (ej. suscripción ya tiene factura pagada), ignorar
+      }
+      // Si la suscripción está ACTIVE pero hay factura abierta en Stripe (ej. cobro falló tras upgrade), permitir pagar desde el portal
+      if (String(subscription.status) === 'ACTIVE') {
+        try {
+          const openInvoices = await this.stripe.invoices.list({
+            subscription: subscription.stripeSubscriptionId,
+            status: 'open',
+            limit: 1,
+          });
+          if (openInvoices.data.length > 0) {
+            hasUnpaidInvoice = true;
+            const inv = openInvoices.data[0];
+            if (inv.amount_due != null && pendingInvoiceAmount == null) {
+              pendingInvoiceAmount = inv.amount_due;
+            }
+          }
+        } catch {
+          // Ignorar
+        }
       }
     }
 
@@ -1233,6 +1256,7 @@ export class BillingService {
       gracePeriodEnd: gracePeriodEnd?.toISOString() ?? null,
       inGracePeriod: inGracePeriod || false,
       pendingInvoiceAmount,
+      hasUnpaidInvoice,
     };
   }
 

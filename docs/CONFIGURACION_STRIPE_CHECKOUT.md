@@ -32,16 +32,51 @@ El Customer Portal se usa para gestionar métodos de pago y facturas de suscripc
    - **Allow customers to cancel subscriptions**: Configura según tu política
    - **Allow customers to switch plans**: Desactivado (manejamos esto desde la app)
 
-### Paso 4: Verificar Webhook Configuration
+### Paso 4: Configurar el webhook (paso a paso)
 
-1. Ve a **Stripe Dashboard** → **Developers** → **Webhooks**
-2. Verifica que tienes un webhook apuntando a tu API: `https://tu-api.com/billing/webhooks/stripe`
-3. Los eventos que debe escuchar (obligatorio para compra tipo Spotify):
-   - `checkout.session.completed` — al completar la compra en Checkout, se activa el plan en la app
-   - `invoice.paid`
-   - `invoice.payment_failed`
-   - `customer.subscription.updated`
-   - `customer.subscription.deleted`
+Sin el webhook configurado, Stripe no notifica a tu API cuando el usuario paga y el plan no se activa. Sigue estos pasos:
+
+1. **Abre Stripe Dashboard**  
+   - Entra en [https://dashboard.stripe.com](https://dashboard.stripe.com)  
+   - Activa **modo Prueba** (toggle arriba a la derecha) si estás en desarrollo.
+
+2. **Ir a Webhooks**  
+   - Menú lateral: **Developers** → **Webhooks**  
+   - Clic en **Add endpoint**.
+
+3. **URL del endpoint**  
+   - **Endpoint URL:** la URL pública de tu API + la ruta del webhook.  
+   - Ruta que usa la app: **`/billing/webhooks/stripe`** (método POST).  
+   - Ejemplos:
+     - Producción (Render): `https://comercial-electrica-api.onrender.com/billing/webhooks/stripe`  
+     - Local con túnel (ngrok): `https://xxxx.ngrok.io/billing/webhooks/stripe`  
+   - No uses `localhost` en producción; Stripe no puede alcanzarlo.
+
+4. **Eventos a escuchar**  
+   - En **Select events to listen to** elige **Select events** (no “Receive all events”).  
+   - Marca estos eventos (mínimo para Checkout y suscripciones):
+     - **`checkout.session.completed`** — imprescindible para que al pagar en Checkout se active el plan.
+     - **`invoice.paid`**
+     - **`invoice.payment_failed`**
+     - **`customer.subscription.updated`**
+     - **`customer.subscription.deleted`**  
+   - Clic en **Add endpoint**.
+
+5. **Copiar el Signing secret**  
+   - En la ficha del webhook recién creado, sección **Signing secret**, clic en **Reveal**.  
+   - Copia el valor (empieza por `whsec_...`).
+
+6. **Configurar la variable de entorno**  
+   - En Render: **Dashboard** → tu servicio **comercial-electrica-api** → **Environment** → **Add Environment Variable**.  
+   - **Key:** `STRIPE_WEBHOOK_SECRET`  
+   - **Value:** el `whsec_...` que copiaste.  
+   - Guarda y redeploya si es necesario para que la API use el nuevo valor.
+
+7. **Comprobar que responde**  
+   - En Stripe, en el mismo webhook: **Send test webhook** → elige por ejemplo `checkout.session.completed` → **Send test webhook**.  
+   - Debe aparecer **200** en la respuesta. Si sale 400/500, revisa que la URL sea correcta y que `STRIPE_WEBHOOK_SECRET` coincida con el del endpoint.
+
+**Resumen:** URL = `https://TU-DOMINIO-API/billing/webhooks/stripe`, eventos anteriores, y `STRIPE_WEBHOOK_SECRET` en tu API.
 
 ### Paso 5: Probar el Flujo Completo
 
