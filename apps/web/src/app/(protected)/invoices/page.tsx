@@ -220,27 +220,27 @@ export default function InvoicesPage() {
                   {s === 'all' ? 'Todas' : STATUS_LABELS[s]}
                 </button>
               ))}
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="gap-1.5 ml-auto"
-                onClick={() => {
-                  retryDianMutation.mutate(undefined, {
-                    onSuccess: (res) => {
-                      toast.success(res.enqueued > 0 ? `Se encolaron ${res.enqueued} documento(s) para reenvío a DIAN.` : res.message);
-                    },
-                    onError: (e: { message?: string }) => {
-                      toast.error(e?.message ?? 'Error al reintentar envíos DIAN');
-                    },
-                  });
-                }}
-                disabled={retryDianMutation.isPending}
-              >
-                <RotateCw className={`h-4 w-4 ${retryDianMutation.isPending ? 'animate-spin' : ''}`} />
-                Reintentar envíos DIAN pendientes
-              </Button>
             </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="gap-1.5 ml-auto shrink-0"
+              onClick={() => {
+                retryDianMutation.mutate(undefined, {
+                  onSuccess: (res) => {
+                    toast.success(res.enqueued > 0 ? `Se encolaron ${res.enqueued} documento(s) para reenvío a DIAN.` : res.message);
+                  },
+                  onError: (e: { message?: string }) => {
+                    toast.error(e?.message ?? 'Error al reintentar envíos DIAN');
+                  },
+                });
+              }}
+              disabled={retryDianMutation.isPending}
+            >
+              <RotateCw className={`h-4 w-4 ${retryDianMutation.isPending ? 'animate-spin' : ''}`} />
+              Reintentar envíos DIAN pendientes
+            </Button>
           </div>
 
           {query.isLoading ? (

@@ -906,18 +906,30 @@ export default function SalesPage() {
                   <span>
                     {saleProductSearch.trim()
                       ? `Ningún producto coincide con «${saleProductSearch.trim()}». Prueba con otra palabra o código.`
-                      : 'No hay productos disponibles. Ve a Productos para crear algunos o ejecuta el script de carga inicial (seed) de la base de datos.'}
+                      : 'No hay productos. Agrégalos desde Productos.'}
                   </span>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="w-fit border-warning/40 text-warning-foreground hover:bg-warning/15 dark:text-warning dark:hover:bg-warning/20"
-                    onClick={() => productsQuery.refetch()}
-                    disabled={productsQuery.isFetching}
-                  >
-                    Reintentar
-                  </Button>
+                  {!saleProductSearch.trim() ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="w-fit border-warning/40 text-warning-foreground hover:bg-warning/15 dark:text-warning dark:hover:bg-warning/20"
+                      asChild
+                    >
+                      <Link href="/products">Ir a Productos</Link>
+                    </Button>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="w-fit border-warning/40 text-warning-foreground hover:bg-warning/15 dark:text-warning dark:hover:bg-warning/20"
+                      onClick={() => productsQuery.refetch()}
+                      disabled={productsQuery.isFetching}
+                    >
+                      Reintentar
+                    </Button>
+                  )}
                 </div>
               )}
               {productsFetching && saleProductSearch.trim() && products.length === 0 && (

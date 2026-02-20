@@ -465,9 +465,9 @@ export default function InventoryPage() {
       <StockActualCard />
 
       <Card className="border border-border/80 shadow-sm rounded-xl overflow-hidden">
-        <CardHeader className="pb-4 border-b border-border/60">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
+        <CardHeader className="pb-6 pt-6 border-b border-border/60">
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="space-y-1">
               <CardTitle className="text-lg font-medium flex items-center gap-2 text-foreground">
                 <Boxes className="h-5 w-5 shrink-0 text-primary" aria-hidden />
                 Movimientos
@@ -477,11 +477,11 @@ export default function InventoryPage() {
               </CardDescription>
             </div>
           </div>
-          <div className="flex flex-wrap items-end gap-3 pt-4">
-            <div className="flex flex-col gap-1.5 flex-1 min-w-[200px] max-w-sm">
+          <div className="flex flex-wrap items-end gap-4 sm:gap-6 pt-6">
+            <div className="flex flex-col gap-2 flex-1 min-w-[200px] max-w-sm">
               <Label htmlFor="search-movement" className="text-xs font-medium text-muted-foreground">Buscar</Label>
               <div className="relative">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
                 <Input
                   id="search-movement"
                   type="search"
@@ -491,14 +491,14 @@ export default function InventoryPage() {
                     setSearchTerm(e.target.value);
                     setPage(1);
                   }}
-                  className="h-9 rounded-lg pl-8 text-sm flex-1 min-w-0"
+                  className="h-10 rounded-lg pl-9 text-sm flex-1 min-w-0"
                   autoComplete="off"
                 />
               </div>
             </div>
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-2">
               <Label className="text-xs font-medium text-muted-foreground">Ordenar por fecha</Label>
-              <div className="flex items-center gap-1 border border-input rounded-lg p-0.5 bg-background">
+              <div className="flex items-center gap-2 border border-input rounded-lg p-1 bg-background">
                 <button
                   type="button"
                   onClick={() => {
@@ -506,7 +506,7 @@ export default function InventoryPage() {
                     else setSortOrder('desc');
                     setPage(1);
                   }}
-                  className={`h-8 px-2.5 flex items-center gap-1 rounded-md text-xs font-medium transition-colors ${
+                  className={`h-9 px-3 flex items-center gap-1.5 rounded-md text-xs font-medium transition-colors ${
                     sortOrder === 'desc' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted text-muted-foreground'
                   }`}
                   title="Más reciente primero"
@@ -521,7 +521,7 @@ export default function InventoryPage() {
                     else setSortOrder('asc');
                     setPage(1);
                   }}
-                  className={`h-8 px-2.5 flex items-center gap-1 rounded-md text-xs font-medium transition-colors ${
+                  className={`h-9 px-3 flex items-center gap-1.5 rounded-md text-xs font-medium transition-colors ${
                     sortOrder === 'asc' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted text-muted-foreground'
                   }`}
                   title="Más antiguo primero"
@@ -541,20 +541,20 @@ export default function InventoryPage() {
                 setPage(1);
               }}
               disabled={!searchTerm.trim() && sortOrder === null}
-              className="h-9 rounded-lg"
+              className="h-10 rounded-lg px-4"
               aria-label="Limpiar filtros"
             >
               Limpiar
             </Button>
           </div>
         </CardHeader>
-        <CardContent className="pt-4 space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-2">
+        <CardContent className="pt-6 pb-6 space-y-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <Pagination meta={meta} onPageChange={setPage} label="Página" />
           </div>
 
           {query.isLoading && (
-            <div className="rounded-lg border border-border/80 overflow-hidden">
+            <div className="rounded-xl border border-border/80 overflow-hidden">
               <Table>
                 <TableHeader>
                   <TableRow className="hover:bg-transparent border-b border-border/80">
@@ -591,7 +591,7 @@ export default function InventoryPage() {
           )}
 
           {!query.isLoading && !query.isError && (
-            <div className="rounded-lg border border-border/80 overflow-hidden">
+            <div className="rounded-xl border border-border/80 overflow-hidden">
               <Table>
                 <TableHeader>
                   <TableRow className="hover:bg-transparent border-b border-border/80">
@@ -650,7 +650,7 @@ export default function InventoryPage() {
                   ))}
                   {rows.length === 0 && (
                     <TableRow className="hover:bg-transparent">
-                      <TableCell colSpan={6} className="h-24 text-center text-muted-foreground text-sm">
+                      <TableCell colSpan={6} className="py-16 text-center text-muted-foreground text-sm">
                         No hay movimientos.
                       </TableCell>
                     </TableRow>

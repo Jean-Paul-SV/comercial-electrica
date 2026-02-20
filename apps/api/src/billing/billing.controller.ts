@@ -1,6 +1,5 @@
 import {
   Controller,
-  Get,
   Post,
   Req,
   Res,
@@ -32,13 +31,6 @@ export class BillingController {
     private readonly billing: BillingService,
     @InjectQueue('stripe-webhooks') private readonly webhookQueue: Queue,
   ) {}
-
-  /** GET solo para comprobar que la URL existe; Stripe envía POST. */
-  @Get('stripe')
-  @ApiExcludeEndpoint()
-  stripeWebhookGet(@Res({ passthrough: true }) res: express.Response) {
-    return { ok: true, message: 'Webhook Stripe: Stripe envía eventos por POST a esta URL.' };
-  }
 
   @Post('stripe')
   @HttpCode(HttpStatus.OK)

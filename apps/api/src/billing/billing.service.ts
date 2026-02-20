@@ -399,6 +399,41 @@ export class BillingService {
   }
 
   /**
+   * Actualiza la suscripción en Stripe para un upgrade (ej. Básico anual → Premium anual).
+   * Reglas:
+   * - Misma suscripción (solo se cambia el ítem/precio).
+   * - NO se modifica billing_cycle_anchor (la fecha de renovación se mantiene).
+   * - Prorrateo: crédito por tiempo no usado del plan anterior + cargo proporcional del nuevo hasta la misma renovación.
+   * - Factura inmediata: solo esa diferencia (usamos always_invoice para que Stripe genere y cobre ya; con create_prorations
+   *   las prorations irían a la próxima factura y se mezclarían con el año completo).
+   * - Si el cobro falla (tarjeta), Stripe reintentará; el webhook invoice.payment_failed ya está manejado.
+   * - Diferencia negativa: Stripe devuelve factura con total 0 o crédito; no bloqueamos.
+   */
+  private async updateSubscriptionForUpgrade(
+    stripeSubscriptionId: string,
+    itemId: string,
+    newPriceId: string,
+    newPlanId: string,
+    billingInterval: string,
+    previousPriceId: string,
+  ): Promise<void> {
+    const updateParams: Stripe.SubscriptionUpdateParams = {
+      items: [{ id: itemId, price: newPriceId }],
+      // create_prorations crea las líneas pero NO factura ya (irían a la próxima factura = renovación, mezclando con el año completo).
+      // always_invoice: genera la factura inmediata solo con la diferencia (crédito + cargo prorrateado) y intenta cobrar ya;
+      // la próxima factura en la renovación será solo el precio anual completo. No pasamos billing_cycle_anchor para preservarlo.
+      proration_behavior: 'always_invoice',
+    };
+    if (this.stripeTaxRateId) {
+      updateParams.default_tax_rates = [this.stripeTaxRateId];
+    }
+    await this.stripe!.subscriptions.update(stripeSubscriptionId, updateParams);
+    this.logger.log(
+      `Suscripción Stripe ${stripeSubscriptionId} actualizada (upgrade): plan ${newPlanId}, billingInterval ${billingInterval}, price ${newPriceId} (antes: ${previousPriceId}). Factura inmediata con prorrateo; renovación sin reinicio.`,
+    );
+  }
+
+  /**
    * Lista planes activos para que el cliente pueda cambiar (precios mensual y anual).
    */
   async getActivePlans(): Promise<
@@ -875,20 +910,20 @@ export class BillingService {
             stripeSub.status === 'incomplete_expired';
 
           // Solo actualizar si el precio es diferente y la suscripción no está incompleta (Stripe no permite cambiar ítems en incomplete)
-          if (itemId && currentPriceId !== effectivePriceId && !isIncomplete) {
-            const updateParams: Stripe.SubscriptionUpdateParams = {
-              items: [{ id: itemId, price: effectivePriceId }],
-              proration_behavior: 'create_prorations',
-            };
-            if (this.stripeTaxRateId) {
-              updateParams.default_tax_rates = [this.stripeTaxRateId];
-            }
-            await this.stripe.subscriptions.update(
+          if (
+            itemId &&
+            currentPriceId != null &&
+            currentPriceId !== effectivePriceId &&
+            !isIncomplete &&
+            subscription.stripeSubscriptionId
+          ) {
+            await this.updateSubscriptionForUpgrade(
               subscription.stripeSubscriptionId,
-              updateParams,
-            );
-            this.logger.log(
-              `Suscripción Stripe ${subscription.stripeSubscriptionId} actualizada: plan ${newPlan.id}, billingInterval ${effectiveBillingInterval}, price ${effectivePriceId} (antes: ${currentPriceId})`,
+              itemId,
+              effectivePriceId,
+              newPlan.id,
+              effectiveBillingInterval ?? 'yearly',
+              currentPriceId,
             );
           } else if (currentPriceId === effectivePriceId) {
             this.logger.log(
