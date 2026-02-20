@@ -1335,6 +1335,13 @@ export class BillingService {
         'No hay suscripción Stripe para esta cuenta. Contacte a soporte.',
       );
     }
+
+    // Evitar abrir un nuevo checkout si la suscripción ya está activa (evitar doble cobro)
+    if (String(subscription.status) === 'ACTIVE') {
+      throw new BadRequestException(
+        'Tu suscripción ya está activa. No es necesario completar el pago.',
+      );
+    }
     
     // Obtener la suscripción de Stripe para obtener el customer y la factura pendiente
     const stripeSubscription = await this.stripe.subscriptions.retrieve(

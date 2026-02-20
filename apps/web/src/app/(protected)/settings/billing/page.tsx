@@ -445,15 +445,18 @@ export default function BillingPage() {
     ? new Date(subscription.currentPeriodEnd) < new Date()
     : false;
 
+  // No mostrar "Completa tu pago" ni el botón de checkout cuando el plan ya está vigente (evitar doble cobro)
+  const showRequiresPayment = requiresPayment && !isActive;
+
   return (
     <div className="space-y-8 max-w-5xl mx-auto px-4 sm:px-6 pb-8">
       {/* Hero */}
       <header className="space-y-1">
         <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-          {requiresPayment ? 'Completa tu pago' : plan ? 'Plan' : 'Elige tu plan'}
+          {showRequiresPayment ? 'Completa tu pago' : plan ? 'Plan' : 'Elige tu plan'}
         </h1>
         <p className="text-sm text-muted-foreground max-w-xl">
-          {requiresPayment
+          {showRequiresPayment
             ? 'Tu empresa está creada. Activa tu acceso completando el pago de tu suscripción.'
             : plan
               ? 'Información de tu suscripción, renovación y opciones de pago.'
@@ -462,7 +465,7 @@ export default function BillingPage() {
       </header>
 
       {/* Aviso periodo de gracia */}
-      {inGracePeriod && !requiresPayment && (
+      {inGracePeriod && !showRequiresPayment && (
         <Card className="overflow-hidden rounded-2xl border-amber-500/30 bg-gradient-to-br from-amber-500/10 to-amber-600/5 shadow-sm">
           <CardContent className="p-5 sm:p-6">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -532,8 +535,8 @@ export default function BillingPage() {
         </Card>
       )}
 
-      {/* Pago pendiente: solo botón Completar pago */}
-      {requiresPayment && canManageBilling && (
+      {/* Pago pendiente: solo botón Completar pago (no mostrar si plan ya está vigente) */}
+      {showRequiresPayment && canManageBilling && (
         <div className="flex justify-center sm:justify-start">
           <Button
             onClick={handleOpenPortal}
