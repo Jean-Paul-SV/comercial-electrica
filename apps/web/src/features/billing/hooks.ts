@@ -1,7 +1,19 @@
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getSubscription, createPortalSession, createCheckoutSession, getBillingPlans, changePlan, validateDowngrade } from './api';
+import {
+  getSubscription,
+  createPortalSession,
+  createCheckoutSession,
+  getBillingPlans,
+  changePlan,
+  validateDowngrade,
+  getWompiConfig,
+  getWompiAcceptanceTokens,
+  createWompiTransaction,
+  getWompiTransaction,
+  type WompiCreateTransactionPayload,
+} from './api';
 import { useAuth } from '@shared/providers/AuthProvider';
 
 export function useSubscriptionInfo(options?: { refetchWhenPendingPayment?: boolean }) {
@@ -77,5 +89,46 @@ export function useValidateDowngrade(planId: string | null) {
     queryKey: ['billing', 'validate-downgrade', planId],
     enabled: Boolean(token) && !isPlatformAdmin && Boolean(planId),
     queryFn: () => validateDowngrade(token!, planId!),
+  });
+}
+
+// --- Wompi (Colombia) ---
+
+export function useWompiConfig() {
+  return useQuery({
+    queryKey: ['billing', 'wompi-config'],
+    queryFn: () => getWompiConfig(),
+  });
+}
+
+export function useWompiAcceptanceTokens(enabled: boolean) {
+  const { token } = useAuth();
+  return useQuery({
+    queryKey: ['billing', 'wompi-acceptance-tokens'],
+    enabled: Boolean(token) && enabled,
+    queryFn: () => getWompiAcceptanceTokens(token!),
+  });
+}
+
+export function useCreateWompiTransaction() {
+  const { token } = useAuth();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: WompiCreateTransactionPayload) =>
+      createWompiTransaction(token!, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['billing', 'subscription'] });
+    },
+  });
+}
+
+export function useWompiTransactionStatus(transactionId: string | null) {
+  const { token } = useAuth();
+  return useQuery({
+    queryKey: ['billing', 'wompi-transaction', transactionId],
+    enabled: Boolean(token) && Boolean(transactionId),
+    queryFn: () => getWompiTransaction(token!, transactionId!),
+    refetchInterval: (query) =>
+      query.state.data?.status === 'PENDING' ? 3000 : false,
   });
 }

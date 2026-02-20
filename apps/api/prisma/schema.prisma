@@ -117,6 +117,7 @@ enum SubscriptionStatus {
 enum PaymentProvider {
   STRIPE
   PAYU
+  WOMPI
 }
 
 enum PaymentStatus {

@@ -1,4 +1,4 @@
-# Configurar pagos (PayU y Stripe)
+# Configurar pagos (Wompi, PayU y Stripe)
 
 Para usar pagos en Orion necesitas crear cuentas y configurar las credenciales en el backend.
 
@@ -45,7 +45,38 @@ Sin `STRIPE_SECRET_KEY` el módulo de facturación no creará suscripciones en S
 
 ---
 
-## 2. PayU (Colombia – PSE, Nequi, Daviplata, tarjetas)
+## 2. Wompi (Colombia – Nequi, PSE, tarjetas, Bancolombia)
+
+**Uso en Orion:** pagar suscripciones desde Colombia con Nequi, PSE, tarjetas, transferencia Bancolombia, etc. La opción "Pagar con Wompi" aparece en la página de facturación cuando Wompi está configurado.
+
+### Crear cuenta y obtener credenciales
+
+1. Regístrate en **https://comercios.wompi.co** (dashboard de comercios).
+2. En *Desarrolladores* obtienes:
+   - **Llave pública** (`pub_test_...` en sandbox, `pub_prod_...` en producción).
+   - **Llave privada** (`priv_test_...` / `priv_prod_...`).
+   - **Secreto de integridad** (en "Secretos para integración técnica"): se usa para firmar cada transacción (SHA256).
+3. Documentación: **https://docs.wompi.co/docs/colombia/** (transacciones, métodos de pago, tokens de aceptación).
+
+### Variables en `.env` (API)
+
+```env
+WOMPI_PRIVATE_KEY=priv_test_...
+WOMPI_PUBLIC_KEY=pub_test_...
+WOMPI_INTEGRITY_SECRET=test_integrity_...
+# Opcional: base URL (por defecto sandbox o producción según el prefijo de la llave)
+# WOMPI_BASE_URL=https://sandbox.wompi.co/v1
+# Para forzar producción aunque uses llave test: WOMPI_USE_PRODUCTION=false
+```
+
+- Sin las tres variables (`WOMPI_PRIVATE_KEY`, `WOMPI_PUBLIC_KEY`, `WOMPI_INTEGRITY_SECRET`) la opción Wompi no se muestra en la app.
+- **Pruebas:** usa llaves con prefijo `pub_test_` / `priv_test_` y secreto de sandbox.
+- **Producción:** llaves `pub_prod_` / `priv_prod_` y secreto de integridad de producción.
+- En la página de facturación, el usuario puede elegir "Pagar con Wompi" → Nequi (teléfono), y próximamente PSE y tarjeta.
+
+---
+
+## 3. PayU (Colombia – PSE, Nequi, Daviplata, tarjetas)
 
 **Uso en Orion:** pagos únicos o módulos/add-ons por tenant. PayU acepta PSE, Nequi, Daviplata, tarjetas de crédito/débito y efectivo referenciado.
 
@@ -77,20 +108,22 @@ PAYU_CONFIRMATION_URL=https://tu-dominio.com/payu/webhook
 
 ---
 
-## 3. Dónde se usan en el código
+## 4. Dónde se usan en el código
 
 | Servicio | Archivo principal | Variables que lee |
 |----------|-------------------|-------------------|
 | Stripe   | `apps/api/src/billing/billing.service.ts` | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` |
+| Wompi    | `apps/api/src/billing/wompi/wompi.service.ts` | `WOMPI_PRIVATE_KEY`, `WOMPI_PUBLIC_KEY`, `WOMPI_INTEGRITY_SECRET`, `WOMPI_BASE_URL`, `FRONTEND_URL` |
 | PayU     | `apps/api/src/payu/payu.service.ts`        | `PAYU_API_KEY`, `PAYU_MERCHANT_ID`, `PAYU_ACCOUNT_ID`, `PAYU_TEST`, `PAYU_CONFIRMATION_URL` |
 
 Las keys **nunca** deben ir en el frontend ni en el repositorio. Usa `.env` local y en producción un gestor de secretos (Render Secrets, AWS Secrets Manager, etc.).
 
 ---
 
-## 4. Resumen
+## 5. Resumen
 
 1. **Stripe:** cuenta en dashboard.stripe.com (país US) → `STRIPE_SECRET_KEY` y opcionalmente `STRIPE_WEBHOOK_SECRET` en `.env` del API.
-2. **PayU:** cuenta en colombia.payu.com → `PAYU_API_KEY`, `PAYU_MERCHANT_ID`, `PAYU_ACCOUNT_ID`, `PAYU_TEST` y `PAYU_CONFIRMATION_URL` en `.env` del API.
-3. Coloca las variables en el archivo `.env` que use la API (raíz del proyecto o `apps/api`, según cómo levantes el servidor).
-4. Reinicia la API tras cambiar las variables.
+2. **Wompi:** cuenta en comercios.wompi.co → `WOMPI_PRIVATE_KEY`, `WOMPI_PUBLIC_KEY`, `WOMPI_INTEGRITY_SECRET` en `.env` del API. Ideal para Colombia (Nequi, PSE, tarjetas).
+3. **PayU:** cuenta en colombia.payu.com → `PAYU_API_KEY`, `PAYU_MERCHANT_ID`, `PAYU_ACCOUNT_ID`, `PAYU_TEST` y `PAYU_CONFIRMATION_URL` en `.env` del API.
+4. Coloca las variables en el archivo `.env` que use la API (raíz del proyecto o `apps/api`, según cómo levantes el servidor).
+5. Reinicia la API tras cambiar las variables.

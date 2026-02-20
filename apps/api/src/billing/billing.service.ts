@@ -2603,4 +2603,45 @@ export class BillingService {
       alertsSent,
     };
   }
+
+  /**
+   * Activa la suscripción del tenant tras un pago aprobado en Wompi.
+   * Ajusta plan, periodo actual y estado ACTIVE.
+   */
+  async activateSubscriptionFromWompiPayment(
+    tenantId: string,
+    planId: string,
+    billingInterval: 'monthly' | 'yearly',
+    wompiTransactionId: string,
+  ): Promise<void> {
+    const now = new Date();
+    const periodEnd = new Date(now);
+    if (billingInterval === 'yearly') {
+      periodEnd.setFullYear(periodEnd.getFullYear() + 1);
+    } else {
+      periodEnd.setMonth(periodEnd.getMonth() + 1);
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.subscription.update({
+        where: { tenantId },
+        data: {
+          planId,
+          status: 'ACTIVE',
+          currentPeriodStart: now,
+          currentPeriodEnd: periodEnd,
+          lastPaymentFailedAt: null,
+          updatedAt: now,
+        },
+      }),
+      this.prisma.tenant.update({
+        where: { id: tenantId },
+        data: { planId, billingInterval, updatedAt: now },
+      }),
+    ]);
+
+    this.logger.log(
+      `Suscripción activada por pago Wompi para tenant ${tenantId}, transacción ${wompiTransactionId}, plan ${planId}, hasta ${periodEnd.toISOString()}.`,
+    );
+  }
 }

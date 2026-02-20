@@ -20,8 +20,19 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@shared/components/ui/dialog';
-import { CreditCard, Calendar, Package, AlertCircle, CheckCircle2, Sparkles, RefreshCw } from 'lucide-react';
-import { useSubscriptionInfo, useCreatePortalSession, useCreateCheckoutSession, useBillingPlans, useChangePlan, useValidateDowngrade } from '@features/billing/hooks';
+import { CreditCard, Calendar, Package, AlertCircle, CheckCircle2, Sparkles, RefreshCw, Smartphone } from 'lucide-react';
+import {
+  useSubscriptionInfo,
+  useCreatePortalSession,
+  useCreateCheckoutSession,
+  useBillingPlans,
+  useChangePlan,
+  useValidateDowngrade,
+  useWompiConfig,
+  useWompiAcceptanceTokens,
+  useCreateWompiTransaction,
+  useWompiTransactionStatus,
+} from '@features/billing/hooks';
 import { useDianConfigStatus } from '@features/dian/hooks';
 import { useSubmitFeedback } from '@features/feedback/hooks';
 import { useAuth } from '@shared/providers/AuthProvider';
@@ -248,13 +259,24 @@ function PlanCard({
 }
 
 export default function BillingPage() {
-  const { isPlatformAdmin } = useAuth();
+  const { isPlatformAdmin, user } = useAuth();
   const subscriptionQuery = useSubscriptionInfo({ refetchWhenPendingPayment: true });
   const createPortalMutation = useCreatePortalSession();
   const createCheckoutMutation = useCreateCheckoutSession();
   const plansQuery = useBillingPlans();
   const changePlanMutation = useChangePlan();
   const submitFeedbackMutation = useSubmitFeedback();
+  const wompiConfig = useWompiConfig();
+  const createWompiMutation = useCreateWompiTransaction();
+  const [wompiDialogOpen, setWompiDialogOpen] = useState(false);
+  const [wompiPlanId, setWompiPlanId] = useState('');
+  const [wompiBillingInterval, setWompiBillingInterval] = useState<'monthly' | 'yearly'>('yearly');
+  const [wompiPhone, setWompiPhone] = useState('');
+  const [wompiAcceptTerms, setWompiAcceptTerms] = useState(false);
+  const [wompiAcceptData, setWompiAcceptData] = useState(false);
+  const [wompiTransactionId, setWompiTransactionId] = useState<string | null>(null);
+  const wompiAcceptance = useWompiAcceptanceTokens(wompiDialogOpen);
+  const wompiTransactionStatus = useWompiTransactionStatus(wompiTransactionId);
   const planSlug = subscriptionQuery.data?.plan?.slug;
   const planIncludesDian = planSlug ? isPlanWithDian(planSlug) : false;
   const { data: dianStatus } = useDianConfigStatus(planIncludesDian);
@@ -309,6 +331,20 @@ export default function BillingPage() {
       },
     });
   };
+
+  // Cuando el pago Wompi se aprueba, cerrar diálogo y refrescar
+  useEffect(() => {
+    const status = wompiTransactionStatus.data?.status;
+    if (!wompiTransactionId || !status) return;
+    if (status === 'APPROVED') {
+      toast.success('Pago aprobado. Tu plan está activo.');
+      setWompiDialogOpen(false);
+      setWompiTransactionId(null);
+      subscriptionQuery.refetch();
+    } else if (status === 'DECLINED' || status === 'ERROR') {
+      toast.error(wompiTransactionStatus.data?.status_message ?? 'Pago rechazado o error.');
+    }
+  }, [wompiTransactionId, wompiTransactionStatus.data?.status, wompiTransactionStatus.data?.status_message]);
 
   // Al volver de Stripe, refrescar suscripción para que el layout desbloquee si el webhook ya procesó el pago
   const hasRefetchedOnMount = useRef(false);
@@ -541,6 +577,210 @@ export default function BillingPage() {
           </Button>
         </div>
       )}
+
+      {/* Pagar con Wompi (Nequi, PSE, tarjetas) — Colombia */}
+      {wompiConfig.data?.enabled && !isPlatformAdmin && (
+        <Card className="overflow-hidden rounded-2xl border border-border/70 shadow-sm bg-card">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-semibold flex items-center gap-2 text-foreground">
+              <Smartphone className="h-5 w-5 shrink-0 text-primary/80" />
+              Pagar con Wompi
+            </CardTitle>
+            <CardDescription className="text-sm mt-0.5">
+              Nequi, PSE, tarjetas y más. Ideal para pagos desde Colombia.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button
+              variant="outline"
+              className="gap-2"
+              onClick={() => {
+                setWompiPlanId(plan?.id ?? plansQuery.data?.[0]?.id ?? '');
+                setWompiBillingInterval(billingInterval ?? 'yearly');
+                setWompiPhone('');
+                setWompiAcceptTerms(false);
+                setWompiAcceptData(false);
+                setWompiTransactionId(null);
+                setWompiDialogOpen(true);
+              }}
+            >
+              <Smartphone className="h-4 w-4" />
+              Pagar con Nequi u otros métodos
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Diálogo Wompi: Nequi (teléfono) + aceptación de términos */}
+      <Dialog open={wompiDialogOpen} onOpenChange={setWompiDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Pagar con Wompi</DialogTitle>
+            <DialogDescription>
+              Elige plan, acepta los términos y completa con Nequi (o más métodos próximamente).
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            {plansQuery.data && plansQuery.data.length > 0 && (
+              <div>
+                <label className="text-sm font-medium text-foreground">Plan</label>
+                <select
+                  className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  value={wompiPlanId}
+                  onChange={(e) => setWompiPlanId(e.target.value)}
+                >
+                  {plansQuery.data.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name} — {wompiBillingInterval === 'yearly' && p.priceYearly != null
+                        ? formatPrice(p.priceYearly) + '/año'
+                        : p.priceMonthly != null
+                          ? formatPrice(p.priceMonthly) + '/mes'
+                          : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            <div>
+              <label className="text-sm font-medium text-foreground">Intervalo</label>
+              <div className="flex gap-4 mt-1">
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="radio"
+                    checked={wompiBillingInterval === 'monthly'}
+                    onChange={() => setWompiBillingInterval('monthly')}
+                  />
+                  Mensual
+                </label>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="radio"
+                    checked={wompiBillingInterval === 'yearly'}
+                    onChange={() => setWompiBillingInterval('yearly')}
+                  />
+                  Anual
+                </label>
+              </div>
+            </div>
+            {wompiAcceptance.data ? (
+              <>
+                <div className="space-y-2">
+                  <label className="flex items-start gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={wompiAcceptTerms}
+                      onChange={(e) => setWompiAcceptTerms(e.target.checked)}
+                    />
+                    <span>
+                      Acepto los{' '}
+                      <a
+                        href={wompiAcceptance.data.permalink_terms}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary underline"
+                      >
+                        términos y condiciones
+                      </a>{' '}
+                      de Wompi.
+                    </span>
+                  </label>
+                  <label className="flex items-start gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={wompiAcceptData}
+                      onChange={(e) => setWompiAcceptData(e.target.checked)}
+                    />
+                    <span>
+                      Acepto la{' '}
+                      <a
+                        href={wompiAcceptance.data.permalink_personal_data}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary underline"
+                      >
+                        autorización de datos personales
+                      </a>
+                      .
+                    </span>
+                  </label>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-foreground">Teléfono Nequi (10 dígitos)</label>
+                  <input
+                    type="tel"
+                    placeholder="3101234567"
+                    className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    value={wompiPhone}
+                    onChange={(e) => setWompiPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-foreground">Correo</label>
+                  <input
+                    type="email"
+                    readOnly
+                    className="mt-1 w-full rounded-md border border-input bg-muted px-3 py-2 text-sm"
+                    value={user?.email ?? ''}
+                  />
+                </div>
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground">Cargando términos…</p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setWompiDialogOpen(false)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              disabled={
+                !wompiAcceptance.data ||
+                !wompiAcceptTerms ||
+                !wompiAcceptData ||
+                wompiPhone.length !== 10 ||
+                !wompiPlanId ||
+                !user?.email ||
+                createWompiMutation.isPending ||
+                Boolean(wompiTransactionId)
+              }
+              onClick={() => {
+                if (!wompiAcceptance.data || !user?.email || !wompiPlanId) return;
+                createWompiMutation.mutate(
+                  {
+                    planId: wompiPlanId,
+                    billingInterval: wompiBillingInterval,
+                    acceptance_token: wompiAcceptance.data.acceptance_token,
+                    accept_personal_auth: wompiAcceptance.data.accept_personal_auth,
+                    customer_email: user.email,
+                    payment_method_type: 'NEQUI',
+                    payment_method: { type: 'NEQUI', phone_number: wompiPhone },
+                  },
+                  {
+                    onSuccess: (res) => {
+                      if (res.async_payment_url) {
+                        window.location.href = res.async_payment_url;
+                        return;
+                      }
+                      setWompiTransactionId(res.transactionId);
+                      toast.info('Revisa tu app Nequi y acepta el pago.');
+                    },
+                    onError: (e) => toast.error(getErrorMessage(e)),
+                  },
+                );
+              }}
+            >
+              {createWompiMutation.isPending
+                ? 'Creando…'
+                : wompiTransactionId
+                  ? 'Esperando confirmación en Nequi…'
+                  : 'Pagar con Nequi'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Plan actual + Estado */}
       <Card className="overflow-hidden rounded-2xl border border-border/70 shadow-sm bg-card">

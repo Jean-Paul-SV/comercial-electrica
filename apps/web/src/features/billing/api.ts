@@ -69,3 +69,66 @@ export function createPortalSession(
     throw error;
   });
 }
+
+// --- Wompi (Colombia: Nequi, PSE, tarjetas) ---
+
+export type WompiConfig = { enabled: boolean; publicKey: string | null };
+
+export function getWompiConfig(): Promise<WompiConfig> {
+  return apiClient.get<WompiConfig>('/billing/wompi/config');
+}
+
+export type WompiAcceptanceTokens = {
+  acceptance_token: string;
+  accept_personal_auth: string;
+  permalink_terms: string;
+  permalink_personal_data: string;
+};
+
+export function getWompiAcceptanceTokens(authToken: string): Promise<WompiAcceptanceTokens> {
+  return apiClient.get<WompiAcceptanceTokens>('/billing/wompi/acceptance-tokens', { authToken });
+}
+
+export type WompiPaymentMethodType = 'NEQUI' | 'PSE' | 'CARD';
+export type WompiCreateTransactionPayload = {
+  planId: string;
+  billingInterval: 'monthly' | 'yearly';
+  acceptance_token: string;
+  accept_personal_auth: string;
+  customer_email: string;
+  payment_method_type: WompiPaymentMethodType;
+  payment_method: Record<string, unknown>;
+  customer_full_name?: string;
+  customer_phone?: string;
+};
+
+export type WompiTransactionResult = {
+  transactionId: string;
+  status: string;
+  async_payment_url?: string;
+  status_message?: string;
+};
+
+export function createWompiTransaction(
+  authToken: string,
+  payload: WompiCreateTransactionPayload,
+): Promise<WompiTransactionResult> {
+  return apiClient.post<WompiTransactionResult>('/billing/wompi/transaction', payload, { authToken });
+}
+
+export type WompiTransactionStatus = {
+  status: string;
+  status_message?: string;
+  async_payment_url?: string;
+  activated?: boolean;
+};
+
+export function getWompiTransaction(
+  authToken: string,
+  transactionId: string,
+): Promise<WompiTransactionStatus> {
+  return apiClient.get<WompiTransactionStatus>(
+    `/billing/wompi/transaction/${encodeURIComponent(transactionId)}`,
+    { authToken },
+  );
+}
