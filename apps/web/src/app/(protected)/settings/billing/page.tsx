@@ -493,7 +493,7 @@ export default function BillingPage() {
         </Card>
       )}
 
-      {/* Aviso pago pendiente + CTA */}
+      {/* Aviso pago pendiente + CTA: desglose para que vean descuento/total antes de ir a Stripe */}
       {requiresPayment && (
         <Card className="overflow-hidden rounded-2xl border-amber-500/30 bg-gradient-to-br from-amber-500/10 to-amber-600/5 shadow-sm">
           <CardContent className="p-5 sm:p-6">
@@ -523,7 +523,7 @@ export default function BillingPage() {
                       </>
                     ) : null}
                     <div className="flex justify-between font-semibold text-amber-700 dark:text-amber-500 pt-0.5 border-t border-amber-500/20">
-                      <span>Total a pagar</span>
+                      <span>Lo que pagarás al completar</span>
                       <span>
                         {formatPrice(currentPrice)}
                         {billingInterval && (
