@@ -1,6 +1,5 @@
 'use client';
 
-import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
@@ -16,10 +15,7 @@ import { Label } from '@shared/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@shared/components/ui/card';
 import { OrionLogo } from '@shared/ui/OrionLogo';
 
-const LoginVideoBackground = dynamic(
-  () => import('./LoginVideoBackground').then((m) => ({ default: m.LoginVideoBackground })),
-  { ssr: false }
-);
+import { LoginVideoBackground } from './LoginVideoBackground';
 
 const loginSchema = z.object({
   email: z.string().email('Email inválido'),
