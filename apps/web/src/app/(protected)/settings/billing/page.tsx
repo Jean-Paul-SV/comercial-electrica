@@ -498,21 +498,53 @@ export default function BillingPage() {
         <Card className="overflow-hidden rounded-2xl border-amber-500/30 bg-gradient-to-br from-amber-500/10 to-amber-600/5 shadow-sm">
           <CardContent className="p-5 sm:p-6">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-3">
                 <p className="text-sm text-foreground flex items-start gap-3 font-medium">
                   <AlertCircle className="h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
                   Pago pendiente. Completa el pago para desbloquear tu cuenta y acceder a todos los módulos.
-                  {currentPrice != null && (
-                    <span className="ml-2 font-semibold text-amber-700 dark:text-amber-500">
-                      Total a pagar: {formatPrice(currentPrice)}
-                      {billingInterval && (
-                        <span className="text-xs font-normal ml-1">
-                          /{billingInterval === 'yearly' ? 'año' : 'mes'}
-                        </span>
-                      )}
-                    </span>
-                  )}
                 </p>
+                {currentPrice != null && plan && (
+                  <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2.5 text-sm space-y-1">
+                    {billingInterval === 'yearly' &&
+                    plan.priceMonthly != null &&
+                    plan.priceYearly != null &&
+                    plan.priceMonthly * 12 > plan.priceYearly ? (
+                      <>
+                        <div className="flex justify-between text-muted-foreground">
+                          <span>12 meses en mensual</span>
+                          <span>{formatPrice(plan.priceMonthly * 12)}</span>
+                        </div>
+                        <div className="flex justify-between text-muted-foreground">
+                          <span>Descuento por pago anual</span>
+                          <span className="text-emerald-600 dark:text-emerald-400">
+                            -{formatPrice(plan.priceMonthly * 12 - plan.priceYearly)}
+                          </span>
+                        </div>
+                      </>
+                    ) : null}
+                    <div className="flex justify-between font-semibold text-amber-700 dark:text-amber-500 pt-0.5 border-t border-amber-500/20">
+                      <span>Total a pagar</span>
+                      <span>
+                        {formatPrice(currentPrice)}
+                        {billingInterval && (
+                          <span className="text-xs font-normal ml-1">
+                            /{billingInterval === 'yearly' ? 'año' : 'mes'}
+                          </span>
+                        )}
+                      </span>
+                    </div>
+                  </div>
+                )}
+                {currentPrice != null && !plan && (
+                  <p className="font-semibold text-amber-700 dark:text-amber-500">
+                    Total a pagar: {formatPrice(currentPrice)}
+                    {billingInterval && (
+                      <span className="text-xs font-normal ml-1">
+                        /{billingInterval === 'yearly' ? 'año' : 'mes'}
+                      </span>
+                    )}
+                  </p>
+                )}
                 <p className="text-xs text-muted-foreground flex items-center gap-2">
                   {subscriptionQuery.isFetching ? (
                     <>
