@@ -103,3 +103,15 @@ export function useWompiTransactionStatus(transactionId: string | null) {
       query.state.data?.status === 'PENDING' ? 3000 : false,
   });
 }
+
+/**
+ * "Portal" de facturación: redirige a la página de billing (Stripe portal eliminado; facturación con Wompi).
+ * El layout lo usa para el botón "Reactivar" en periodo de gracia.
+ */
+export function useCreatePortalSession() {
+  return useMutation({
+    mutationFn: async (returnUrl: string): Promise<{ url: string }> => {
+      return { url: returnUrl };
+    },
+  });
+}
