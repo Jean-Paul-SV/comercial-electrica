@@ -24,11 +24,23 @@ export class AlertService {
 
   /**
    * Envía una alerta a todos los canales configurados (Slack, Email, Webhook).
+   * Devuelve { emailSent } cuando se intentó email (para diagnóstico).
    */
-  async sendAlert(payload: AlertPayload): Promise<void> {
+  async sendAlert(payload: AlertPayload): Promise<{ emailSent?: boolean }> {
+    const result: { emailSent?: boolean } = {};
+    const sendEmail =
+      this.mailer.isConfigured() &&
+      (payload.severity === 'critical' ||
+        (payload.severity === 'warning' && this.isEmailWarningEnabled()));
+    if (sendEmail) {
+      try {
+        result.emailSent = await this.sendToEmail(payload);
+      } catch (err) {
+        this.logger.error('Error enviando alerta por email:', err);
+        result.emailSent = false;
+      }
+    }
     const promises: Promise<void>[] = [];
-
-    // Slack
     if (this.isSlackEnabled()) {
       promises.push(
         this.sendToSlack(payload).catch((err) => {
@@ -36,21 +48,6 @@ export class AlertService {
         }),
       );
     }
-
-    // Email: críticas siempre; warning si ALERT_EMAIL_INCLUDE_WARNING=true
-    const sendEmail =
-      this.mailer.isConfigured() &&
-      (payload.severity === 'critical' ||
-        (payload.severity === 'warning' && this.isEmailWarningEnabled()));
-    if (sendEmail) {
-      promises.push(
-        this.sendToEmail(payload).catch((err) => {
-          this.logger.error('Error enviando alerta por email:', err);
-        }),
-      );
-    }
-
-    // Webhook
     if (this.isWebhookEnabled()) {
       promises.push(
         this.sendToWebhook(payload).catch((err) => {
@@ -58,8 +55,8 @@ export class AlertService {
         }),
       );
     }
-
     await Promise.allSettled(promises);
+    return result;
   }
 
   /**
@@ -145,15 +142,15 @@ export class AlertService {
   }
 
   /**
-   * Envía alerta por email (críticas siempre; warning si ALERT_EMAIL_INCLUDE_WARNING=true).
+   * Envía alerta por email. Devuelve true si se envió correctamente.
    */
-  private async sendToEmail(payload: AlertPayload): Promise<void> {
+  private async sendToEmail(payload: AlertPayload): Promise<boolean> {
     const recipients = this.getAlertEmailRecipients();
     if (recipients.length === 0) {
       this.logger.warn(
         'ALERT_EMAIL o ALERT_EMAILS no configurado, omitiendo envío por email',
       );
-      return;
+      return false;
     }
 
     const subject = `[${payload.severity.toUpperCase()}] ${payload.title}`;
@@ -184,12 +181,18 @@ ${payload.metadata ? `Detalles:\n${JSON.stringify(payload.metadata, null, 2)}` :
 Orion Alert System
     `.trim();
 
-    await this.mailer.sendMail({
+    const sent = await this.mailer.sendMail({
       to: recipients.join(', '),
       subject,
       html,
       text,
     });
+    if (!sent) {
+      this.logger.warn(
+        'No se pudo enviar la alerta por email. Revisa SMTP en Render (Gmail: contraseña de aplicación, sin espacios).',
+      );
+    }
+    return sent;
   }
 
   /**

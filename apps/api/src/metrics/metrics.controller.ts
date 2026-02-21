@@ -157,7 +157,7 @@ export class MetricsController {
   ) {
     const effectiveSeverity =
       severity === 'critical' || severity === 'warning' ? severity : 'info';
-    await this.alertService.sendAlert({
+    const result = await this.alertService.sendAlert({
       title: 'Alerta de Prueba',
       message: 'Esta es una alerta de prueba del sistema de monitoreo Orion',
       severity: effectiveSeverity,
@@ -166,13 +166,15 @@ export class MetricsController {
         source: 'test-endpoint',
       },
     });
+    const attempted =
+      effectiveSeverity === 'critical' ||
+      (effectiveSeverity === 'warning' &&
+        this.config.get<string>('ALERT_EMAIL_INCLUDE_WARNING') === 'true');
     return {
       message: 'Alerta de prueba enviada',
       severity: effectiveSeverity,
-      emailSent:
-        effectiveSeverity === 'critical' ||
-        (effectiveSeverity === 'warning' &&
-          this.config.get<string>('ALERT_EMAIL_INCLUDE_WARNING') === 'true'),
+      emailAttempted: attempted,
+      emailSent: result.emailSent ?? null,
     };
   }
 

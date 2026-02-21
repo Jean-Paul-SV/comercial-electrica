@@ -14,15 +14,18 @@ export class MailerService {
 
   constructor(private readonly config: ConfigService) {
     const host = this.config.get<string>('SMTP_HOST');
-    const port = this.config.get<number>('SMTP_PORT');
+    const portRaw = this.config.get<string>('SMTP_PORT');
+    const port = portRaw ? parseInt(String(portRaw), 10) : 587;
+    const numPort = Number.isNaN(port) ? 587 : port;
     const user = this.config.get<string>('SMTP_USER');
     const pass = this.config.get<string>('SMTP_PASS');
     const from = this.config.get<string>('SMTP_FROM');
     if (host && user && pass) {
       this.transporter = nodemailer.createTransport({
         host,
-        port: port ?? 587,
-        secure: port === 465,
+        port: numPort,
+        secure: numPort === 465,
+        requireTLS: numPort === 587,
         auth: { user, pass },
       });
       this.fromAddress = from || user;
@@ -56,7 +59,9 @@ export class MailerService {
       });
       return true;
     } catch (err) {
-      console.error('MailerService.sendMail error:', err);
+      const msg = err instanceof Error ? err.message : String(err);
+      const code = err && typeof err === 'object' && 'code' in err ? (err as { code?: string }).code : undefined;
+      console.error(`MailerService.sendMail error: ${msg}${code ? ` (code: ${code})` : ''}`);
       return false;
     }
   }
