@@ -221,7 +221,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </header>
         <main className="flex-1 overflow-auto p-4 md:p-6 pb-20 lg:pb-8">
-          <div className="mx-auto max-w-6xl animate-in fade-in duration-200">
+          <div className="mx-auto w-full max-w-[1137px] animate-in fade-in duration-200">
             {enabledModules?.includes('electronic_invoicing') && <DianAlertsBanner />}
             {children}
           </div>

@@ -23,7 +23,8 @@ import {
 import { Skeleton } from '@shared/components/ui/skeleton';
 import { Pagination } from '@shared/components/Pagination';
 import { formatDateTime, formatMoney } from '@shared/utils/format';
-import { Boxes, Plus, Trash2, ChevronUp, ChevronDown, Search, Layers, DollarSign, AlertTriangle } from 'lucide-react';
+import Link from 'next/link';
+import { Boxes, Plus, Trash2, ChevronUp, ChevronDown, Search, Layers, DollarSign, AlertTriangle, ArrowLeft } from 'lucide-react';
 import { useMovementsList, useCreateMovement, useInventoryTotalValue } from '@features/inventory/hooks';
 import { useProductsList } from '@features/products/hooks';
 import { useSuppliersList } from '@features/suppliers/hooks';
@@ -87,8 +88,8 @@ function StockActualCard() {
   }, [stockSearch, stockSort]);
 
   return (
-    <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] overflow-hidden dark:border-[#1F2937]">
-      <div className="p-6 pb-4 border-b border-border/60">
+    <div className="space-y-4">
+      <div>
         <p className="text-lg font-medium text-foreground flex items-center gap-2">
           <Layers className="h-5 w-5 shrink-0 text-primary" aria-hidden />
           Stock actual
@@ -96,58 +97,63 @@ function StockActualCard() {
         <p className="mt-1.5 text-sm text-muted-foreground">
           Cantidad en mano por producto. Para modificar stock, registra un movimiento (entrada, salida o ajuste) más abajo.
         </p>
-        {!stockQuery.isLoading && (
-          <div className="grid gap-4 sm:grid-cols-2 mt-4">
-            <div className="rounded-lg border border-border/60 bg-muted/20 p-4 flex items-start gap-3">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                <DollarSign className="h-4 w-4" />
-              </span>
-              <div className="min-w-0">
-                <p className="text-xs font-medium text-muted-foreground">Valor total del inventario</p>
-                <p className="text-lg font-semibold tabular-nums text-foreground mt-0.5">
-                  {totalValueQuery.isLoading || totalValueQuery.isFetching ? '…' : formatMoney(totalValueAll)}
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">Suma de (stock × costo) de todos los productos</p>
-              </div>
-            </div>
-            <div className="rounded-lg border border-border/60 bg-muted/20 p-4 flex items-start gap-3">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                <AlertTriangle className="h-4 w-4" />
-              </span>
-              <div className="min-w-0 flex-1">
-                <Label htmlFor="low-stock-threshold" className="text-xs font-medium text-muted-foreground">
-                  Stock mínimo por defecto
-                </Label>
-                <div className="flex items-center gap-2 mt-1.5">
-                  <Input
-                    id="low-stock-threshold"
-                    type="number"
-                    min={0}
-                    value={thresholdInput !== '' ? thresholdInput : String(lowStockThreshold)}
-                    onChange={(e) => setThresholdInput(e.target.value)}
-                    onBlur={() => {
-                      const n = parseInt(thresholdInput, 10);
-                      if (!Number.isNaN(n) && n >= 0) {
-                        setLowStockThreshold(n);
-                        setThresholdInput('');
-                      } else {
-                        setThresholdInput('');
-                      }
-                    }}
-                    className="h-9 w-20 tabular-nums rounded-lg"
-                  />
-                  <span className="text-xs text-muted-foreground">unidades</span>
-                </div>
-                <p className="text-xs text-muted-foreground mt-1.5">Se usa cuando el producto no tiene stock mínimo propio. Stock ≤ mínimo se considera en alerta.</p>
-              </div>
+      </div>
+
+      {!stockQuery.isLoading && (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="rounded-2xl border border-border/50 bg-card shadow-sm dark:border-[#1F2937] p-5 flex items-start gap-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <DollarSign className="h-4 w-4" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-xs font-medium text-muted-foreground">Valor total del inventario</p>
+              <p className="text-lg font-semibold tabular-nums text-foreground mt-0.5">
+                {totalValueQuery.isLoading || totalValueQuery.isFetching ? '…' : formatMoney(totalValueAll)}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">Suma de (stock × costo) de todos los productos</p>
             </div>
           </div>
-        )}
-        <div className="flex flex-wrap items-end gap-3 pt-4 mt-2 border-t border-border/60">
+          <div className="rounded-2xl border border-border/50 bg-card shadow-sm dark:border-[#1F2937] p-5 flex items-start gap-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <AlertTriangle className="h-4 w-4" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <Label htmlFor="low-stock-threshold" className="text-xs font-medium text-muted-foreground">
+                Stock mínimo por defecto
+              </Label>
+              <div className="flex items-center gap-2 mt-1.5">
+                <Input
+                  id="low-stock-threshold"
+                  type="number"
+                  min={0}
+                  value={thresholdInput !== '' ? thresholdInput : String(lowStockThreshold)}
+                  onChange={(e) => setThresholdInput(e.target.value)}
+                  onBlur={() => {
+                    const n = parseInt(thresholdInput, 10);
+                    if (!Number.isNaN(n) && n >= 0) {
+                      setLowStockThreshold(n);
+                      setThresholdInput('');
+                    } else {
+                      setThresholdInput('');
+                    }
+                  }}
+                  className="h-9 w-20 tabular-nums rounded-lg"
+                />
+                <span className="text-xs text-muted-foreground">unidades</span>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1.5">Se usa cuando el producto no tiene stock mínimo propio. Stock ≤ mínimo se considera en alerta.</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="rounded-2xl border border-border/50 bg-card shadow-sm overflow-hidden dark:border-[#1F2937]">
+        <div className="p-6 pb-4">
+        <div className="flex flex-wrap items-end gap-4">
           <div className="flex flex-col gap-1.5 flex-1 min-w-[200px]">
             <Label htmlFor="search-stock" className="text-xs font-medium text-muted-foreground">Buscar</Label>
             <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
               <Input
                 id="search-stock"
                 type="search"
@@ -157,14 +163,14 @@ function StockActualCard() {
                   setStockSearch(e.target.value);
                   setStockPage(1);
                 }}
-                className="h-9 rounded-lg pl-8 text-sm flex-1 min-w-0"
+                className="h-10 rounded-lg pl-9 text-sm flex-1 min-w-0"
                 autoComplete="off"
               />
             </div>
           </div>
           <div className="flex flex-col gap-1.5">
             <Label className="text-xs font-medium text-muted-foreground">Ordenar por stock</Label>
-            <div className="flex items-center gap-1 border border-input rounded-lg p-0.5 bg-background">
+            <div className="flex items-center h-10 border border-input rounded-lg overflow-hidden bg-background shrink-0">
               <button
                 type="button"
                 onClick={() => {
@@ -172,8 +178,8 @@ function StockActualCard() {
                   else setStockSort('desc');
                   setStockPage(1);
                 }}
-                className={`h-8 px-2.5 flex items-center gap-1 rounded-md text-xs font-medium transition-colors ${
-                  stockSort === 'desc' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted text-muted-foreground'
+                className={`h-full px-4 flex items-center gap-1.5 rounded-none border-r border-input text-xs font-medium transition-colors min-w-[4.5rem] ${
+                  stockSort === 'desc' ? 'bg-primary text-primary-foreground border-primary' : 'hover:bg-muted text-muted-foreground'
                 }`}
                 title="Mayor a menor"
               >
@@ -187,7 +193,7 @@ function StockActualCard() {
                   else setStockSort('asc');
                   setStockPage(1);
                 }}
-                className={`h-8 px-2.5 flex items-center gap-1 rounded-md text-xs font-medium transition-colors ${
+                className={`h-full px-4 flex items-center gap-1.5 rounded-none text-xs font-medium transition-colors min-w-[4.5rem] ${
                   stockSort === 'asc' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted text-muted-foreground'
                 }`}
                 title="Menor a mayor"
@@ -197,18 +203,22 @@ function StockActualCard() {
               </button>
             </div>
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              setStockSearch('');
-              setStockSort(null);
-              setStockPage(1);
-            }}
-            className="h-9 text-xs rounded-lg"
-          >
-            Limpiar
-          </Button>
+          <div className="flex flex-col gap-1.5">
+            <Label className="text-xs font-medium text-muted-foreground invisible sm:visible">Limpiar</Label>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setStockSearch('');
+                setStockSort(null);
+                setStockPage(1);
+              }}
+              className="h-10 rounded-lg px-4 shrink-0"
+              aria-label="Limpiar filtros"
+            >
+              Limpiar
+            </Button>
+          </div>
         </div>
       </div>
       <div className="p-6 pt-4 space-y-4">
@@ -279,6 +289,7 @@ function StockActualCard() {
             </Table>
           </div>
         )}
+        </div>
       </div>
     </div>
   );
@@ -436,14 +447,22 @@ export default function InventoryPage() {
   return (
     <div className="space-y-10">
       <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between pt-2 pb-2">
-        <div>
-          <h1 className="text-2xl font-light tracking-tight text-foreground sm:text-3xl flex items-center gap-2">
-            <Layers className="h-7 w-7 shrink-0 text-primary" aria-hidden />
-            Inventario
-          </h1>
-          <p className="mt-2 text-sm text-muted-foreground max-w-xl">
-            Stock actual por producto y movimientos (entradas, salidas, ajustes)
-          </p>
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" asChild className="shrink-0 rounded-lg">
+            <Link href="/app">
+              <ArrowLeft className="h-4 w-4" />
+              <span className="sr-only">Volver al inicio</span>
+            </Link>
+          </Button>
+          <div>
+            <h1 className="text-2xl font-light tracking-tight text-foreground sm:text-3xl flex items-center gap-2">
+              <Layers className="h-7 w-7 shrink-0 text-primary" aria-hidden />
+              Inventario
+            </h1>
+            <p className="mt-2 text-sm text-muted-foreground max-w-xl">
+              Stock actual por producto y movimientos (entradas, salidas, ajustes)
+            </p>
+          </div>
         </div>
         <Button
           size="default"
@@ -457,21 +476,21 @@ export default function InventoryPage() {
 
       <StockActualCard />
 
-      <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] overflow-hidden dark:border-[#1F2937]">
-        <div className="p-6 pb-6 border-b border-border/60">
-          <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-            <div className="space-y-1">
-              <p className="text-lg font-medium text-foreground flex items-center gap-2">
-                <Boxes className="h-5 w-5 shrink-0 text-primary" aria-hidden />
-                Movimientos
-              </p>
-              <p className="text-sm text-muted-foreground">
-                {meta ? `${meta.total} movimiento${meta.total !== 1 ? 's' : ''}` : 'Listado paginado'} · Entradas, salidas y ajustes
-              </p>
-            </div>
-          </div>
-          <div className="flex flex-wrap items-end gap-4 sm:gap-6 pt-6">
-            <div className="flex flex-col gap-2 flex-1 min-w-[200px] max-w-sm">
+      <div className="space-y-4">
+        <div>
+          <p className="text-lg font-medium text-foreground flex items-center gap-2">
+            <Boxes className="h-5 w-5 shrink-0 text-primary" aria-hidden />
+            Movimientos
+          </p>
+          <p className="mt-1.5 text-sm text-muted-foreground">
+            {meta ? `${meta.total} movimiento${meta.total !== 1 ? 's' : ''}` : 'Listado paginado'} · Entradas, salidas y ajustes
+          </p>
+        </div>
+
+        <div className="rounded-2xl border border-border/50 bg-card shadow-sm overflow-hidden dark:border-[#1F2937]">
+          <div className="p-6 pb-4">
+          <div className="flex flex-wrap items-end gap-4">
+            <div className="flex flex-col gap-1.5 flex-1 min-w-[200px]">
               <Label htmlFor="search-movement" className="text-xs font-medium text-muted-foreground">Buscar</Label>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
@@ -489,9 +508,9 @@ export default function InventoryPage() {
                 />
               </div>
             </div>
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-1.5">
               <Label className="text-xs font-medium text-muted-foreground">Ordenar por fecha</Label>
-              <div className="flex items-center gap-2 border border-input rounded-lg p-1 bg-background">
+              <div className="flex items-center h-10 border border-input rounded-lg overflow-hidden bg-background shrink-0">
                 <button
                   type="button"
                   onClick={() => {
@@ -499,8 +518,8 @@ export default function InventoryPage() {
                     else setSortOrder('desc');
                     setPage(1);
                   }}
-                  className={`h-9 px-3 flex items-center gap-1.5 rounded-md text-xs font-medium transition-colors ${
-                    sortOrder === 'desc' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted text-muted-foreground'
+                  className={`h-full px-4 flex items-center gap-1.5 rounded-none border-r border-input text-xs font-medium transition-colors min-w-[4.5rem] ${
+                    sortOrder === 'desc' ? 'bg-primary text-primary-foreground border-primary' : 'hover:bg-muted text-muted-foreground'
                   }`}
                   title="Más reciente primero"
                 >
@@ -514,7 +533,7 @@ export default function InventoryPage() {
                     else setSortOrder('asc');
                     setPage(1);
                   }}
-                  className={`h-9 px-3 flex items-center gap-1.5 rounded-md text-xs font-medium transition-colors ${
+                  className={`h-full px-4 flex items-center gap-1.5 rounded-none text-xs font-medium transition-colors min-w-[4.5rem] ${
                     sortOrder === 'asc' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted text-muted-foreground'
                   }`}
                   title="Más antiguo primero"
@@ -524,21 +543,24 @@ export default function InventoryPage() {
                 </button>
               </div>
             </div>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setSearchTerm('');
-                setSortOrder(null);
-                setPage(1);
-              }}
-              disabled={!searchTerm.trim() && sortOrder === null}
-              className="h-10 rounded-lg px-4"
-              aria-label="Limpiar filtros"
-            >
-              Limpiar
-            </Button>
+            <div className="flex flex-col gap-1.5">
+              <Label className="text-xs font-medium text-muted-foreground invisible sm:visible">Limpiar</Label>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setSearchTerm('');
+                  setSortOrder(null);
+                  setPage(1);
+                }}
+                disabled={!searchTerm.trim() && sortOrder === null}
+                className="h-10 rounded-lg px-4 shrink-0"
+                aria-label="Limpiar filtros"
+              >
+                Limpiar
+              </Button>
+            </div>
           </div>
         </div>
         <div className="p-6 pt-6 pb-6 space-y-6">
@@ -653,6 +675,7 @@ export default function InventoryPage() {
             </div>
           )}
         </div>
+      </div>
       </div>
 
       <Dialog open={openNew} onOpenChange={setOpenNew}>

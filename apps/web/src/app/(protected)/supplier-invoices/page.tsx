@@ -25,7 +25,7 @@ import {
 import { Skeleton } from '@shared/components/ui/skeleton';
 import { Pagination } from '@shared/components/Pagination';
 import { formatMoney } from '@shared/utils/format';
-import { FileCheck, Plus, AlertTriangle, Info, Wallet, Search } from 'lucide-react';
+import { FileCheck, Plus, AlertTriangle, Info, Wallet, Search, ArrowLeft } from 'lucide-react';
 
 const SEARCH_DEBOUNCE_MS = 300;
 import { Select } from '@shared/components/ui/select';
@@ -270,14 +270,22 @@ export default function SupplierInvoicesPage() {
   return (
     <div className="space-y-10">
       <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between pt-2 pb-2">
-        <div>
-          <h1 className="text-2xl font-light tracking-tight text-foreground sm:text-3xl flex items-center gap-2">
-            <FileCheck className="h-7 w-7 shrink-0 text-primary" aria-hidden />
-            Facturas de proveedores
-          </h1>
-          <p className="mt-2 text-sm text-muted-foreground max-w-xl">
-            Cuentas por pagar
-          </p>
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" asChild className="shrink-0 rounded-lg">
+            <Link href="/app">
+              <ArrowLeft className="h-4 w-4" />
+              <span className="sr-only">Volver al inicio</span>
+            </Link>
+          </Button>
+          <div>
+            <h1 className="text-2xl font-light tracking-tight text-foreground sm:text-3xl flex items-center gap-2">
+              <FileCheck className="h-7 w-7 shrink-0 text-primary" aria-hidden />
+              Facturas de proveedores
+            </h1>
+            <p className="mt-2 text-sm text-muted-foreground max-w-xl">
+              Cuentas por pagar
+            </p>
+          </div>
         </div>
         <Button size="default" onClick={() => setOpenNew(true)} className="gap-2 rounded-xl shrink-0 bg-primary hover:bg-primary/90 text-primary-foreground">
           <Plus className="h-4 w-4" />

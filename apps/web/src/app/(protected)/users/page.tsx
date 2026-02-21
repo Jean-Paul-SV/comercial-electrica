@@ -27,7 +27,8 @@ import {
 } from '@shared/components/ui/table';
 import { Skeleton } from '@shared/components/ui/skeleton';
 import { Badge } from '@shared/components/ui/badge';
-import { UserPlus, ShieldAlert, Pencil, Trash2, Users, Camera, User, KeyRound } from 'lucide-react';
+import Link from 'next/link';
+import { UserPlus, ShieldAlert, Pencil, Trash2, Users, Camera, User, KeyRound, ArrowLeft } from 'lucide-react';
 import { useRegisterUser, useUsersList, useUpdateUser, useDeleteUser, useUploadEmployeePicture } from '@features/auth/hooks';
 import type { UserListItem } from '@features/auth/types';
 import { useAuth } from '@shared/providers/AuthProvider';
@@ -208,16 +209,24 @@ export default function UsersPage() {
 
   return (
     <div className="space-y-10">
-      <header className="pt-2 pb-2">
-        <h1 className="text-2xl font-light tracking-tight text-foreground sm:text-3xl flex items-center gap-2">
-          <Users className="h-7 w-7 shrink-0 text-primary" aria-hidden />
-          Usuarios
-        </h1>
-        <p className="mt-2 text-sm text-muted-foreground max-w-xl">
-          {canCreate
-            ? 'Crear y gestionar usuarios de tu empresa. El rol define los permisos de acceso.'
-            : 'Lista de usuarios de tu empresa.'}
-        </p>
+      <header className="flex items-center gap-4 pt-2 pb-2">
+        <Button variant="ghost" size="icon" asChild className="shrink-0 rounded-lg">
+          <Link href="/app">
+            <ArrowLeft className="h-4 w-4" />
+            <span className="sr-only">Volver al inicio</span>
+          </Link>
+        </Button>
+        <div>
+          <h1 className="text-2xl font-light tracking-tight text-foreground sm:text-3xl flex items-center gap-2">
+            <Users className="h-7 w-7 shrink-0 text-primary" aria-hidden />
+            Usuarios
+          </h1>
+          <p className="mt-2 text-sm text-muted-foreground max-w-xl">
+            {canCreate
+              ? 'Crear y gestionar usuarios de tu empresa. El rol define los permisos de acceso.'
+              : 'Lista de usuarios de tu empresa.'}
+          </p>
+        </div>
       </header>
 
       {canRead && (

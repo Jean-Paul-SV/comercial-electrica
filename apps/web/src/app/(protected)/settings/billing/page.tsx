@@ -13,7 +13,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@shared/components/ui/dialog';
-import { CreditCard, Calendar, Package, AlertCircle, CheckCircle2, Sparkles, RefreshCw, Smartphone } from 'lucide-react';
+import { CreditCard, Calendar, Package, AlertCircle, CheckCircle2, Sparkles, RefreshCw, Smartphone, ArrowLeft } from 'lucide-react';
 import {
   useSubscriptionInfo,
   useBillingPlans,
@@ -109,21 +109,26 @@ function PlanCard({
 
   return (
     <div
-      className={`rounded-xl border p-5 transition-all ${
+      className={`rounded-2xl border p-6 transition-all ${
         isCurrent
           ? 'border-primary/40 bg-primary/10 shadow-sm ring-1 ring-primary/20'
-          : 'border-border/70 bg-card hover:border-primary/30 hover:shadow-md'
+          : 'border-border/50 bg-card shadow-sm shadow-black/[0.03] hover:border-primary/30 hover:shadow-md dark:border-[#1F2937]'
       }`}
     >
       <div className="flex flex-col gap-4">
         <div className="flex items-start justify-between gap-2">
-          <div>
-            <p className="font-semibold text-foreground">{p.name}</p>
-            {p.maxUsers != null && (
-              <p className="text-xs text-muted-foreground mt-0.5">
-                hasta {p.maxUsers} usuarios
-              </p>
-            )}
+          <div className="flex items-start gap-3 min-w-0">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary" aria-hidden>
+              <Package className="h-4 w-4" />
+            </span>
+            <div className="min-w-0">
+              <p className="font-semibold text-foreground">{p.name}</p>
+              {p.maxUsers != null && (
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  hasta {p.maxUsers} usuarios
+                </p>
+              )}
+            </div>
           </div>
           {isCurrent && (
             <Badge variant="secondary" className="shrink-0 px-2.5">
@@ -359,7 +364,7 @@ export default function BillingPage() {
 
   if (isPlatformAdmin) {
     return (
-      <div className="space-y-10 max-w-5xl mx-auto">
+      <div className="space-y-10 max-w-6xl mx-auto">
         <header>
           <h1 className="text-2xl font-light tracking-tight text-foreground sm:text-3xl">Plan</h1>
           <p className="mt-2 text-sm text-muted-foreground">Gestión de planes y suscripciones.</p>
@@ -384,7 +389,7 @@ export default function BillingPage() {
 
   if (subscriptionQuery.isLoading || subscriptionQuery.isPending) {
     return (
-      <div className="space-y-8 max-w-5xl mx-auto">
+      <div className="space-y-8 max-w-6xl mx-auto">
         <div className="flex flex-col gap-1">
           <Skeleton className="h-8 w-24" />
           <Skeleton className="h-4 w-64" />
@@ -405,7 +410,7 @@ export default function BillingPage() {
 
   if (subscriptionQuery.isError) {
     return (
-      <div className="space-y-8 max-w-5xl mx-auto">
+      <div className="space-y-8 max-w-6xl mx-auto">
         <div className="flex flex-col gap-1">
           <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
             Plan
@@ -452,19 +457,28 @@ export default function BillingPage() {
   const showRequiresPayment = requiresPayment && !isActive;
 
   return (
-    <div className="space-y-10 max-w-5xl mx-auto pb-8">
+    <div className="space-y-10 max-w-6xl mx-auto pb-8">
       {/* Hero */}
-      <header className="space-y-1">
-        <h1 className="text-2xl font-light tracking-tight text-foreground sm:text-3xl">
-          {showRequiresPayment ? 'Completa tu pago' : plan ? 'Plan' : 'Elige tu plan'}
-        </h1>
-        <p className="text-sm text-muted-foreground max-w-xl">
-          {showRequiresPayment
-            ? 'Tu empresa está creada. Activa tu acceso completando el pago de tu suscripción.'
-            : plan
-              ? 'Información de tu suscripción, renovación y opciones de pago.'
-              : 'Selecciona el plan que mejor se adapte a las necesidades de tu empresa.'}
-        </p>
+      <header className="flex items-center gap-4 space-y-0">
+        <Button variant="ghost" size="icon" asChild className="shrink-0 rounded-lg">
+          <Link href="/app">
+            <ArrowLeft className="h-4 w-4" />
+            <span className="sr-only">Volver al inicio</span>
+          </Link>
+        </Button>
+        <div className="space-y-1">
+          <h1 className="text-2xl font-light tracking-tight text-foreground sm:text-3xl flex items-center gap-2">
+            <CreditCard className="h-7 w-7 shrink-0 text-primary" aria-hidden />
+            {showRequiresPayment ? 'Completa tu pago' : plan ? 'Plan' : 'Elige tu plan'}
+          </h1>
+          <p className="text-sm text-muted-foreground max-w-xl">
+            {showRequiresPayment
+              ? 'Tu empresa está creada. Activa tu acceso completando el pago de tu suscripción.'
+              : plan
+                ? 'Información de tu suscripción, renovación y opciones de pago.'
+                : 'Selecciona el plan que mejor se adapte a las necesidades de tu empresa.'}
+          </p>
+        </div>
       </header>
 
       {/* Aviso periodo de gracia */}

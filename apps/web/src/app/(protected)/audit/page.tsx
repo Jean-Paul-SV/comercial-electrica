@@ -22,7 +22,8 @@ import { Skeleton } from '@shared/components/ui/skeleton';
 import { Pagination } from '@shared/components/Pagination';
 import { toast } from 'sonner';
 import { formatDateTime } from '@shared/utils/format';
-import { ClipboardList, Eye, ShieldCheck } from 'lucide-react';
+import Link from 'next/link';
+import { ClipboardList, Eye, ShieldCheck, ArrowLeft } from 'lucide-react';
 import { useAuditLogsList, useVerifyAuditChain } from '@features/audit/hooks';
 import type { AuditLog } from '@features/audit/types';
 
@@ -188,14 +189,22 @@ export default function AuditPage() {
 
   return (
     <div className="space-y-10">
-      <header className="pt-2 pb-2">
-        <h1 className="text-2xl font-light tracking-tight text-foreground sm:text-3xl flex items-center gap-2">
-          <ClipboardList className="h-7 w-7 shrink-0 text-primary" aria-hidden />
-          Auditoría
-        </h1>
-        <p className="mt-2 text-sm text-muted-foreground max-w-xl">
-          Registro de acciones del sistema. En eliminaciones se muestra la justificación.
-        </p>
+      <header className="flex items-center gap-4 pt-2 pb-2">
+        <Button variant="ghost" size="icon" asChild className="shrink-0 rounded-lg">
+          <Link href="/app">
+            <ArrowLeft className="h-4 w-4" />
+            <span className="sr-only">Volver al inicio</span>
+          </Link>
+        </Button>
+        <div>
+          <h1 className="text-2xl font-light tracking-tight text-foreground sm:text-3xl flex items-center gap-2">
+            <ClipboardList className="h-7 w-7 shrink-0 text-primary" aria-hidden />
+            Auditoría
+          </h1>
+          <p className="mt-2 text-sm text-muted-foreground max-w-xl">
+            Registro de acciones del sistema. En eliminaciones se muestra la justificación.
+          </p>
+        </div>
       </header>
 
       <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] overflow-hidden dark:border-[#1F2937]">

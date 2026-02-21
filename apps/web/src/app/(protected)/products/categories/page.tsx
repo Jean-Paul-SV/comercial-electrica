@@ -21,7 +21,8 @@ import {
 } from '@shared/components/ui/dialog';
 import { Skeleton } from '@shared/components/ui/skeleton';
 import { EmptyState } from '@shared/components/EmptyState';
-import { Tag, Pencil, Trash2, Plus } from 'lucide-react';
+import Link from 'next/link';
+import { Tag, Pencil, Trash2, Plus, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   useCategories,
@@ -116,14 +117,22 @@ export default function CategoriesPage() {
   return (
     <div className="space-y-10">
       <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between pt-2 pb-2">
-        <div>
-          <h1 className="text-2xl font-light tracking-tight text-foreground sm:text-3xl flex items-center gap-2">
-            <Tag className="h-7 w-7 shrink-0 text-primary" />
-            Categorías
-          </h1>
-          <p className="mt-2 text-sm text-muted-foreground max-w-xl">
-            Organiza productos por categoría (Cables, Iluminación, Herrajes, etc.).
-          </p>
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" asChild className="shrink-0 rounded-lg">
+            <Link href="/app">
+              <ArrowLeft className="h-4 w-4" />
+              <span className="sr-only">Volver al inicio</span>
+            </Link>
+          </Button>
+          <div>
+            <h1 className="text-2xl font-light tracking-tight text-foreground sm:text-3xl flex items-center gap-2">
+              <Tag className="h-7 w-7 shrink-0 text-primary" />
+              Categorías
+            </h1>
+            <p className="mt-2 text-sm text-muted-foreground max-w-xl">
+              Organiza productos por categoría (Cables, Iluminación, Herrajes, etc.).
+            </p>
+          </div>
         </div>
         <Button
           size="default"
@@ -163,19 +172,6 @@ export default function CategoriesPage() {
               message="Sin categorías"
               description="Crea tu primera categoría para organizar el catálogo."
               icon={Tag}
-              action={
-                <Button
-                  size="sm"
-                  className="gap-1.5"
-                  onClick={() => {
-                    setNewName('');
-                    setOpenNew(true);
-                  }}
-                >
-                  <Plus className="h-4 w-4" />
-                  Nueva categoría
-                </Button>
-              }
               className="py-10"
             />
           ) : (

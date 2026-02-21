@@ -31,7 +31,7 @@ import { EmptyState } from '@shared/components/EmptyState';
 import { formatMoney, formatDateTime } from '@shared/utils/format';
 import { getErrorMessage } from '@shared/utils/errors';
 import { useHasPermission } from '@shared/hooks/useHasPermission';
-import { Wallet, Plus, ArrowDownToLine, ArrowUpFromLine, SlidersHorizontal, Lock, TrendingUp, Calculator, Receipt } from 'lucide-react';
+import { Wallet, Plus, ArrowDownToLine, ArrowUpFromLine, SlidersHorizontal, Lock, TrendingUp, Calculator, Receipt, ArrowLeft } from 'lucide-react';
 import { useCashSessionsList, useOpenCashSession, useCloseCashSession, useSessionMovements } from '@features/cash/hooks';
 import { useDashboard, useCashReport } from '@features/reports/hooks';
 
@@ -148,28 +148,36 @@ export default function CashPage() {
   return (
     <div className="space-y-10">
       <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between pt-2 pb-2">
-        <div>
-          <h1 className="text-2xl font-light tracking-tight text-foreground sm:text-3xl flex items-center gap-2">
-            <Wallet className="h-7 w-7 shrink-0 text-primary" aria-hidden />
-            Caja
-          </h1>
-          <p className="mt-2 text-sm text-muted-foreground max-w-xl">
-            {hasData
-              ? `${totalSessions} sesión${totalSessions !== 1 ? 'es' : ''} de caja`
-              : 'Sesiones de caja'}
-          </p>
-          {!dashboard.isLoading && (
-            <div className="mt-3 rounded-xl border border-border/50 bg-muted/20 px-4 py-2.5 inline-flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 text-primary shrink-0" aria-hidden />
-              <span className="text-sm font-medium text-foreground">Ventas del día:</span>
-              <span className="text-sm font-semibold text-primary">{formatMoney(todaySalesTotal)}</span>
-              {todaySalesCount > 0 && (
-                <span className="text-sm text-muted-foreground">
-                  ({todaySalesCount} venta{todaySalesCount !== 1 ? 's' : ''})
-                </span>
-              )}
-            </div>
-          )}
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" asChild className="shrink-0 rounded-lg">
+            <Link href="/app">
+              <ArrowLeft className="h-4 w-4" />
+              <span className="sr-only">Volver al inicio</span>
+            </Link>
+          </Button>
+          <div>
+            <h1 className="text-2xl font-light tracking-tight text-foreground sm:text-3xl flex items-center gap-2">
+              <Wallet className="h-7 w-7 shrink-0 text-primary" aria-hidden />
+              Caja
+            </h1>
+            <p className="mt-2 text-sm text-muted-foreground max-w-xl">
+              {hasData
+                ? `${totalSessions} sesión${totalSessions !== 1 ? 'es' : ''} de caja`
+                : 'Sesiones de caja'}
+            </p>
+            {!dashboard.isLoading && (
+              <div className="mt-3 rounded-xl border border-border/50 bg-muted/20 px-4 py-2.5 inline-flex items-center gap-2">
+                <TrendingUp className="h-4 w-4 text-primary shrink-0" aria-hidden />
+                <span className="text-sm font-medium text-foreground">Ventas del día:</span>
+                <span className="text-sm font-semibold text-primary">{formatMoney(todaySalesTotal)}</span>
+                {todaySalesCount > 0 && (
+                  <span className="text-sm text-muted-foreground">
+                    ({todaySalesCount} venta{todaySalesCount !== 1 ? 's' : ''})
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
         </div>
         <div className="flex flex-wrap gap-2 shrink-0">
           <Button size="sm" variant="outline" asChild className="gap-2 rounded-xl">
@@ -302,18 +310,6 @@ export default function CashPage() {
                             message="No hay sesiones de caja"
                             description="Abre una sesión para registrar ventas y movimientos de efectivo."
                             icon={Wallet}
-                            action={
-                              hasCashCreate ? (
-                                <Button
-                                  size="sm"
-                                  onClick={() => setOpenNewSession(true)}
-                                  className="gap-2"
-                                >
-                                  <Plus className="h-4 w-4" />
-                                  Abrir sesión
-                                </Button>
-                              ) : undefined
-                            }
                             className="py-16"
                           />
                         </TableCell>

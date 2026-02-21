@@ -33,7 +33,7 @@ import { formatMoney, formatDateTime } from '@shared/utils/format';
 import { getErrorMessage } from '@shared/utils/errors';
 import { useHasPermission } from '@shared/hooks/useHasPermission';
 import Link from 'next/link';
-import { ShoppingCart, Plus, Trash2, Search, FileText, Printer, Layers, Eye, UserPlus } from 'lucide-react';
+import { ShoppingCart, Plus, Trash2, Search, FileText, Printer, Layers, Eye, UserPlus, ArrowLeft } from 'lucide-react';
 import { useSalesList, useCreateSale } from '@features/sales/hooks';
 import { useCashSessionsList } from '@features/cash/hooks';
 import { useCustomersList, useCustomerSalesStats, useCreateCustomer } from '@features/customers/hooks';
@@ -499,14 +499,22 @@ export default function SalesPage() {
     <div className="space-y-10">
       {/* ——— HEADER: bloque independiente, sin card ——— */}
       <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between pt-2 pb-2">
-        <div>
-          <h1 className="text-2xl font-light tracking-tight text-foreground sm:text-3xl flex items-center gap-2">
-            <ShoppingCart className="h-7 w-7 shrink-0 text-primary" />
-            Listado de ventas
-          </h1>
-          <p className="mt-2 text-sm text-muted-foreground max-w-xl">
-            Ventas paginadas. Busca por cliente, número de factura o vendedor.
-          </p>
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" asChild className="shrink-0 rounded-lg">
+            <Link href="/app">
+              <ArrowLeft className="h-4 w-4" />
+              <span className="sr-only">Volver al inicio</span>
+            </Link>
+          </Button>
+          <div>
+            <h1 className="text-2xl font-light tracking-tight text-foreground sm:text-3xl flex items-center gap-2">
+              <ShoppingCart className="h-7 w-7 shrink-0 text-primary" />
+              Listado de ventas
+            </h1>
+            <p className="mt-2 text-sm text-muted-foreground max-w-xl">
+              Ventas paginadas. Busca por cliente, número de factura o vendedor.
+            </p>
+          </div>
         </div>
         {hasSalesCreate && (
           <Button

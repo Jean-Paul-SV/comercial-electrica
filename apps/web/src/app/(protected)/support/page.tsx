@@ -1,7 +1,7 @@
 'use client';
 
 import { Button } from '@shared/components/ui/button';
-import { MessageCircle } from 'lucide-react';
+import { MessageCircle, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 
 const DEFAULT_MESSAGE = 'Hola, necesito ayuda con Orion.';
@@ -17,14 +17,22 @@ export default function SupportPage() {
   if (whatsappUrl) {
     return (
       <div className="space-y-10 mx-auto max-w-lg">
-        <header>
-          <h1 className="text-2xl font-light tracking-tight text-foreground sm:text-3xl flex items-center gap-2">
-            <MessageCircle className="h-7 w-7 shrink-0 text-primary" aria-hidden />
-            Soporte
-          </h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Abre WhatsApp en una nueva pestaña para contactar a soporte. La app seguirá abierta aquí.
-          </p>
+        <header className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" asChild className="shrink-0 rounded-lg">
+            <Link href="/app">
+              <ArrowLeft className="h-4 w-4" />
+              <span className="sr-only">Volver al inicio</span>
+            </Link>
+          </Button>
+          <div>
+            <h1 className="text-2xl font-light tracking-tight text-foreground sm:text-3xl flex items-center gap-2">
+              <MessageCircle className="h-7 w-7 shrink-0 text-primary" aria-hidden />
+              Soporte
+            </h1>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Abre WhatsApp en una nueva pestaña para contactar a soporte. La app seguirá abierta aquí.
+            </p>
+          </div>
         </header>
         <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] p-6 dark:border-[#1F2937]">
           <div className="space-y-4">
@@ -49,14 +57,22 @@ export default function SupportPage() {
 
   return (
     <div className="space-y-10 mx-auto max-w-lg">
-      <header>
-        <h1 className="text-2xl font-light tracking-tight text-foreground sm:text-3xl flex items-center gap-2">
-          <MessageCircle className="h-7 w-7 shrink-0 text-primary" aria-hidden />
-          Soporte
-        </h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          El número de WhatsApp de soporte no está configurado para esta instalación.
-        </p>
+      <header className="flex items-center gap-4">
+        <Button variant="ghost" size="icon" asChild className="shrink-0 rounded-lg">
+          <Link href="/app">
+            <ArrowLeft className="h-4 w-4" />
+            <span className="sr-only">Volver al inicio</span>
+          </Link>
+        </Button>
+        <div>
+          <h1 className="text-2xl font-light tracking-tight text-foreground sm:text-3xl flex items-center gap-2">
+            <MessageCircle className="h-7 w-7 shrink-0 text-primary" aria-hidden />
+            Soporte
+          </h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            El número de WhatsApp de soporte no está configurado para esta instalación.
+          </p>
+        </div>
       </header>
       <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] p-6 dark:border-[#1F2937]">
           <p className="text-muted-foreground text-sm mb-4">

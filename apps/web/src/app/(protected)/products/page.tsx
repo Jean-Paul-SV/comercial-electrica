@@ -31,7 +31,7 @@ import { Pagination } from '@shared/components/Pagination';
 import { EmptyState } from '@shared/components/EmptyState';
 import { formatMoney } from '@shared/utils/format';
 import Link from 'next/link';
-import { Package, Plus, Tag, Pencil, Eye, BookOpen, Trash2, AlertTriangle } from 'lucide-react';
+import { Package, Plus, Tag, Pencil, Eye, BookOpen, Trash2, AlertTriangle, ArrowLeft } from 'lucide-react';
 import {
   useProductsList,
   useCreateProduct,
@@ -342,14 +342,22 @@ export default function ProductsPage() {
   return (
     <div className="space-y-10">
       <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between pt-2 pb-2">
-        <div>
-          <h1 className="text-2xl font-light tracking-tight text-foreground sm:text-3xl flex items-center gap-2">
-            <Package className="h-7 w-7 shrink-0 text-primary" aria-hidden />
-            Productos
-          </h1>
-          <p className="mt-2 text-sm text-muted-foreground max-w-xl">
-            Catálogo de productos (código, nombre, categoría, precios). El stock se gestiona en Inventario.
-          </p>
+        <div className="flex items-center gap-4 min-w-0 w-full sm:flex-1 sm:min-w-0">
+          <Button variant="ghost" size="icon" asChild className="shrink-0 rounded-lg">
+            <Link href="/app">
+              <ArrowLeft className="h-4 w-4" />
+              <span className="sr-only">Volver al inicio</span>
+            </Link>
+          </Button>
+          <div className="min-w-0">
+            <h1 className="text-2xl font-light tracking-tight text-foreground sm:text-3xl flex items-center gap-2">
+              <Package className="h-7 w-7 shrink-0 text-primary" aria-hidden />
+              Productos
+            </h1>
+            <p className="mt-2 text-sm text-muted-foreground w-full">
+              Catálogo de productos (código, nombre, categoría, precios). El stock se gestiona en Inventario.
+            </p>
+          </div>
         </div>
         <div className="flex flex-wrap gap-2 shrink-0">
           <Button variant="outline" size="sm" onClick={() => setOpenNewCategory(true)} className="gap-2 rounded-xl">
@@ -529,16 +537,6 @@ export default function ProductsPage() {
                             message="No hay productos"
                             description="Crea un producto o una categoría para organizar tu catálogo."
                             icon={Package}
-                            action={
-                              <Button
-                                size="sm"
-                                onClick={() => setOpenNewProduct(true)}
-                                className="gap-2"
-                              >
-                                <Plus className="h-4 w-4" />
-                                Nuevo producto
-                              </Button>
-                            }
                             className="py-16"
                           />
                         </TableCell>

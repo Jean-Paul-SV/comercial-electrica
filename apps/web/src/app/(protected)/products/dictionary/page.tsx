@@ -141,14 +141,22 @@ export default function ProductDictionaryPage() {
   return (
     <div className="space-y-10">
       <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between pt-2 pb-2">
-        <div>
-          <h1 className="text-2xl font-light tracking-tight text-foreground sm:text-3xl flex items-center gap-2">
-            <BookOpen className="h-7 w-7 shrink-0 text-primary" aria-hidden />
-            Diccionario
-          </h1>
-          <p className="mt-2 text-sm text-muted-foreground max-w-xl">
-            Términos o frases que los clientes escriben al preguntar por productos. Opcionalmente puedes vincular cada término a un producto.
-          </p>
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" asChild className="shrink-0 rounded-lg">
+            <Link href="/app">
+              <ArrowLeft className="h-4 w-4" />
+              <span className="sr-only">Volver al inicio</span>
+            </Link>
+          </Button>
+          <div>
+            <h1 className="text-2xl font-light tracking-tight text-foreground sm:text-3xl flex items-center gap-2">
+              <BookOpen className="h-7 w-7 shrink-0 text-primary" aria-hidden />
+              Diccionario
+            </h1>
+            <p className="mt-2 text-sm text-muted-foreground max-w-xl">
+              Términos o frases que los clientes escriben al preguntar por productos. Opcionalmente puedes vincular cada término a un producto.
+            </p>
+          </div>
         </div>
         <Button asChild variant="outline" size="sm" className="gap-2 shrink-0 rounded-xl">
           <Link href="/products" className="flex items-center gap-2">
@@ -240,25 +248,6 @@ export default function ProductDictionaryPage() {
                 search.trim()
                   ? `No se encontró "${search.trim()}". Puedes agregarlo al diccionario.`
                   : 'Agrega términos o frases que los clientes escriben al preguntar por productos.'
-              }
-              action={
-                search.trim() ? (
-                  <Button
-                    onClick={() => {
-                      setNewTerm(search.trim());
-                      setOpenCreate(true);
-                    }}
-                    className="gap-2"
-                  >
-                    <Plus className="h-4 w-4" />
-                    Agregar &quot;{search.trim()}&quot;
-                  </Button>
-                ) : (
-                  <Button onClick={() => setOpenCreate(true)} className="gap-2">
-                    <Plus className="h-4 w-4" />
-                    Agregar término
-                  </Button>
-                )
               }
             />
           )}

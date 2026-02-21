@@ -19,7 +19,8 @@ import {
 } from '@shared/components/ui/dialog';
 import { Skeleton } from '@shared/components/ui/skeleton';
 import { Badge } from '@shared/components/ui/badge';
-import { Database, Plus, Download, Trash2, ShieldCheck } from 'lucide-react';
+import Link from 'next/link';
+import { Database, Plus, Download, Trash2, ShieldCheck, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   useBackupsList,
@@ -99,14 +100,22 @@ export default function BackupsPage() {
   return (
     <div className="space-y-10">
       <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between pt-2 pb-2">
-        <div>
-          <h1 className="text-2xl font-light tracking-tight text-foreground sm:text-3xl flex items-center gap-2">
-            <Database className="h-7 w-7 shrink-0 text-primary" aria-hidden />
-            Backups
-          </h1>
-          <p className="mt-2 text-sm text-muted-foreground max-w-xl">
-            Crear y descargar copias de seguridad de los datos de tu empresa (CSV en ZIP). Solo los completados pueden descargarse.
-          </p>
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" asChild className="shrink-0 rounded-lg">
+            <Link href="/app">
+              <ArrowLeft className="h-4 w-4" />
+              <span className="sr-only">Volver al inicio</span>
+            </Link>
+          </Button>
+          <div>
+            <h1 className="text-2xl font-light tracking-tight text-foreground sm:text-3xl flex items-center gap-2">
+              <Database className="h-7 w-7 shrink-0 text-primary" aria-hidden />
+              Backups
+            </h1>
+            <p className="mt-2 text-sm text-muted-foreground max-w-xl">
+              Crear y descargar copias de seguridad de los datos de tu empresa (CSV en ZIP). Solo los completados pueden descargarse.
+            </p>
+          </div>
         </div>
         <Button
           type="button"
