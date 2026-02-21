@@ -2,13 +2,6 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@shared/components/ui/card';
 import { Button } from '@shared/components/ui/button';
 import { Input } from '@shared/components/ui/input';
 import { Label } from '@shared/components/ui/label';
@@ -58,8 +51,8 @@ export default function ProviderUsagePage() {
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
   return (
-    <div className="p-4 md:p-6 space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="space-y-10">
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" asChild>
             <Link href="/provider">
@@ -68,25 +61,25 @@ export default function ProviderUsagePage() {
             </Link>
           </Button>
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight flex items-center gap-2">
-              <BarChart3 className="h-6 w-6 text-primary" />
+            <h1 className="text-2xl font-light tracking-tight text-foreground sm:text-3xl flex items-center gap-2">
+              <BarChart3 className="h-7 w-7 shrink-0 text-primary" aria-hidden />
               Datos de uso
             </h1>
-            <p className="text-muted-foreground text-sm mt-0.5">
+            <p className="mt-2 text-sm text-muted-foreground max-w-xl">
               Eventos para mejorar el producto (pantallas visitadas, acciones). Solo uso interno, sin vender datos.
             </p>
           </div>
         </div>
-      </div>
+      </header>
 
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg">Resumen por empresa</CardTitle>
-          <CardDescription>
+      <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] overflow-hidden dark:border-[#1F2937]">
+        <div className="p-6 pb-3">
+          <h2 className="text-lg font-medium text-foreground">Resumen por empresa</h2>
+          <p className="text-sm text-muted-foreground mt-0.5">
             Conteos de datos (usuarios, productos, ventas, clientes) de cada empresa. Mismo dato que en el detalle de cada una.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+          </p>
+        </div>
+        <div>
           {tenantsLoading ? (
             <Skeleton className="h-32 w-full rounded-lg" />
           ) : tenants.length === 0 ? (
@@ -128,17 +121,12 @@ export default function ProviderUsagePage() {
               </Table>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg">Eventos</CardTitle>
-          <CardDescription>
-            Filtra por empresa, tipo de evento o rango de fechas.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
+      <div className="rounded-2xl border border-border/50 bg-muted/20 p-5 shadow-sm dark:bg-[#111827] dark:border-[#1F2937] sm:p-6">
+        <p className="text-sm font-medium text-foreground mb-2">Eventos</p>
+        <p className="text-muted-foreground text-sm mb-4">Filtra por empresa, tipo de evento o rango de fechas.</p>
           <div className="flex flex-wrap gap-4 items-end">
             <div className="space-y-1">
               <Label className="text-xs">Empresa</Label>
@@ -198,7 +186,9 @@ export default function ProviderUsagePage() {
               />
             </div>
           </div>
+      </div>
 
+      <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] p-6 dark:border-[#1F2937] space-y-6">
           <div>
             <p className="text-sm font-medium text-muted-foreground mb-2">Eventos por día (mismos filtros)</p>
             {eventsByDayLoading ? (
@@ -220,8 +210,7 @@ export default function ProviderUsagePage() {
             </p>
           ) : (
             <>
-              <div className="rounded-lg border border-border/60 overflow-x-auto">
-                <Table>
+              <Table>
                   <TableHeader>
                     <TableRow className="border-border/50">
                       <TableHead className="font-medium">Fecha</TableHead>
@@ -266,7 +255,6 @@ export default function ProviderUsagePage() {
                     ))}
                   </TableBody>
                 </Table>
-              </div>
 
               {totalPages > 1 && (
                 <div className="flex items-center justify-between pt-2">
@@ -297,8 +285,7 @@ export default function ProviderUsagePage() {
               )}
             </>
           )}
-        </CardContent>
-      </Card>
+      </div>
     </div>
   );
 }

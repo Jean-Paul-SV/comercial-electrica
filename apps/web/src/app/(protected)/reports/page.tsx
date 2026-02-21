@@ -3,13 +3,6 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@shared/components/ui/card';
-import {
   Table,
   TableBody,
   TableCell,
@@ -207,25 +200,26 @@ export default function ReportsPage() {
   );
 
   return (
-    <div className="space-y-6 sm:space-y-8">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-xl font-semibold tracking-tight sm:text-2xl text-foreground">
+    <div className="space-y-10">
+      <header className="pt-2 pb-2">
+        <h1 className="text-2xl font-light tracking-tight text-foreground sm:text-3xl flex items-center gap-2">
+          <FileText className="h-7 w-7 shrink-0 text-primary" aria-hidden />
           Reportes
         </h1>
-        <p className="text-sm text-muted-foreground">
+        <p className="mt-2 text-sm text-muted-foreground max-w-xl">
           Ventas, inventario, caja, clientes y KPIs
         </p>
-      </div>
+      </header>
 
-      <Card className="border border-border/80 shadow-sm rounded-xl overflow-hidden">
-        <CardHeader className="pb-4 border-b border-border/60">
-          <CardTitle className="text-lg font-medium flex items-center gap-2 text-foreground">
+      <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] overflow-hidden dark:border-[#1F2937]">
+        <div className="p-6 pb-4 border-b border-border/50">
+          <p className="text-lg font-medium text-foreground flex items-center gap-2">
             <FileText className="h-5 w-5 shrink-0 text-primary" aria-hidden />
             Reportes y dashboard
-          </CardTitle>
-          <CardDescription>
+          </p>
+          <p className="mt-1.5 text-sm text-muted-foreground">
             Resúmenes de ventas, inventario, caja y clientes. Exporta a CSV cuando lo necesites.
-          </CardDescription>
+          </p>
           <div className="flex flex-wrap items-center gap-2 pt-2">
             <span className="text-xs text-muted-foreground mr-1">Exportar CSV:</span>
             <Button
@@ -269,8 +263,8 @@ export default function ReportsPage() {
               Clientes
             </Button>
           </div>
-        </CardHeader>
-        <CardContent className="pt-4 space-y-4">
+        </div>
+        <div className="p-6 pt-4 space-y-4">
           <div className="flex flex-wrap gap-2 border-b border-border/60 pb-3">
             {tabs.map(({ id, label, icon: Icon }) => (
               <button
@@ -1040,8 +1034,8 @@ export default function ReportsPage() {
               )}
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

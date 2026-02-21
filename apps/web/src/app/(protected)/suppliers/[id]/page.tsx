@@ -2,13 +2,6 @@
 
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@shared/components/ui/card';
 import { Button } from '@shared/components/ui/button';
 import { Badge } from '@shared/components/ui/badge';
 import { Skeleton } from '@shared/components/ui/skeleton';
@@ -29,101 +22,80 @@ export default function SupplierDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-10">
         <Skeleton className="h-8 w-48" />
-        <Card>
-          <CardHeader>
-            <Skeleton className="h-6 w-32" />
-            <Skeleton className="h-4 w-64" />
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Skeleton className="h-5 w-full" />
-            <Skeleton className="h-5 w-full" />
-          </CardContent>
-        </Card>
+        <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] p-6 dark:border-[#1F2937]">
+          <Skeleton className="h-6 w-32" />
+          <Skeleton className="h-4 w-64 mt-2" />
+          <Skeleton className="h-5 w-full mt-4" />
+          <Skeleton className="h-5 w-full" />
+        </div>
       </div>
     );
   }
 
   if (isError || !supplier) {
     return (
-      <div className="space-y-6">
-        <Link href="/suppliers">
-          <Button variant="ghost" size="sm" className="gap-2">
+      <div className="space-y-10">
+        <Button variant="outline" size="sm" asChild className="gap-2 rounded-xl">
+          <Link href="/suppliers">
             <ArrowLeft className="h-4 w-4" />
             Volver a proveedores
-          </Button>
-        </Link>
-        <Card className="border-destructive/50">
-          <CardContent className="pt-6">
-            <p className="text-sm text-destructive">
-              {(error as { message?: string })?.message ?? 'Proveedor no encontrado.'}
-            </p>
-          </CardContent>
-        </Card>
+          </Link>
+        </Button>
+        <div className="rounded-2xl border border-destructive/50 bg-card p-6">
+          <p className="text-sm text-destructive">
+            {(error as { message?: string })?.message ?? 'Proveedor no encontrado.'}
+          </p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-8">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <Link href="/suppliers">
-          <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground hover:text-foreground">
-            <ArrowLeft className="h-4 w-4" />
-            Volver a proveedores
+    <div className="space-y-10">
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-light tracking-tight text-foreground sm:text-3xl flex items-center gap-2">
+            <Truck className="h-7 w-7 shrink-0 text-primary" aria-hidden />
+            {supplier.name}
+          </h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            NIT {supplier.nit}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2 shrink-0">
+          <Button variant="outline" size="sm" asChild className="gap-2 rounded-xl">
+            <Link href="/suppliers">
+              <ArrowLeft className="h-4 w-4" />
+              Volver a proveedores
+            </Link>
           </Button>
-        </Link>
-        <div className="flex flex-wrap gap-2">
-          <Button asChild variant="outline" size="sm" className="gap-2">
+          <Button variant="outline" size="sm" asChild className="gap-2">
             <Link href={`/supplier-invoices?supplierId=${supplier.id}`}>
               <FileText className="h-4 w-4" />
               Facturas
             </Link>
           </Button>
-          <Button asChild variant="outline" size="sm" className="gap-2">
+          <Button variant="outline" size="sm" asChild className="gap-2">
             <Link href="/suppliers">
               <Pencil className="h-4 w-4" />
               Ir a listado para editar
             </Link>
           </Button>
         </div>
-      </div>
+      </header>
 
-      <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl text-foreground">
-          Detalle del proveedor
-        </h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          {supplier.name} · NIT {supplier.nit}
-        </p>
-      </div>
-
-      <Card className="border border-border/80 shadow-sm rounded-2xl overflow-hidden bg-card">
-        <CardHeader className="pb-5 pt-6 px-6 sm:px-8 border-b border-border/60 bg-muted/20">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                <Truck className="h-6 w-6" aria-hidden />
-              </div>
-              <div className="min-w-0">
-                <CardTitle className="text-xl font-semibold tracking-tight text-foreground truncate">
-                  {supplier.name}
-                </CardTitle>
-                <CardDescription className="text-sm mt-0.5">
-                  NIT {supplier.nit}
-                </CardDescription>
-              </div>
-            </div>
-            <Badge
-              variant={supplier.isActive ? 'default' : 'secondary'}
-              className="shrink-0 font-medium px-3 py-1"
-            >
-              {supplier.isActive ? 'Activo' : 'Inactivo'}
-            </Badge>
-          </div>
-        </CardHeader>
-        <CardContent className="pt-6 pb-6 px-6 sm:px-8">
+      <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] overflow-hidden dark:border-[#1F2937]">
+        <div className="pb-5 pt-6 px-6 sm:px-8 border-b border-border/60 bg-muted/20 flex flex-wrap items-center justify-end gap-3">
+          <Badge
+            variant={supplier.isActive ? 'default' : 'secondary'}
+            className="shrink-0 font-medium px-3 py-1"
+          >
+            {supplier.isActive ? 'Activo' : 'Inactivo'}
+          </Badge>
+        </div>
+        <div className="pt-6 pb-6 px-6 sm:px-8">
           <dl className="grid gap-x-8 gap-y-5 sm:grid-cols-2">
             <div className="flex flex-col gap-1">
               <dt className="text-sm font-medium text-muted-foreground">NIT</dt>
@@ -174,8 +146,8 @@ export default function SupplierDetailPage() {
               <dd className="text-base font-medium text-foreground tabular-nums">{formatDate(supplier.updatedAt)}</dd>
             </div>
           </dl>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

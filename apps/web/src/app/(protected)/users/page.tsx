@@ -5,13 +5,6 @@ import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@shared/components/ui/card';
 import { Button } from '@shared/components/ui/button';
 import { Input } from '@shared/components/ui/input';
 import { Label } from '@shared/components/ui/label';
@@ -201,60 +194,59 @@ export default function UsersPage() {
           <h1 className="text-xl font-semibold tracking-tight sm:text-2xl text-foreground">Usuarios</h1>
           <p className="text-sm text-muted-foreground">Gestión de usuarios del tenant.</p>
         </div>
-        <Card className="border-0 shadow-xl rounded-2xl overflow-hidden max-w-md bg-card">
-          <div className="h-1 w-full bg-gradient-to-r from-primary to-primary/80" />
-          <CardContent className="flex flex-col items-center justify-center gap-4 py-12">
+        <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] max-w-md p-6 dark:border-[#1F2937]">
+          <div className="flex flex-col items-center justify-center gap-4 py-12">
             <ShieldAlert className="h-14 w-14 text-muted-foreground/80" aria-hidden />
             <p className="text-muted-foreground text-center text-sm max-w-sm">
               No tienes permiso para gestionar usuarios. Solo los administradores pueden ver y crear usuarios.
             </p>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-8">
-      <div className="flex flex-col gap-1 border-l-4 border-primary pl-4">
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+    <div className="space-y-10">
+      <header className="pt-2 pb-2">
+        <h1 className="text-2xl font-light tracking-tight text-foreground sm:text-3xl flex items-center gap-2">
+          <Users className="h-7 w-7 shrink-0 text-primary" aria-hidden />
           Usuarios
         </h1>
-        <p className="text-sm text-muted-foreground">
+        <p className="mt-2 text-sm text-muted-foreground max-w-xl">
           {canCreate
             ? 'Crear y gestionar usuarios de tu empresa. El rol define los permisos de acceso.'
             : 'Lista de usuarios de tu empresa.'}
         </p>
-      </div>
+      </header>
 
       {canRead && (
-        <Card className="border-0 shadow-xl rounded-2xl overflow-hidden bg-card">
-          <div className="h-1 w-full bg-gradient-to-r from-primary to-primary/80" />
-          <CardHeader className="pb-5 pt-6 px-6 border-b border-border/60">
+        <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] overflow-hidden dark:border-[#1F2937]">
+          <div className="p-6 pb-5 border-b border-border/60">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <CardTitle className="text-lg font-semibold flex items-center gap-2.5 text-foreground">
+                <p className="text-lg font-semibold text-foreground flex items-center gap-2.5">
                   <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
                     <Users className="h-5 w-5" aria-hidden />
                   </div>
                   Lista de usuarios
-                </CardTitle>
-                <CardDescription className="text-muted-foreground mt-1">
+                </p>
+                <p className="text-muted-foreground text-sm mt-1">
                   Usuarios del mismo tenant. Puedes editar el rol o restablecer la contraseña.
-                </CardDescription>
+                </p>
               </div>
               <Button
                 variant="outline"
                 size="sm"
-                className="shrink-0 gap-2"
+                className="shrink-0 gap-2 rounded-xl"
                 onClick={() => window.dispatchEvent(new CustomEvent('open-change-password'))}
               >
                 <KeyRound className="h-4 w-4" />
                 Cambiar contraseña
               </Button>
             </div>
-          </CardHeader>
-          <CardContent className="pt-5 px-6 pb-6">
+          </div>
+          <div className="pt-5 px-6 pb-6">
             {usersList.isLoading && (
               <div className="rounded-xl border border-border/60 overflow-hidden">
                 <Table>
@@ -388,26 +380,25 @@ export default function UsersPage() {
                 </Table>
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
 
       {canCreate && (
         <div className="flex justify-center">
-          <Card className="border-0 shadow-xl rounded-2xl overflow-hidden w-full max-w-2xl bg-card">
-          <div className="h-1 w-full bg-gradient-to-r from-primary to-primary/80" />
-          <CardHeader className="pb-5 pt-6 px-6 border-b border-border/60">
-            <CardTitle className="text-lg font-semibold flex items-center gap-2.5 text-foreground">
+          <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] w-full max-w-2xl overflow-hidden dark:border-[#1F2937]">
+          <div className="p-6 pb-5 border-b border-border/60">
+            <p className="text-lg font-semibold text-foreground flex items-center gap-2.5">
               <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
                 <UserPlus className="h-5 w-5" aria-hidden />
               </div>
               Crear usuario
-            </CardTitle>
-            <CardDescription className="text-muted-foreground">
+            </p>
+            <p className="text-muted-foreground text-sm mt-1">
               Alta directa con correo y contraseña. El correo debe ser único en el sistema.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="pt-6 px-6 pb-6">
+            </p>
+          </div>
+          <div className="pt-6 px-6 pb-6">
             <form onSubmit={onSubmit} className="space-y-6">
               <div className="space-y-2">
                 <Label htmlFor="name" className="text-sm font-medium text-foreground">Nombre</Label>
@@ -478,8 +469,8 @@ export default function UsersPage() {
                 {registerUser.isPending ? 'Creando…' : 'Crear usuario'}
               </Button>
             </form>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
         </div>
       )}
 

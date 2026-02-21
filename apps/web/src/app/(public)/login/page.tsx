@@ -9,10 +9,10 @@ import { useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 import { useLogin } from '@features/auth/hooks';
 import { useAuth } from '@shared/providers/AuthProvider';
+import { isNetworkError } from '@infrastructure/api/client';
 import { Button } from '@shared/components/ui/button';
 import { Input } from '@shared/components/ui/input';
 import { Label } from '@shared/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@shared/components/ui/card';
 import { OrionLogo } from '@shared/ui/OrionLogo';
 
 import { LoginVideoBackground } from './LoginVideoBackground';
@@ -52,30 +52,30 @@ export default function LoginPage() {
   };
 
   return (
-    <main className="relative min-h-screen flex items-center justify-center p-6 overflow-hidden">
+    <main className="relative min-h-screen flex items-center justify-center p-6 pt-[20vh] pb-[15vh] sm:pt-[18vh] sm:pb-20 overflow-hidden">
       {/* Fondo por defecto oscuro (sin blanco); el video se monta solo en cliente */}
       <div className="absolute inset-0 z-0 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900" aria-hidden />
       <LoginVideoBackground />
 
-      <Card className="relative z-10 w-full max-w-md border border-border/50 rounded-2xl overflow-hidden shadow-none">
+      <div className="relative z-10 w-full max-w-md rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] overflow-hidden dark:border-[#1F2937]">
         {/* Línea de acento superior */}
         <div className="h-1 bg-gradient-to-r from-primary to-primary/80" />
 
-        <CardHeader className="space-y-1 pb-6 pt-8 px-8">
+        <div className="space-y-1 pb-6 pt-8 px-8">
           <div className="flex items-center justify-center gap-3 mb-2">
             <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
               <OrionLogo size={28} withCircle />
             </div>
-            <CardTitle className="text-2xl font-semibold tracking-tight text-foreground">
+            <p className="text-2xl font-semibold tracking-tight text-foreground">
               Orion
-            </CardTitle>
+            </p>
           </div>
-          <CardDescription className="text-center text-muted-foreground">
+          <p className="text-center text-muted-foreground text-sm">
             Acceso al sistema de gestión
-          </CardDescription>
-        </CardHeader>
+          </p>
+        </div>
 
-        <CardContent className="px-8 pb-10">
+        <div className="px-8 pb-10">
           <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-5">
             <div className="space-y-2">
               <Label htmlFor="email" className="text-foreground/90 font-medium">
@@ -135,7 +135,9 @@ export default function LoginPage() {
 
             {loginMutation.isError && (
               <p className="text-sm text-destructive rounded-lg bg-destructive/10 px-3 py-2">
-                {(loginMutation.error as { message?: string })?.message ?? 'Error al iniciar sesión'}
+                {isNetworkError(loginMutation.error)
+                  ? 'No se pudo conectar con la API. Ejecuta en la raíz del proyecto: npm run dev:local (API en http://localhost:3000, abre la app en http://localhost:3001).'
+                  : (loginMutation.error as { message?: string })?.message ?? 'Error al iniciar sesión'}
               </p>
             )}
 
@@ -160,8 +162,8 @@ export default function LoginPage() {
               .
             </p>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </main>
   );
 }

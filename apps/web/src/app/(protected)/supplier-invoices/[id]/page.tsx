@@ -2,13 +2,6 @@
 
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@shared/components/ui/card';
 import { Button } from '@shared/components/ui/button';
 import { Badge } from '@shared/components/ui/badge';
 import { Skeleton } from '@shared/components/ui/skeleton';
@@ -37,38 +30,32 @@ export default function SupplierInvoiceDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-10">
         <Skeleton className="h-8 w-48" />
-        <Card>
-          <CardHeader>
-            <Skeleton className="h-6 w-32" />
-            <Skeleton className="h-4 w-64" />
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Skeleton className="h-5 w-full" />
-            <Skeleton className="h-5 w-full" />
-          </CardContent>
-        </Card>
+        <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] p-6 dark:border-[#1F2937]">
+          <Skeleton className="h-6 w-32" />
+          <Skeleton className="h-4 w-64 mt-2" />
+          <Skeleton className="h-5 w-full mt-4" />
+          <Skeleton className="h-5 w-full" />
+        </div>
       </div>
     );
   }
 
   if (isError || !invoice) {
     return (
-      <div className="space-y-6">
-        <Link href="/supplier-invoices">
-          <Button variant="ghost" size="sm" className="gap-2">
+      <div className="space-y-10">
+        <Button variant="outline" size="sm" asChild className="gap-2 rounded-xl">
+          <Link href="/supplier-invoices">
             <ArrowLeft className="h-4 w-4" />
             Volver a facturas proveedor
-          </Button>
-        </Link>
-        <Card className="border-destructive/50">
-          <CardContent className="pt-6">
-            <p className="text-sm text-destructive">
-              {(error as { message?: string })?.message ?? 'Factura no encontrada.'}
-            </p>
-          </CardContent>
-        </Card>
+          </Link>
+        </Button>
+        <div className="rounded-2xl border border-destructive/50 bg-card p-6">
+          <p className="text-sm text-destructive">
+            {(error as { message?: string })?.message ?? 'Factura no encontrada.'}
+          </p>
+        </div>
       </div>
     );
   }
@@ -80,52 +67,43 @@ export default function SupplierInvoiceDetailPage() {
   const paidAmount = Number(invoice.paidAmount ?? 0);
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <Link href="/supplier-invoices">
-          <Button variant="ghost" size="sm" className="gap-2">
-            <ArrowLeft className="h-4 w-4" />
-            Volver a facturas proveedor
-          </Button>
-        </Link>
-        {invoice.supplier && (
-          <Button asChild variant="outline" size="sm" className="gap-2">
-            <Link href={`/suppliers/${invoice.supplier.id}`}>
-              <Truck className="h-4 w-4" />
-              Ver proveedor
+    <div className="space-y-10">
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-light tracking-tight text-foreground sm:text-3xl flex items-center gap-2">
+            <FileText className="h-7 w-7 shrink-0 text-primary" aria-hidden />
+            {invoice.invoiceNumber}
+          </h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            {invoice.supplier ? `${invoice.supplier.name} · NIT ${invoice.supplier.nit}` : `Proveedor ID: ${invoice.supplierId}`}
+          </p>
+        </div>
+        <div className="flex gap-2 shrink-0">
+          <Button variant="outline" size="sm" asChild className="gap-2 rounded-xl">
+            <Link href="/supplier-invoices">
+              <ArrowLeft className="h-4 w-4" />
+              Volver a facturas proveedor
             </Link>
           </Button>
-        )}
-      </div>
+          {invoice.supplier && (
+            <Button asChild variant="outline" size="sm" className="gap-2">
+              <Link href={`/suppliers/${invoice.supplier.id}`}>
+                <Truck className="h-4 w-4" />
+                Ver proveedor
+              </Link>
+            </Button>
+          )}
+        </div>
+      </header>
 
-      <div className="flex flex-col gap-1">
-        <h1 className="text-xl font-semibold tracking-tight sm:text-2xl text-foreground">
-          Factura de proveedor
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          {invoice.invoiceNumber}
-          {invoice.supplier && ` · ${invoice.supplier.name}`}
-        </p>
-      </div>
-
-      <Card className="border border-border/80 shadow-sm rounded-xl overflow-hidden">
-        <CardHeader className="pb-4 border-b border-border/60">
-          <div className="flex items-center justify-between gap-2 flex-wrap">
-            <CardTitle className="text-lg font-medium flex items-center gap-2 text-foreground">
-              <FileText className="h-5 w-5 shrink-0 text-primary" aria-hidden />
-              {invoice.invoiceNumber}
-            </CardTitle>
-            <Badge variant="secondary">
-              {STATUS_LABELS[invoice.status] ?? invoice.status}
-            </Badge>
-          </div>
-          <CardDescription>
-            {invoice.supplier
-              ? `${invoice.supplier.name} · NIT ${invoice.supplier.nit}`
-              : `Proveedor ID: ${invoice.supplierId}`}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="pt-6 space-y-4">
+      <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] overflow-hidden dark:border-[#1F2937]">
+        <div className="pb-4 border-b border-border/60 px-6 pt-6 flex items-center justify-between gap-2 flex-wrap">
+          <h2 className="text-lg font-medium text-foreground">Detalle</h2>
+          <Badge variant="secondary">
+            {STATUS_LABELS[invoice.status] ?? invoice.status}
+          </Badge>
+        </div>
+        <div className="pt-6 px-6 pb-6 space-y-4">
           <dl className="grid gap-3 sm:grid-cols-2">
             <div>
               <dt className="text-xs font-medium text-muted-foreground">Nº factura</dt>
@@ -192,8 +170,8 @@ export default function SupplierInvoiceDetailPage() {
               </ul>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

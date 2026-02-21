@@ -2,13 +2,6 @@
 
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@shared/components/ui/card';
 import { Button } from '@shared/components/ui/button';
 import { Badge } from '@shared/components/ui/badge';
 import { Skeleton } from '@shared/components/ui/skeleton';
@@ -29,52 +22,42 @@ export default function ProductDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="p-4 md:p-6 space-y-6 max-w-5xl mx-auto">
-        <Skeleton className="h-6 w-32 rounded" />
-        <div className="flex flex-col gap-2">
-          <Skeleton className="h-8 w-64 rounded" />
-          <Skeleton className="h-4 w-48 rounded" />
+      <div className="space-y-10 max-w-5xl mx-auto">
+        <Skeleton className="h-8 w-48" />
+        <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] p-6 dark:border-[#1F2937]">
+          <Skeleton className="h-6 w-36" />
+          <Skeleton className="h-4 w-72 mt-2" />
+          <div className="grid gap-4 sm:grid-cols-3 mt-6">
+            <Skeleton className="h-20 rounded-lg" />
+            <Skeleton className="h-20 rounded-lg" />
+            <Skeleton className="h-20 rounded-lg" />
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2 mt-4">
+            <Skeleton className="h-20 rounded-lg" />
+            <Skeleton className="h-20 rounded-lg" />
+          </div>
         </div>
-        <Card className="border border-border/80 shadow-sm rounded-xl overflow-hidden">
-          <CardHeader className="pb-4 border-b border-border/60">
-            <Skeleton className="h-6 w-36 rounded" />
-            <Skeleton className="h-4 w-72 rounded mt-2" />
-          </CardHeader>
-          <CardContent className="pt-6 space-y-6">
-            <div className="grid gap-4 sm:grid-cols-3">
-              <Skeleton className="h-20 rounded-lg" />
-              <Skeleton className="h-20 rounded-lg" />
-              <Skeleton className="h-20 rounded-lg" />
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Skeleton className="h-20 rounded-lg" />
-              <Skeleton className="h-20 rounded-lg" />
-            </div>
-          </CardContent>
-        </Card>
       </div>
     );
   }
 
   if (isError || !product) {
     return (
-      <div className="p-4 md:p-6 space-y-6 max-w-5xl mx-auto">
-        <Link href="/products" className="inline-flex">
-          <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground hover:text-foreground">
+      <div className="space-y-10 max-w-5xl mx-auto">
+        <Button variant="outline" size="sm" asChild className="gap-2 rounded-xl">
+          <Link href="/products">
             <ArrowLeft className="h-4 w-4" />
             Volver a productos
-          </Button>
-        </Link>
-        <Card className="border border-destructive/40 shadow-sm rounded-xl overflow-hidden bg-destructive/5">
-          <CardContent className="pt-6 pb-6">
-            <p className="text-sm text-destructive font-medium">
-              {(error as { message?: string })?.message ?? 'Producto no encontrado.'}
-            </p>
-            <Link href="/products" className="inline-block mt-3">
-              <Button variant="outline" size="sm">Ver listado</Button>
-            </Link>
-          </CardContent>
-        </Card>
+          </Link>
+        </Button>
+        <div className="rounded-2xl border border-destructive/40 bg-destructive/5 p-6">
+          <p className="text-sm text-destructive font-medium">
+            {(error as { message?: string })?.message ?? 'Producto no encontrado.'}
+          </p>
+          <Link href="/products" className="inline-block mt-3">
+            <Button variant="outline" size="sm">Ver listado</Button>
+          </Link>
+        </div>
       </div>
     );
   }
@@ -92,49 +75,51 @@ export default function ProductDetailPage() {
     'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground';
 
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-5xl mx-auto">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <Link href="/products" className="inline-flex">
-          <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground hover:text-foreground -ml-2">
-            <ArrowLeft className="h-4 w-4" />
-            Volver a productos
+    <div className="space-y-10 max-w-5xl mx-auto">
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-light tracking-tight text-foreground sm:text-3xl flex items-center gap-2 flex-wrap">
+            <Package className="h-7 w-7 shrink-0 text-primary" aria-hidden />
+            <span>{product.name}</span>
+            <Badge variant={product.isActive ? 'success' : 'secondary'} className="font-medium">
+              {product.isActive ? 'Activo' : 'Inactivo'}
+            </Badge>
+          </h1>
+          <p className="mt-2 text-sm text-muted-foreground font-mono">
+            {product.internalCode}
+            {product.category ? ` · ${product.category.name}` : ''}
+          </p>
+        </div>
+        <div className="flex gap-2 shrink-0">
+          <Button variant="outline" size="sm" asChild className="gap-2 rounded-xl">
+            <Link href="/products">
+              <ArrowLeft className="h-4 w-4" />
+              Volver a productos
+            </Link>
           </Button>
-        </Link>
-        <Link href="/products" className="w-full sm:w-auto">
-          <Button variant="outline" size="sm" className="gap-2 w-full sm:w-auto">
-            <Pencil className="h-4 w-4" />
-            Ir a listado para editar
+          <Button variant="outline" size="sm" asChild className="gap-2">
+            <Link href="/products">
+              <Pencil className="h-4 w-4" />
+              Ir a listado para editar
+            </Link>
           </Button>
-        </Link>
-      </div>
-
-      <header>
-        <h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl flex items-center gap-2 flex-wrap">
-          <span>{product.name}</span>
-          <Badge variant={product.isActive ? 'success' : 'secondary'} className="font-medium">
-            {product.isActive ? 'Activo' : 'Inactivo'}
-          </Badge>
-        </h1>
-        <p className="text-sm text-muted-foreground mt-1 font-mono">
-          {product.internalCode}
-          {product.category ? ` · ${product.category.name}` : ''}
-        </p>
+        </div>
       </header>
 
-      <Card className="overflow-hidden">
-        <CardHeader className="pb-4 border-b border-border/60">
-          <CardTitle className="text-lg font-medium flex items-center gap-2">
+      <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] overflow-hidden dark:border-[#1F2937]">
+        <div className="pb-4 border-b border-border/60 px-6 pt-6">
+          <h2 className="text-lg font-medium text-foreground flex items-center gap-2">
             <span className={iconWrapClass}>
               <Package className="h-4 w-4" />
             </span>
             Parte actual
-          </CardTitle>
-          <CardDescription>
+          </h2>
+          <p className="text-sm text-muted-foreground mt-0.5">
             {product.name} · Código: {product.internalCode}
             {product.category ? ` · Categoría: ${product.category.name}` : ''}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="pt-6">
+          </p>
+        </div>
+        <div className="pt-6 px-6 pb-6">
           <div className="grid gap-8 lg:grid-cols-2">
             {/* Columna izquierda: Identificación + Inventario */}
             <div className="space-y-6">
@@ -260,8 +245,8 @@ export default function ProductDetailPage() {
               </div>
             </section>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

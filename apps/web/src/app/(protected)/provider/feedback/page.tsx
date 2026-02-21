@@ -2,13 +2,6 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@shared/components/ui/card';
 import { Button } from '@shared/components/ui/button';
 import {
   Table,
@@ -40,8 +33,8 @@ export default function ProviderFeedbackPage() {
   const updateStatus = useUpdateFeedbackStatus();
 
   return (
-    <div className="p-4 md:p-6 space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="space-y-10">
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" asChild>
             <Link href="/provider">
@@ -50,41 +43,37 @@ export default function ProviderFeedbackPage() {
             </Link>
           </Button>
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight flex items-center gap-2">
-              <Lightbulb className="h-6 w-6 text-primary" />
+            <h1 className="text-2xl font-light tracking-tight text-foreground sm:text-3xl flex items-center gap-2">
+              <Lightbulb className="h-7 w-7 shrink-0 text-primary" aria-hidden />
               Sugerencias de clientes
             </h1>
-            <p className="text-muted-foreground text-sm mt-0.5">
+            <p className="mt-2 text-sm text-muted-foreground max-w-xl">
               Mejoras e ideas enviadas por usuarios de las empresas. Marca como leída o resuelta.
             </p>
           </div>
         </div>
+      </header>
+
+      <div className="rounded-2xl border border-border/50 bg-muted/20 p-5 shadow-sm dark:bg-[#111827] dark:border-[#1F2937] sm:p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <p className="text-sm font-medium text-muted-foreground">Filtra por estado</p>
+          <div className="flex gap-2 flex-wrap">
+            {(['', 'PENDING', 'READ', 'DONE'] as const).map((s) => (
+              <Button
+                key={s || 'all'}
+                variant={statusFilter === s ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setStatusFilter(s)}
+              >
+                {s === '' ? 'Todas' : STATUS_LABELS[s]}
+              </Button>
+            ))}
+          </div>
+        </div>
       </div>
 
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <CardTitle className="text-lg">Listado</CardTitle>
-              <CardDescription>
-                Filtra por estado o revisa todas.
-              </CardDescription>
-            </div>
-            <div className="flex gap-2 flex-wrap">
-              {(['', 'PENDING', 'READ', 'DONE'] as const).map((s) => (
-                <Button
-                  key={s || 'all'}
-                  variant={statusFilter === s ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setStatusFilter(s)}
-                >
-                  {s === '' ? 'Todas' : STATUS_LABELS[s]}
-                </Button>
-              ))}
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
+      <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] overflow-hidden dark:border-[#1F2937]">
+        <div className="p-6">
           {isLoading ? (
             <Skeleton className="h-64 w-full rounded-lg" />
           ) : items.length === 0 ? (
@@ -92,8 +81,7 @@ export default function ProviderFeedbackPage() {
               No hay sugerencias {statusFilter ? `con estado "${STATUS_LABELS[statusFilter]}"` : ''}.
             </p>
           ) : (
-            <div className="rounded-lg border border-border/60 overflow-hidden">
-              <Table>
+            <Table>
                 <TableHeader>
                   <TableRow className="border-border/50">
                     <TableHead className="font-medium">Empresa</TableHead>
@@ -222,10 +210,9 @@ export default function ProviderFeedbackPage() {
                   ))}
                 </TableBody>
               </Table>
-            </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

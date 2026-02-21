@@ -2,13 +2,6 @@
 
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@shared/components/ui/card';
 import { Button } from '@shared/components/ui/button';
 import { Skeleton } from '@shared/components/ui/skeleton';
 import {
@@ -53,72 +46,65 @@ export default function SaleDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-10">
         <Skeleton className="h-8 w-48" />
-        <Card>
-          <CardHeader>
-            <Skeleton className="h-6 w-32" />
-            <Skeleton className="h-4 w-64" />
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Skeleton className="h-5 w-full" />
-          </CardContent>
-        </Card>
+        <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] p-6 dark:border-[#1F2937]">
+          <Skeleton className="h-6 w-32" />
+          <Skeleton className="h-4 w-64 mt-2" />
+          <Skeleton className="h-5 w-full mt-4" />
+        </div>
       </div>
     );
   }
 
   if (isError || !sale) {
     return (
-      <div className="space-y-6">
-        <Link href="/sales">
-          <Button variant="ghost" size="sm" className="gap-2">
+      <div className="space-y-10">
+        <Button variant="outline" size="sm" asChild className="gap-2 rounded-xl">
+          <Link href="/sales">
             <ArrowLeft className="h-4 w-4" />
             Volver a ventas
-          </Button>
-        </Link>
-        <Card className="border-destructive/50">
-          <CardContent className="pt-6">
+          </Link>
+        </Button>
+        <div className="rounded-2xl border border-destructive/50 bg-card p-6 dark:border-[#1F2937]">
             <p className="text-sm text-destructive">
               {(error as { message?: string })?.message ?? 'Venta no encontrada.'}
             </p>
-          </CardContent>
-        </Card>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <Link href="/sales">
-        <Button variant="ghost" size="sm" className="gap-2">
-          <ArrowLeft className="h-4 w-4" />
-          Volver a ventas
+    <div className="space-y-10">
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-light tracking-tight text-foreground sm:text-3xl flex items-center gap-2">
+            <ShoppingCart className="h-7 w-7 shrink-0 text-primary" aria-hidden />
+            Venta #{sale.id.slice(0, 8)}
+          </h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            {soldAt}
+            {sale.customer ? ` · ${sale.customer.name}` : ''}
+          </p>
+        </div>
+        <Button variant="outline" size="sm" asChild className="gap-2 shrink-0 rounded-xl">
+          <Link href="/sales">
+            <ArrowLeft className="h-4 w-4" />
+            Volver a ventas
+          </Link>
         </Button>
-      </Link>
+      </header>
 
-      <div className="flex flex-col gap-1">
-        <h1 className="text-xl font-semibold tracking-tight sm:text-2xl text-foreground">
-          Venta #{sale.id.slice(0, 8)}
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          {soldAt}
-          {sale.customer ? ` · ${sale.customer.name}` : ''}
-        </p>
-      </div>
-
-      <Card className="border border-border/80 shadow-sm rounded-xl overflow-hidden">
-        <CardHeader className="pb-4 border-b border-border/60">
-          <CardTitle className="text-lg font-medium flex items-center gap-2 text-foreground">
-            <ShoppingCart className="h-5 w-5 shrink-0 text-primary" aria-hidden />
-            Detalle de la venta
-          </CardTitle>
-          <CardDescription>
+      <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] overflow-hidden dark:border-[#1F2937]">
+        <div className="pb-4 border-b border-border/60 px-6 pt-6">
+          <h2 className="text-lg font-medium text-foreground">Detalle de la venta</h2>
+          <p className="text-sm text-muted-foreground mt-0.5">
             Cliente: {sale.customer?.name ?? '—'}
             {sale.createdBy ? ` · Registrada por: ${sale.createdBy.email}` : ''}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="pt-6 space-y-6">
+          </p>
+        </div>
+        <div className="pt-6 px-6 pb-6 space-y-6">
           <dl className="grid gap-3 sm:grid-cols-2">
             <div>
               <dt className="text-xs font-medium text-muted-foreground">Fecha</dt>
@@ -265,8 +251,8 @@ export default function SaleDetailPage() {
               </div>
             </>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

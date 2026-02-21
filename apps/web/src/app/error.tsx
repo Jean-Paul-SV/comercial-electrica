@@ -2,7 +2,6 @@
 
 import { useEffect } from 'react';
 import { Button } from '@shared/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@shared/components/ui/card';
 import { AlertTriangle } from 'lucide-react';
 
 export default function Error({
@@ -20,17 +19,17 @@ export default function Error({
 
   return (
     <main className="min-h-screen flex items-center justify-center p-6 bg-background">
-      <Card className="w-full max-w-md border-destructive/30">
-        <CardHeader>
+      <div className="w-full max-w-md rounded-2xl border border-border/50 border-destructive/30 bg-card shadow-sm shadow-black/[0.03] p-6 dark:border-[#1F2937]">
+        <div className="space-y-1 pb-2">
           <div className="flex items-center gap-2 text-destructive">
             <AlertTriangle className="h-5 w-5" />
-            <CardTitle>Algo salió mal</CardTitle>
+            <p className="font-semibold text-foreground">Algo salió mal</p>
           </div>
-          <CardDescription>
+          <p className="text-sm text-muted-foreground">
             Revisa que la API esté corriendo en http://localhost:3000 y vuelve a intentar.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+          </p>
+        </div>
+        <div className="space-y-4 pt-4">
           {isDev && error?.message && (
             <div className="rounded-md bg-destructive/10 border border-destructive/30 p-3 text-sm">
               <p className="font-medium text-destructive">{error.message}</p>
@@ -48,8 +47,8 @@ export default function Error({
           <Button variant="outline" className="w-full" asChild>
             <a href="/">Ir al inicio</a>
           </Button>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </main>
   );
 }

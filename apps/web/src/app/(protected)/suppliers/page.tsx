@@ -5,13 +5,6 @@ import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@shared/components/ui/card';
 import { Button } from '@shared/components/ui/button';
 import { Input } from '@shared/components/ui/input';
 import { Label } from '@shared/components/ui/label';
@@ -179,40 +172,29 @@ export default function SuppliersPage() {
   };
 
   return (
-    <div className="space-y-6 sm:space-y-8">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">
-          Proveedores
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Gestión de proveedores
-        </p>
-      </div>
+    <div className="space-y-10">
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between pt-2 pb-2">
+        <div>
+          <h1 className="text-2xl font-light tracking-tight text-foreground sm:text-3xl flex items-center gap-2">
+            <Truck className="h-7 w-7 shrink-0 text-primary" />
+            Proveedores
+          </h1>
+          <p className="mt-2 text-sm text-muted-foreground max-w-xl">
+            Proveedores paginados
+          </p>
+        </div>
+        <Button
+          size="default"
+          onClick={() => setOpenNewSupplier(true)}
+          className="gap-2 shrink-0 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground"
+        >
+          <Plus className="h-4 w-4" />
+          Nuevo proveedor
+        </Button>
+      </header>
 
-      <Card className="border-0 shadow-sm overflow-hidden">
-        <CardHeader className="pb-4 bg-muted/30 border-b border-border/50">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <CardTitle className="text-lg font-medium flex items-center gap-2">
-                <Truck className="h-5 w-5 shrink-0 text-primary" />
-                Listado
-              </CardTitle>
-              <CardDescription>
-                Proveedores paginados
-              </CardDescription>
-            </div>
-            <Button
-              size="sm"
-              onClick={() => setOpenNewSupplier(true)}
-              className="gap-2 w-full sm:w-auto shadow-sm"
-            >
-              <Plus className="h-4 w-4 shrink-0" />
-              Nuevo proveedor
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4 pt-4">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between rounded-lg bg-muted/20 border border-border/50 p-3">
+      <div className="rounded-2xl border border-border/50 bg-muted/20 p-5 shadow-sm dark:bg-[#111827] dark:border-[#1F2937] sm:p-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex flex-1 flex-wrap items-center gap-3 min-w-0">
               <div className="flex items-center gap-2 flex-1 min-w-[200px] max-w-sm">
                 <label htmlFor="suppliers-search" className="text-sm font-medium text-muted-foreground whitespace-nowrap shrink-0">
@@ -244,12 +226,13 @@ export default function SuppliersPage() {
                 Limpiar búsqueda
               </Button>
             </div>
-            <Pagination meta={meta} onPageChange={setPage} label="Página" />
-          </div>
+          <Pagination meta={meta} onPageChange={setPage} label="Página" />
+        </div>
+      </div>
 
+      <div className="rounded-2xl border border-border/50 bg-card overflow-hidden shadow-sm shadow-black/[0.03] dark:shadow-none overflow-x-auto">
           {query.isLoading && (
-            <div className="rounded-lg border border-border overflow-hidden">
-              <Table>
+            <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/40">
                     <TableHead className="font-medium">NIT</TableHead>
@@ -271,19 +254,17 @@ export default function SuppliersPage() {
                   ))}
                 </TableBody>
               </Table>
-            </div>
           )}
 
           {query.isError && (
-            <p className="text-sm text-destructive py-4">
+            <p className="text-sm text-destructive py-8 px-6">
               {(query.error as { message?: string })?.message ??
                 'Error al cargar proveedores'}
             </p>
           )}
 
           {!query.isLoading && (
-            <div className="rounded-lg border border-border overflow-hidden">
-              <Table>
+            <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/40 hover:bg-muted/40">
                     <TableHead className="font-medium">NIT</TableHead>
@@ -393,10 +374,8 @@ export default function SuppliersPage() {
                   )}
                 </TableBody>
               </Table>
-            </div>
           )}
-        </CardContent>
-      </Card>
+      </div>
 
       <Dialog
         open={!!supplierToDisable}

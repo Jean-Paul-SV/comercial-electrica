@@ -4,13 +4,6 @@ import { useMemo, useState, useEffect, useCallback } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { toast } from 'sonner';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@shared/components/ui/card';
 import { Button } from '@shared/components/ui/button';
 import { Input } from '@shared/components/ui/input';
 import { Label } from '@shared/components/ui/label';
@@ -275,22 +268,22 @@ export default function SupplierInvoicesPage() {
   };
 
   return (
-    <div className="space-y-6 sm:space-y-8">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="space-y-10">
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between pt-2 pb-2">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl flex items-center gap-2">
-            <FileCheck className="h-6 w-6 shrink-0 text-primary" aria-hidden />
+          <h1 className="text-2xl font-light tracking-tight text-foreground sm:text-3xl flex items-center gap-2">
+            <FileCheck className="h-7 w-7 shrink-0 text-primary" aria-hidden />
             Facturas de proveedores
           </h1>
-          <p className="text-sm text-muted-foreground mt-1">
+          <p className="mt-2 text-sm text-muted-foreground max-w-xl">
             Cuentas por pagar
           </p>
         </div>
-        <Button size="sm" onClick={() => setOpenNew(true)} className="gap-2 rounded-xl font-medium shrink-0">
+        <Button size="default" onClick={() => setOpenNew(true)} className="gap-2 rounded-xl shrink-0 bg-primary hover:bg-primary/90 text-primary-foreground">
           <Plus className="h-4 w-4" />
           Nueva factura
         </Button>
-      </div>
+      </header>
 
       <div className="rounded-xl border border-border/60 bg-muted/20 p-4">
         <div className="flex items-start gap-3">
@@ -320,18 +313,8 @@ export default function SupplierInvoicesPage() {
         </div>
       )}
 
-      <Card className="border border-border/80 shadow-sm rounded-xl overflow-hidden">
-        <CardHeader className="pb-4 border-b border-border/60">
-          <div>
-            <CardTitle className="text-lg font-medium flex items-center gap-2 text-foreground">
-              <FileCheck className="h-5 w-5 shrink-0 text-primary" aria-hidden />
-              Listado
-            </CardTitle>
-            <CardDescription>
-              {meta ? `${meta.total} factura${meta.total !== 1 ? 's' : ''}` : 'Facturas con estado y vencimiento'} · Filtra por estado o busca por número/proveedor
-            </CardDescription>
-          </div>
-          <div className="flex flex-wrap items-end gap-3 pt-4">
+      <div className="rounded-2xl border border-border/50 bg-muted/20 p-5 shadow-sm dark:bg-[#111827] dark:border-[#1F2937] sm:p-6">
+        <div className="flex flex-wrap items-end gap-3">
             <div className="flex flex-col gap-1.5 flex-1 min-w-[200px] max-w-sm">
               <Label htmlFor="search-invoices" className="text-xs font-medium text-muted-foreground">Buscar</Label>
               <div className="relative">
@@ -368,16 +351,15 @@ export default function SupplierInvoicesPage() {
                 Limpiar
               </Button>
             )}
-          </div>
-        </CardHeader>
-        <CardContent className="pt-4 space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-2">
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-2 mt-4">
             <Pagination meta={meta} onPageChange={setPage} label="Página" />
-          </div>
+        </div>
+      </div>
 
+      <div className="rounded-2xl border border-border/50 bg-card overflow-hidden shadow-sm shadow-black/[0.03] dark:shadow-none overflow-x-auto">
           {query.isLoading && (
-            <div className="rounded-lg border border-border/80 overflow-hidden">
-              <Table>
+            <Table>
                 <TableHeader>
                   <TableRow className="hover:bg-transparent border-b border-border/80">
                     <TableHead className="font-medium text-muted-foreground">Nº factura</TableHead>
@@ -403,20 +385,16 @@ export default function SupplierInvoicesPage() {
                   ))}
                 </TableBody>
               </Table>
-            </div>
           )}
 
           {query.isError && (
-            <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3">
-              <p className="text-sm text-destructive font-medium">
-                {(query.error as { message?: string })?.message ?? 'Error al cargar facturas'}
-              </p>
-            </div>
+            <p className="text-sm text-destructive py-8 px-6">
+              {(query.error as { message?: string })?.message ?? 'Error al cargar facturas'}
+            </p>
           )}
 
           {!query.isLoading && !query.isError && (
-            <div className="rounded-lg border border-border/80 overflow-hidden">
-              <Table>
+            <Table>
                 <TableHeader>
                   <TableRow className="hover:bg-transparent border-b border-border/80">
                     <TableHead className="font-medium text-muted-foreground">Nº factura</TableHead>
@@ -508,10 +486,8 @@ export default function SupplierInvoicesPage() {
                   )}
                 </TableBody>
               </Table>
-            </div>
           )}
-        </CardContent>
-      </Card>
+      </div>
 
       <Dialog open={openNew} onOpenChange={setOpenNew}>
         <DialogContent showClose className="sm:max-w-lg">

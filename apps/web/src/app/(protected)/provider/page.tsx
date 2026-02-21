@@ -2,13 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@shared/components/ui/card';
 import { Button } from '@shared/components/ui/button';
 import { Input } from '@shared/components/ui/input';
 import {
@@ -83,92 +76,77 @@ export default function ProviderTenantsPage() {
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   return (
-    <div className="p-4 md:p-6 space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="space-y-10">
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Empresas</h1>
-          <p className="text-muted-foreground text-sm">
+          <h1 className="text-2xl font-light tracking-tight text-foreground sm:text-3xl flex items-center gap-2">
+            <Building2 className="h-7 w-7 shrink-0 text-primary" aria-hidden />
+            Empresas
+          </h1>
+          <p className="mt-2 text-sm text-muted-foreground max-w-xl">
             Listado de tenants (empresas) de la plataforma.
           </p>
         </div>
-        <Button asChild>
+        <Button asChild className="shrink-0 rounded-xl bg-primary hover:bg-primary/90">
           <Link href="/provider/new">
             <PlusCircle className="mr-2 h-4 w-4" />
             Nueva empresa
           </Link>
         </Button>
-      </div>
+      </header>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <BarChart3 className="h-4 w-4" />
-              Empresas totales
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-semibold tracking-tight">
-              {isLoadingSummary ? '—' : summary?.totalTenants ?? 0}
-            </p>
-            <p className="text-xs text-muted-foreground mt-1">
-              Incluye activas y suspendidas.
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Empresas activas</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-semibold tracking-tight">
-              {isLoadingSummary ? '—' : summary?.activeTenants ?? 0}
-            </p>
-            <p className="text-xs text-muted-foreground mt-1">
-              Con acceso habilitado al sistema.
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Empresas suspendidas</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-semibold tracking-tight">
-              {isLoadingSummary ? '—' : summary?.suspendedTenants ?? 0}
-            </p>
-            <p className="text-xs text-muted-foreground mt-1">
-              No pueden iniciar sesión hasta reactivarlas.
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Usuarios totales</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-semibold tracking-tight">
-              {isLoadingSummary ? '—' : summary?.totalUsers ?? 0}
-            </p>
-            <p className="text-xs text-muted-foreground mt-1">
-              Usuarios dentro de las empresas (sin contar admins de plataforma).
-            </p>
-          </CardContent>
-        </Card>
+        <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] p-5 dark:border-[#1F2937]">
+          <p className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+            <BarChart3 className="h-4 w-4" />
+            Empresas totales
+          </p>
+          <p className="text-2xl font-semibold tracking-tight mt-2">
+            {isLoadingSummary ? '—' : summary?.totalTenants ?? 0}
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Incluye activas y suspendidas.
+          </p>
+        </div>
+        <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] p-5 dark:border-[#1F2937]">
+          <p className="text-sm font-medium text-muted-foreground">Empresas activas</p>
+          <p className="text-2xl font-semibold tracking-tight mt-2">
+            {isLoadingSummary ? '—' : summary?.activeTenants ?? 0}
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Con acceso habilitado al sistema.
+          </p>
+        </div>
+        <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] p-5 dark:border-[#1F2937]">
+          <p className="text-sm font-medium text-muted-foreground">Empresas suspendidas</p>
+          <p className="text-2xl font-semibold tracking-tight mt-2">
+            {isLoadingSummary ? '—' : summary?.suspendedTenants ?? 0}
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">
+            No pueden iniciar sesión hasta reactivarlas.
+          </p>
+        </div>
+        <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] p-5 dark:border-[#1F2937]">
+          <p className="text-sm font-medium text-muted-foreground">Usuarios totales</p>
+          <p className="text-2xl font-semibold tracking-tight mt-2">
+            {isLoadingSummary ? '—' : summary?.totalUsers ?? 0}
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Usuarios dentro de las empresas (sin contar admins de plataforma).
+          </p>
+        </div>
       </div>
 
       {dianActivations.length > 0 && (
-        <Card className="overflow-hidden border-amber-500/30 bg-amber-500/5">
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <FileCheck className="h-5 w-5 text-amber-600 dark:text-amber-400" />
-              Activaciones DIAN pendientes
-            </CardTitle>
-            <CardDescription>
-              Empresas que cambiaron a un plan con DIAN. Cobra el costo de activación ($300.000), configura el servicio y marca como completada.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+        <div className="rounded-2xl border border-amber-500/30 bg-amber-500/5 overflow-hidden p-6 dark:border-amber-500/40">
+          <h2 className="text-lg font-medium flex items-center gap-2 text-foreground">
+            <FileCheck className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+            Activaciones DIAN pendientes
+          </h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            Empresas que cambiaron a un plan con DIAN. Cobra el costo de activación ($300.000), configura el servicio y marca como completada.
+          </p>
+          <div className="mt-4">
             {isLoadingDian ? (
               <p className="text-sm text-muted-foreground">Cargando…</p>
             ) : (
@@ -233,23 +211,11 @@ export default function ProviderTenantsPage() {
                 </Table>
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
 
-      <Card className="overflow-hidden border-border/60 bg-card/50">
-        <CardHeader className="space-y-4 pb-4">
-          <div>
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <Building2 className="h-5 w-5 text-primary/90" />
-              Panel proveedor
-            </CardTitle>
-            <CardDescription className="mt-1">
-              Filtrar por estado y ver última actividad.
-            </CardDescription>
-          </div>
-
-          <div className="rounded-xl border border-border/50 bg-muted/20 p-4 space-y-4">
+      <div className="rounded-2xl border border-border/50 bg-muted/20 p-5 shadow-sm dark:bg-[#111827] dark:border-[#1F2937] sm:p-6">
             <div className="flex flex-col sm:flex-row sm:items-end gap-4 flex-wrap">
               <div className="flex-1 min-w-[200px] space-y-1.5">
                 <Label htmlFor="search-name" className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
@@ -321,20 +287,19 @@ export default function ProviderTenantsPage() {
                 </Button>
               </div>
             </div>
-          </div>
-        </CardHeader>
-        <CardContent className="pt-0">
+      </div>
+
+      <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] overflow-hidden dark:border-[#1F2937]">
           {error && (
-            <p className="text-destructive text-sm py-4">
+            <p className="text-destructive text-sm py-8 px-6">
               {(error as { message?: string })?.message ?? 'Error al cargar empresas.'}
             </p>
           )}
           {isLoading ? (
-            <Skeleton className="h-64 w-full rounded-lg" />
+            <Skeleton className="h-64 w-full rounded-lg m-6" />
           ) : (
             <>
-              <div className="rounded-lg border border-border/50 overflow-hidden">
-                <Table>
+              <Table>
                   <TableHeader>
                     <TableRow className="border-border/50 hover:bg-transparent">
                       <TableHead className="font-semibold text-muted-foreground">Nombre</TableHead>
@@ -403,7 +368,6 @@ export default function ProviderTenantsPage() {
                     )}
                   </TableBody>
                 </Table>
-              </div>
               {totalPages > 1 && (
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 mt-4 border-t border-border/50">
                   <p className="text-sm text-muted-foreground order-2 sm:order-1">
@@ -435,8 +399,7 @@ export default function ProviderTenantsPage() {
               )}
             </>
           )}
-        </CardContent>
-      </Card>
+      </div>
 
       <Dialog open={!!tenantToDelete} onOpenChange={(open) => !open && setTenantToDelete(null)}>
         <DialogContent showClose>

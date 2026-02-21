@@ -9,7 +9,6 @@ import { useForgotPassword } from '@features/auth/hooks';
 import { Button } from '@shared/components/ui/button';
 import { Input } from '@shared/components/ui/input';
 import { Label } from '@shared/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@shared/components/ui/card';
 import { Zap, ArrowLeft } from 'lucide-react';
 
 const schema = z.object({
@@ -48,15 +47,15 @@ export default function ForgotPasswordPage() {
   if (done) {
     return (
       <main className="min-h-screen flex items-center justify-center p-6 bg-background">
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-xl">
+        <div className="w-full max-w-md rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] p-6 dark:border-[#1F2937]">
+          <div className="space-y-1 pb-2">
+            <p className="flex items-center gap-2 text-xl font-semibold text-foreground">
               <Zap className="h-6 w-6 text-primary" />
               Restablecer contraseña
-            </CardTitle>
-            <CardDescription>{done.message}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+            </p>
+            <p className="text-sm text-muted-foreground">{done.message}</p>
+          </div>
+          <div className="space-y-4 pt-4">
             {done.resetLink && (
               <p className="text-sm text-muted-foreground break-all">
                 Para pruebas, usa este enlace:{' '}
@@ -71,25 +70,25 @@ export default function ForgotPasswordPage() {
                 Volver al inicio de sesión
               </Link>
             </Button>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </main>
     );
   }
 
   return (
     <main className="min-h-screen flex items-center justify-center p-6 bg-background">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-xl">
+      <div className="w-full max-w-md rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] p-6 dark:border-[#1F2937]">
+        <div className="space-y-1 pb-2">
+          <p className="flex items-center gap-2 text-xl font-semibold text-foreground">
             <Zap className="h-6 w-6 text-primary" />
             ¿Olvidaste tu contraseña?
-          </CardTitle>
-          <CardDescription>
+          </p>
+          <p className="text-sm text-muted-foreground">
             Ingresa tu correo y te enviaremos un enlace para restablecer tu contraseña.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+          </p>
+        </div>
+        <div className="pt-4">
           <form onSubmit={onSubmit} noValidate className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Correo electrónico</Label>
@@ -120,8 +119,8 @@ export default function ForgotPasswordPage() {
               </Link>
             </Button>
           </form>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </main>
   );
 }

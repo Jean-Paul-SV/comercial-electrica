@@ -1,13 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@shared/components/ui/card';
 import { Button } from '@shared/components/ui/button';
 import { Label } from '@shared/components/ui/label';
 import { Textarea } from '@shared/components/ui/textarea';
@@ -47,25 +40,20 @@ export default function FeedbackPage() {
   };
 
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-3xl mx-auto">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight flex items-center gap-2">
-          <Lightbulb className="h-6 w-6 text-primary" />
+    <div className="space-y-10 max-w-3xl mx-auto">
+      <header>
+        <h1 className="text-2xl font-light tracking-tight text-foreground sm:text-3xl flex items-center gap-2">
+          <Lightbulb className="h-7 w-7 shrink-0 text-primary" aria-hidden />
           Sugerencias de mejora
         </h1>
-        <p className="text-muted-foreground text-sm mt-1">
+        <p className="mt-2 text-sm text-muted-foreground">
           Cuéntanos qué te gustaría mejorar en el software. Tus mensajes se revisan en el equipo de producto.
         </p>
-      </div>
+      </header>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Enviar sugerencia</CardTitle>
-          <CardDescription>
-            Describe la mejora o idea. Máximo 2000 caracteres.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+      <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] p-6 dark:border-[#1F2937]">
+        <h2 className="text-base font-medium text-foreground mb-1">Enviar sugerencia</h2>
+        <p className="text-sm text-muted-foreground mb-4">Describe la mejora o idea. Máximo 2000 caracteres.</p>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="feedback-message">Mensaje</Label>
@@ -92,17 +80,11 @@ export default function FeedbackPage() {
               Enviar sugerencia
             </Button>
           </form>
-        </CardContent>
-      </Card>
+      </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Mis sugerencias enviadas</CardTitle>
-          <CardDescription>
-            Historial de las sugerencias que has enviado y su estado.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+      <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] p-6 dark:border-[#1F2937]">
+        <h2 className="text-base font-medium text-foreground mb-1">Mis sugerencias enviadas</h2>
+        <p className="text-sm text-muted-foreground mb-4">Historial de las sugerencias que has enviado y su estado.</p>
           {isLoading ? (
             <p className="text-sm text-muted-foreground">Cargando…</p>
           ) : myFeedback.length === 0 ? (
@@ -131,8 +113,7 @@ export default function FeedbackPage() {
               ))}
             </ul>
           )}
-        </CardContent>
-      </Card>
+      </div>
     </div>
   );
 }

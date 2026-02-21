@@ -130,7 +130,7 @@ const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps>(
     return createPortal(
       <>
         <div
-          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm animate-fade-in"
+          className="fixed inset-0 z-50 bg-black/30 backdrop-blur-md animate-fade-in"
           aria-hidden
           onPointerDown={handleOverlayPointerDown}
         />
@@ -139,7 +139,7 @@ const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps>(
           role="dialog"
           aria-modal
           className={cn(
-            'fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg max-h-[90vh] overflow-y-auto translate-x-[-50%] translate-y-[-50%] gap-4 border border-border bg-background p-4 shadow-xl sm:rounded-xl sm:p-6 animate-fade-in-up',
+            'fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg max-h-[90vh] overflow-y-auto translate-x-[-50%] translate-y-[-50%] gap-4 rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] p-6 dark:border-[#1F2937] animate-fade-in-up',
             className
           )}
           onClick={(e) => e.stopPropagation()}
@@ -150,7 +150,7 @@ const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps>(
             <button
               type="button"
               onClick={() => onOpenChange(false)}
-              className="absolute right-4 top-4 rounded-lg opacity-70 hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 transition-opacity duration-200"
+              className="absolute right-5 top-5 rounded-xl opacity-70 hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 transition-opacity duration-200"
               aria-label="Cerrar"
             >
               <X className="h-4 w-4" />
@@ -170,7 +170,7 @@ const DialogHeader = ({
 }: React.HTMLAttributes<HTMLDivElement>) => (
   <div
     className={cn(
-      'flex flex-col space-y-1.5 text-center sm:text-left',
+      'flex flex-col space-y-1.5 text-center sm:text-left pb-2',
       className
     )}
     {...props}
@@ -184,7 +184,7 @@ const DialogFooter = ({
 }: React.HTMLAttributes<HTMLDivElement>) => (
   <div
     className={cn(
-      'flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2',
+      'flex flex-col-reverse sm:flex-row sm:justify-end gap-2 sm:gap-2 pt-4',
       className
     )}
     {...props}
@@ -198,7 +198,7 @@ const DialogTitle = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <h2
     ref={ref}
-    className={cn('text-lg font-semibold leading-none tracking-tight', className)}
+    className={cn('text-lg font-semibold leading-none tracking-tight text-foreground', className)}
     {...props}
   />
 ));
@@ -208,7 +208,7 @@ const DialogDescription = React.forwardRef<
   HTMLParagraphElement,
   React.HTMLAttributes<HTMLParagraphElement>
 >(({ className, ...props }, ref) => (
-  <p ref={ref} className={cn('text-sm text-muted-foreground', className)} {...props} />
+  <p ref={ref} className={cn('text-sm text-muted-foreground mt-0.5', className)} {...props} />
 ));
 DialogDescription.displayName = 'DialogDescription';
 

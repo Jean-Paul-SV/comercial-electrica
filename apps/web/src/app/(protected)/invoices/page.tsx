@@ -4,13 +4,6 @@ import { useMemo, useState, useEffect, useCallback } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { toast } from 'sonner';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@shared/components/ui/card';
 import { Button } from '@shared/components/ui/button';
 import { Input } from '@shared/components/ui/input';
 import {
@@ -176,26 +169,21 @@ export default function InvoicesPage() {
   const meta = query.data?.meta;
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Facturas</h1>
-        <p className="text-muted-foreground">
-          Facturas generadas por ventas. Consulta número, cliente, total y estado.
-        </p>
-      </div>
+    <div className="space-y-10">
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between pt-2 pb-2">
+        <div>
+          <h1 className="text-2xl font-light tracking-tight text-foreground sm:text-3xl flex items-center gap-2">
+            <FileText className="h-7 w-7 shrink-0 text-primary" />
+            Facturas
+          </h1>
+          <p className="mt-2 text-sm text-muted-foreground max-w-xl">
+            Facturas generadas por ventas. Consulta número, cliente, total y estado.
+          </p>
+        </div>
+      </header>
 
-      <Card>
-        <CardHeader className="pb-4">
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <FileText className="h-5 w-5 shrink-0 text-primary" />
-            Listado de facturas
-          </CardTitle>
-          <CardDescription>
-            Búsqueda por número de factura o nombre de cliente. Filtro por estado.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex flex-wrap items-center gap-3">
+      <div className="rounded-2xl border border-border/50 bg-muted/20 p-5 shadow-sm dark:bg-[#111827] dark:border-[#1F2937] sm:p-6">
+        <div className="flex flex-wrap items-center gap-3">
             <div className="relative flex-1 min-w-[200px] max-w-sm">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
@@ -241,11 +229,12 @@ export default function InvoicesPage() {
               <RotateCw className={`h-4 w-4 ${retryDianMutation.isPending ? 'animate-spin' : ''}`} />
               Reintentar envíos DIAN pendientes
             </Button>
-          </div>
+        </div>
+      </div>
 
+      <div className="rounded-2xl border border-border/50 bg-card overflow-hidden shadow-sm shadow-black/[0.03] dark:shadow-none overflow-x-auto">
           {query.isLoading ? (
-            <div className="rounded-md border">
-              <Table>
+            <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Número</TableHead>
@@ -269,9 +258,8 @@ export default function InvoicesPage() {
                   ))}
                 </TableBody>
               </Table>
-            </div>
           ) : (
-            <div className="rounded-md border">
+            <>
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -343,14 +331,13 @@ export default function InvoicesPage() {
                   )}
                 </TableBody>
               </Table>
-            </div>
+            </>
           )}
 
           {meta && meta.totalPages > 1 && (
             <Pagination meta={meta} onPageChange={setPage} label="Facturas" />
           )}
-        </CardContent>
-      </Card>
+      </div>
 
       <Dialog open={!!invoiceToVoid} onOpenChange={(open) => !open && setInvoiceToVoid(null)}>
         <DialogContent>

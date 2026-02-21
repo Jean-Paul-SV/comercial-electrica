@@ -2,13 +2,6 @@
 
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@shared/components/ui/card';
 import { Button } from '@shared/components/ui/button';
 import { Badge } from '@shared/components/ui/badge';
 import { Skeleton } from '@shared/components/ui/skeleton';
@@ -366,17 +359,12 @@ export default function BillingPage() {
 
   if (isPlatformAdmin) {
     return (
-      <div className="space-y-8 max-w-5xl mx-auto px-4 sm:px-6">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-            Plan
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Gestión de planes y suscripciones.
-          </p>
-        </div>
-        <Card className="border border-border/80 shadow-sm rounded-xl overflow-hidden">
-          <CardContent className="pt-6">
+      <div className="space-y-10 max-w-5xl mx-auto">
+        <header>
+          <h1 className="text-2xl font-light tracking-tight text-foreground sm:text-3xl">Plan</h1>
+          <p className="mt-2 text-sm text-muted-foreground">Gestión de planes y suscripciones.</p>
+        </header>
+        <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] overflow-hidden dark:border-[#1F2937] p-6">
             <p className="text-muted-foreground flex items-center gap-3 rounded-xl border border-border/60 bg-muted/20 px-4 py-3">
               <AlertCircle className="h-5 w-5 shrink-0 text-amber-600 dark:text-amber-500" />
               Los administradores de plataforma gestionan empresas y planes
@@ -389,49 +377,46 @@ export default function BillingPage() {
               </a>
               .
             </p>
-          </CardContent>
-        </Card>
+        </div>
       </div>
     );
   }
 
   if (subscriptionQuery.isLoading || subscriptionQuery.isPending) {
     return (
-      <div className="space-y-8 max-w-5xl mx-auto px-4 sm:px-6">
+      <div className="space-y-8 max-w-5xl mx-auto">
         <div className="flex flex-col gap-1">
           <Skeleton className="h-8 w-24" />
           <Skeleton className="h-4 w-64" />
         </div>
-        <Card className="border border-border/80 rounded-xl overflow-hidden">
-          <CardHeader className="pb-4 border-b border-border/60">
+        <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] overflow-hidden dark:border-[#1F2937]">
+          <div className="p-6 pb-4 border-b border-border/60">
             <Skeleton className="h-6 w-32" />
             <Skeleton className="h-4 w-64" />
-          </CardHeader>
-          <CardContent className="pt-6 space-y-4">
+          </div>
+          <div className="p-6 pt-6 space-y-4">
             <Skeleton className="h-20 w-full rounded-xl" />
             <Skeleton className="h-20 w-full rounded-xl" />
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
     );
   }
 
   if (subscriptionQuery.isError) {
     return (
-      <div className="space-y-8 max-w-5xl mx-auto px-4 sm:px-6">
+      <div className="space-y-8 max-w-5xl mx-auto">
         <div className="flex flex-col gap-1">
           <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
             Plan
           </h1>
         </div>
-        <Card className="border border-destructive/30 rounded-xl overflow-hidden">
-          <CardContent className="pt-6">
-            <p className="text-destructive flex items-center gap-3 rounded-xl bg-destructive/5 border border-destructive/20 px-4 py-3">
-              <AlertCircle className="h-5 w-5 shrink-0" />
-              {getErrorMessage(subscriptionQuery.error)}
-            </p>
-          </CardContent>
-        </Card>
+        <div className="rounded-2xl border border-destructive/30 bg-card shadow-sm p-6 dark:border-[#1F2937]">
+          <p className="text-destructive flex items-center gap-3 rounded-xl bg-destructive/5 border border-destructive/20 px-4 py-3">
+            <AlertCircle className="h-5 w-5 shrink-0" />
+            {getErrorMessage(subscriptionQuery.error)}
+          </p>
+        </div>
       </div>
     );
   }
@@ -467,10 +452,10 @@ export default function BillingPage() {
   const showRequiresPayment = requiresPayment && !isActive;
 
   return (
-    <div className="space-y-8 max-w-5xl mx-auto px-4 sm:px-6 pb-8">
+    <div className="space-y-10 max-w-5xl mx-auto pb-8">
       {/* Hero */}
       <header className="space-y-1">
-        <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+        <h1 className="text-2xl font-light tracking-tight text-foreground sm:text-3xl">
           {showRequiresPayment ? 'Completa tu pago' : plan ? 'Plan' : 'Elige tu plan'}
         </h1>
         <p className="text-sm text-muted-foreground max-w-xl">
@@ -484,9 +469,8 @@ export default function BillingPage() {
 
       {/* Aviso periodo de gracia */}
       {inGracePeriod && !showRequiresPayment && (
-        <Card className="overflow-hidden rounded-2xl border-amber-500/30 bg-gradient-to-br from-amber-500/10 to-amber-600/5 shadow-sm">
-          <CardContent className="p-5 sm:p-6">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="rounded-2xl border border-amber-500/30 bg-muted/20 p-5 shadow-sm dark:bg-[#111827] dark:border-[#1F2937] sm:p-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex flex-col gap-2">
                 <p className="text-sm text-foreground flex items-start gap-3 font-medium">
                   <AlertCircle className="h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
@@ -510,42 +494,39 @@ export default function BillingPage() {
                 <Button
                   onClick={handleOpenPortal}
                   disabled={false /* Stripe eliminado */}
-                  className="gap-2 shrink-0"
+                  className="gap-2 shrink-0 rounded-xl bg-primary hover:bg-primary/90"
                 >
                   <CreditCard className="h-4 w-4" />
                   {false /* Stripe eliminado */ ? 'Abriendo…' : 'Reactivar suscripción'}
                 </Button>
               )}
             </div>
-          </CardContent>
-        </Card>
+        </div>
       )}
 
       {/* "Completa tu pago" solo aparece si requiresPayment (PENDING_PAYMENT) o hasUnpaidInvoice (factura abierta en Stripe). Si el estado es Activa y no hay factura abierta, esta sección no se muestra. */}
       {/* Factura abierta en Stripe (plan Activo pero cobro pendiente): permitir completar pago desde el portal */}
       {hasUnpaidInvoice && !requiresPayment && (
-        <Card className="overflow-hidden rounded-2xl border-amber-500/30 bg-gradient-to-br from-amber-500/10 to-amber-600/5 shadow-sm">
-          <CardContent className="p-5 sm:p-6">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex flex-col gap-2">
-                <p className="text-sm text-foreground flex items-start gap-3 font-medium">
-                  <AlertCircle className="h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
-                  Tienes una factura pendiente de pago. Completa el pago para mantener tu suscripción al día.
-                </p>
-              </div>
-              {canManageBilling && (
-                <Button
-                  onClick={handleOpenPortal}
-                  disabled={false /* Stripe eliminado */}
-                  className="shrink-0 gap-2 bg-amber-600 hover:bg-amber-700 text-white border-0"
-                >
-                  <CreditCard className="h-4 w-4 shrink-0" />
-                  {false /* Stripe eliminado */ ? 'Abriendo…' : 'Completar pago'}
-                </Button>
-              )}
+        <div className="rounded-2xl border border-amber-500/30 bg-muted/20 p-5 shadow-sm dark:bg-[#111827] dark:border-[#1F2937] sm:p-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-2">
+              <p className="text-sm text-foreground flex items-start gap-3 font-medium">
+                <AlertCircle className="h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
+                Tienes una factura pendiente de pago. Completa el pago para mantener tu suscripción al día.
+              </p>
             </div>
-          </CardContent>
-        </Card>
+            {canManageBilling && (
+              <Button
+                onClick={handleOpenPortal}
+                disabled={false /* Stripe eliminado */}
+                className="shrink-0 gap-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white border-0"
+              >
+                <CreditCard className="h-4 w-4 shrink-0" />
+                {false /* Stripe eliminado */ ? 'Abriendo…' : 'Completar pago'}
+              </Button>
+            )}
+          </div>
+        </div>
       )}
 
       {/* Pago pendiente: solo botón Completar pago (no mostrar si plan ya está vigente) */}
@@ -564,20 +545,18 @@ export default function BillingPage() {
 
       {/* Pagar con Wompi (Nequi, PSE, tarjetas) — Colombia */}
       {wompiConfig.data?.enabled && !isPlatformAdmin && (
-        <Card className="overflow-hidden rounded-2xl border border-border/70 shadow-sm bg-card">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base font-semibold flex items-center gap-2 text-foreground">
-              <Smartphone className="h-5 w-5 shrink-0 text-primary/80" />
-              Pagar con Wompi
-            </CardTitle>
-            <CardDescription className="text-sm mt-0.5">
-              Nequi, PSE, tarjetas y más. Ideal para pagos desde Colombia.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+        <div className="rounded-2xl border border-border/50 bg-muted/20 p-5 shadow-sm dark:bg-[#111827] dark:border-[#1F2937] sm:p-6">
+          <p className="text-base font-semibold text-foreground flex items-center gap-2">
+            <Smartphone className="h-5 w-5 shrink-0 text-primary/80" />
+            Pagar con Wompi
+          </p>
+          <p className="text-sm text-muted-foreground mt-1">
+            Nequi, PSE, tarjetas y más. Ideal para pagos desde Colombia.
+          </p>
+          <div className="mt-4">
             <Button
               variant="outline"
-              className="gap-2"
+              className="gap-2 rounded-xl"
               onClick={() => {
                 setWompiPlanId(plan?.id ?? plansQuery.data?.[0]?.id ?? '');
                 setWompiBillingInterval(billingInterval ?? 'yearly');
@@ -591,8 +570,8 @@ export default function BillingPage() {
               <Smartphone className="h-4 w-4" />
               Pagar con Nequi u otros métodos
             </Button>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
 
       {/* Diálogo Wompi: Nequi (teléfono) + aceptación de términos */}
@@ -767,15 +746,15 @@ export default function BillingPage() {
       </Dialog>
 
       {/* Plan actual + Estado */}
-      <Card className="overflow-hidden rounded-2xl border border-border/70 shadow-sm bg-card">
-        <CardHeader className="pb-5 border-b border-border/50 bg-muted/10">
-          <CardTitle className="text-base font-semibold flex items-center gap-2 text-foreground">
+      <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] overflow-hidden dark:border-[#1F2937]">
+        <div className="p-6 pb-5 border-b border-border/50 bg-muted/10">
+          <p className="text-base font-semibold text-foreground flex items-center gap-2">
             <Package className="h-5 w-5 shrink-0 text-primary/80" aria-hidden />
             Plan actual
-          </CardTitle>
-          <CardDescription className="text-sm mt-0.5">
+          </p>
+          <p className="text-sm text-muted-foreground mt-1">
             Tu plan incluye los módulos activos para tu empresa.
-          </CardDescription>
+          </p>
           {plan && isPlanWithDian(plan.slug) && !isDianConfiguredByProvider(plan.slug) && dianStatus && isActive && (
             <>
               {dianStatus.readyForSend ? (
@@ -806,8 +785,8 @@ export default function BillingPage() {
               )}
             </>
           )}
-        </CardHeader>
-        <CardContent className="pt-6 space-y-5">
+        </div>
+        <div className="p-6 pt-6 space-y-5">
           {plan ? (
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-xl border border-border/60 bg-muted/5 p-4 sm:p-5">
               <div className="flex items-center gap-4">
@@ -1098,8 +1077,8 @@ export default function BillingPage() {
               Para cambiar el método de pago o ver facturas, contacte a soporte.
             </p>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* Confirmación cambio de plan o selección de plan */}
       <Dialog

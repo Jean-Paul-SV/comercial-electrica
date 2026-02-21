@@ -3,13 +3,6 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@shared/components/ui/card';
 import { Button } from '@shared/components/ui/button';
 import { Input } from '@shared/components/ui/input';
 import { Label } from '@shared/components/ui/label';
@@ -213,16 +206,12 @@ export default function ProviderElectronicInvoicingPage() {
     return (
       <div className="p-4 md:p-6 space-y-6 max-w-5xl mx-auto">
         <Skeleton className="h-8 w-48" />
-        <Card>
-          <CardHeader>
-            <Skeleton className="h-6 w-48" />
-            <Skeleton className="h-4 w-72" />
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Skeleton className="h-20 w-full" />
-            <Skeleton className="h-32 w-full" />
-          </CardContent>
-        </Card>
+        <div className="rounded-2xl border border-border/50 bg-card shadow-sm p-6 dark:border-[#1F2937] space-y-4">
+          <Skeleton className="h-6 w-48" />
+          <Skeleton className="h-4 w-72" />
+          <Skeleton className="h-20 w-full" />
+          <Skeleton className="h-32 w-full" />
+        </div>
       </div>
     );
   }
@@ -244,39 +233,42 @@ export default function ProviderElectronicInvoicingPage() {
   const statusInfo = STATUS_CONFIG[status] ?? STATUS_CONFIG.incomplete;
 
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-5xl mx-auto">
-      <div className="flex flex-col gap-2">
-        <Button variant="ghost" size="sm" className="w-fit gap-2" asChild>
-          <Link href={`/provider/${tenantId}`}>
-            <ArrowLeft className="h-4 w-4" />
-            Volver a {tenant?.name ?? 'empresa'}
-          </Link>
-        </Button>
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Facturación electrónica (DIAN)
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Configuración para {tenant?.name ?? 'esta empresa'}.
-        </p>
-      </div>
+    <div className="space-y-10 max-w-5xl mx-auto">
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" asChild>
+            <Link href={`/provider/${tenantId}`}>
+              <ArrowLeft className="h-4 w-4" />
+              <span className="sr-only">Volver</span>
+            </Link>
+          </Button>
+          <div>
+            <h1 className="text-2xl font-light tracking-tight text-foreground sm:text-3xl flex items-center gap-2">
+              <FileKey className="h-7 w-7 shrink-0 text-primary" aria-hidden />
+              Facturación electrónica (DIAN)
+            </h1>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Configuración para {tenant?.name ?? 'esta empresa'}.
+            </p>
+          </div>
+        </div>
+      </header>
 
       {/* Estado + Qué hacer: misma fila cuando hay pasos pendientes */}
       <div className={`grid gap-4 ${!readyForSend ? 'md:grid-cols-2' : ''}`}>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2">
-              {readyForSend ? (
-                <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-500" />
-              ) : status === 'cert_expired' || status === 'range_exhausted' ? (
-                <ShieldAlert className="h-5 w-5 text-destructive" />
-              ) : (
-                <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-500" />
-              )}
-              Estado
-            </CardTitle>
-            <CardDescription>{statusInfo.description}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2">
+        <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] p-6 dark:border-[#1F2937]">
+          <p className="text-base font-medium text-foreground flex items-center gap-2">
+            {readyForSend ? (
+              <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-500" />
+            ) : status === 'cert_expired' || status === 'range_exhausted' ? (
+              <ShieldAlert className="h-5 w-5 text-destructive" />
+            ) : (
+              <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-500" />
+            )}
+            Estado
+          </p>
+          <p className="mt-1.5 text-sm text-muted-foreground">{statusInfo.description}</p>
+          <div className="mt-4 space-y-2">
             <Badge variant={statusInfo.variant}>{statusInfo.label}</Badge>
             {missing.length > 0 && (
               <div className="text-sm text-muted-foreground mt-2">
@@ -308,67 +300,61 @@ export default function ProviderElectronicInvoicingPage() {
                 )}
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
         {!readyForSend && (
-          <Card className="border-amber-200 dark:border-amber-900/50 bg-amber-50/50 dark:bg-amber-950/20">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">Qué hacer</CardTitle>
-              <CardDescription>
-                Complete los datos obligatorios: NIT, Software ID, PIN, certificado .p12 y numeración.
-              </CardDescription>
-            </CardHeader>
-          </Card>
+          <div className="rounded-2xl border border-amber-200 dark:border-amber-900/50 bg-amber-50/50 dark:bg-amber-950/20 p-6 dark:border-[#1F2937]">
+            <p className="text-base font-medium text-foreground">Qué hacer</p>
+            <p className="mt-1.5 text-sm text-muted-foreground">
+              Complete los datos obligatorios: NIT, Software ID, PIN, certificado .p12 y numeración.
+            </p>
+          </div>
         )}
       </div>
 
       {/* Plantilla: acción rápida */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <p className="font-medium text-foreground">Plantilla rápida</p>
-              <p className="text-sm text-muted-foreground mt-0.5">
-                Aplique valores típicos de habilitación y luego complete NIT, software y certificado.
-              </p>
-            </div>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="shrink-0 w-full sm:w-auto"
-              onClick={() =>
-                setForm((p) => ({
-                  ...p,
-                  env: 'HABILITACION',
-                  prefix: 'FAC',
-                  rangeFrom: 1,
-                  rangeTo: 999999,
-                }))
-              }
-            >
-              Aplicar plantilla: Pyme básico (habilitación)
-            </Button>
+      <div className="rounded-2xl border border-border/50 bg-muted/20 p-5 shadow-sm dark:bg-[#111827] dark:border-[#1F2937] sm:p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <p className="font-medium text-foreground">Plantilla rápida</p>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              Aplique valores típicos de habilitación y luego complete NIT, software y certificado.
+            </p>
           </div>
-        </CardContent>
-      </Card>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="shrink-0 w-full sm:w-auto rounded-xl"
+            onClick={() =>
+              setForm((p) => ({
+                ...p,
+                env: 'HABILITACION',
+                prefix: 'FAC',
+                rangeFrom: 1,
+                rangeTo: 999999,
+              }))
+            }
+          >
+            Aplicar plantilla: Pyme básico (habilitación)
+          </Button>
+        </div>
+      </div>
 
       {/* Formulario en 2 columnas: emisor + software | certificado + numeración */}
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Columna izquierda: Datos del emisor + Software DIAN */}
         <div className="space-y-6">
       {/* Datos del emisor */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <Building2 className="h-4 w-4" />
-            Datos del emisor
-          </CardTitle>
-          <CardDescription>
-            NIT y razón social (deben coincidir con DIAN y Cámara de Comercio).
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] p-6 dark:border-[#1F2937]">
+        <p className="text-base font-medium text-foreground flex items-center gap-2">
+          <Building2 className="h-4 w-4" />
+          Datos del emisor
+        </p>
+        <p className="mt-1.5 text-sm text-muted-foreground">
+          NIT y razón social (deben coincidir con DIAN y Cámara de Comercio).
+        </p>
+        <div className="mt-4 space-y-4">
           <p className="text-xs text-amber-600 dark:text-amber-500 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md px-3 py-2">
             <strong>Obligación legal:</strong> NIT y razón social exactos respecto al contribuyente en DIAN.
           </p>
@@ -391,19 +377,17 @@ export default function ProviderElectronicInvoicingPage() {
               )}
             </p>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* Software DIAN */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <Hash className="h-4 w-4" />
-            Software DIAN
-          </CardTitle>
-          <CardDescription>ID y PIN asignados por la DIAN.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] p-6 dark:border-[#1F2937]">
+        <p className="text-base font-medium text-foreground flex items-center gap-2">
+          <Hash className="h-4 w-4" />
+          Software DIAN
+        </p>
+        <p className="mt-1.5 text-sm text-muted-foreground">ID y PIN asignados por la DIAN.</p>
+        <div className="mt-4 space-y-4">
           <div className="grid gap-2">
             <Label htmlFor="softwareId">Software ID</Label>
             <Input
@@ -424,24 +408,22 @@ export default function ProviderElectronicInvoicingPage() {
               autoComplete="off"
             />
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
         </div>
 
         {/* Columna derecha: Certificado + Numeración */}
         <div className="space-y-6">
       {/* Certificado */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <FileKey className="h-4 w-4" />
-            Certificado .p12
-          </CardTitle>
-          <CardDescription>
-            Certificado de firma electrónica. Se almacena cifrado.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] p-6 dark:border-[#1F2937]">
+        <p className="text-base font-medium text-foreground flex items-center gap-2">
+          <FileKey className="h-4 w-4" />
+          Certificado .p12
+        </p>
+        <p className="mt-1.5 text-sm text-muted-foreground">
+          Certificado de firma electrónica. Se almacena cifrado.
+        </p>
+        <div className="mt-4 space-y-4">
           {config?.hasCert && (
             <p className="text-sm text-muted-foreground flex items-center gap-2">
               <CheckCircle2 className="h-4 w-4 text-green-600" />
@@ -471,19 +453,17 @@ export default function ProviderElectronicInvoicingPage() {
             {uploadCertMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
             Subir certificado
           </Button>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* Numeración y ambiente */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <ListOrdered className="h-4 w-4" />
-            Numeración y ambiente
-          </CardTitle>
-          <CardDescription>Resolución, prefijo, rango y ambiente DIAN.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] p-6 dark:border-[#1F2937]">
+        <p className="text-base font-medium text-foreground flex items-center gap-2">
+          <ListOrdered className="h-4 w-4" />
+          Numeración y ambiente
+        </p>
+        <p className="mt-1.5 text-sm text-muted-foreground">Resolución, prefijo, rango y ambiente DIAN.</p>
+        <div className="mt-4 space-y-4">
           <div className="grid gap-2">
             <Label htmlFor="env">Ambiente</Label>
             <Select
@@ -546,22 +526,21 @@ export default function ProviderElectronicInvoicingPage() {
               </div>
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
         </div>
       </div>
 
-      <Card>
-        <CardContent className="pt-6">
-          <Button
-            onClick={handleSaveConfig}
-            disabled={updateMutation.isPending}
-          >
-            {updateMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-            Guardar configuración
-          </Button>
-        </CardContent>
-      </Card>
+      <div className="rounded-2xl border border-border/50 bg-muted/20 p-5 shadow-sm dark:bg-[#111827] dark:border-[#1F2937] sm:p-6">
+        <Button
+          onClick={handleSaveConfig}
+          disabled={updateMutation.isPending}
+          className="rounded-xl bg-primary hover:bg-primary/90"
+        >
+          {updateMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+          Guardar configuración
+        </Button>
+      </div>
     </div>
   );
 }

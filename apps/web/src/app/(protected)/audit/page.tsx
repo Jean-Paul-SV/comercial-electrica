@@ -1,13 +1,6 @@
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@shared/components/ui/card';
 import { Button } from '@shared/components/ui/button';
 import { Input } from '@shared/components/ui/input';
 import { Label } from '@shared/components/ui/label';
@@ -194,35 +187,36 @@ export default function AuditPage() {
   const hasData = rows.length > 0;
 
   return (
-    <div className="space-y-6 sm:space-y-8">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-xl font-semibold tracking-tight sm:text-2xl text-foreground">
+    <div className="space-y-10">
+      <header className="pt-2 pb-2">
+        <h1 className="text-2xl font-light tracking-tight text-foreground sm:text-3xl flex items-center gap-2">
+          <ClipboardList className="h-7 w-7 shrink-0 text-primary" aria-hidden />
           Auditoría
         </h1>
-        <p className="text-sm text-muted-foreground">
+        <p className="mt-2 text-sm text-muted-foreground max-w-xl">
           Registro de acciones del sistema. En eliminaciones se muestra la justificación.
         </p>
-      </div>
+      </header>
 
-      <Card className="border border-border/80 shadow-sm rounded-xl overflow-hidden">
-        <CardHeader className="pb-4 border-b border-border/60">
+      <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] overflow-hidden dark:border-[#1F2937]">
+        <div className="p-6 pb-4 border-b border-border/60">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-              <CardTitle className="text-lg font-medium flex items-center gap-2 text-foreground">
+              <p className="text-lg font-medium text-foreground flex items-center gap-2">
                 <ClipboardList className="h-5 w-5 shrink-0 text-primary" aria-hidden />
                 Registro de auditoría
-              </CardTitle>
-              <CardDescription>
+              </p>
+              <p className="mt-1.5 text-sm text-muted-foreground">
                 {hasData
                   ? `${totalLogs} registro${totalLogs !== 1 ? 's' : ''}`
                   : 'Listado de logs (creaciones, actualizaciones, eliminaciones). Cadena de integridad para inmutabilidad.'}
-              </CardDescription>
+              </p>
             </div>
             <Button
               type="button"
               variant="outline"
               size="sm"
-              className="shrink-0 gap-2"
+              className="shrink-0 gap-2 rounded-xl"
               onClick={runVerifyChain}
               disabled={verifyChain.isPending}
               aria-label="Verificar cadena de integridad"
@@ -231,8 +225,8 @@ export default function AuditPage() {
               {verifyChain.isPending ? 'Verificando…' : 'Verificar cadena'}
             </Button>
           </div>
-        </CardHeader>
-        <CardContent className="pt-4">
+        </div>
+        <div className="p-6 pt-4">
           {query.isLoading ? (
             <div className="rounded-lg border border-border/80 overflow-hidden">
               <Table>
@@ -426,8 +420,8 @@ export default function AuditPage() {
               </Dialog>
             </>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

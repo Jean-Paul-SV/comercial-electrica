@@ -6,13 +6,6 @@ import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@shared/components/ui/card';
 import { Button } from '@shared/components/ui/button';
 import { Input } from '@shared/components/ui/input';
 import { Label } from '@shared/components/ui/label';
@@ -101,8 +94,8 @@ export default function ProviderNewTenantPage() {
   });
 
   return (
-    <div className="p-4 md:p-6 lg:p-8 space-y-6 max-w-4xl lg:max-w-5xl xl:max-w-6xl mx-auto">
-      <div className="flex items-center gap-4">
+    <div className="space-y-10 max-w-4xl lg:max-w-5xl xl:max-w-6xl mx-auto">
+      <header className="flex items-center gap-4">
         <Button variant="ghost" size="icon" asChild className="rounded-xl shrink-0">
           <Link href="/provider">
             <ArrowLeft className="h-4 w-4" />
@@ -110,26 +103,24 @@ export default function ProviderNewTenantPage() {
           </Link>
         </Button>
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight flex items-center gap-2 text-foreground">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary shrink-0">
-              <Building2 className="h-5 w-5" />
-            </span>
+          <h1 className="text-2xl font-light tracking-tight flex items-center gap-2 text-foreground sm:text-3xl">
+            <Building2 className="h-7 w-7 shrink-0 text-primary" aria-hidden />
             Nueva empresa
           </h1>
-          <p className="text-muted-foreground text-sm mt-0.5">
+          <p className="mt-2 text-sm text-muted-foreground max-w-xl">
             Crear la empresa (tenant) y su primer usuario administrador en un solo paso.
           </p>
         </div>
-      </div>
+      </header>
 
-      <Card className="rounded-2xl border-border/80 shadow-sm overflow-hidden">
-        <CardHeader className="border-b border-border/60 pb-6">
-          <CardTitle className="text-lg font-semibold text-foreground">Datos de la empresa</CardTitle>
-          <CardDescription className="text-muted-foreground">
+      <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] overflow-hidden dark:border-[#1F2937]">
+        <div className="border-b border-border/60 pb-6 px-6 pt-6">
+          <h2 className="text-lg font-semibold text-foreground">Datos de la empresa</h2>
+          <p className="text-sm text-muted-foreground mt-0.5">
             El identificador (slug) no se puede cambiar después. La razón social solo se define aquí.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="pt-6">
+          </p>
+        </div>
+        <div className="pt-6 px-6 pb-6">
           <form onSubmit={onSubmit} className="space-y-8">
             {/* Datos de la empresa */}
             <div className="space-y-5">
@@ -344,8 +335,8 @@ export default function ProviderNewTenantPage() {
               </Button>
             </div>
           </form>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

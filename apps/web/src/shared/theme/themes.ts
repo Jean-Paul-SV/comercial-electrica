@@ -38,9 +38,9 @@ const blue: ThemePreset = {
     ring: '221 83% 53%',
   },
   dark: {
-    primary: '221 83% 58%',
+    primary: '217 91% 60%',
     primaryForeground: '0 0% 100%',
-    ring: '221 83% 58%',
+    ring: '217 91% 60%',
   },
 };
 

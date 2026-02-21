@@ -1,13 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@shared/components/ui/card';
 import { Button } from '@shared/components/ui/button';
 import { Badge } from '@shared/components/ui/badge';
 import {
@@ -68,8 +61,8 @@ export default function ProviderBackupsPage() {
   const { data: alerts, isLoading: alertsLoading, error: alertsError } = useBackupsAlerts();
 
   return (
-    <div className="p-4 md:p-6 space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="space-y-10">
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" asChild>
             <Link href="/provider">
@@ -78,43 +71,39 @@ export default function ProviderBackupsPage() {
             </Link>
           </Button>
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight flex items-center gap-2">
-              <Database className="h-6 w-6 text-primary" />
+            <h1 className="text-2xl font-light tracking-tight text-foreground sm:text-3xl flex items-center gap-2">
+              <Database className="h-7 w-7 shrink-0 text-primary" aria-hidden />
               Metadatos de Backups
             </h1>
-            <p className="text-muted-foreground text-sm mt-0.5">
+            <p className="mt-2 text-sm text-muted-foreground max-w-xl">
               Información de backups para monitoreo y análisis. Solo metadatos,
               sin acceso al contenido.
             </p>
           </div>
         </div>
-      </div>
+      </header>
 
       {/* Alertas */}
       {alertsLoading ? (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-destructive" />
-              Alertas
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
+        <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] p-6 dark:border-[#1F2937]">
+          <p className="text-lg font-medium text-foreground flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5 text-destructive" />
+            Alertas
+          </p>
+          <div className="mt-4">
             <Skeleton className="h-20 w-full rounded-lg" />
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       ) : alerts && alerts.length > 0 ? (
-        <Card className="border-destructive/50">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-destructive" />
-              Alertas ({alerts.length})
-            </CardTitle>
-            <CardDescription>
-              Problemas detectados que requieren atención
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+        <div className="rounded-2xl border border-destructive/50 bg-card shadow-sm shadow-black/[0.03] p-6 dark:border-[#1F2937]">
+          <p className="text-lg font-medium text-foreground flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5 text-destructive" />
+            Alertas ({alerts.length})
+          </p>
+          <p className="mt-1.5 text-sm text-muted-foreground">
+            Problemas detectados que requieren atención
+          </p>
+          <div className="mt-4">
             <div className="space-y-2">
               {alerts.slice(0, 10).map((alert, idx) => (
                 <div
@@ -150,46 +139,38 @@ export default function ProviderBackupsPage() {
                 </p>
               )}
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       ) : alerts && alerts.length === 0 ? (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-muted-foreground" />
-              Alertas
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
+        <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] p-6 dark:border-[#1F2937]">
+          <p className="text-lg font-medium text-foreground flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5 text-muted-foreground" />
+            Alertas
+          </p>
+          <div className="mt-4">
             <p className="text-sm text-muted-foreground py-4 text-center">
               No hay alertas. Todo está funcionando correctamente.
             </p>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       ) : null}
 
       {/* Estadísticas */}
       {statsError ? (
-        <Card className="border-destructive/50">
-          <CardContent className="pt-6">
-            <p className="text-sm text-destructive text-center">
-              Error al cargar estadísticas. Intenta recargar la página.
-            </p>
-          </CardContent>
-        </Card>
+        <div className="rounded-2xl border border-destructive/50 bg-card shadow-sm p-6 dark:border-[#1F2937]">
+          <p className="text-sm text-destructive text-center">
+            Error al cargar estadísticas. Intenta recargar la página.
+          </p>
+        </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Adopción
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
+          <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] p-6 dark:border-[#1F2937]">
+            <p className="text-sm font-medium text-muted-foreground">Adopción</p>
+            <div className="mt-3">
               {statsLoading ? (
                 <Skeleton className="h-8 w-24" />
               ) : (
-                <div>
+                <>
                   <div className="text-2xl font-bold">
                     {stats?.adoptionRate ?? 0}%
                   </div>
@@ -197,90 +178,77 @@ export default function ProviderBackupsPage() {
                     {stats?.tenantsWithBackups ?? 0} de{' '}
                     {stats?.totalTenants ?? 0} empresas
                   </p>
-                </div>
+                </>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </div>
 
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Tasa de éxito
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {statsLoading ? (
-              <Skeleton className="h-8 w-24" />
-            ) : (
-              <div>
-                <div className="text-2xl font-bold">
-                  {stats?.successRate ?? 0}%
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {stats?.completedBackups ?? 0} completados,{' '}
-                  {stats?.failedBackups ?? 0} fallidos (30 días)
-                </p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+          <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] p-6 dark:border-[#1F2937]">
+            <p className="text-sm font-medium text-muted-foreground">Tasa de éxito</p>
+            <div className="mt-3">
+              {statsLoading ? (
+                <Skeleton className="h-8 w-24" />
+              ) : (
+                <>
+                  <div className="text-2xl font-bold">
+                    {stats?.successRate ?? 0}%
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {stats?.completedBackups ?? 0} completados,{' '}
+                    {stats?.failedBackups ?? 0} fallidos (30 días)
+                  </p>
+                </>
+              )}
+            </div>
+          </div>
 
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Promedio por empresa
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {statsLoading ? (
-              <Skeleton className="h-8 w-24" />
-            ) : (
-              <div>
-                <div className="text-2xl font-bold">
-                  {stats?.averageBackupsPerTenant ?? 0}
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Backups por empresa (30 días)
-                </p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+          <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] p-6 dark:border-[#1F2937]">
+            <p className="text-sm font-medium text-muted-foreground">Promedio por empresa</p>
+            <div className="mt-3">
+              {statsLoading ? (
+                <Skeleton className="h-8 w-24" />
+              ) : (
+                <>
+                  <div className="text-2xl font-bold">
+                    {stats?.averageBackupsPerTenant ?? 0}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Backups por empresa (30 días)
+                  </p>
+                </>
+              )}
+            </div>
+          </div>
 
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Tamaño promedio
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {statsLoading ? (
-              <Skeleton className="h-8 w-24" />
-            ) : (
-              <div>
-                <div className="text-2xl font-bold">
-                  {formatBytes(stats?.averageSize ?? null)}
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Duración: {formatDuration(stats?.averageDuration ?? null)}
-                </p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+          <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] p-6 dark:border-[#1F2937]">
+            <p className="text-sm font-medium text-muted-foreground">Tamaño promedio</p>
+            <div className="mt-3">
+              {statsLoading ? (
+                <Skeleton className="h-8 w-24" />
+              ) : (
+                <>
+                  <div className="text-2xl font-bold">
+                    {formatBytes(stats?.averageSize ?? null)}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Duración: {formatDuration(stats?.averageDuration ?? null)}
+                  </p>
+                </>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
       {/* Backups recientes */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg">Backups recientes</CardTitle>
-          <CardDescription>
-            Últimos 100 backups con información del tenant y estadísticas
-            básicas
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+      <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] overflow-hidden dark:border-[#1F2937]">
+        <div className="p-6 pb-3">
+          <p className="text-lg font-medium text-foreground">Backups recientes</p>
+          <p className="mt-1.5 text-sm text-muted-foreground">
+            Últimos 100 backups con información del tenant y estadísticas básicas
+          </p>
+        </div>
+        <div className="p-6 pt-0">
           {backupsError ? (
             <p className="text-sm text-destructive py-8 text-center">
               Error al cargar backups. Intenta recargar la página.
@@ -352,8 +320,8 @@ export default function ProviderBackupsPage() {
               </Table>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

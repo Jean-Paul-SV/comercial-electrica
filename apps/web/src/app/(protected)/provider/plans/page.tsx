@@ -6,13 +6,6 @@ import { useForm, Controller } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@shared/components/ui/card';
 import { Button } from '@shared/components/ui/button';
 import { DianActivationDisclaimer } from '@shared/components/DianActivationDisclaimer';
 import { Input } from '@shared/components/ui/input';
@@ -229,40 +222,42 @@ export default function ProviderPlansPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <Link href="/provider">
-          <Button variant="ghost" size="sm" className="gap-2">
-            <ArrowLeft className="h-4 w-4" />
-            Volver al panel
+    <div className="space-y-10">
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-light tracking-tight text-foreground sm:text-3xl flex items-center gap-2">
+            <CreditCard className="h-7 w-7 shrink-0 text-primary" aria-hidden />
+            Planes
+          </h1>
+          <p className="mt-2 text-sm text-muted-foreground max-w-xl">
+            Gestiona planes y precios: <strong>plan sin DIAN</strong> (solo documento interno) y <strong>plan con DIAN</strong> (facturación electrónica). Asigna un Stripe Price ID para suscripciones automáticas.
+          </p>
+        </div>
+        <div className="flex gap-2 shrink-0">
+          <Button variant="outline" size="sm" asChild className="gap-2 rounded-xl">
+            <Link href="/provider">
+              <ArrowLeft className="h-4 w-4" />
+              Volver al panel
+            </Link>
           </Button>
-        </Link>
-        <Button size="sm" onClick={() => setOpenNewPlan(true)} className="gap-2 shrink-0">
+          <Button size="sm" onClick={() => setOpenNewPlan(true)} className="gap-2 rounded-xl bg-primary hover:bg-primary/90">
           <Plus className="h-4 w-4" />
-          Nuevo plan
-        </Button>
-      </div>
+            Nuevo plan
+          </Button>
+        </div>
+      </header>
 
-      <div className="flex flex-col gap-1">
-        <h1 className="text-xl font-semibold tracking-tight sm:text-2xl text-foreground">
-          Planes
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Gestiona planes y precios: <strong>plan sin DIAN</strong> (solo documento interno) y <strong>plan con DIAN</strong> (facturación electrónica). Asigna un Stripe Price ID para suscripciones automáticas.
-        </p>
-      </div>
-
-      <Card className="border border-border/80 shadow-sm overflow-hidden">
-        <CardHeader className="pb-4 border-b border-border/60">
-          <CardTitle className="text-lg font-medium flex items-center gap-2 text-foreground">
+      <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] overflow-hidden dark:border-[#1F2937]">
+        <div className="p-6 pb-4 border-b border-border/60">
+          <p className="text-lg font-medium text-foreground flex items-center gap-2">
             <CreditCard className="h-5 w-5 shrink-0 text-primary" />
             Listado de planes
-          </CardTitle>
-          <CardDescription>
+          </p>
+          <p className="mt-1.5 text-sm text-muted-foreground">
             La columna Facturación indica si el plan incluye DIAN. Solo los planes activos aparecen al asignar plan a una empresa.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="p-0">
+          </p>
+        </div>
+        <div className="p-0">
           {isLoading ? (
             <div className="p-4 space-y-3">
               <Skeleton className="h-10 w-full" />
@@ -332,8 +327,8 @@ export default function ProviderPlansPage() {
               No hay planes. Crea uno con &quot;Nuevo plan&quot;.
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* Dialog: Nuevo plan */}
       <Dialog open={openNewPlan} onOpenChange={setOpenNewPlan}>

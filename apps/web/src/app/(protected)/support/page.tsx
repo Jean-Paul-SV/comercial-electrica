@@ -1,12 +1,5 @@
 'use client';
 
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@shared/components/ui/card';
 import { Button } from '@shared/components/ui/button';
 import { MessageCircle } from 'lucide-react';
 import Link from 'next/link';
@@ -23,19 +16,19 @@ export default function SupportPage() {
 
   if (whatsappUrl) {
     return (
-      <div className="mx-auto max-w-lg">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <MessageCircle className="h-5 w-5" />
-              Soporte
-            </CardTitle>
-            <CardDescription>
-              Abre WhatsApp en una nueva pestaña para contactar a soporte. La app seguirá abierta aquí.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Button asChild size="lg" className="w-full bg-[#25D366] hover:bg-[#20BD5A]">
+      <div className="space-y-10 mx-auto max-w-lg">
+        <header>
+          <h1 className="text-2xl font-light tracking-tight text-foreground sm:text-3xl flex items-center gap-2">
+            <MessageCircle className="h-7 w-7 shrink-0 text-primary" aria-hidden />
+            Soporte
+          </h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Abre WhatsApp en una nueva pestaña para contactar a soporte. La app seguirá abierta aquí.
+          </p>
+        </header>
+        <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] p-6 dark:border-[#1F2937]">
+          <div className="space-y-4">
+            <Button asChild size="lg" className="w-full rounded-xl bg-[#25D366] hover:bg-[#20BD5A]">
               <a
                 href={whatsappUrl}
                 target="_blank"
@@ -48,25 +41,24 @@ export default function SupportPage() {
             <Button asChild variant="secondary" className="w-full">
               <Link href="/app">Volver al inicio</Link>
             </Button>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="mx-auto max-w-lg">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <MessageCircle className="h-5 w-5" />
-            Soporte
-          </CardTitle>
-          <CardDescription>
-            El número de WhatsApp de soporte no está configurado para esta instalación.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+    <div className="space-y-10 mx-auto max-w-lg">
+      <header>
+        <h1 className="text-2xl font-light tracking-tight text-foreground sm:text-3xl flex items-center gap-2">
+          <MessageCircle className="h-7 w-7 shrink-0 text-primary" aria-hidden />
+          Soporte
+        </h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          El número de WhatsApp de soporte no está configurado para esta instalación.
+        </p>
+      </header>
+      <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] p-6 dark:border-[#1F2937]">
           <p className="text-muted-foreground text-sm mb-4">
             Si eres el administrador, configura la variable{' '}
             <code className="rounded bg-muted px-1">NEXT_PUBLIC_SUPPORT_WHATSAPP_NUMBER</code> en el
@@ -82,8 +74,7 @@ export default function SupportPage() {
           <Button asChild variant="secondary">
             <Link href="/app">Volver al inicio</Link>
           </Button>
-        </CardContent>
-      </Card>
+      </div>
     </div>
   );
 }

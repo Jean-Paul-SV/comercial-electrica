@@ -1,13 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@shared/components/ui/card';
 import { Button } from '@shared/components/ui/button';
 import { Input } from '@shared/components/ui/input';
 import { Label } from '@shared/components/ui/label';
@@ -202,38 +195,40 @@ export default function ElectronicInvoicingPage() {
 
   if (configQuery.isLoading || statusQuery.isLoading) {
     return (
-      <div className="space-y-6 max-w-2xl">
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Facturación electrónica (DIAN)
-        </h1>
-        <Card>
-          <CardHeader>
+      <div className="space-y-10 max-w-2xl">
+        <header>
+          <h1 className="text-2xl font-light tracking-tight text-foreground sm:text-3xl flex items-center gap-2">
+            <FileKey className="h-7 w-7 shrink-0 text-primary" aria-hidden />
+            Facturación electrónica (DIAN)
+          </h1>
+        </header>
+        <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] p-6 dark:border-[#1F2937]">
+          <div className="space-y-4">
             <Skeleton className="h-6 w-48" />
             <Skeleton className="h-4 w-72" />
-          </CardHeader>
-          <CardContent className="space-y-4">
             <Skeleton className="h-20 w-full" />
             <Skeleton className="h-32 w-full" />
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
     );
   }
 
   if (configQuery.isError || statusQuery.isError) {
     return (
-      <div className="space-y-6 max-w-2xl">
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Facturación electrónica (DIAN)
-        </h1>
-        <Card>
-          <CardContent className="pt-6">
+      <div className="space-y-10 max-w-2xl">
+        <header>
+          <h1 className="text-2xl font-light tracking-tight text-foreground sm:text-3xl flex items-center gap-2">
+            <FileKey className="h-7 w-7 shrink-0 text-primary" aria-hidden />
+            Facturación electrónica (DIAN)
+          </h1>
+        </header>
+        <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] p-6 dark:border-[#1F2937]">
             <p className="text-destructive flex items-center gap-2">
               <AlertCircle className="h-4 w-4 shrink-0" />
               {getErrorMessage(configQuery.error ?? statusQuery.error)}
             </p>
-          </CardContent>
-        </Card>
+        </div>
       </div>
     );
   }
@@ -241,10 +236,13 @@ export default function ElectronicInvoicingPage() {
   const statusInfo = STATUS_CONFIG[status] ?? STATUS_CONFIG.incomplete;
 
   return (
-    <div className="space-y-6 max-w-2xl">
-      <h1 className="text-2xl font-semibold tracking-tight">
-        Facturación electrónica (DIAN)
-      </h1>
+    <div className="space-y-10 max-w-2xl">
+      <header>
+        <h1 className="text-2xl font-light tracking-tight text-foreground sm:text-3xl flex items-center gap-2">
+          <FileKey className="h-7 w-7 shrink-0 text-primary" aria-hidden />
+          Facturación electrónica (DIAN)
+        </h1>
+      </header>
 
       <DianActivationDisclaimer variant="card" />
       <p className="text-sm text-muted-foreground">
@@ -252,21 +250,19 @@ export default function ElectronicInvoicingPage() {
       </p>
 
       {/* Estado */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base flex items-center gap-2">
-            {readyForSend ? (
-              <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-500" />
-            ) : status === 'cert_expired' || status === 'range_exhausted' ? (
-              <ShieldAlert className="h-5 w-5 text-destructive" />
-            ) : (
-              <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-500" />
-            )}
-            Estado
-          </CardTitle>
-          <CardDescription>{statusInfo.description}</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-2">
+      <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] p-6 dark:border-[#1F2937]">
+        <p className="text-base font-medium text-foreground flex items-center gap-2">
+          {readyForSend ? (
+            <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-500" />
+          ) : status === 'cert_expired' || status === 'range_exhausted' ? (
+            <ShieldAlert className="h-5 w-5 text-destructive" />
+          ) : (
+            <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-500" />
+          )}
+          Estado
+        </p>
+        <p className="mt-1.5 text-sm text-muted-foreground">{statusInfo.description}</p>
+        <div className="mt-4 space-y-2">
           <Badge variant={statusInfo.variant}>{statusInfo.label}</Badge>
           {missing.length > 0 && (
             <div className="text-sm text-muted-foreground mt-2">
@@ -315,19 +311,17 @@ export default function ElectronicInvoicingPage() {
               )}
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* Diagnóstico: qué hacer cuando no está listo */}
       {!readyForSend && (
-        <Card className="border-amber-200 dark:border-amber-900/50 bg-amber-50/50 dark:bg-amber-950/20">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Qué hacer</CardTitle>
-            <CardDescription>
-              Siga estos pasos para dejar la facturación electrónica lista para enviar a la DIAN.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+        <div className="rounded-2xl border border-amber-200 dark:border-amber-900/50 bg-amber-50/50 dark:bg-amber-950/20 p-6 dark:border-[#1F2937]">
+          <p className="text-base font-medium text-foreground">Qué hacer</p>
+          <p className="mt-1.5 text-sm text-muted-foreground">
+            Siga estos pasos para dejar la facturación electrónica lista para enviar a la DIAN.
+          </p>
+          <div className="mt-4">
             <ul className="list-disc list-inside space-y-2 text-sm text-foreground">
               {status === 'not_configured' && (
                 <>
@@ -363,23 +357,22 @@ export default function ElectronicInvoicingPage() {
                 </>
               )}
             </ul>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
 
       {/* Plantillas (Fase 2) */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Plantillas de configuración</CardTitle>
-          <CardDescription>
-            Aplique valores típicos para empezar. Luego complete NIT, razón social, software y certificado.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+      <div className="rounded-2xl border border-border/50 bg-muted/20 p-5 shadow-sm dark:bg-[#111827] dark:border-[#1F2937] sm:p-6">
+        <p className="text-base font-medium text-foreground">Plantillas de configuración</p>
+        <p className="mt-1.5 text-sm text-muted-foreground">
+          Aplique valores típicos para empezar. Luego complete NIT, razón social, software y certificado.
+        </p>
+        <div className="mt-4">
           <Button
             type="button"
             variant="outline"
             size="sm"
+            className="rounded-xl"
             onClick={() =>
               setForm((p) => ({
                 ...p,
@@ -395,21 +388,19 @@ export default function ElectronicInvoicingPage() {
           <p className="text-xs text-muted-foreground mt-2">
             Prefijo FAC, rango 1–999999, ambiente Habilitación. No modifica emisor ni certificado.
           </p>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* 1. Datos del emisor */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <Building2 className="h-4 w-4" />
-            Datos del emisor
-          </CardTitle>
-          <CardDescription>
-            NIT y razón social de su empresa (van en el XML ante la DIAN).
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] p-6 dark:border-[#1F2937]">
+        <p className="text-base font-medium text-foreground flex items-center gap-2">
+          <Building2 className="h-4 w-4" />
+          Datos del emisor
+        </p>
+        <p className="mt-1.5 text-sm text-muted-foreground">
+          NIT y razón social de su empresa (van en el XML ante la DIAN).
+        </p>
+        <div className="mt-4 space-y-4">
           <p className="text-xs text-amber-600 dark:text-amber-500 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md px-3 py-2">
             <strong>Importante (obligación legal):</strong> La razón social y el NIT deben coincidir exactamente con los datos del contribuyente registrado ante la DIAN y la Cámara de Comercio. Usar datos distintos puede invalidar las facturas y generar responsabilidad tributaria.
           </p>
@@ -435,21 +426,19 @@ export default function ElectronicInvoicingPage() {
               La razón social se establece únicamente al crear la empresa. Para cambiarla contacte al administrador de la plataforma.
             </p>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* 2. Software DIAN */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <Hash className="h-4 w-4" />
-            Software DIAN
-          </CardTitle>
-          <CardDescription>
-            ID y PIN asignados por la DIAN al habilitar su software.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] p-6 dark:border-[#1F2937]">
+        <p className="text-base font-medium text-foreground flex items-center gap-2">
+          <Hash className="h-4 w-4" />
+          Software DIAN
+        </p>
+        <p className="mt-1.5 text-sm text-muted-foreground">
+          ID y PIN asignados por la DIAN al habilitar su software.
+        </p>
+        <div className="mt-4 space-y-4">
           <div className="grid gap-2">
             <Label htmlFor="softwareId">Software ID</Label>
             <Input
@@ -475,21 +464,19 @@ export default function ElectronicInvoicingPage() {
               </p>
             )}
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* 3. Certificado */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <FileKey className="h-4 w-4" />
-            Certificado de firma (.p12)
-          </CardTitle>
-          <CardDescription>
-            Certificado de firma electrónica. Se almacena cifrado. No se muestra después de subir.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] p-6 dark:border-[#1F2937]">
+        <p className="text-base font-medium text-foreground flex items-center gap-2">
+          <FileKey className="h-4 w-4" />
+          Certificado de firma (.p12)
+        </p>
+        <p className="mt-1.5 text-sm text-muted-foreground">
+          Certificado de firma electrónica. Se almacena cifrado. No se muestra después de subir.
+        </p>
+        <div className="mt-4 space-y-4">
           {config?.hasCert && (
             <p className="text-sm text-muted-foreground flex items-center gap-2">
               <CheckCircle2 className="h-4 w-4 text-green-600" />
@@ -527,21 +514,19 @@ export default function ElectronicInvoicingPage() {
             ) : null}
             Subir certificado
           </Button>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* 4. Numeración y ambiente */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <ListOrdered className="h-4 w-4" />
-            Numeración y ambiente
-          </CardTitle>
-          <CardDescription>
-            Resolución de facturación, prefijo y rango autorizado. Ambiente DIAN.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] p-6 dark:border-[#1F2937]">
+        <p className="text-base font-medium text-foreground flex items-center gap-2">
+          <ListOrdered className="h-4 w-4" />
+          Numeración y ambiente
+        </p>
+        <p className="mt-1.5 text-sm text-muted-foreground">
+          Resolución de facturación, prefijo y rango autorizado. Ambiente DIAN.
+        </p>
+        <div className="mt-4 space-y-4">
           <div className="grid gap-2">
             <Label htmlFor="env">Ambiente</Label>
             <Select
@@ -609,23 +594,22 @@ export default function ElectronicInvoicingPage() {
               </div>
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* Guardar configuración */}
-      <Card>
-        <CardContent className="pt-6">
-          <Button
-            onClick={handleSaveConfig}
-            disabled={updateMutation.isPending}
-          >
+      <div className="rounded-2xl border border-border/50 bg-muted/20 p-5 shadow-sm dark:bg-[#111827] dark:border-[#1F2937] sm:p-6">
+        <Button
+          onClick={handleSaveConfig}
+          disabled={updateMutation.isPending}
+          className="rounded-xl bg-primary hover:bg-primary/90"
+        >
             {updateMutation.isPending ? (
               <Loader2 className="h-4 w-4 animate-spin mr-2" />
             ) : null}
             Guardar configuración
           </Button>
-        </CardContent>
-      </Card>
+      </div>
     </div>
   );
 }

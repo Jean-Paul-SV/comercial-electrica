@@ -3,13 +3,6 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@shared/components/ui/card';
 import { Button } from '@shared/components/ui/button';
 import { Input } from '@shared/components/ui/input';
 import { Label } from '@shared/components/ui/label';
@@ -95,18 +88,15 @@ export default function OnboardingPage() {
 
   if (showWelcome) {
     return (
-      <div className="max-w-md mx-auto py-12 px-4">
-        <div className="flex justify-center mb-6">
-          <Store className="h-16 w-16 text-primary" />
-        </div>
-        <Card className="border-0 shadow-md">
-          <CardHeader className="text-center space-y-2">
-            <CardTitle className="text-xl">Bienvenido</CardTitle>
-            <CardDescription className="text-base">
-              En 3 pasos podrás registrar tu primera venta.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-3">
+      <div className="max-w-md mx-auto py-12 px-4 space-y-10">
+        <header className="text-center">
+          <h1 className="text-2xl font-light tracking-tight text-foreground sm:text-3xl flex items-center justify-center gap-2">
+            <Store className="h-7 w-7 shrink-0 text-primary" aria-hidden />
+            Bienvenido
+          </h1>
+          <p className="mt-2 text-sm text-muted-foreground">En 3 pasos podrás registrar tu primera venta.</p>
+        </header>
+        <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] p-6 dark:border-[#1F2937] flex flex-col gap-3">
             <Button
               size="lg"
               className="w-full"
@@ -124,14 +114,13 @@ export default function OnboardingPage() {
             >
               Entendido, ir al sistema
             </Button>
-          </CardContent>
-        </Card>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-md mx-auto py-12 px-4">
+    <div className="max-w-md mx-auto py-12 px-4 space-y-10">
       <div className="mb-6 flex items-center justify-between">
         <span className="text-sm font-medium text-muted-foreground">
           Paso {stepToShow} de 3
@@ -149,19 +138,17 @@ export default function OnboardingPage() {
       </div>
 
       {stepToShow === 1 && (
-        <Card className="border-0 shadow-md">
-          <CardHeader className="space-y-2">
-            <CardTitle className="flex items-center gap-2">
-              <Wallet className="h-5 w-5" />
-              Abrir caja
-            </CardTitle>
-            <CardDescription>
-              Para registrar ventas necesitas tener la caja abierta. Es como
-              abrir la gaveta al inicio del día. Indica con cuánto dinero
-              empiezas (puede ser 0).
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] p-6 dark:border-[#1F2937]">
+          <p className="text-base font-medium text-foreground flex items-center gap-2">
+            <Wallet className="h-5 w-5" />
+            Abrir caja
+          </p>
+          <p className="mt-1.5 text-sm text-muted-foreground">
+            Para registrar ventas necesitas tener la caja abierta. Es como
+            abrir la gaveta al inicio del día. Indica con cuánto dinero
+            empiezas (puede ser 0).
+          </p>
+          <div className="mt-4 space-y-4">
             <div className="space-y-2">
               <Label htmlFor="monto">Monto inicial</Label>
               <Input
@@ -192,22 +179,20 @@ export default function OnboardingPage() {
                 Omitir por ahora
               </Button>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
 
       {stepToShow === 2 && (
-        <Card className="border-0 shadow-md">
-          <CardHeader className="space-y-2">
-            <CardTitle className="flex items-center gap-2">
-              <Package className="h-5 w-5" />
-              Tu primer producto
-            </CardTitle>
-            <CardDescription>
-              Así tus ventas tendrán qué vender. Puedes agregar más después.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] p-6 dark:border-[#1F2937]">
+          <p className="text-base font-medium text-foreground flex items-center gap-2">
+            <Package className="h-5 w-5" />
+            Tu primer producto
+          </p>
+          <p className="mt-1.5 text-sm text-muted-foreground">
+            Así tus ventas tendrán qué vender. Puedes agregar más después.
+          </p>
+          <div className="mt-4 space-y-4">
             <Button size="lg" className="w-full" asChild>
               <Link href="/products">Agregar un producto ahora</Link>
             </Button>
@@ -219,22 +204,20 @@ export default function OnboardingPage() {
             >
               Tengo muchos productos, los cargo después
             </Button>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
 
       {stepToShow === 3 && (
-        <Card className="border-0 shadow-md">
-          <CardHeader className="space-y-2">
-            <CardTitle className="flex items-center gap-2">
-              <CheckCircle2 className="h-5 w-5 text-success" />
-              ¿Listo para vender?
-            </CardTitle>
-            <CardDescription>
-              Ya puedes registrar tu primera venta.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] p-6 dark:border-[#1F2937]">
+          <p className="text-base font-medium text-foreground flex items-center gap-2">
+            <CheckCircle2 className="h-5 w-5 text-success" />
+            ¿Listo para vender?
+          </p>
+          <p className="mt-1.5 text-sm text-muted-foreground">
+            Ya puedes registrar tu primera venta.
+          </p>
+          <div className="mt-4 space-y-4">
             <ul className="space-y-2 text-sm">
               <li className="flex items-center gap-2">
                 {data.hasOpenCashSession ? (
@@ -266,8 +249,8 @@ export default function OnboardingPage() {
                 Ver mi resumen
               </Button>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
     </div>
   );

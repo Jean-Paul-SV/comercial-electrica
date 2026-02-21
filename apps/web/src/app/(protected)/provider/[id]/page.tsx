@@ -4,13 +4,6 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { toast } from 'sonner';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@shared/components/ui/card';
 import { Button } from '@shared/components/ui/button';
 import { Badge } from '@shared/components/ui/badge';
 import { Select } from '@shared/components/ui/select';
@@ -123,8 +116,8 @@ export default function ProviderTenantDetailPage() {
   }
 
   return (
-    <div className="p-4 md:p-6 space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="space-y-10">
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" asChild>
             <Link href="/provider">
@@ -133,11 +126,11 @@ export default function ProviderTenantDetailPage() {
             </Link>
           </Button>
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight flex items-center gap-2">
-              <Building2 className="h-6 w-6" />
+            <h1 className="text-2xl font-light tracking-tight text-foreground sm:text-3xl flex items-center gap-2">
+              <Building2 className="h-7 w-7 shrink-0 text-primary" aria-hidden />
               {tenant.name}
             </h1>
-            <p className="text-muted-foreground text-sm">{tenant.slug}</p>
+            <p className="mt-2 text-sm text-muted-foreground font-mono">{tenant.slug}</p>
           </div>
         </div>
         <Button
@@ -158,7 +151,7 @@ export default function ProviderTenantDetailPage() {
             </>
           )}
         </Button>
-      </div>
+      </header>
 
       {/* Plan y suscripción visibles */}
       <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border/60 bg-muted/10 px-4 py-3">
@@ -206,37 +199,35 @@ export default function ProviderTenantDetailPage() {
       </div>
 
       {/* Facturación electrónica (DIAN) — acceso directo */}
-      <Card className="overflow-hidden">
-        <CardHeader className="pb-3">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-                  <FileCheck className="h-4 w-4" />
-                </span>
-                Facturación electrónica (DIAN)
-              </CardTitle>
-              <CardDescription className="mt-1.5">
-                NIT, certificado, Software ID y numeración para esta empresa.
-              </CardDescription>
-            </div>
-            <Button asChild variant="outline" size="sm" className="shrink-0 w-full sm:w-auto">
-              <Link href={`/provider/${tenant.id}/electronic-invoicing`} className="gap-2">
+      <div className="rounded-2xl border border-border/50 bg-muted/20 p-5 shadow-sm dark:bg-[#111827] dark:border-[#1F2937] sm:p-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-lg font-medium text-foreground flex items-center gap-2">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
                 <FileCheck className="h-4 w-4" />
-                Configurar DIAN
-              </Link>
-            </Button>
+              </span>
+              Facturación electrónica (DIAN)
+            </p>
+            <p className="mt-1.5 text-sm text-muted-foreground">
+              NIT, certificado, Software ID y numeración para esta empresa.
+            </p>
           </div>
-        </CardHeader>
-      </Card>
+          <Button asChild variant="outline" size="sm" className="shrink-0 w-full sm:w-auto rounded-xl">
+            <Link href={`/provider/${tenant.id}/electronic-invoicing`} className="gap-2">
+              <FileCheck className="h-4 w-4" />
+              Configurar DIAN
+            </Link>
+          </Button>
+        </div>
+      </div>
 
       <div className="grid gap-4 md:grid-cols-2">
-        <Card className="overflow-hidden">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg">Estado y suscripción</CardTitle>
-            <CardDescription>Datos de la cuenta y plan.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-5">
+        <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] overflow-hidden dark:border-[#1F2937]">
+          <div className="p-6 pb-3">
+            <p className="text-lg font-medium text-foreground">Estado y suscripción</p>
+            <p className="mt-1.5 text-sm text-muted-foreground">Datos de la cuenta y plan.</p>
+          </div>
+          <div className="px-6 pb-6 space-y-5">
             <div className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-3 text-sm items-center">
               <span className="text-muted-foreground">Estado</span>
               <Badge variant={tenant.isActive ? 'default' : 'secondary'} className="justify-self-end">
@@ -341,15 +332,13 @@ export default function ProviderTenantDetailPage() {
                   : '—'}
               </span>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Uso</CardTitle>
-            <CardDescription>Conteos de datos en la empresa.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2">
+        <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] p-6 dark:border-[#1F2937]">
+          <p className="text-lg font-medium text-foreground">Uso</p>
+          <p className="mt-1.5 text-sm text-muted-foreground mb-4">Conteos de datos en la empresa.</p>
+          <div className="space-y-2">
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Usuarios</span>
               <span>{tenant._count.users}</span>
@@ -366,8 +355,8 @@ export default function ProviderTenantDetailPage() {
               <span className="text-muted-foreground">Clientes</span>
               <span>{tenant._count.customers}</span>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
 
       <div className="text-sm text-muted-foreground">

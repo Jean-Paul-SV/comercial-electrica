@@ -1,13 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@shared/components/ui/card';
 import { Button } from '@shared/components/ui/button';
 import { Input } from '@shared/components/ui/input';
 import { Label } from '@shared/components/ui/label';
@@ -121,20 +114,20 @@ export default function CategoriesPage() {
   };
 
   return (
-    <div className="p-4 md:p-6 space-y-6">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+    <div className="space-y-10">
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between pt-2 pb-2">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight flex items-center gap-2">
-            <Tag className="h-5 w-5 shrink-0 text-primary" />
+          <h1 className="text-2xl font-light tracking-tight text-foreground sm:text-3xl flex items-center gap-2">
+            <Tag className="h-7 w-7 shrink-0 text-primary" />
             Categorías
           </h1>
-          <p className="text-sm text-muted-foreground">
+          <p className="mt-2 text-sm text-muted-foreground max-w-xl">
             Organiza productos por categoría (Cables, Iluminación, Herrajes, etc.).
           </p>
         </div>
         <Button
-          size="sm"
-          className="gap-1.5"
+          size="default"
+          className="gap-2 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground"
           onClick={() => {
             setNewName('');
             setOpenNew(true);
@@ -143,17 +136,17 @@ export default function CategoriesPage() {
           <Plus className="h-4 w-4" />
           Nueva categoría
         </Button>
-      </div>
+      </header>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Listado de categorías</CardTitle>
-          <CardDescription>
+      <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] overflow-hidden dark:border-[#1F2937]">
+        <div className="p-6 pb-4 border-b border-border/60">
+          <p className="text-lg font-medium text-foreground">Listado de categorías</p>
+          <p className="mt-1.5 text-sm text-muted-foreground">
             Puedes renombrar o eliminar categorías. Solo se pueden borrar si no
             tienen productos asociados.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+          </p>
+        </div>
+        <div className="p-6 pt-4">
           {categoriesQuery.isLoading ? (
             <div className="space-y-2">
               <Skeleton className="h-9 w-full rounded-lg" />
@@ -233,8 +226,8 @@ export default function CategoriesPage() {
               </Table>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* Dialog nueva categoría */}
       <Dialog open={openNew} onOpenChange={setOpenNew}>

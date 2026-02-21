@@ -2,13 +2,6 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@shared/components/ui/card';
 import { Button } from '@shared/components/ui/button';
 import { Input } from '@shared/components/ui/input';
 import { Label } from '@shared/components/ui/label';
@@ -146,34 +139,27 @@ export default function ProductDictionaryPage() {
   };
 
   return (
-    <div className="space-y-6 sm:space-y-8">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+    <div className="space-y-10">
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between pt-2 pb-2">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight sm:text-2xl text-foreground">
+          <h1 className="text-2xl font-light tracking-tight text-foreground sm:text-3xl flex items-center gap-2">
+            <BookOpen className="h-7 w-7 shrink-0 text-primary" aria-hidden />
             Diccionario
           </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="mt-2 text-sm text-muted-foreground max-w-xl">
             Términos o frases que los clientes escriben al preguntar por productos. Opcionalmente puedes vincular cada término a un producto.
           </p>
         </div>
-        <Button asChild variant="outline" size="sm" className="gap-2 shrink-0">
+        <Button asChild variant="outline" size="sm" className="gap-2 shrink-0 rounded-xl">
           <Link href="/products" className="flex items-center gap-2">
             <ArrowLeft className="h-4 w-4" />
             Volver a productos
           </Link>
         </Button>
-      </div>
+      </header>
 
-      <Card className="border border-border/80 shadow-sm rounded-xl overflow-hidden">
-        <CardHeader className="pb-4 border-b border-border/60">
-          <CardTitle className="text-lg font-medium flex items-center gap-2 text-foreground">
-            <BookOpen className="h-5 w-5 shrink-0 text-primary" aria-hidden />
-            Términos que preguntan
-          </CardTitle>
-          <CardDescription>
-            Agrega palabras o frases que la gente usa al buscar productos (ej. &quot;cable 2.5&quot;, &quot;foco led&quot;) y opcionalmente asígnales un producto.
-          </CardDescription>
-          <div className="flex flex-wrap items-center gap-2 pt-2">
+      <div className="rounded-2xl border border-border/50 bg-muted/20 p-5 shadow-sm dark:bg-[#111827] dark:border-[#1F2937] sm:p-6">
+          <div className="flex flex-wrap items-center gap-2">
             <div className="flex items-center gap-2 flex-1 min-w-[200px] flex-wrap">
               <Label htmlFor="dict-search" className="text-xs text-muted-foreground whitespace-nowrap">
                 Buscar término:
@@ -213,11 +199,11 @@ export default function ProductDictionaryPage() {
               Agregar término
             </Button>
           </div>
-        </CardHeader>
-        <CardContent className="pt-4">
+      </div>
+
+      <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] overflow-hidden dark:border-[#1F2937]">
           {dictionary.isLoading && (
-            <div className="rounded-lg border border-border/80 overflow-hidden">
-              <Table>
+            <Table>
                 <TableHeader>
                     <TableRow className="hover:bg-transparent">
                     <TableHead className="font-medium text-muted-foreground">Término</TableHead>
@@ -235,11 +221,10 @@ export default function ProductDictionaryPage() {
                   ))}
                 </TableBody>
               </Table>
-            </div>
           )}
 
           {dictionary.isError && (
-            <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3">
+            <div className="py-8 px-6">
               <p className="text-sm text-destructive">
                 {(dictionary.error as { message?: string })?.message ??
                   'Error al cargar el diccionario'}
@@ -279,8 +264,7 @@ export default function ProductDictionaryPage() {
           )}
 
           {!dictionary.isLoading && !dictionary.isError && entries.length > 0 && (
-            <div className="rounded-lg border border-border/80 overflow-hidden">
-              <Table>
+            <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/40 hover:bg-muted/40">
                     <TableHead className="font-medium">Término</TableHead>
@@ -323,10 +307,8 @@ export default function ProductDictionaryPage() {
                   ))}
                 </TableBody>
               </Table>
-            </div>
           )}
-        </CardContent>
-      </Card>
+      </div>
 
       {/* Dialog crear */}
       <Dialog open={openCreate} onOpenChange={setOpenCreate}>

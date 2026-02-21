@@ -1,13 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@shared/components/ui/card';
 import { Button } from '@shared/components/ui/button';
 import {
   Table,
@@ -38,8 +31,8 @@ export default function ProviderOverviewPage() {
   }));
 
   return (
-    <div className="p-4 md:p-6 space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="space-y-10">
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" asChild>
             <Link href="/provider">
@@ -48,64 +41,63 @@ export default function ProviderOverviewPage() {
             </Link>
           </Button>
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight flex items-center gap-2">
-              <LayoutGrid className="h-6 w-6 text-primary" />
+            <h1 className="text-2xl font-light tracking-tight text-foreground sm:text-3xl flex items-center gap-2">
+              <LayoutGrid className="h-7 w-7 shrink-0 text-primary" aria-hidden />
               Vista global
             </h1>
-            <p className="text-muted-foreground text-sm mt-0.5">
+            <p className="mt-2 text-sm text-muted-foreground max-w-xl">
               Todas las empresas con plan, estado, uso y última actividad en una sola vista.
             </p>
           </div>
         </div>
-      </div>
+      </header>
 
-      {/* KPIs */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total empresas</CardTitle>
+        <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] p-5 dark:border-[#1F2937]">
+          <p className="text-sm font-medium text-muted-foreground flex items-center justify-between">
+            Total empresas
             <Building2 className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
+          </p>
+          <div className="mt-2">
             {summaryLoading ? (
               <Skeleton className="h-8 w-16" />
             ) : (
               <span className="text-2xl font-bold tabular-nums">{summary?.totalTenants ?? 0}</span>
             )}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Empresas activas</CardTitle>
+          </div>
+        </div>
+        <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] p-5 dark:border-[#1F2937]">
+          <p className="text-sm font-medium text-muted-foreground flex items-center justify-between">
+            Empresas activas
             <Activity className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
+          </p>
+          <div className="mt-2">
             {summaryLoading ? (
               <Skeleton className="h-8 w-16" />
             ) : (
               <span className="text-2xl font-bold tabular-nums">{summary?.activeTenants ?? 0}</span>
             )}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total usuarios</CardTitle>
+          </div>
+        </div>
+        <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] p-5 dark:border-[#1F2937]">
+          <p className="text-sm font-medium text-muted-foreground flex items-center justify-between">
+            Total usuarios
             <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
+          </p>
+          <div className="mt-2">
             {summaryLoading ? (
               <Skeleton className="h-8 w-16" />
             ) : (
               <span className="text-2xl font-bold tabular-nums">{summary?.totalUsers ?? 0}</span>
             )}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">MRR aproximado</CardTitle>
+          </div>
+        </div>
+        <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] p-5 dark:border-[#1F2937]">
+          <p className="text-sm font-medium text-muted-foreground flex items-center justify-between">
+            MRR aproximado
             <Wallet className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
+          </p>
+          <div className="mt-2">
             {summaryLoading ? (
               <Skeleton className="h-8 w-24" />
             ) : (
@@ -113,14 +105,14 @@ export default function ProviderOverviewPage() {
                 {formatMoney(summary?.totalMrrApprox ?? 0)}
               </span>
             )}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Ventas del mes</CardTitle>
+          </div>
+        </div>
+        <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] p-5 dark:border-[#1F2937]">
+          <p className="text-sm font-medium text-muted-foreground flex items-center justify-between">
+            Ventas del mes
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
+          </p>
+          <div className="mt-2">
             {summaryLoading ? (
               <Skeleton className="h-8 w-24" />
             ) : (
@@ -128,18 +120,15 @@ export default function ProviderOverviewPage() {
                 {formatMoney(summary?.totalSalesCurrentMonth ?? 0)}
               </span>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
 
-      {/* Gráfico por plan + Uso en el tiempo */}
       <div className="grid gap-6 lg:grid-cols-2">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg">Empresas por plan</CardTitle>
-            <CardDescription>Distribución por tipo de plan.</CardDescription>
-          </CardHeader>
-          <CardContent>
+        <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] p-6 dark:border-[#1F2937]">
+          <h2 className="text-lg font-medium text-foreground">Empresas por plan</h2>
+          <p className="text-sm text-muted-foreground mt-0.5">Distribución por tipo de plan.</p>
+          <div className="mt-4">
             {summaryLoading ? (
               <Skeleton className="h-56 w-full rounded-lg" />
             ) : plansBarData.length === 0 ? (
@@ -147,14 +136,12 @@ export default function ProviderOverviewPage() {
             ) : (
               <KpiBarChart data={plansBarData} className="h-56 w-full min-w-0" />
             )}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg">Uso en el tiempo</CardTitle>
-            <CardDescription>Eventos de uso por día (últimos 30 días).</CardDescription>
-          </CardHeader>
-          <CardContent>
+          </div>
+        </div>
+        <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] p-6 dark:border-[#1F2937]">
+          <h2 className="text-lg font-medium text-foreground">Uso en el tiempo</h2>
+          <p className="text-sm text-muted-foreground mt-0.5">Eventos de uso por día (últimos 30 días).</p>
+          <div className="mt-4">
             {eventsByDayLoading ? (
               <Skeleton className="h-56 w-full rounded-lg" />
             ) : !eventsByDay?.length ? (
@@ -162,27 +149,26 @@ export default function ProviderOverviewPage() {
             ) : (
               <UsagePeakChart data={eventsByDay} className="h-56 w-full min-w-0" />
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
 
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg">Todas las empresas</CardTitle>
-          <CardDescription>
+      <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] overflow-hidden dark:border-[#1F2937]">
+        <div className="p-6 pb-3">
+          <h2 className="text-lg font-medium text-foreground">Todas las empresas</h2>
+          <p className="text-sm text-muted-foreground mt-0.5">
             Resumen unificado: plan, suscripción, usuarios, productos, ventas, clientes y última actividad.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+          </p>
+        </div>
+        <div>
           {isLoading ? (
-            <Skeleton className="h-64 w-full rounded-lg" />
+            <Skeleton className="h-64 w-full rounded-lg mx-6 mb-6" />
           ) : tenants.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-8 text-center">
+            <p className="text-sm text-muted-foreground py-8 px-6 text-center">
               No hay empresas.
             </p>
           ) : (
-            <div className="rounded-lg border border-border/60 overflow-x-auto">
-              <Table>
+            <Table>
                 <TableHeader>
                   <TableRow className="border-border/50">
                     <TableHead className="font-medium">Empresa</TableHead>
@@ -237,10 +223,9 @@ export default function ProviderOverviewPage() {
                   ))}
                 </TableBody>
               </Table>
-            </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

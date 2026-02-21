@@ -3,6 +3,7 @@ import { AppModule } from './app.module';
 import { ValidationPipe, HttpException } from '@nestjs/common';
 import { config } from 'dotenv';
 import { resolve, join } from 'path';
+import { existsSync } from 'fs';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AllExceptionsFilter } from './common/filters/http-exception.filter';
 import { JsonLogger } from './common/logger/json-logger';
@@ -37,6 +38,17 @@ if (!envLoaded) {
   console.warn(
     '⚠ Warning: .env file not found. Make sure DATABASE_URL is set in environment variables.',
   );
+}
+
+// Modo local: sobrescribir con .env.seed.local (base de datos local) para que el login use usuarios del seed:local
+if (process.env.USE_LOCAL_DB === 'true') {
+  const seedLocalPath = resolve(process.cwd(), '../../.env.seed.local');
+  if (existsSync(seedLocalPath)) {
+    config({ path: seedLocalPath, override: true });
+    const dbUrl = process.env.DATABASE_URL ?? '';
+    const host = dbUrl.includes('localhost') ? 'localhost' : 'remoto';
+    console.log(`✓ USE_LOCAL_DB: cargado .env.seed.local (base: ${host})`);
+  }
 }
 
 async function bootstrap() {

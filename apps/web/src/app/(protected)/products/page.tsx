@@ -7,13 +7,6 @@ import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@shared/components/ui/card';
 import { Button } from '@shared/components/ui/button';
 import { Input } from '@shared/components/ui/input';
 import { MoneyInput } from '@shared/components/ui/money-input';
@@ -347,59 +340,41 @@ export default function ProductsPage() {
   const hasData = rows.length > 0;
 
   return (
-    <div className="space-y-6 sm:space-y-8">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-xl font-semibold tracking-tight sm:text-2xl text-foreground">
-          Productos
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Catálogo de productos (código, nombre, categoría, precios). El stock se gestiona en Inventario.
-        </p>
-      </div>
+    <div className="space-y-10">
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between pt-2 pb-2">
+        <div>
+          <h1 className="text-2xl font-light tracking-tight text-foreground sm:text-3xl flex items-center gap-2">
+            <Package className="h-7 w-7 shrink-0 text-primary" aria-hidden />
+            Productos
+          </h1>
+          <p className="mt-2 text-sm text-muted-foreground max-w-xl">
+            Catálogo de productos (código, nombre, categoría, precios). El stock se gestiona en Inventario.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2 shrink-0">
+          <Button variant="outline" size="sm" onClick={() => setOpenNewCategory(true)} className="gap-2 rounded-xl">
+            <Tag className="h-4 w-4 shrink-0" />
+            Nueva categoría
+          </Button>
+          <Button asChild size="sm" variant="outline" className="gap-2 rounded-xl">
+            <Link href="/products/dictionary" className="flex items-center gap-2">
+              <BookOpen className="h-4 w-4 shrink-0" />
+              Diccionario
+            </Link>
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => setOpenAddTerm(true)} className="gap-2 rounded-xl">
+            <BookOpen className="h-4 w-4 shrink-0" />
+            Agregar término
+          </Button>
+          <Button size="sm" onClick={() => setOpenNewProduct(true)} className="gap-2 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground">
+            <Plus className="h-4 w-4 shrink-0" />
+            Nuevo producto
+          </Button>
+        </div>
+      </header>
 
-      <Card className="border border-border/80 shadow-sm rounded-xl overflow-hidden">
-        <CardHeader className="pb-4 border-b border-border/60">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <CardTitle className="text-lg font-medium flex items-center gap-2 text-foreground">
-                <Package className="h-5 w-5 shrink-0 text-primary" aria-hidden />
-                Catálogo
-              </CardTitle>
-              <CardDescription>
-                {hasData
-                  ? `${totalProducts} producto${totalProducts !== 1 ? 's' : ''}`
-                  : 'Listado paginado de productos'}
-              </CardDescription>
-            </div>
-            <div className="flex flex-wrap gap-2 shrink-0">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setOpenNewCategory(true)}
-                className="gap-2 w-full sm:w-auto"
-              >
-                <Tag className="h-4 w-4 shrink-0" />
-                Nueva categoría
-              </Button>
-              <Button asChild size="sm" variant="outline" className="gap-2 w-full sm:w-auto">
-                <Link href="/products/dictionary" className="flex items-center gap-2">
-                  <BookOpen className="h-4 w-4 shrink-0" />
-                  Diccionario
-                </Link>
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => setOpenAddTerm(true)} className="gap-2 w-full sm:w-auto">
-                <BookOpen className="h-4 w-4 shrink-0" />
-                Agregar término
-              </Button>
-              <Button size="sm" onClick={() => setOpenNewProduct(true)} className="gap-2 w-full sm:w-auto">
-                <Plus className="h-4 w-4 shrink-0" />
-                Nuevo producto
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="pt-4 space-y-4">
-          <div className="flex flex-wrap gap-3 pb-3 border-b border-border/60">
+      <div className="rounded-2xl border border-border/50 bg-muted/20 p-5 shadow-sm dark:bg-[#111827] dark:border-[#1F2937] sm:p-6">
+        <div className="flex flex-wrap gap-3">
             <div className="flex items-center gap-2 flex-1 min-w-[200px]">
               <Label htmlFor="search-product" className="text-xs text-muted-foreground whitespace-nowrap">
                 Buscar:
@@ -439,11 +414,12 @@ export default function ProductsPage() {
                 Filtro activo: stock bajo (≤ {threshold} unidades).
               </p>
             )}
-          </div>
+        </div>
+      </div>
 
+      <div className="rounded-2xl border border-border/50 bg-card overflow-hidden shadow-sm shadow-black/[0.03] dark:shadow-none overflow-x-auto">
           {query.isLoading && (
-            <div className="rounded-lg border border-border/80 overflow-hidden">
-              <Table>
+            <Table>
                 <TableHeader>
                   <TableRow className="hover:bg-transparent">
                     <TableHead className="font-medium text-muted-foreground">Código</TableHead>
@@ -465,22 +441,18 @@ export default function ProductsPage() {
                   ))}
                 </TableBody>
               </Table>
-            </div>
           )}
 
           {query.isError && (
-            <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3">
-              <p className="text-sm text-destructive">
-                {(query.error as { message?: string })?.message ??
-                  'Error al cargar productos'}
-              </p>
-            </div>
+            <p className="text-sm text-destructive py-8 px-6">
+              {(query.error as { message?: string })?.message ??
+                'Error al cargar productos'}
+            </p>
           )}
 
           {!query.isLoading && !query.isError && (
             <>
-              <div className="rounded-lg border border-border/80 overflow-hidden">
-                <Table>
+              <Table>
                   <TableHeader>
                     <TableRow className="hover:bg-transparent border-b border-border/80">
                       <TableHead className="font-medium text-muted-foreground">Código</TableHead>
@@ -574,7 +546,6 @@ export default function ProductsPage() {
                     )}
                   </TableBody>
                 </Table>
-              </div>
               {meta && (meta.total > 0 || meta.totalPages > 1) && (
                 <div className="flex items-center justify-between gap-4 flex-wrap">
                   <p className="text-xs text-muted-foreground">
@@ -587,8 +558,7 @@ export default function ProductsPage() {
               )}
             </>
           )}
-        </CardContent>
-      </Card>
+      </div>
 
       <Dialog
         open={openNewCategory}

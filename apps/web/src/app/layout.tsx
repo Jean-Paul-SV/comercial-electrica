@@ -1,5 +1,4 @@
 import type { ReactNode } from 'react';
-import Script from 'next/script';
 import { QueryClientProvider } from '@shared/providers/QueryClientProvider';
 import { AuthProvider } from '@shared/providers/AuthProvider';
 import { ThemeProvider } from '@shared/theme';
@@ -37,7 +36,7 @@ export const viewport = {
   viewportFit: 'cover' as const,
   themeColor: [
     { media: '(prefers-color-scheme: light)', color: '#ffffff' },
-    { media: '(prefers-color-scheme: dark)', color: '#0f172a' },
+    { media: '(prefers-color-scheme: dark)', color: '#0B0F1A' },
   ],
 };
 
@@ -46,9 +45,9 @@ const themeScript = `
 (function(){
   var t=localStorage.getItem('ce-theme')||'blue';
   var d=localStorage.getItem('ce-dark');
-  var dark=d===null?(typeof matchMedia!=='undefined'&&matchMedia('(prefers-color-scheme: dark)').matches):d==='true';
+  var dark=d===null?true:(d==='true');
   var themes={
-    blue:{light:{primary:'221 83% 53%',pf:'0 0% 100%',ring:'221 83% 53%'},dark:{primary:'221 83% 58%',pf:'0 0% 100%',ring:'221 83% 58%'}},
+    blue:{light:{primary:'221 83% 53%',pf:'0 0% 100%',ring:'221 83% 53%'},dark:{primary:'217 91% 60%',pf:'0 0% 100%',ring:'217 91% 60%'}},
     indigo:{light:{primary:'239 84% 67%',pf:'0 0% 100%',ring:'239 84% 67%'},dark:{primary:'239 84% 72%',pf:'0 0% 100%',ring:'239 84% 72%'}},
     emerald:{light:{primary:'160 84% 39%',pf:'0 0% 100%',ring:'160 84% 39%'},dark:{primary:'160 84% 45%',pf:'0 0% 100%',ring:'160 84% 45%'}},
     violet:{light:{primary:'263 70% 50%',pf:'0 0% 100%',ring:'263 70% 50%'},dark:{primary:'263 70% 58%',pf:'0 0% 100%',ring:'263 70% 58%'}},
@@ -68,12 +67,14 @@ const themeScript = `
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="es" suppressHydrationWarning data-scroll-behavior="smooth">
-      <body>
-        <Script
+      <head>
+        {/* Ejecutar antes del primer pintado para evitar flash blanco/claro */}
+        <script
           id="theme-init"
-          strategy="beforeInteractive"
           dangerouslySetInnerHTML={{ __html: themeScript }}
         />
+      </head>
+      <body>
         <ThemeProvider>
           <AuthProvider>
             <QueryClientProvider>{children}</QueryClientProvider>

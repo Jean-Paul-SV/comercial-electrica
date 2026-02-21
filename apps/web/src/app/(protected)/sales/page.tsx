@@ -6,13 +6,6 @@ import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { isNetworkError } from '@infrastructure/api/client';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@shared/components/ui/card';
 import { Button } from '@shared/components/ui/button';
 import { Input } from '@shared/components/ui/input';
 import { Label } from '@shared/components/ui/label';
@@ -503,56 +496,44 @@ export default function SalesPage() {
   };
 
   return (
-    <div className="space-y-6 sm:space-y-8">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">
-          Ventas
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Registro y listado de ventas
-        </p>
-      </div>
+    <div className="space-y-10">
+      {/* ——— HEADER: bloque independiente, sin card ——— */}
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between pt-2 pb-2">
+        <div>
+          <h1 className="text-2xl font-light tracking-tight text-foreground sm:text-3xl flex items-center gap-2">
+            <ShoppingCart className="h-7 w-7 shrink-0 text-primary" />
+            Listado de ventas
+          </h1>
+          <p className="mt-2 text-sm text-muted-foreground max-w-xl">
+            Ventas paginadas. Busca por cliente, número de factura o vendedor.
+          </p>
+        </div>
+        {hasSalesCreate && (
+          <Button
+            size="default"
+            onClick={() => setOpenNewSale(true)}
+            className="gap-2 shrink-0 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl"
+          >
+            <Plus className="h-4 w-4" />
+            Nueva venta
+          </Button>
+        )}
+      </header>
 
-      <Card className="border-0 shadow-sm overflow-hidden">
-        <CardHeader className="pb-4 bg-muted/30 border-b border-border/50">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <CardTitle className="text-lg font-medium flex items-center gap-2">
-                <ShoppingCart className="h-5 w-5 shrink-0 text-primary" />
-                Listado de ventas
-              </CardTitle>
-              <CardDescription>
-                Ventas paginadas. Busca por cliente, número de factura o vendedor.
-              </CardDescription>
-            </div>
-            {hasSalesCreate && (
-              <Button
-                size="sm"
-                onClick={() => setOpenNewSale(true)}
-                className="gap-2 w-full sm:w-fit shadow-sm"
-              >
-                <Plus className="h-4 w-4" />
-                Nueva venta
-              </Button>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4 pt-4">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between rounded-lg bg-muted/20 border border-border/50 p-3">
-            <div className="flex flex-1 flex-wrap items-center gap-3 min-w-0">
-              <div className="flex items-center gap-2 flex-1 min-w-[200px] max-w-sm">
-                <Label htmlFor="search-sale" className="text-sm text-muted-foreground whitespace-nowrap">
-                  Buscar:
-                </Label>
-                <Input
-                  id="search-sale"
-                  type="search"
-                  placeholder="Buscar por cliente, factura o vendedor..."
-                  value={searchInput}
-                  onChange={(e) => setSearchInput(e.target.value)}
-                  className="h-9 rounded-lg bg-background border-border/80 text-sm flex-1 min-w-0"
-                />
-              </div>
+      {/* ——— TOOLBAR: card ligera, búsqueda y paginación ——— */}
+      <div className="rounded-2xl border border-border/50 bg-muted/20 p-5 shadow-sm dark:bg-[#111827] dark:border-[#1F2937] sm:p-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-1 flex-wrap items-center gap-3 min-w-0">
+            <div className="flex flex-1 gap-2 min-w-[200px] max-w-xl">
+              <Input
+                id="search-sale"
+                type="search"
+                placeholder="Buscar por cliente, factura o vendedor..."
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                className="h-10 rounded-xl bg-background/80 border-border/80 text-sm flex-1 min-w-0 placeholder:text-muted-foreground"
+                aria-label="Buscar ventas"
+              />
               <Button
                 type="button"
                 variant="outline"
@@ -563,18 +544,21 @@ export default function SalesPage() {
                   setPage(1);
                 }}
                 disabled={!searchInput && !search}
-                className="h-9 shrink-0 border-border bg-background text-foreground hover:bg-muted/50 disabled:opacity-50"
+                className="h-10 shrink-0 rounded-xl border-border bg-background/50 text-foreground hover:bg-background disabled:opacity-50"
                 aria-label="Limpiar filtros"
               >
                 Limpiar filtros
               </Button>
             </div>
-            <Pagination meta={meta} onPageChange={setPage} label="Página" />
           </div>
+          <Pagination meta={meta} onPageChange={setPage} label="Página" />
+        </div>
+      </div>
 
-          {salesQuery.isLoading && (
-            <div className="rounded-lg border border-border overflow-hidden">
-              <Table>
+      {/* ——— TABLA: bloque separado, limpia y modular ——— */}
+      <div className="rounded-2xl border border-border/50 bg-card overflow-hidden shadow-sm shadow-black/[0.03] dark:shadow-none overflow-x-auto">
+        {salesQuery.isLoading && (
+          <Table className="min-w-[600px]">
                 <TableHeader>
                   <TableRow>
                     <TableHead>Fecha</TableHead>
@@ -596,77 +580,76 @@ export default function SalesPage() {
                   ))}
                 </TableBody>
               </Table>
-            </div>
-          )}
+        )}
 
-          {salesQuery.isError && (
-            <p className="text-sm text-destructive py-4">
-              {getErrorMessage(salesQuery.error, 'Error al cargar ventas')}
-            </p>
-          )}
+        {salesQuery.isError && (
+          <p className="text-sm text-destructive py-8 px-6">
+            {getErrorMessage(salesQuery.error, 'Error al cargar ventas')}
+          </p>
+        )}
 
-          {!salesQuery.isLoading && (
-            <div className="rounded-lg border border-border overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Fecha</TableHead>
-                    <TableHead>Cliente</TableHead>
-                    <TableHead>Factura</TableHead>
-                    <TableHead>Vendedor</TableHead>
-                    <TableHead className="text-right">Total</TableHead>
-                    <TableHead className="w-20 text-center">Acciones</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {rows.map((s) => (
-                    <TableRow key={s.id}>
-                      <TableCell className="text-muted-foreground text-sm">
-                        {formatDateTime(s.soldAt)}
-                      </TableCell>
-                      <TableCell>{s.customer?.name ?? '—'}</TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {s.invoices?.[0]?.number ?? '—'}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {s.createdBy?.email ?? '—'}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums font-medium">
-                        {formatMoney(Number(s.grandTotal))}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Link href={`/sales/${s.id}`}>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
-                            title="Ver detalle"
-                            aria-label="Ver detalle"
-                          >
-                            <Eye className="h-3.5 w-3.5" />
-                          </Button>
-                        </Link>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {rows.length === 0 && (
-                    <TableRow>
-                      <TableCell
-                        colSpan={6}
-                        className="h-24 text-center text-muted-foreground"
+        {!salesQuery.isLoading && !salesQuery.isError && (
+          <Table className="min-w-[600px]">
+            <TableHeader>
+              <TableRow className="border-b border-border/60 hover:bg-transparent">
+                <TableHead className="text-muted-foreground font-medium pb-3 pt-6">Fecha</TableHead>
+                <TableHead className="text-muted-foreground font-medium pb-3 pt-6">Cliente</TableHead>
+                <TableHead className="text-muted-foreground font-medium pb-3 pt-6">Factura</TableHead>
+                <TableHead className="text-muted-foreground font-medium pb-3 pt-6">Vendedor</TableHead>
+                <TableHead className="text-right text-muted-foreground font-medium pb-3 pt-6">Total</TableHead>
+                <TableHead className="w-20 text-center text-muted-foreground font-medium pb-3 pt-6">Acciones</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {rows.map((s) => (
+                <TableRow
+                  key={s.id}
+                  className="border-b border-border/40 hover:bg-muted/20 transition-colors"
+                >
+                  <TableCell className="text-muted-foreground text-sm py-4">
+                    {formatDateTime(s.soldAt)}
+                  </TableCell>
+                  <TableCell className="py-4">{s.customer?.name ?? '—'}</TableCell>
+                  <TableCell className="text-muted-foreground py-4">
+                    {s.invoices?.[0]?.number ?? '—'}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground py-4">
+                    {s.createdBy?.email ?? '—'}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums font-medium py-4 text-foreground">
+                    {formatMoney(Number(s.grandTotal))}
+                  </TableCell>
+                  <TableCell className="text-center py-4">
+                    <Link href={`/sales/${s.id}`}>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 w-8 p-0 text-muted-foreground hover:text-primary"
+                        title="Ver detalle"
+                        aria-label="Ver detalle"
                       >
-                        {search
-                          ? 'Ninguna venta coincide con la búsqueda.'
-                          : 'No hay ventas. Registra una para comenzar.'}
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                        <Eye className="h-3.5 w-3.5" />
+                      </Button>
+                    </Link>
+                  </TableCell>
+                </TableRow>
+              ))}
+              {rows.length === 0 && (
+                <TableRow className="hover:bg-transparent">
+                  <TableCell
+                    colSpan={6}
+                    className="h-32 text-center text-muted-foreground py-8"
+                  >
+                    {search
+                      ? 'Ninguna venta coincide con la búsqueda.'
+                      : 'No hay ventas. Registra una para comenzar.'}
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        )}
+      </div>
 
       <Dialog open={openNewSale} onOpenChange={setOpenNewSale}>
         <DialogContent showClose className="sm:max-w-4xl max-h-[90vh] flex flex-col overflow-hidden overflow-x-hidden p-4 sm:p-6">

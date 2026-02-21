@@ -2,13 +2,6 @@
 
 import { useMemo, useState, useEffect } from 'react';
 import Link from 'next/link';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@shared/components/ui/card';
 import { Button } from '@shared/components/ui/button';
 import { Input } from '@shared/components/ui/input';
 import { Label } from '@shared/components/ui/label';
@@ -122,49 +115,29 @@ export default function CashMovementsPage() {
   const hasData = rows.length > 0;
 
   return (
-    <div className="space-y-6 sm:space-y-8">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-xl font-semibold tracking-tight sm:text-2xl text-foreground">
-          Movimientos de caja
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Historial de entradas, salidas y ajustes por sesión
-        </p>
-      </div>
+    <div className="space-y-10">
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between pt-2 pb-2">
+        <div>
+          <h1 className="text-2xl font-light tracking-tight text-foreground sm:text-3xl flex items-center gap-2">
+            <DollarSign className="h-7 w-7 shrink-0 text-primary" strokeWidth={2} aria-hidden />
+            Movimientos de caja
+          </h1>
+          <p className="mt-2 text-sm text-muted-foreground max-w-xl">
+            {hasData
+              ? `${totalMovements} movimiento${totalMovements !== 1 ? 's' : ''}`
+              : 'Historial de entradas, salidas y ajustes por sesión'}
+          </p>
+        </div>
+        <Button variant="outline" size="sm" asChild className="gap-2 shrink-0 rounded-xl">
+          <Link href="/cash">
+            <Wallet className="h-4 w-4 shrink-0" />
+            Volver a Caja
+          </Link>
+        </Button>
+      </header>
 
-      <Card className="border border-border/80 shadow-sm rounded-xl overflow-hidden">
-        <CardHeader className="pb-4 border-b border-border/60">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-start gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary">
-                <DollarSign className="h-5 w-5" strokeWidth={2.5} aria-hidden />
-              </div>
-              <div>
-                <CardTitle className="text-lg font-medium flex items-center gap-2 text-foreground">
-                  Listado de movimientos
-                </CardTitle>
-                <CardDescription className="mt-0.5 text-muted-foreground">
-                  {hasData
-                    ? `${totalMovements} movimiento${totalMovements !== 1 ? 's' : ''}`
-                    : 'Filtra por sesión, tipo y fechas. Busca por referencia o ID.'}
-                </CardDescription>
-              </div>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              asChild
-              className="gap-2 w-full sm:w-auto rounded-lg border-border/80"
-            >
-              <Link href="/cash">
-                <Wallet className="h-4 w-4 shrink-0" />
-                Volver a Caja
-              </Link>
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="pt-4 space-y-4">
-          <div className="rounded-lg border border-border/80 bg-muted/10 p-4">
+      <div className="rounded-2xl border border-border/50 bg-muted/20 p-5 shadow-sm dark:bg-[#111827] dark:border-[#1F2937] sm:p-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center gap-x-4 gap-y-3 min-w-0">
             <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center gap-x-4 gap-y-3 min-w-0">
               <div className="flex items-center gap-2 flex-1 min-w-0 max-w-xs">
                 <Label htmlFor="search-ref" className="text-sm font-medium text-muted-foreground shrink-0">
@@ -258,9 +231,11 @@ export default function CashMovementsPage() {
               </Button>
             </div>
           </div>
+      </div>
 
+      <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] overflow-hidden dark:border-[#1F2937]">
           {query.isLoading && (
-            <div className="rounded-lg border border-border/80 overflow-hidden">
+            <div className="overflow-hidden">
               <Table>
                 <TableHeader>
                   <TableRow className="hover:bg-transparent border-b border-border/80">
@@ -289,7 +264,7 @@ export default function CashMovementsPage() {
           )}
 
           {query.isError && (
-            <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3">
+            <div className="py-8 px-6">
               <p className="text-sm text-destructive">
                 {(query.error as { message?: string })?.message ?? 'Error al cargar movimientos'}
               </p>
@@ -298,8 +273,7 @@ export default function CashMovementsPage() {
 
           {!query.isLoading && !query.isError && (
             <>
-              <div className="rounded-lg border border-border/80 overflow-hidden">
-                <Table>
+              <Table>
                   <TableHeader>
                     <TableRow className="hover:bg-transparent border-b border-border/80">
                       <TableHead className="font-medium text-muted-foreground">Fecha</TableHead>
@@ -372,7 +346,6 @@ export default function CashMovementsPage() {
                     )}
                   </TableBody>
                 </Table>
-              </div>
               {meta && (meta.total > 0 || meta.totalPages > 1) && (
                 <div className="flex items-center justify-between gap-4 flex-wrap">
                   <Pagination meta={meta} onPageChange={setPage} label="Página" />
@@ -380,8 +353,7 @@ export default function CashMovementsPage() {
               )}
             </>
           )}
-        </CardContent>
-      </Card>
+      </div>
     </div>
   );
 }

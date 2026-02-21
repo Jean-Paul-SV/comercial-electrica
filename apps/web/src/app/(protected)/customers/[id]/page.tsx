@@ -2,13 +2,6 @@
 
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@shared/components/ui/card';
 import { Button } from '@shared/components/ui/button';
 import { Skeleton } from '@shared/components/ui/skeleton';
 import { ArrowLeft, Pencil, Users } from 'lucide-react';
@@ -35,79 +28,72 @@ export default function CustomerDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-10">
         <Skeleton className="h-8 w-48" />
-        <Card>
-          <CardHeader>
-            <Skeleton className="h-6 w-32" />
-            <Skeleton className="h-4 w-64" />
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Skeleton className="h-5 w-full" />
-            <Skeleton className="h-5 w-full" />
-          </CardContent>
-        </Card>
+        <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] p-6 dark:border-[#1F2937]">
+          <Skeleton className="h-6 w-32" />
+          <Skeleton className="h-4 w-64 mt-2" />
+          <Skeleton className="h-5 w-full mt-4" />
+          <Skeleton className="h-5 w-full" />
+        </div>
       </div>
     );
   }
 
   if (isError || !customer) {
     return (
-      <div className="space-y-6">
-        <Link href="/customers">
-          <Button variant="ghost" size="sm" className="gap-2">
+      <div className="space-y-10">
+        <Button variant="outline" size="sm" asChild className="gap-2 rounded-xl">
+          <Link href="/customers">
             <ArrowLeft className="h-4 w-4" />
             Volver a clientes
-          </Button>
-        </Link>
-        <Card className="border-destructive/50">
-          <CardContent className="pt-6">
-            <p className="text-sm text-destructive">
-              {(error as { message?: string })?.message ?? 'Cliente no encontrado.'}
-            </p>
-          </CardContent>
-        </Card>
+          </Link>
+        </Button>
+        <div className="rounded-2xl border border-destructive/50 bg-card p-6">
+          <p className="text-sm text-destructive">
+            {(error as { message?: string })?.message ?? 'Cliente no encontrado.'}
+          </p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <Link href="/customers">
-          <Button variant="ghost" size="sm" className="gap-2">
-            <ArrowLeft className="h-4 w-4" />
-            Volver a clientes
-          </Button>
-        </Link>
-        <Link href="/customers">
-          <Button variant="outline" size="sm" className="gap-2">
-            <Pencil className="h-4 w-4" />
-            Ir a listado para editar
-          </Button>
-        </Link>
-      </div>
-
-      <div className="flex flex-col gap-1">
-        <h1 className="text-xl font-semibold tracking-tight sm:text-2xl text-foreground">
-          Detalle del cliente
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          {customer.name} · {DOC_LABELS[customer.docType] ?? customer.docType} {customer.docNumber}
-        </p>
-      </div>
-
-      <Card className="border border-border/80 shadow-sm rounded-xl overflow-hidden">
-        <CardHeader className="pb-4 border-b border-border/60">
-          <CardTitle className="text-lg font-medium flex items-center gap-2 text-foreground">
-            <Users className="h-5 w-5 shrink-0 text-primary" aria-hidden />
+    <div className="space-y-10">
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-light tracking-tight text-foreground sm:text-3xl flex items-center gap-2">
+            <Users className="h-7 w-7 shrink-0 text-primary" aria-hidden />
             {customer.name}
-          </CardTitle>
-          <CardDescription>
+          </h1>
+          <p className="mt-2 text-sm text-muted-foreground">
             {DOC_LABELS[customer.docType] ?? customer.docType}: {customer.docNumber}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="pt-6 space-y-4">
+          </p>
+        </div>
+        <div className="flex gap-2 shrink-0">
+          <Button variant="outline" size="sm" asChild className="gap-2 rounded-xl">
+            <Link href="/customers">
+              <ArrowLeft className="h-4 w-4" />
+              Volver a clientes
+            </Link>
+          </Button>
+          <Button variant="outline" size="sm" asChild className="gap-2">
+            <Link href="/customers">
+              <Pencil className="h-4 w-4" />
+              Ir a listado para editar
+            </Link>
+          </Button>
+        </div>
+      </header>
+
+      <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] overflow-hidden dark:border-[#1F2937]">
+        <div className="pb-4 border-b border-border/60 px-6 pt-6">
+          <h2 className="text-lg font-medium text-foreground">Datos del cliente</h2>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            {customer.name} · {DOC_LABELS[customer.docType] ?? customer.docType} {customer.docNumber}
+          </p>
+        </div>
+        <div className="pt-6 px-6 pb-6 space-y-4">
           <dl className="grid gap-3 sm:grid-cols-2">
             <div>
               <dt className="text-xs font-medium text-muted-foreground">Tipo de documento</dt>
@@ -136,8 +122,8 @@ export default function CustomerDetailPage() {
               </div>
             )}
           </dl>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

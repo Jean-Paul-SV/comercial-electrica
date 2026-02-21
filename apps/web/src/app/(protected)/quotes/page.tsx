@@ -6,13 +6,6 @@ import { toast } from 'sonner';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@shared/components/ui/card';
 import { Button } from '@shared/components/ui/button';
 import { Input } from '@shared/components/ui/input';
 import { Label } from '@shared/components/ui/label';
@@ -355,43 +348,36 @@ export default function QuotesPage() {
   const canSubmitNew = lines.some((l) => l.productId && l.qty >= 1);
 
   return (
-    <div className="space-y-6 sm:space-y-8">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">Cotizaciones</h1>
-        <p className="text-sm text-muted-foreground">Listado de cotizaciones</p>
-      </div>
+    <div className="space-y-10">
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between pt-2 pb-2">
+        <div>
+          <h1 className="text-2xl font-light tracking-tight text-foreground sm:text-3xl flex items-center gap-2">
+            <FileSignature className="h-7 w-7 shrink-0 text-primary" />
+            Cotizaciones
+          </h1>
+          <p className="mt-2 text-sm text-muted-foreground max-w-xl">
+            Cotizaciones paginadas. Busca por cliente (nombre o número).
+          </p>
+        </div>
+        <Button
+          size="default"
+          onClick={() => setOpenNew(true)}
+          className="gap-2 shrink-0 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground"
+        >
+          <Plus className="h-4 w-4" />
+          Nueva cotización
+        </Button>
+      </header>
 
       {statusFilter === 'EXPIRED' && (
-        <p className="text-sm text-muted-foreground rounded-lg border border-border/60 bg-muted/30 px-3 py-2">
+        <p className="text-sm text-muted-foreground rounded-xl border border-border/50 bg-muted/30 px-4 py-2">
           Filtro desde alerta: cotizaciones vencidas.
           <a href="/quotes" className="ml-2 text-primary font-medium hover:underline">Ver todas</a>
         </p>
       )}
 
-      <Card className="border-0 shadow-sm overflow-hidden">
-        <CardHeader className="pb-4 bg-muted/30 border-b border-border/50">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <CardTitle className="text-lg font-medium flex items-center gap-2">
-                <FileSignature className="h-5 w-5 shrink-0 text-primary" />
-                Listado
-              </CardTitle>
-              <CardDescription>
-                Cotizaciones paginadas. Busca por cliente (nombre o número).
-              </CardDescription>
-            </div>
-            <Button
-              size="sm"
-              onClick={() => setOpenNew(true)}
-              className="gap-2 w-full sm:w-fit shadow-sm"
-            >
-              <Plus className="h-4 w-4" />
-              Nueva cotización
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4 pt-4">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between rounded-lg bg-muted/20 border border-border/50 p-3">
+      <div className="rounded-2xl border border-border/50 bg-muted/20 p-5 shadow-sm dark:bg-[#111827] dark:border-[#1F2937] sm:p-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex flex-1 flex-wrap items-center gap-3 min-w-0">
               <div className="flex items-center gap-2 flex-1 min-w-[200px] max-w-sm">
                 <Label htmlFor="search-quote" className="text-sm text-muted-foreground whitespace-nowrap">
@@ -426,25 +412,26 @@ export default function QuotesPage() {
                 Limpiar filtros
               </Button>
             </div>
-            <Pagination meta={meta} onPageChange={setPage} label="Página" />
-          </div>
+          <Pagination meta={meta} onPageChange={setPage} label="Página" />
+        </div>
+      </div>
 
-          {openSessions.length === 0 && (
-            <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 flex items-start gap-3 text-sm text-amber-800 dark:text-amber-200 dark:bg-amber-500/15 dark:border-amber-500/30">
-              <Info className="h-5 w-5 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
-              <p className="flex-1 min-w-0">
-                Para convertir una cotización a factura (venta) debes tener al menos una <strong>sesión de caja abierta</strong>. Ve a{' '}
-                <Link href="/cash" className="font-medium text-primary hover:underline">
-                  Caja
-                </Link>{' '}
-                y abre una sesión para habilitar el botón &quot;Convertir a factura&quot;.
-              </p>
-            </div>
-          )}
+      {openSessions.length === 0 && (
+        <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 flex items-start gap-3 text-sm text-amber-800 dark:text-amber-200 dark:bg-amber-500/15 dark:border-amber-500/30">
+          <Info className="h-5 w-5 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+          <p className="flex-1 min-w-0">
+            Para convertir una cotización a factura (venta) debes tener al menos una <strong>sesión de caja abierta</strong>. Ve a{' '}
+            <Link href="/cash" className="font-medium text-primary hover:underline">
+              Caja
+            </Link>{' '}
+            y abre una sesión para habilitar el botón &quot;Convertir a factura&quot;.
+          </p>
+        </div>
+      )}
 
+      <div className="rounded-2xl border border-border/50 bg-card overflow-hidden shadow-sm shadow-black/[0.03] dark:shadow-none overflow-x-auto">
           {query.isLoading && (
-            <div className="rounded-lg border border-border overflow-hidden">
-              <Table>
+            <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/40">
                     <TableHead className="font-medium">Cliente</TableHead>
@@ -466,19 +453,17 @@ export default function QuotesPage() {
                   ))}
                 </TableBody>
               </Table>
-            </div>
           )}
 
           {query.isError && (
-            <p className="text-sm text-destructive py-4">
+            <p className="text-sm text-destructive py-8 px-6">
               {(query.error as { message?: string })?.message ??
                 'Error al cargar cotizaciones'}
             </p>
           )}
 
           {!query.isLoading && (
-            <div className="rounded-lg border border-border overflow-hidden">
-              <Table>
+            <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/40 hover:bg-muted/40">
                     <TableHead className="font-medium">Cliente</TableHead>
@@ -574,10 +559,8 @@ export default function QuotesPage() {
                   )}
                 </TableBody>
               </Table>
-            </div>
           )}
-        </CardContent>
-      </Card>
+      </div>
 
       {/* Modal Nueva cotización */}
       <Dialog open={openNew} onOpenChange={setOpenNew}>

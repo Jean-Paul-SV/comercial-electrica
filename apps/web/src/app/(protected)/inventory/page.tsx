@@ -2,13 +2,6 @@
 
 import { useMemo, useState, useEffect } from 'react';
 import { toast } from 'sonner';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@shared/components/ui/card';
 import { Button } from '@shared/components/ui/button';
 import { Input } from '@shared/components/ui/input';
 import { Label } from '@shared/components/ui/label';
@@ -94,15 +87,15 @@ function StockActualCard() {
   }, [stockSearch, stockSort]);
 
   return (
-    <Card className="border border-border/80 shadow-sm rounded-xl overflow-hidden">
-      <CardHeader className="pb-4 border-b border-border/60">
-        <CardTitle className="text-lg font-medium flex items-center gap-2 text-foreground">
+    <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] overflow-hidden dark:border-[#1F2937]">
+      <div className="p-6 pb-4 border-b border-border/60">
+        <p className="text-lg font-medium text-foreground flex items-center gap-2">
           <Layers className="h-5 w-5 shrink-0 text-primary" aria-hidden />
           Stock actual
-        </CardTitle>
-        <CardDescription>
+        </p>
+        <p className="mt-1.5 text-sm text-muted-foreground">
           Cantidad en mano por producto. Para modificar stock, registra un movimiento (entrada, salida o ajuste) más abajo.
-        </CardDescription>
+        </p>
         {!stockQuery.isLoading && (
           <div className="grid gap-4 sm:grid-cols-2 mt-4">
             <div className="rounded-lg border border-border/60 bg-muted/20 p-4 flex items-start gap-3">
@@ -217,8 +210,8 @@ function StockActualCard() {
             Limpiar
           </Button>
         </div>
-      </CardHeader>
-      <CardContent className="pt-4 space-y-4">
+      </div>
+      <div className="p-6 pt-4 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <Pagination meta={stockMeta} onPageChange={setStockPage} label="Página" />
         </div>
@@ -286,8 +279,8 @@ function StockActualCard() {
             </Table>
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
 
@@ -441,40 +434,40 @@ export default function InventoryPage() {
     lines.length > 0 && !lines.some((l) => !l.productId || l.qty < 1);
 
   return (
-    <div className="space-y-6 sm:space-y-8">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="space-y-10">
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between pt-2 pb-2">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl flex items-center gap-2">
-            <Layers className="h-6 w-6 shrink-0 text-primary" aria-hidden />
+          <h1 className="text-2xl font-light tracking-tight text-foreground sm:text-3xl flex items-center gap-2">
+            <Layers className="h-7 w-7 shrink-0 text-primary" aria-hidden />
             Inventario
           </h1>
-          <p className="text-sm text-muted-foreground mt-1">
+          <p className="mt-2 text-sm text-muted-foreground max-w-xl">
             Stock actual por producto y movimientos (entradas, salidas, ajustes)
           </p>
         </div>
         <Button
-          size="sm"
+          size="default"
           onClick={() => setOpenNew(true)}
-          className="gap-2 rounded-xl font-medium shrink-0"
+          className="gap-2 rounded-xl shrink-0 bg-primary hover:bg-primary/90 text-primary-foreground"
         >
           <Plus className="h-4 w-4" />
           Nuevo movimiento
         </Button>
-      </div>
+      </header>
 
       <StockActualCard />
 
-      <Card className="border border-border/80 shadow-sm rounded-xl overflow-hidden">
-        <CardHeader className="pb-6 pt-6 border-b border-border/60">
+      <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] overflow-hidden dark:border-[#1F2937]">
+        <div className="p-6 pb-6 border-b border-border/60">
           <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-1">
-              <CardTitle className="text-lg font-medium flex items-center gap-2 text-foreground">
+              <p className="text-lg font-medium text-foreground flex items-center gap-2">
                 <Boxes className="h-5 w-5 shrink-0 text-primary" aria-hidden />
                 Movimientos
-              </CardTitle>
-              <CardDescription>
+              </p>
+              <p className="text-sm text-muted-foreground">
                 {meta ? `${meta.total} movimiento${meta.total !== 1 ? 's' : ''}` : 'Listado paginado'} · Entradas, salidas y ajustes
-              </CardDescription>
+              </p>
             </div>
           </div>
           <div className="flex flex-wrap items-end gap-4 sm:gap-6 pt-6">
@@ -547,8 +540,8 @@ export default function InventoryPage() {
               Limpiar
             </Button>
           </div>
-        </CardHeader>
-        <CardContent className="pt-6 pb-6 space-y-6">
+        </div>
+        <div className="p-6 pt-6 pb-6 space-y-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <Pagination meta={meta} onPageChange={setPage} label="Página" />
           </div>
@@ -659,8 +652,8 @@ export default function InventoryPage() {
               </Table>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       <Dialog open={openNew} onOpenChange={setOpenNew}>
         <DialogContent showClose className="sm:max-w-xl">

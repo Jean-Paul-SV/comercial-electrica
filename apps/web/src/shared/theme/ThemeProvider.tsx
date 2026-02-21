@@ -43,10 +43,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       if (storedDark !== null) {
         setDarkModeState(storedDark === 'true');
       } else {
-        setDarkModeState(
-          typeof window !== 'undefined' &&
-            window.matchMedia('(prefers-color-scheme: dark)').matches
-        );
+        setDarkModeState(true);
       }
     } finally {
       setMounted(true);

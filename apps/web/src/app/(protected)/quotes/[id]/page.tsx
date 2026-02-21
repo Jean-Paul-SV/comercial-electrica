@@ -2,13 +2,6 @@
 
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@shared/components/ui/card';
 import { Button } from '@shared/components/ui/button';
 import { Badge } from '@shared/components/ui/badge';
 import { Skeleton } from '@shared/components/ui/skeleton';
@@ -53,50 +46,39 @@ export default function QuoteDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="space-y-6">
-        <Skeleton className="h-6 w-32 rounded" />
-        <div className="flex flex-col gap-2">
-          <Skeleton className="h-8 w-56 rounded" />
-          <Skeleton className="h-4 w-40 rounded" />
+      <div className="space-y-10">
+        <Skeleton className="h-8 w-48" />
+        <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] p-6 dark:border-[#1F2937]">
+          <Skeleton className="h-6 w-40" />
+          <Skeleton className="h-4 w-72 mt-2" />
+          <div className="grid gap-4 sm:grid-cols-3 mt-6">
+            <Skeleton className="h-14 rounded-lg" />
+            <Skeleton className="h-14 rounded-lg" />
+            <Skeleton className="h-14 rounded-lg" />
+          </div>
+          <Skeleton className="h-48 rounded-lg mt-4" />
         </div>
-        <Card className="border border-border/80 shadow-sm rounded-xl overflow-hidden">
-          <CardHeader className="pb-4 border-b border-border/60">
-            <Skeleton className="h-6 w-40 rounded" />
-            <Skeleton className="h-4 w-72 rounded mt-2" />
-          </CardHeader>
-          <CardContent className="pt-6 space-y-6">
-            <div className="grid gap-4 sm:grid-cols-3">
-              <Skeleton className="h-14 rounded-lg" />
-              <Skeleton className="h-14 rounded-lg" />
-              <Skeleton className="h-14 rounded-lg" />
-            </div>
-            <Skeleton className="h-48 rounded-lg" />
-            <Skeleton className="h-20 w-48 ml-auto rounded-lg" />
-          </CardContent>
-        </Card>
       </div>
     );
   }
 
   if (isError || !quote) {
     return (
-      <div className="space-y-6">
-        <Link href="/quotes" className="inline-flex">
-          <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground hover:text-foreground">
+      <div className="space-y-10">
+        <Button variant="outline" size="sm" asChild className="gap-2 rounded-xl">
+          <Link href="/quotes">
             <ArrowLeft className="h-4 w-4" />
             Volver a cotizaciones
-          </Button>
-        </Link>
-        <Card className="border border-destructive/40 shadow-sm rounded-xl overflow-hidden bg-destructive/5">
-          <CardContent className="pt-6 pb-6">
-            <p className="text-sm text-destructive font-medium">
-              {(error as { message?: string })?.message ?? 'Cotización no encontrada.'}
-            </p>
-            <Link href="/quotes" className="inline-block mt-3">
-              <Button variant="outline" size="sm">Ver listado</Button>
-            </Link>
-          </CardContent>
-        </Card>
+          </Link>
+        </Button>
+        <div className="rounded-2xl border border-destructive/40 bg-destructive/5 p-6">
+          <p className="text-sm text-destructive font-medium">
+            {(error as { message?: string })?.message ?? 'Cotización no encontrada.'}
+          </p>
+          <Link href="/quotes" className="inline-block mt-3">
+            <Button variant="outline" size="sm">Ver listado</Button>
+          </Link>
+        </div>
       </div>
     );
   }
@@ -113,41 +95,39 @@ export default function QuoteDetailPage() {
   const validUntilStr = quote.validUntil ? new Date(quote.validUntil).toLocaleDateString() : null;
 
   return (
-    <div className="space-y-6">
-      <Link href="/quotes" className="inline-flex">
-        <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground hover:text-foreground -ml-2">
-          <ArrowLeft className="h-4 w-4" />
-          Volver a cotizaciones
-        </Button>
-      </Link>
-
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+    <div className="space-y-10">
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl flex items-center gap-2 flex-wrap">
+          <h1 className="text-2xl font-light tracking-tight text-foreground sm:text-3xl flex items-center gap-2 flex-wrap">
+            <FileText className="h-7 w-7 shrink-0 text-primary" aria-hidden />
             <span>Cotización #{quote.id.slice(0, 8)}</span>
             <Badge variant={badgeVariant} className="font-medium">
               {statusLabel}
             </Badge>
           </h1>
-          <p className="text-sm text-muted-foreground mt-1">
+          <p className="mt-2 text-sm text-muted-foreground">
             {quote.customer ? quote.customer.name : 'Sin cliente'}
+            {createdStr && ` · Creada: ${createdStr}`}
           </p>
         </div>
-      </div>
+        <Button variant="outline" size="sm" asChild className="gap-2 shrink-0 rounded-xl">
+          <Link href="/quotes">
+            <ArrowLeft className="h-4 w-4" />
+            Volver a cotizaciones
+          </Link>
+        </Button>
+      </header>
 
-      <Card className="border border-border/80 shadow-sm rounded-xl overflow-hidden">
-        <CardHeader className="pb-4 border-b border-border/60">
-          <CardTitle className="text-lg font-medium flex items-center gap-2 text-foreground">
-            <FileText className="h-5 w-5 shrink-0 text-primary" aria-hidden />
-            Detalle de la cotización
-          </CardTitle>
-          <CardDescription>
+      <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] overflow-hidden dark:border-[#1F2937]">
+        <div className="pb-4 border-b border-border/60 px-6 pt-6">
+          <h2 className="text-lg font-medium text-foreground">Detalle de la cotización</h2>
+          <p className="text-sm text-muted-foreground mt-0.5">
             {createdStr && <span>Creada: {createdStr}</span>}
             {validUntilStr && <span>{createdStr ? ' · ' : ''}Válida hasta: {validUntilStr}</span>}
             {!createdStr && !validUntilStr && '—'}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="pt-6 space-y-6">
+          </p>
+        </div>
+        <div className="pt-6 px-6 pb-6 space-y-6">
           <div className="grid gap-4 sm:grid-cols-3">
             <div className="rounded-lg border border-border/60 bg-muted/20 p-4 flex items-start gap-3">
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
@@ -240,8 +220,8 @@ export default function QuoteDetailPage() {
               <span className="tabular-nums text-foreground">{formatMoney(grandTotal)}</span>
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

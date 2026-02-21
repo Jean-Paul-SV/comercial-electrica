@@ -3,7 +3,6 @@
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Lock, LayoutDashboard, CreditCard } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@shared/components/ui/card';
 import { Button } from '@shared/components/ui/button';
 import { DianActivationDisclaimer } from '@shared/components/DianActivationDisclaimer';
 
@@ -30,29 +29,27 @@ export default function PlanRequiredPage() {
 
   return (
     <div className="min-h-[60vh] flex items-center justify-center p-4">
-      <Card className="max-w-md w-full">
-        <CardHeader>
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Lock className="h-5 w-5" />
-            <CardTitle>Módulo no incluido en tu plan</CardTitle>
-          </div>
-          <CardDescription className="space-y-2">
-            <span className="block">
-              La sección &quot;{label}&quot; no está disponible con tu plan actual.
-              Contacta a tu administrador o cambia de plan para acceder.
-            </span>
-            {upgradeHint && (
-              <span className="block mt-2 text-foreground/90">{upgradeHint}</span>
-            )}
-          </CardDescription>
+      <div className="max-w-md w-full space-y-6">
+        <header className="text-center">
+          <h1 className="text-2xl font-light tracking-tight text-foreground sm:text-3xl flex items-center justify-center gap-2">
+            <Lock className="h-7 w-7 shrink-0 text-primary" aria-hidden />
+            M?dulo no incluido en tu plan
+          </h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            La secci?n &quot;{label}&quot; no est? disponible con tu plan actual.
+            Contacta a tu administrador o cambia de plan para acceder.
+          </p>
+          {upgradeHint && (
+            <p className="mt-2 text-sm text-foreground/90">{upgradeHint}</p>
+          )}
           {moduleCode === 'electronic_invoicing' && (
-            <div className="mt-3">
+            <div className="mt-3 text-left">
               <DianActivationDisclaimer variant="card" />
             </div>
           )}
-        </CardHeader>
-        <CardContent className="flex flex-col sm:flex-row gap-2">
-          <Button asChild className="w-full sm:w-auto" variant="default">
+        </header>
+        <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] p-6 dark:border-[#1F2937] flex flex-col sm:flex-row gap-2">
+          <Button asChild className="w-full sm:w-auto rounded-xl bg-primary hover:bg-primary/90" variant="default">
             <Link href="/settings/billing">
               <CreditCard className="mr-2 h-4 w-4" />
               Cambiar de plan
@@ -64,8 +61,8 @@ export default function PlanRequiredPage() {
               Volver al inicio
             </Link>
           </Button>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

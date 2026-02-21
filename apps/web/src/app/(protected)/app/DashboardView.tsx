@@ -4,13 +4,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@shared/providers/AuthProvider';
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@shared/components/ui/card';
-import {
   LayoutDashboard,
   ShoppingCart,
   Package,
@@ -97,39 +90,34 @@ export default function DashboardView() {
   };
 
   return (
-    <div className="space-y-6 sm:space-y-8">
-      <div className="rounded-xl border border-border/60 bg-gradient-to-br from-muted/30 to-transparent px-4 py-3 sm:px-5 sm:py-4">
-        <h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
+    <div className="space-y-10 sm:space-y-12">
+      <header className="pt-1 pb-2">
+        <h1 className="text-2xl font-light tracking-tight text-foreground sm:text-3xl">
           Dashboard
         </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <p className="mt-2 text-sm text-muted-foreground">
           Sesión: {user?.email} · {user?.role === 'USER' ? 'USUARIO' : user?.role}
         </p>
-      </div>
+      </header>
 
       {d?.inventory?.lowStockCount != null && d.inventory.lowStockCount > 0 && (
-        <div className="relative overflow-hidden rounded-2xl border-2 border-orange-400/60 dark:border-orange-500/50 bg-[#fff9f5] dark:bg-orange-950/30 shadow-md shadow-orange-500/10">
-          <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-gradient-to-b from-orange-400 to-amber-500 dark:from-orange-500 dark:to-amber-600" aria-hidden />
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between px-5 py-4 sm:pl-6">
+        <div className="relative overflow-hidden rounded-2xl border border-border/50 bg-muted/30 dark:bg-warning/5 px-6 py-4 shadow-sm">
+          <div className="absolute left-0 top-0 bottom-0 w-1 bg-warning/60 rounded-l-2xl" aria-hidden />
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between pl-4">
             <div className="flex items-start gap-4 min-w-0 flex-1">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-orange-500/20 text-orange-600 dark:bg-orange-400/25 dark:text-orange-400 shadow-inner">
-                <AlertTriangle className="h-6 w-6" strokeWidth={2.25} />
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-warning/10 text-warning">
+                <AlertTriangle className="h-5 w-5" strokeWidth={2} />
               </div>
               <div className="min-w-0 pt-0.5">
-                <p className="text-sm font-semibold text-orange-800 dark:text-orange-200">
+                <p className="text-sm font-medium text-foreground">
                   Alerta de stock
                 </p>
-                <p className="mt-1 text-sm text-orange-700/90 dark:text-orange-300/90">
+                <p className="mt-1 text-sm text-muted-foreground">
                   Hay {d.inventory.lowStockCount} producto(s) con stock bajo (≤{d.inventory.lowStockThreshold ?? lowStockThreshold ?? 10} unidades). Considera reponer.
                 </p>
               </div>
             </div>
-            <Button
-              asChild
-              size="sm"
-              variant="outline"
-              className="shrink-0 rounded-xl border-2 border-orange-400/70 bg-white dark:bg-orange-950/50 font-semibold text-orange-700 dark:text-orange-300 hover:bg-orange-100 hover:border-orange-500 dark:hover:bg-orange-900/50 dark:hover:border-orange-400 transition-all shadow-sm"
-            >
+            <Button asChild size="sm" variant="outline" className="shrink-0 rounded-xl border-border">
               <Link href={`/products?lowStock=true&lowStockThreshold=${d.inventory.lowStockThreshold ?? lowStockThreshold ?? 10}`}>
                 Ver productos con stock bajo
               </Link>
@@ -139,17 +127,17 @@ export default function DashboardView() {
       )}
 
       {operationalState.data?.alerts && operationalState.data.alerts.length > 0 && (
-        <Card className="border-0 shadow-sm overflow-hidden">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+        <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] overflow-hidden dark:border-[#1F2937]">
+          <div className="p-6 pb-3">
+            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground flex items-center gap-2">
               <AlertTriangle className="h-4 w-4" />
               Acciones recomendadas
-            </CardTitle>
-            <CardDescription>
+            </p>
+            <p className="text-sm text-muted-foreground mt-1">
               Alertas por caja, inventario, cotizaciones, facturas proveedor y ventas
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="pt-0">
+            </p>
+          </div>
+          <div className="pt-0 px-6 pb-6">
             <ul className="space-y-3">
               {operationalState.data.alerts
                 .slice()
@@ -157,12 +145,12 @@ export default function DashboardView() {
                 .map((alert) => (
                   <li
                     key={alert.code + (alert.entityIds?.[0] ?? '')}
-                    className={`flex flex-col gap-2 rounded-lg border-l-4 py-2 px-3 bg-muted/30 dark:bg-muted/20 ${severityBorderClass[alert.severity] ?? 'border-l-muted-foreground/40'}`}
+                    className={`flex min-h-[88px] flex-col justify-center gap-2 rounded-xl border-l-4 py-4 px-4 bg-muted/30 dark:bg-muted/20 ${severityBorderClass[alert.severity] ?? 'border-l-muted-foreground/40'}`}
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
                         <p className="text-sm font-semibold text-foreground">{alert.title}</p>
-                        <p className="mt-0.5 text-xs text-muted-foreground">{alert.message}</p>
+                        <p className="mt-0.5 text-xs text-muted-foreground leading-relaxed">{alert.message}</p>
                       </div>
                       {alert.count > 0 && (
                         <Badge variant="secondary" className="shrink-0 text-xs">
@@ -171,24 +159,24 @@ export default function DashboardView() {
                       )}
                     </div>
                     {alert.actionLabel && alert.actionHref && (
-                      <Button asChild size="sm" variant="outline" className="w-fit">
+                      <Button asChild size="sm" variant="outline" className="w-fit mt-0.5">
                         <Link href={alert.actionHref}>{alert.actionLabel}</Link>
                       </Button>
                     )}
                   </li>
                 ))}
             </ul>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
 
       {showProgressPanel && onboardingData && (
-        <Card className="border-0 shadow-sm">
-          <CardHeader className="pb-2">
+        <div className="rounded-2xl border border-border/50 bg-muted/20 p-5 shadow-sm dark:bg-[#111827] dark:border-[#1F2937] sm:p-6">
+          <div className="pb-2">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
+              <p className="text-sm font-medium text-muted-foreground">
                 Tu progreso
-              </CardTitle>
+              </p>
               <div className="flex items-center gap-1">
                 <Button
                   variant="ghost"
@@ -212,10 +200,10 @@ export default function DashboardView() {
                 </Button>
               </div>
             </div>
-            <CardDescription>Configuración recomendada para operar</CardDescription>
-          </CardHeader>
+            <p className="text-sm text-muted-foreground mt-0.5">Configuración recomendada para operar</p>
+          </div>
           {!progressCollapsed && (
-            <CardContent>
+            <div className="pt-2">
               <ul className="space-y-2">
                 {onboardingData.checklist.map((item) => (
                   <li key={item.id} className="flex items-center gap-2 text-sm">
@@ -244,9 +232,9 @@ export default function DashboardView() {
               >
                 Configurar en 3 pasos
               </Link>
-            </CardContent>
+            </div>
           )}
-        </Card>
+        </div>
       )}
 
       {dashboard.isLoading && (
@@ -265,31 +253,27 @@ export default function DashboardView() {
       )}
 
       {trendingProducts.data?.items && trendingProducts.data.items.length > 0 && (
-        <Card className="w-full flex flex-col overflow-hidden rounded-2xl border border-border/80 border-l-4 border-l-primary shadow-sm bg-gradient-to-br from-primary/5 to-transparent dark:from-primary/10 min-h-[280px] h-[320px]">
-          <CardHeader className="shrink-0 pb-2 pt-4 px-4">
-            <div className="flex items-center justify-between gap-2">
-              <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary">
-                  <TrendingUp className="h-4 w-4" />
-                </span>
-                Artículos en tendencias
-              </CardTitle>
-            </div>
-            <CardDescription className="text-xs text-muted-foreground mt-0.5">
+        <div className="flex h-[320px] min-h-[280px] w-full flex-col overflow-hidden rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] dark:border-[#1F2937]">
+          <div className="shrink-0 p-6 pb-2">
+            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+              <TrendingUp className="h-4 w-4 text-primary" />
+              Artículos en tendencias
+            </p>
+            <p className="text-sm text-muted-foreground mt-1">
               Por ingreso (últimos {trendingProducts.data.periodDays} días)
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex min-h-0 flex-1 flex-col gap-3 px-4 pb-4 pt-0">
+            </p>
+          </div>
+          <div className="flex min-h-0 flex-1 flex-col gap-3 px-6 pb-6 pt-0">
             <ul className="min-h-0 flex-1 space-y-1.5 overflow-y-auto overflow-x-hidden pr-1">
               {trendingProducts.data.items.slice(0, 8).map((item, idx) => (
                 <li
                   key={item.product.id}
-                  className="flex items-center justify-between gap-3 rounded-xl bg-muted/40 px-3 py-2 transition-colors hover:bg-muted/60 dark:bg-muted/25 dark:hover:bg-muted/45"
+                  className="flex items-center justify-between gap-3 rounded-xl bg-muted/30 px-3 py-2 transition-colors hover:bg-muted/50 dark:bg-muted/20"
                 >
                   <span className="min-w-0 truncate text-sm font-medium text-foreground">
                     {idx + 1}. {item.product.name}
                   </span>
-                  <span className="shrink-0 text-sm font-semibold text-primary tabular-nums">
+                  <span className="shrink-0 text-sm font-medium text-primary tabular-nums">
                     {formatMoney(item.totalRevenue)}
                   </span>
                 </li>
@@ -297,63 +281,61 @@ export default function DashboardView() {
             </ul>
             <Link
               href="/reports?tab=trending"
-              className="shrink-0 flex w-full items-center justify-center gap-1.5 rounded-xl bg-primary py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 shadow-sm"
+              className="shrink-0 flex w-full items-center justify-center gap-1.5 rounded-xl bg-primary py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
             >
               Ver todos los artículos en tendencias
               <ChevronRight className="h-4 w-4 shrink-0" />
             </Link>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
 
       {d && (
-        <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
+        <div className="grid grid-cols-2 gap-6 md:grid-cols-4">
           {d.sales?.today?.total != null && (
-            <Card className="border-0 shadow-sm">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
+            <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] dark:border-[#1F2937]">
+              <div className="pb-1 pt-6 px-6">
+                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
                   Ventas hoy
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-2xl font-semibold">
+                </p>
+              </div>
+              <div className="px-6 pb-6 pt-0">
+                <p className="text-3xl font-light tracking-tight text-foreground">
                   {formatMoney(d.sales.today.total)}
                 </p>
-                <p className="text-xs text-muted-foreground mt-1">
+                <p className="mt-2 text-sm text-muted-foreground">
                   {d.sales.today.count ?? 0} ventas
                 </p>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           )}
           {d.inventory?.lowStockCount != null && d.inventory.lowStockCount > 0 && (
-            <Card className="border-0 shadow-md overflow-hidden border-l-4 border-l-primary bg-gradient-to-br from-primary/5 to-transparent dark:from-primary/10 flex h-[280px] min-h-[280px] w-full flex-col">
-              <CardHeader className="shrink-0 pb-2 pt-4 px-4">
+            <div className="flex min-h-[280px] w-full flex-col overflow-hidden rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] dark:border-[#1F2937] dark:border-l-primary/30 dark:border-l-4">
+              <div className="shrink-0 pb-2 pt-6 px-6">
                 <div className="flex items-center justify-between gap-2">
-                  <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
-                    <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/15 text-primary">
-                      <Package className="h-4 w-4" />
-                    </span>
+                  <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                    <Package className="h-4 w-4 text-primary" />
                     Stock bajo
-                  </CardTitle>
-                  <Badge variant="default" className="shrink-0 font-medium">
+                  </p>
+                  <Badge variant="secondary" className="shrink-0 text-xs font-medium">
                     {d.inventory.lowStockCount}
                   </Badge>
                 </div>
-              </CardHeader>
-              <CardContent className="flex min-h-0 flex-1 flex-col gap-3 px-4 pb-4 pt-0">
+              </div>
+              <div className="flex min-h-0 flex-1 flex-col gap-3 px-6 pb-6 pt-0">
                 {d.inventory.lowStockProducts && d.inventory.lowStockProducts.length > 0 ? (
                   <ul className="min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-0.5">
                     {d.inventory.lowStockProducts.slice(0, 8).map((p) => (
                       <li
                         key={p.id}
-                        className="flex items-center justify-between gap-3 rounded-lg bg-muted/50 px-3 py-2 transition-colors hover:bg-muted/70 dark:bg-muted/30 dark:hover:bg-muted/50"
+                        className="flex items-center justify-between gap-3 rounded-xl bg-muted/40 px-3 py-2 transition-colors hover:bg-muted/60 dark:bg-muted/25"
                       >
                         <span className="truncate text-sm font-medium text-foreground">
                           {p.name}
                         </span>
                         <Badge
                           variant={p.stock === 0 ? 'destructive' : 'secondary'}
-                          className="shrink-0 text-xs font-semibold"
+                          className="shrink-0 text-xs font-medium"
                         >
                           {p.stock} u.
                         </Badge>
@@ -367,92 +349,90 @@ export default function DashboardView() {
                   </ul>
                 ) : (
                   <div className="flex min-h-0 flex-1 flex-col justify-center">
-                    <p className="text-2xl font-semibold">{d.inventory.lowStockCount}</p>
-                    <p className="text-xs text-muted-foreground mt-1">productos</p>
+                    <p className="text-3xl font-light tracking-tight">{d.inventory.lowStockCount}</p>
+                    <p className="mt-1 text-sm text-muted-foreground">productos</p>
                   </div>
                 )}
                 <Link
                   href={`/products?lowStock=true&lowStockThreshold=${d.inventory.lowStockThreshold ?? lowStockThreshold ?? 10}`}
-                  className="shrink-0 flex w-full items-center justify-center gap-1.5 rounded-lg border border-primary/30 bg-primary/10 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/20 dark:hover:bg-primary/15"
+                  className="shrink-0 flex w-full items-center justify-center gap-1.5 rounded-xl border border-border bg-muted/30 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-muted/50"
                 >
                   Ver productos con stock bajo
                   <ChevronRight className="h-4 w-4" />
                 </Link>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           )}
           {d.cash?.openSessions != null && (
-            <Card className="border-0 shadow-sm">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
+            <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] dark:border-[#1F2937]">
+              <div className="pb-1 pt-6 px-6">
+                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
                   Sesiones abiertas
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-2xl font-semibold">{d.cash.openSessions}</p>
-                <p className="text-xs text-muted-foreground mt-1">caja</p>
-              </CardContent>
-            </Card>
+                </p>
+              </div>
+              <div className="px-6 pb-6 pt-0">
+                <p className="text-3xl font-light tracking-tight text-foreground">{d.cash.openSessions}</p>
+                <p className="mt-2 text-sm text-muted-foreground">caja</p>
+              </div>
+            </div>
           )}
           {d.quotes?.pending != null && (
-            <Card className="border-0 shadow-sm">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
+            <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] dark:border-[#1F2937]">
+              <div className="pb-1 pt-6 px-6">
+                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
                   Cotizaciones pendientes
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-2xl font-semibold">{d.quotes.pending}</p>
-                <p className="text-xs text-muted-foreground mt-1">pendientes</p>
-              </CardContent>
-            </Card>
+                </p>
+              </div>
+              <div className="px-6 pb-6 pt-0">
+                <p className="text-3xl font-light tracking-tight text-foreground">{d.quotes.pending}</p>
+                <p className="mt-2 text-sm text-muted-foreground">pendientes</p>
+              </div>
+            </div>
           )}
         </div>
       )}
 
       {d && (d.inventory?.lowStockCount != null || d.cash?.openSessions != null || d.quotes?.pending != null) && (
-        <Card className="border-0 shadow-sm overflow-visible">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+        <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] overflow-visible dark:border-[#1F2937]">
+          <div className="pb-2 pt-6 px-6">
+            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
               Indicadores
-            </CardTitle>
-            <CardDescription>Stock bajo, sesiones abiertas, cotizaciones pendientes</CardDescription>
-          </CardHeader>
-          <CardContent className="overflow-visible">
+            </p>
+            <p className="text-sm text-muted-foreground mt-1">Stock bajo, sesiones abiertas, cotizaciones pendientes</p>
+          </div>
+          <div className="overflow-visible px-6 pb-6 pt-0">
             <KpiBarChart className="h-56 w-full min-w-0" data={kpiChartData} />
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
 
       {dashboardSummary.isLoading && (
-        <Card className="border-0 shadow-sm overflow-hidden border-l-4 border-l-primary/30">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Resumen del día
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
+        <div className="rounded-2xl border border-border/50 bg-muted/20 shadow-sm dark:bg-[#111827] dark:border-[#1F2937] border-l-4 border-l-primary/30 p-6">
+          <p className="text-sm font-medium text-muted-foreground">
+            Resumen del día
+          </p>
+          <div className="mt-2">
             <p className="text-sm text-muted-foreground animate-pulse">
               Cargando resumen…
             </p>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
       {!dashboardSummary.isLoading && dashboardSummary.data?.summary && (
-        <Card className="border-0 shadow-sm overflow-hidden border-l-4 border-l-primary/50">
-          <CardHeader className="pb-2">
+        <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] overflow-hidden dark:border-[#1F2937]">
+          <div className="pb-2 pt-6 px-6">
             <div className="flex items-center justify-between gap-2">
-              <CardTitle className="text-sm font-medium text-foreground">
+              <p className="text-xs font-medium uppercase tracking-wider text-foreground">
                 Resumen del día
-              </CardTitle>
+              </p>
               {dashboardSummary.data.source === 'llm' ? (
-                <Badge variant="secondary" className="text-xs">IA</Badge>
+                <Badge variant="secondary" className="text-xs font-medium">IA</Badge>
               ) : (
                 <Badge variant="outline" className="text-xs text-muted-foreground">Resumen automático</Badge>
               )}
             </div>
-          </CardHeader>
-          <CardContent className="space-y-2">
+          </div>
+          <div className="space-y-2 px-6 pb-6 pt-0">
             <p className="text-sm text-muted-foreground leading-relaxed">
               {dashboardSummary.data.summary}
             </p>
@@ -461,13 +441,13 @@ export default function DashboardView() {
                 Configura <code className="rounded bg-muted px-1">OPENAI_API_KEY</code> en la API para un resumen generado con IA.
               </p>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
       {!dashboardSummary.isLoading && dashboardSummary.isError && (
-        <Card className="border-0 shadow-sm border-l-4 border-l-muted">
-          <CardContent className="pt-4 pb-4">
-            <p className="text-sm text-muted-foreground">
+        <div className="rounded-2xl border border-border/50 bg-muted/20 shadow-sm dark:bg-[#111827] dark:border-[#1F2937] border-l-4 border-l-muted p-6">
+          <div className="flex min-h-[100px] flex-col justify-center items-start">
+            <p className="text-sm text-muted-foreground leading-relaxed">
               {(dashboardSummary.error as { status?: number })?.status === 403
                 ? '¿Quieres tener el resumen del día con IA? Adquiere un plan Premium o Enterprise en Facturación.'
                 : 'No se pudo cargar el resumen del día.'}
@@ -480,8 +460,8 @@ export default function DashboardView() {
                 Ver planes y facturación →
               </Link>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
 
       {actionable.data !== undefined && (
@@ -560,103 +540,85 @@ export default function DashboardView() {
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         <Link href="/sales">
-          <Card className="border-0 shadow-sm hover:shadow-md transition-shadow duration-200 cursor-pointer h-full">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <ShoppingCart className="h-4 w-4" />
-                Ventas
-              </CardTitle>
-              <CardDescription>Listado y creación de ventas</CardDescription>
-            </CardHeader>
-          </Card>
+          <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] hover:shadow-md transition-shadow duration-200 cursor-pointer h-full p-6 dark:border-[#1F2937]">
+            <p className="flex items-center gap-2 text-base font-medium text-foreground">
+              <ShoppingCart className="h-4 w-4" />
+              Ventas
+            </p>
+            <p className="text-sm text-muted-foreground mt-1">Listado y creación de ventas</p>
+          </div>
         </Link>
         <Link href="/products">
-          <Card className="border-0 shadow-sm hover:shadow-md transition-shadow duration-200 cursor-pointer h-full">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Package className="h-4 w-4" />
-                Productos
-              </CardTitle>
-              <CardDescription>Catálogo y categorías</CardDescription>
-            </CardHeader>
-          </Card>
+          <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] hover:shadow-md transition-shadow duration-200 cursor-pointer h-full p-6 dark:border-[#1F2937]">
+            <p className="flex items-center gap-2 text-base font-medium text-foreground">
+              <Package className="h-4 w-4" />
+              Productos
+            </p>
+            <p className="text-sm text-muted-foreground mt-1">Catálogo y categorías</p>
+          </div>
         </Link>
         <Link href="/customers">
-          <Card className="border-0 shadow-sm hover:shadow-md transition-shadow duration-200 cursor-pointer h-full">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Users className="h-4 w-4" />
-                Clientes
-              </CardTitle>
-              <CardDescription>Gestión de clientes</CardDescription>
-            </CardHeader>
-          </Card>
+          <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] hover:shadow-md transition-shadow duration-200 cursor-pointer h-full p-6 dark:border-[#1F2937]">
+            <p className="flex items-center gap-2 text-base font-medium text-foreground">
+              <Users className="h-4 w-4" />
+              Clientes
+            </p>
+            <p className="text-sm text-muted-foreground mt-1">Gestión de clientes</p>
+          </div>
         </Link>
         <Link href="/cash">
-          <Card className="border-0 shadow-sm hover:shadow-md transition-shadow duration-200 cursor-pointer h-full">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Wallet className="h-4 w-4" />
-                Caja
-              </CardTitle>
-              <CardDescription>Sesiones y movimientos</CardDescription>
-            </CardHeader>
-          </Card>
+          <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] hover:shadow-md transition-shadow duration-200 cursor-pointer h-full p-6 dark:border-[#1F2937]">
+            <p className="flex items-center gap-2 text-base font-medium text-foreground">
+              <Wallet className="h-4 w-4" />
+              Caja
+            </p>
+            <p className="text-sm text-muted-foreground mt-1">Sesiones y movimientos</p>
+          </div>
         </Link>
         <Link href="/quotes">
-          <Card className="border-0 shadow-sm hover:shadow-md transition-shadow duration-200 cursor-pointer h-full">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <FileText className="h-4 w-4" />
-                Cotizaciones
-              </CardTitle>
-              <CardDescription>Crear y convertir cotizaciones</CardDescription>
-            </CardHeader>
-          </Card>
+          <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] hover:shadow-md transition-shadow duration-200 cursor-pointer h-full p-6 dark:border-[#1F2937]">
+            <p className="flex items-center gap-2 text-base font-medium text-foreground">
+              <FileText className="h-4 w-4" />
+              Cotizaciones
+            </p>
+            <p className="text-sm text-muted-foreground mt-1">Crear y convertir cotizaciones</p>
+          </div>
         </Link>
         <Link href="/inventory">
-          <Card className="border-0 shadow-sm hover:shadow-md transition-shadow duration-200 cursor-pointer h-full">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Boxes className="h-4 w-4" />
-                Inventario
-              </CardTitle>
-              <CardDescription>Movimientos de stock</CardDescription>
-            </CardHeader>
-          </Card>
+          <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] hover:shadow-md transition-shadow duration-200 cursor-pointer h-full p-6 dark:border-[#1F2937]">
+            <p className="flex items-center gap-2 text-base font-medium text-foreground">
+              <Boxes className="h-4 w-4" />
+              Inventario
+            </p>
+            <p className="text-sm text-muted-foreground mt-1">Movimientos de stock</p>
+          </div>
         </Link>
         <Link href="/suppliers">
-          <Card className="border-0 shadow-sm hover:shadow-md transition-shadow duration-200 cursor-pointer h-full">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Truck className="h-4 w-4" />
-                Proveedores
-              </CardTitle>
-              <CardDescription>Gestión de proveedores</CardDescription>
-            </CardHeader>
-          </Card>
+          <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] hover:shadow-md transition-shadow duration-200 cursor-pointer h-full p-6 dark:border-[#1F2937]">
+            <p className="flex items-center gap-2 text-base font-medium text-foreground">
+              <Truck className="h-4 w-4" />
+              Proveedores
+            </p>
+            <p className="text-sm text-muted-foreground mt-1">Gestión de proveedores</p>
+          </div>
         </Link>
         <Link href="/supplier-invoices">
-          <Card className="border-0 shadow-sm hover:shadow-md transition-shadow duration-200 cursor-pointer h-full">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <FileCheck className="h-4 w-4" />
-                Facturas proveedor
-              </CardTitle>
-              <CardDescription>Cuentas por pagar</CardDescription>
-            </CardHeader>
-          </Card>
+          <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] hover:shadow-md transition-shadow duration-200 cursor-pointer h-full p-6 dark:border-[#1F2937]">
+            <p className="flex items-center gap-2 text-base font-medium text-foreground">
+              <FileCheck className="h-4 w-4" />
+              Facturas proveedor
+            </p>
+            <p className="text-sm text-muted-foreground mt-1">Cuentas por pagar</p>
+          </div>
         </Link>
         <Link href="/reports">
-          <Card className="border-0 shadow-sm hover:shadow-md transition-shadow duration-200 cursor-pointer h-full">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <LayoutDashboard className="h-4 w-4" />
-                Reportes
-              </CardTitle>
-              <CardDescription>Ventas, inventario, caja, clientes</CardDescription>
-            </CardHeader>
-          </Card>
+          <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] hover:shadow-md transition-shadow duration-200 cursor-pointer h-full p-6 dark:border-[#1F2937]">
+            <p className="flex items-center gap-2 text-base font-medium text-foreground">
+              <LayoutDashboard className="h-4 w-4" />
+              Reportes
+            </p>
+            <p className="text-sm text-muted-foreground mt-1">Ventas, inventario, caja, clientes</p>
+          </div>
         </Link>
       </div>
     </div>

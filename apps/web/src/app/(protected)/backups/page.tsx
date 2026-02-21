@@ -1,13 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@shared/components/ui/card';
 import { Button } from '@shared/components/ui/button';
 import {
   Table,
@@ -104,40 +97,29 @@ export default function BackupsPage() {
   };
 
   return (
-    <div className="space-y-6 sm:space-y-8">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-xl font-semibold tracking-tight sm:text-2xl text-foreground">
-          Backups
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Crear y descargar copias de seguridad de los datos de tu empresa (CSV en ZIP). Cada administrador puede generar y descargar el backup de su tenant.
-        </p>
-      </div>
+    <div className="space-y-10">
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between pt-2 pb-2">
+        <div>
+          <h1 className="text-2xl font-light tracking-tight text-foreground sm:text-3xl flex items-center gap-2">
+            <Database className="h-7 w-7 shrink-0 text-primary" aria-hidden />
+            Backups
+          </h1>
+          <p className="mt-2 text-sm text-muted-foreground max-w-xl">
+            Crear y descargar copias de seguridad de los datos de tu empresa (CSV en ZIP). Solo los completados pueden descargarse.
+          </p>
+        </div>
+        <Button
+          type="button"
+          onClick={handleCreate}
+          disabled={createBackup.isPending || list.isRefetching}
+          className="gap-2 shrink-0 rounded-xl bg-primary hover:bg-primary/90"
+        >
+          <Plus className="h-4 w-4" />
+          {createBackup.isPending ? 'Creando…' : 'Nuevo backup'}
+        </Button>
+      </header>
 
-      <Card className="border border-border/80 shadow-sm rounded-xl overflow-hidden">
-        <CardHeader className="pb-4 border-b border-border/60">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <CardTitle className="text-lg font-medium flex items-center gap-2 text-foreground">
-                <Database className="h-5 w-5 shrink-0 text-primary" aria-hidden />
-                Copias de seguridad
-              </CardTitle>
-              <CardDescription>
-                Lista de backups. Solo los completados pueden descargarse.
-              </CardDescription>
-            </div>
-            <Button
-              type="button"
-              onClick={handleCreate}
-              disabled={createBackup.isPending || list.isRefetching}
-              className="gap-2 shrink-0"
-            >
-              <Plus className="h-4 w-4" />
-              {createBackup.isPending ? 'Creando…' : 'Nuevo backup'}
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="pt-4">
+      <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] overflow-hidden dark:border-[#1F2937]">
           {list.isLoading && (
             <div className="space-y-3">
               {[1, 2, 3].map((i) => (
@@ -146,13 +128,12 @@ export default function BackupsPage() {
             </div>
           )}
           {list.isError && (
-            <p className="text-sm text-destructive py-4">
+            <p className="text-sm text-destructive py-8 px-6">
               {(list.error as { message?: string })?.message ?? 'Error al cargar backups'}
             </p>
           )}
           {!list.isLoading && !list.isError && (
-            <div className="rounded-lg border border-border overflow-hidden">
-              <Table>
+            <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/40 hover:bg-muted/40">
                     <TableHead className="font-medium">Fecha</TableHead>
@@ -242,10 +223,8 @@ export default function BackupsPage() {
                   )}
                 </TableBody>
               </Table>
-            </div>
           )}
-        </CardContent>
-      </Card>
+      </div>
 
       <Dialog open={deleteId != null} onOpenChange={(open) => !open && setDeleteId(null)}>
         <DialogContent>

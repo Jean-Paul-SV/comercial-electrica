@@ -10,7 +10,6 @@ import { useAcceptInvite } from '@features/auth/hooks';
 import { Button } from '@shared/components/ui/button';
 import { Input } from '@shared/components/ui/input';
 import { Label } from '@shared/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@shared/components/ui/card';
 import { Zap, ArrowLeft } from 'lucide-react';
 
 const schema = z
@@ -52,25 +51,27 @@ function AcceptInviteContent() {
     }
   });
 
+  const cardClass = 'w-full max-w-md rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] p-6 dark:border-[#1F2937]';
+
   if (success) {
     return (
       <main className="min-h-screen flex items-center justify-center p-6 bg-background">
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-xl">
+        <div className={cardClass}>
+          <div className="space-y-1 pb-2">
+            <p className="flex items-center gap-2 text-xl font-semibold text-foreground">
               <Zap className="h-6 w-6 text-primary" />
               Invitación aceptada
-            </CardTitle>
-            <CardDescription>
+            </p>
+            <p className="text-sm text-muted-foreground">
               Tu contraseña se ha establecido correctamente. Ya puedes iniciar sesión.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+            </p>
+          </div>
+          <div className="pt-4">
             <Button asChild className="w-full">
               <Link href="/login">Iniciar sesión</Link>
             </Button>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </main>
     );
   }
@@ -78,39 +79,39 @@ function AcceptInviteContent() {
   if (!token) {
     return (
       <main className="min-h-screen flex items-center justify-center p-6 bg-background">
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-xl">
+        <div className={cardClass}>
+          <div className="space-y-1 pb-2">
+            <p className="flex items-center gap-2 text-xl font-semibold text-foreground">
               <Zap className="h-6 w-6 text-primary" />
               Enlace inválido
-            </CardTitle>
-            <CardDescription>
+            </p>
+            <p className="text-sm text-muted-foreground">
               Falta el token de invitación. Pide a quien te invitó que te envíe de nuevo el enlace.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+            </p>
+          </div>
+          <div className="pt-4">
             <Button asChild className="w-full">
               <Link href="/login">Ir al inicio de sesión</Link>
             </Button>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </main>
     );
   }
 
   return (
     <main className="min-h-screen flex items-center justify-center p-6 bg-background">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-xl">
+      <div className={cardClass}>
+        <div className="space-y-1 pb-2">
+          <p className="flex items-center gap-2 text-xl font-semibold text-foreground">
             <Zap className="h-6 w-6 text-primary" />
             Aceptar invitación
-          </CardTitle>
-          <CardDescription>
+          </p>
+          <p className="text-sm text-muted-foreground">
             Establece tu contraseña para acceder (mínimo 8 caracteres).
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+          </p>
+        </div>
+        <div className="pt-4">
           <form onSubmit={onSubmit} noValidate className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="password">Contraseña</Label>
@@ -161,8 +162,8 @@ function AcceptInviteContent() {
               </Link>
             </Button>
           </form>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </main>
   );
 }
@@ -172,11 +173,9 @@ export default function AcceptInvitePage() {
     <Suspense
       fallback={
         <main className="min-h-screen flex items-center justify-center p-6 bg-background">
-          <Card className="w-full max-w-md">
-            <CardContent className="pt-6">
-              <p className="text-sm text-muted-foreground animate-pulse">Cargando…</p>
-            </CardContent>
-          </Card>
+          <div className="w-full max-w-md rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] p-6 dark:border-[#1F2937]">
+            <p className="text-sm text-muted-foreground animate-pulse">Cargando…</p>
+          </div>
         </main>
       }
     >

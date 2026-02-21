@@ -6,13 +6,6 @@ import { useForm, Controller } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@shared/components/ui/card';
 import { Button } from '@shared/components/ui/button';
 import { Input } from '@shared/components/ui/input';
 import { MoneyInput } from '@shared/components/ui/money-input';
@@ -153,76 +146,54 @@ export default function CashPage() {
   const hasData = rows.length > 0;
 
   return (
-    <div className="space-y-6 sm:space-y-8">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-xl font-semibold tracking-tight sm:text-2xl text-foreground">
-          Caja
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Sesiones de caja
-        </p>
-      </div>
+    <div className="space-y-10">
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between pt-2 pb-2">
+        <div>
+          <h1 className="text-2xl font-light tracking-tight text-foreground sm:text-3xl flex items-center gap-2">
+            <Wallet className="h-7 w-7 shrink-0 text-primary" aria-hidden />
+            Caja
+          </h1>
+          <p className="mt-2 text-sm text-muted-foreground max-w-xl">
+            {hasData
+              ? `${totalSessions} sesión${totalSessions !== 1 ? 'es' : ''} de caja`
+              : 'Sesiones de caja'}
+          </p>
+          {!dashboard.isLoading && (
+            <div className="mt-3 rounded-xl border border-border/50 bg-muted/20 px-4 py-2.5 inline-flex items-center gap-2">
+              <TrendingUp className="h-4 w-4 text-primary shrink-0" aria-hidden />
+              <span className="text-sm font-medium text-foreground">Ventas del día:</span>
+              <span className="text-sm font-semibold text-primary">{formatMoney(todaySalesTotal)}</span>
+              {todaySalesCount > 0 && (
+                <span className="text-sm text-muted-foreground">
+                  ({todaySalesCount} venta{todaySalesCount !== 1 ? 's' : ''})
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+        <div className="flex flex-wrap gap-2 shrink-0">
+          <Button size="sm" variant="outline" asChild className="gap-2 rounded-xl">
+            <Link href="/cash/movements">
+              <Receipt className="h-4 w-4 shrink-0" />
+              Movimientos de caja
+            </Link>
+          </Button>
+          {hasCashCreate && (
+            <Button
+              size="default"
+              onClick={() => setOpenNewSession(true)}
+              className="gap-2 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground"
+            >
+              <Plus className="h-4 w-4 shrink-0" />
+              Abrir sesión
+            </Button>
+          )}
+        </div>
+      </header>
 
-      <Card className="border border-border/80 shadow-sm rounded-xl overflow-hidden">
-        <CardHeader className="pb-4 border-b border-border/60">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex flex-col gap-3">
-              <div>
-                <CardTitle className="text-lg font-medium flex items-center gap-2 text-foreground">
-                  <Wallet className="h-5 w-5 shrink-0 text-primary" aria-hidden />
-                  Sesiones
-                </CardTitle>
-                <CardDescription>
-                  {hasData
-                    ? `${totalSessions} sesión${totalSessions !== 1 ? 'es' : ''} de caja`
-                    : 'Listado de sesiones de caja'}
-                </CardDescription>
-              </div>
-              {!dashboard.isLoading && (
-                <div className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-2.5">
-                  <div className="flex items-center gap-2">
-                    <TrendingUp className="h-4 w-4 text-primary shrink-0" aria-hidden />
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-sm font-medium text-foreground">
-                        Ventas del día:
-                      </span>
-                      <span className="text-sm font-semibold text-primary">
-                        {formatMoney(todaySalesTotal)}
-                      </span>
-                      {todaySalesCount > 0 && (
-                        <span className="text-sm text-muted-foreground">
-                          ({todaySalesCount} venta{todaySalesCount !== 1 ? 's' : ''})
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-            <div className="flex flex-wrap gap-2 shrink-0">
-              <Button size="sm" variant="outline" asChild className="gap-2">
-                <Link href="/cash/movements">
-                  <Receipt className="h-4 w-4 shrink-0" />
-                  Movimientos de caja
-                </Link>
-              </Button>
-              {hasCashCreate && (
-                <Button
-                  size="sm"
-                  onClick={() => setOpenNewSession(true)}
-                  className="gap-2 w-full sm:w-auto"
-                >
-                  <Plus className="h-4 w-4 shrink-0" />
-                  Abrir sesión
-                </Button>
-              )}
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="pt-4 space-y-4">
+      <div className="rounded-2xl border border-border/50 bg-card overflow-hidden shadow-sm shadow-black/[0.03] dark:shadow-none overflow-x-auto">
           {query.isLoading && (
-            <div className="rounded-lg border border-border/80 overflow-hidden">
-              <Table>
+            <Table>
                 <TableHeader>
                   <TableRow className="hover:bg-transparent">
                     <TableHead className="font-medium text-muted-foreground">Apertura</TableHead>
@@ -246,7 +217,6 @@ export default function CashPage() {
                   ))}
                 </TableBody>
               </Table>
-            </div>
           )}
 
           {query.isError && (
@@ -259,8 +229,7 @@ export default function CashPage() {
 
           {!query.isLoading && !query.isError && (
             <>
-              <div className="rounded-lg border border-border/80 overflow-hidden">
-                <Table>
+              <Table>
                   <TableHeader>
                     <TableRow className="hover:bg-transparent border-b border-border/80">
                       <TableHead className="font-medium text-muted-foreground">Apertura</TableHead>
@@ -352,7 +321,6 @@ export default function CashPage() {
                     )}
                   </TableBody>
                 </Table>
-              </div>
               {meta && (meta.total > 0 || meta.totalPages > 1) && (
                 <div className="flex items-center justify-between gap-4 flex-wrap">
                   <p className="text-xs text-muted-foreground">
@@ -365,8 +333,7 @@ export default function CashPage() {
               )}
             </>
           )}
-        </CardContent>
-      </Card>
+      </div>
 
       <Dialog open={openNewSession} onOpenChange={setOpenNewSession}>
         <DialogContent showClose className="sm:max-w-md">
