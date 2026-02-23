@@ -31,6 +31,7 @@ import { ProviderModule } from './provider/provider.module';
 import { BillingModule } from './billing/billing.module';
 import { FeedbackModule } from './feedback/feedback.module';
 import { UsageModule } from './usage/usage.module';
+import { TrackingModule } from './tracking/tracking.module';
 import { validateEnv } from './config/env.validation';
 import { MetricsModule } from './metrics/metrics.module';
 import { RequestMetricsInterceptor } from './metrics/request-metrics.interceptor';
@@ -132,6 +133,7 @@ import { TenantModule } from './tenant/tenant.module';
     BillingModule,
     FeedbackModule,
     UsageModule,
+    TrackingModule,
     TenantModule,
     ConfigValidationModule, // Validar configuración después de ConfigModule
   ],

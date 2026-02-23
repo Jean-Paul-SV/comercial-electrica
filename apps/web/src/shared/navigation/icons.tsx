@@ -31,6 +31,7 @@ import {
   MessageCircle,
   Lightbulb,
   TrendingUp,
+  Eye,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -61,6 +62,7 @@ export const navIconMap: Record<string, LucideIcon> = {
   MessageCircle,
   Lightbulb,
   TrendingUp,
+  Eye,
 };
 
 export function getNavIcon(name: string): LucideIcon | undefined {

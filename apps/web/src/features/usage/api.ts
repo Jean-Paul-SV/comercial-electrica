@@ -11,3 +11,11 @@ export function recordUsageEvent(
 ): Promise<{ ok: true }> {
   return apiClient.post<{ ok: true }>('/usage/events', body, { authToken });
 }
+
+/** Registra una visita a una página para el contador del panel proveedor. */
+export function recordPageVisit(
+  authToken: string,
+  path: string
+): Promise<{ ok: true }> {
+  return apiClient.post<{ ok: true }>('/tracking/visit', { path }, { authToken });
+}

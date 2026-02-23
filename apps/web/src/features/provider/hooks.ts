@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@shared/providers/AuthProvider';
 import * as api from './api';
-import type { ListTenantsQuery, ListFeedbackQuery, ListUsageEventsQuery, UsageByDayQuery } from './api';
+import type { ListTenantsQuery, ListFeedbackQuery, ListUsageEventsQuery, UsageByDayQuery, PageVisitsAnalyticsQuery } from './api';
 import type { CreateTenantPayload, ProviderAlert, BackupMetadata, BackupsStatistics, BackupAlert } from './types';
 
 export function usePlans(activeOnly?: boolean) {
@@ -186,6 +186,16 @@ export function useUsageEventsByDay(query?: UsageByDayQuery) {
     queryKey: ['provider', 'usage', 'by-day', query],
     queryFn: () => api.getUsageEventsByDay(token!, query),
     enabled: Boolean(token),
+  });
+}
+
+export function usePageVisitsAnalytics(query?: PageVisitsAnalyticsQuery) {
+  const { token } = useAuth();
+  return useQuery({
+    queryKey: ['provider', 'analytics', 'page-visits', query],
+    queryFn: () => api.getPageVisitsAnalytics(token!, query),
+    enabled: Boolean(token),
+    refetchInterval: 60_000, // Actualizar cada minuto con la página abierta
   });
 }
 

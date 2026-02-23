@@ -100,6 +100,20 @@ export class ProviderController {
     });
   }
 
+  @Get('analytics/page-visits')
+  @ApiOperation({
+    summary: 'Contador de visitas por empresa y por página',
+    description:
+      'Devuelve total universal, visitas por tenant y por ruta (path). Opcional: from/to en ISO para filtrar por fecha.',
+  })
+  @ApiResponse({ status: 200, description: 'Datos de visitas.' })
+  getPageVisitsAnalytics(
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    return this.provider.getPageVisitsAnalytics({ from, to });
+  }
+
   @Get('plans')
   @ApiOperation({
     summary: 'Listar planes',

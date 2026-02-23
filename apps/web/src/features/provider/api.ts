@@ -272,3 +272,31 @@ export function getBusinessMetrics(authToken: string): Promise<BusinessMetrics> 
     authToken,
   });
 }
+
+/** Contador de visitas: total, por empresa y por ruta. */
+export type PageVisitsAnalytics = {
+  total: number;
+  byTenant: Array<{
+    tenantId: string | null;
+    tenantName: string | null;
+    tenantSlug: string | null;
+    count: number;
+  }>;
+  byPath: Array<{ path: string; count: number }>;
+};
+
+export type PageVisitsAnalyticsQuery = { from?: string; to?: string };
+
+export function getPageVisitsAnalytics(
+  authToken: string,
+  query?: PageVisitsAnalyticsQuery
+): Promise<PageVisitsAnalytics> {
+  const params = new URLSearchParams();
+  if (query?.from) params.set('from', query.from);
+  if (query?.to) params.set('to', query.to);
+  const qs = params.toString();
+  return apiClient.get<PageVisitsAnalytics>(
+    `/provider/analytics/page-visits${qs ? `?${qs}` : ''}`,
+    { authToken }
+  );
+}

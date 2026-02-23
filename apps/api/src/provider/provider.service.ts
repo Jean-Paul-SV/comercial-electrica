@@ -857,4 +857,57 @@ export class ProviderService {
 
     return { success: true };
   }
+
+  /**
+   * Analytics de visitas a páginas: total universal, por empresa (tenant) y por ruta (path).
+   * Solo admin de plataforma.
+   */
+  async getPageVisitsAnalytics(options?: { from?: string; to?: string }) {
+    const where: Prisma.PageVisitWhereInput = {};
+    if (options?.from || options?.to) {
+      where.createdAt = {};
+      if (options.from) (where.createdAt as Prisma.DateTimeFilter).gte = new Date(options.from);
+      if (options.to) (where.createdAt as Prisma.DateTimeFilter).lte = new Date(options.to);
+    }
+
+    const [total, byTenantRows, byPathRows] = await Promise.all([
+      this.prisma.pageVisit.count({ where }),
+      this.prisma.pageVisit.groupBy({
+        by: ['tenantId'],
+        where: { ...where, tenantId: { not: null } },
+        _count: { id: true },
+        orderBy: { _count: { id: 'desc' } },
+      }),
+      this.prisma.pageVisit.groupBy({
+        by: ['path'],
+        where,
+        _count: { id: true },
+        orderBy: { _count: { id: 'desc' } },
+      }),
+    ]);
+
+    const tenantIds = byTenantRows.map((r) => r.tenantId).filter(Boolean) as string[];
+    const tenants =
+      tenantIds.length > 0
+        ? await this.prisma.tenant.findMany({
+            where: { id: { in: tenantIds } },
+            select: { id: true, name: true, slug: true },
+          })
+        : [];
+    const tenantMap = new Map(tenants.map((t) => [t.id, t]));
+
+    return {
+      total,
+      byTenant: byTenantRows.map((r) => ({
+        tenantId: r.tenantId,
+        tenantName: r.tenantId ? tenantMap.get(r.tenantId)?.name ?? null : null,
+        tenantSlug: r.tenantId ? tenantMap.get(r.tenantId)?.slug ?? null : null,
+        count: r._count.id,
+      })),
+      byPath: byPathRows.map((r) => ({
+        path: r.path,
+        count: r._count.id,
+      })),
+    };
+  }
 }

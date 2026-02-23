@@ -105,6 +105,7 @@ export const navConfig: NavTreeConfig = {
         { id: 'provider-backups', href: '/provider/backups', label: 'Backups', icon: 'Database', order: 6 },
         { id: 'provider-feedback', href: '/provider/feedback', label: 'Sugerencias', icon: 'Lightbulb', order: 7 },
         { id: 'provider-dian-requests', href: '/provider/dian-requests', label: 'Solicitudes DIAN', icon: 'FileCheck', order: 8 },
+        { id: 'provider-visits', href: '/provider/visits', label: 'Contador de visitas', icon: 'Eye', order: 9 },
       ],
     },
   ],
