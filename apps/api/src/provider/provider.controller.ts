@@ -299,14 +299,14 @@ export class ProviderController {
   @ApiOperation({
     summary: 'Listar sugerencias de mejoras de los clientes',
     description:
-      'Todas las sugerencias enviadas por usuarios de los tenants. Opcional: ?tenantId=... y ?status=PENDING|READ|DONE.',
+      'Todas las sugerencias enviadas por usuarios de los tenants (excluye solicitudes de activación DIAN, que se gestionan en Solicitudes DIAN). Opcional: ?tenantId=... y ?status=PENDING|READ|DONE.',
   })
   @ApiResponse({ status: 200, description: 'Lista de sugerencias.' })
   listFeedback(
     @Query('tenantId') tenantId?: string,
     @Query('status') status?: 'PENDING' | 'READ' | 'DONE',
   ) {
-    return this.feedbackService.findAll(tenantId, status);
+    return this.feedbackService.findAll(tenantId, status, true);
   }
 
   @Patch('feedback/:id')

@@ -33,10 +33,10 @@ export default function PlanRequiredPage() {
         <header className="text-center">
           <h1 className="text-2xl font-light tracking-tight text-foreground sm:text-3xl flex items-center justify-center gap-2">
             <Lock className="h-7 w-7 shrink-0 text-primary" aria-hidden />
-            M?dulo no incluido en tu plan
+            Módulo no incluido en tu plan
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            La secci?n &quot;{label}&quot; no est? disponible con tu plan actual.
+            La sección &quot;{label}&quot; no está disponible con tu plan actual.
             Contacta a tu administrador o cambia de plan para acceder.
           </p>
           {upgradeHint && (

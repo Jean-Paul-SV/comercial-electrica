@@ -43,7 +43,7 @@ const severityBorderClass: Record<string, string> = {
 
 export default function DashboardView() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, enabledModules } = useAuth();
   const [lowStockThreshold] = useLowStockThreshold();
   const dashboard = useDashboard({ lowStockThreshold });
   const actionable = useActionableIndicators({ days: 30, top: 10 });
@@ -464,7 +464,7 @@ export default function DashboardView() {
         </div>
       )}
 
-      {actionable.data !== undefined && (
+      {enabledModules.includes('advanced_reports') && actionable.data !== undefined && (
         <section className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 dark:bg-primary/10">
           <h2 className="text-sm font-medium text-foreground flex items-center gap-2">
             <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/15 text-primary">

@@ -1696,7 +1696,8 @@ export class ReportsService {
           title: 'Ventas hoy por debajo de lo habitual',
           insight: `Ventas de hoy ($${Math.round(todayTotal).toLocaleString()}) están por debajo del 50 % de la media diaria de los últimos 7 días ($${Math.round(avgDaily7).toLocaleString()}/día).`,
           metric: `$${Math.round(todayTotal).toLocaleString()} hoy`,
-          severity: 'medium',
+          // Usar severidad informativa para que se vea como las demás sugerencias (sin borde lateral de alerta).
+          severity: 'info',
           suggestedAction:
             'Revisar causas (horario, disponibilidad, promociones) o considerar campaña.',
           actionLabel: 'Ver ventas',
@@ -1706,9 +1707,10 @@ export class ReportsService {
         });
       }
 
-      // 6) Patrones de venta por empleado (ventas por usuario)
+      // 6) Patrones de venta por empleado (ventas por usuario) — solo ventas del tenant actual
       const salesByUser = await this.prisma.sale.findMany({
         where: {
+          tenantId,
           status: 'PAID',
           soldAt: soldAtRange,
           createdByUserId: { not: null },

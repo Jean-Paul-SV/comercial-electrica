@@ -41,7 +41,7 @@ export default function FeedbackPage() {
   };
 
   return (
-    <div className="space-y-10 max-w-3xl mx-auto">
+    <div className="space-y-10">
       <header className="flex items-center gap-4">
         <Button variant="ghost" size="icon" asChild className="shrink-0 rounded-lg">
           <Link href="/app">

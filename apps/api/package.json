@@ -20,6 +20,7 @@
     "prisma:migrate:reset": "dotenv -e ../../.env -- prisma migrate reset --force",
     "prisma:studio": "dotenv -e ../../.env -- prisma studio",
     "prisma:seed": "dotenv -e ../../.env -- prisma db seed",
+    "update-admin-password": "dotenv -e ../../.env -- npx ts-node -r tsconfig-paths/register scripts/update-admin-password.ts",
     "prisma:seed:local": "dotenv -e ../../.env.seed.local -- prisma db seed",
     "prisma:migrate:local": "dotenv -e ../../.env.seed.local -- prisma migrate deploy",
     "prisma:migrate:status": "dotenv -e ../../.env -- prisma migrate status",
@@ -32,7 +33,8 @@
     "test:e2e:serial": "jest --config ./test/jest-e2e.json --runInBand",
     "db:purge": "cd ../.. && node scripts/purgar-db-test.js",
     "rotate-dian-key": "ts-node scripts/rotate-dian-cert-key.ts",
-    "verify:tenant-isolation": "dotenv -e ../../.env -- ts-node scripts/verify-tenant-isolation.ts"
+    "verify:tenant-isolation": "dotenv -e ../../.env -- ts-node scripts/verify-tenant-isolation.ts",
+    "seed-tenant-sales": "dotenv -e ../../.env -- ts-node -r tsconfig-paths/register scripts/seed-tenant-sales.ts"
   },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"

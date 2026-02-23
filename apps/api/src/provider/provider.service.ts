@@ -715,8 +715,9 @@ export class ProviderService {
   }
 
   /**
-   * Lista las solicitudes de activación DIAN pendientes (empresas que cambiaron a plan con DIAN pero aún no han activado).
-   * Solo incluye tenants cuyo plan actual incluye el módulo electronic_invoicing.
+   * Lista las solicitudes de activación DIAN pendientes:
+   * 1) Empresas con DianConfig en PENDING (plan con DIAN).
+   * 2) Empresas que enviaron un feedback de tipo "solicitud de activación de facturación" y tienen plan con DIAN (por si aún no tienen DianConfig).
    */
   async listDianActivationRequests() {
     const configs = await this.prisma.dianConfig.findMany({
@@ -750,14 +751,13 @@ export class ProviderService {
       },
     });
 
-    // Filtrar solo tenants cuyo plan actual incluye DIAN
     const configsWithDianPlan = configs.filter((config) => {
       const plan = config.tenant.plan;
       if (!plan) return false;
       return plan.features.some((f) => f.moduleCode === DIAN_MODULE_CODE);
     });
 
-    return configsWithDianPlan.map((config) => ({
+    const fromConfig = configsWithDianPlan.map((config) => ({
       id: config.id,
       tenantId: config.tenantId,
       tenantName: config.tenant.name,
@@ -766,32 +766,94 @@ export class ProviderService {
       planSlug: config.tenant.plan?.slug ?? null,
       requestedAt: config.createdAt,
     }));
+
+    const tenantIdsFromConfig = new Set(fromConfig.map((r) => r.tenantId));
+
+    const dianFeedback = await this.prisma.tenantFeedback.findMany({
+      where: {
+        AND: [
+          { message: { contains: 'solicitud', mode: 'insensitive' } },
+          { message: { contains: 'activación', mode: 'insensitive' } },
+          { message: { contains: 'facturación', mode: 'insensitive' } },
+        ],
+      },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        tenant: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            plan: {
+              select: {
+                name: true,
+                slug: true,
+                features: { select: { moduleCode: true } },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const fromFeedback: Array<{
+      id: string;
+      tenantId: string;
+      tenantName: string;
+      tenantSlug: string;
+      planName: string;
+      planSlug: string | null;
+      requestedAt: Date;
+    }> = [];
+    const seenTenantIds = new Set(tenantIdsFromConfig);
+    for (const f of dianFeedback) {
+      if (seenTenantIds.has(f.tenantId)) continue;
+      const plan = f.tenant.plan;
+      if (!plan || !plan.features.some((fe) => fe.moduleCode === DIAN_MODULE_CODE)) continue;
+      seenTenantIds.add(f.tenantId);
+      fromFeedback.push({
+        id: `feedback-${f.id}`,
+        tenantId: f.tenantId,
+        tenantName: f.tenant.name,
+        tenantSlug: f.tenant.slug,
+        planName: plan.name,
+        planSlug: plan.slug,
+        requestedAt: f.createdAt,
+      });
+    }
+
+    return [...fromConfig, ...fromFeedback].sort(
+      (a, b) => new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime(),
+    );
   }
 
   /**
    * Marca la activación DIAN como completada (después de que el admin cobró y configuró el servicio).
+   * Si no existía DianConfig (solicitud solo por feedback), se crea con ACTIVATED para que no vuelva a listarse.
    */
   async markDianActivationAsCompleted(tenantId: string) {
     const config = await this.prisma.dianConfig.findUnique({
       where: { tenantId },
     });
 
-    if (!config) {
-      throw new NotFoundException(
-        'Configuración DIAN no encontrada para esta empresa.',
-      );
+    if (config) {
+      if (config.activationStatus === 'ACTIVATED') {
+        throw new BadRequestException(
+          'La activación DIAN ya está marcada como completada.',
+        );
+      }
+      await this.prisma.dianConfig.update({
+        where: { tenantId },
+        data: { activationStatus: 'ACTIVATED' },
+      });
+    } else {
+      await this.prisma.dianConfig.create({
+        data: {
+          tenantId,
+          activationStatus: 'ACTIVATED',
+        },
+      });
     }
-
-    if (config.activationStatus === 'ACTIVATED') {
-      throw new BadRequestException(
-        'La activación DIAN ya está marcada como completada.',
-      );
-    }
-
-    await this.prisma.dianConfig.update({
-      where: { tenantId },
-      data: { activationStatus: 'ACTIVATED' },
-    });
 
     return { success: true };
   }

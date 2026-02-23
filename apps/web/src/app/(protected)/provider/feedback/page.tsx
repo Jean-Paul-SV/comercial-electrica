@@ -48,7 +48,7 @@ export default function ProviderFeedbackPage() {
               Sugerencias de clientes
             </h1>
             <p className="mt-2 text-sm text-muted-foreground max-w-xl">
-              Mejoras e ideas enviadas por usuarios de las empresas. Marca como leída o resuelta.
+              Mejoras e ideas que los usuarios quieren para el sistema. Marca como leída o resuelta. Para solicitudes de activación de factura electrónica, usa Solicitudes DIAN.
             </p>
           </div>
         </div>
