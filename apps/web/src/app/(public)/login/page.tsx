@@ -29,6 +29,7 @@ export default function LoginPage() {
   const auth = useAuth();
   const loginMutation = useLogin();
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
 
   const {
     register,
@@ -45,19 +46,24 @@ export default function LoginPage() {
   const onSubmit = (values: LoginFormValues) => {
     loginMutation.mutate(values, {
       onSuccess: (data) => {
-        auth.login(data.accessToken, data.mustChangePassword);
+        auth.login(data.accessToken, data.mustChangePassword, rememberMe);
         router.replace(data.isPlatformAdmin ? '/provider' : '/app');
       },
     });
   };
 
+  const authorName = typeof process.env.NEXT_PUBLIC_ORION_AUTHOR === 'string' && process.env.NEXT_PUBLIC_ORION_AUTHOR.trim()
+    ? process.env.NEXT_PUBLIC_ORION_AUTHOR.trim()
+    : null;
+
   return (
-    <main className="relative min-h-screen flex items-center justify-center p-6 pt-[20vh] pb-[15vh] sm:pt-[18vh] sm:pb-20 overflow-hidden">
+    <main className="relative min-h-screen flex items-center justify-center p-6 overflow-hidden">
       {/* Fondo por defecto oscuro (sin blanco); el video se monta solo en cliente */}
       <div className="absolute inset-0 z-0 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900" aria-hidden />
       <LoginVideoBackground />
 
-      <div className="relative z-10 w-full max-w-md rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] overflow-hidden dark:border-[#1F2937]">
+      <div className="relative z-10 flex flex-col items-center w-full max-w-md flex-shrink-0">
+        <div className="w-full rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] overflow-hidden dark:border-[#1F2937]">
         {/* Línea de acento superior */}
         <div className="h-1 bg-gradient-to-r from-primary to-primary/80" />
 
@@ -133,6 +139,20 @@ export default function LoginPage() {
               )}
             </div>
 
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="rememberMe"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className="h-4 w-4 rounded border-input bg-background text-primary focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                disabled={loginMutation.isPending}
+              />
+              <Label htmlFor="rememberMe" className="text-sm font-normal text-muted-foreground cursor-pointer">
+                Mantener perfil iniciado
+              </Label>
+            </div>
+
             {loginMutation.isError && (
               <p className="text-sm text-destructive rounded-lg bg-destructive/10 px-3 py-2">
                 {isNetworkError(loginMutation.error)
@@ -163,6 +183,11 @@ export default function LoginPage() {
             </p>
           </div>
         </div>
+        </div>
+
+        <footer className="w-full text-center mt-8 pb-4 text-xs text-muted-foreground/80">
+          © {new Date().getFullYear()} {authorName ? `Orion by ${authorName}.` : 'Orion.'} Todos los derechos reservados.
+        </footer>
       </div>
     </main>
   );

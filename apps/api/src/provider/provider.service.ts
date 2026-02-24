@@ -886,7 +886,9 @@ export class ProviderService {
       }),
     ]);
 
-    const tenantIds = byTenantRows.map((r) => r.tenantId).filter(Boolean) as string[];
+    type TenantRow = { tenantId: string | null; _count: { id: number } };
+    type PathRow = { path: string; _count: { id: number } };
+    const tenantIds = (byTenantRows as TenantRow[]).map((r: TenantRow) => r.tenantId).filter(Boolean) as string[];
     const tenants =
       tenantIds.length > 0
         ? await this.prisma.tenant.findMany({
@@ -898,13 +900,13 @@ export class ProviderService {
 
     return {
       total,
-      byTenant: byTenantRows.map((r) => ({
+      byTenant: (byTenantRows as TenantRow[]).map((r: TenantRow) => ({
         tenantId: r.tenantId,
         tenantName: r.tenantId ? tenantMap.get(r.tenantId)?.name ?? null : null,
         tenantSlug: r.tenantId ? tenantMap.get(r.tenantId)?.slug ?? null : null,
         count: r._count.id,
       })),
-      byPath: byPathRows.map((r) => ({
+      byPath: (byPathRows as PathRow[]).map((r: PathRow) => ({
         path: r.path,
         count: r._count.id,
       })),

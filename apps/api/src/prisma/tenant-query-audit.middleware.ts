@@ -1,4 +1,4 @@
-import { Logger } from '@nestjs/common';
+import { ForbiddenException, Logger } from '@nestjs/common';
 import { getAuditContext } from '../common/audit/audit-context';
 
 /**
@@ -43,13 +43,14 @@ function hasTenantIdInWhere(args: { where?: Record<string, unknown> }): boolean 
 }
 
 /**
- * Middleware de Prisma que registra cuando se ejecuta una query sobre un modelo
- * con alcance por tenant sin filtrar por tenantId (riesgo de fuga de datos).
+ * Middleware de Prisma que registra o bloquea queries sobre modelos con alcance por tenant
+ * sin filtrar por tenantId (riesgo de fuga de datos).
  * Solo aplica cuando el request tiene tenantId (usuario de tenant autenticado).
- * En desarrollo loguea; en producción solo loguea (AlertService podría añadirse después).
+ * En desarrollo: solo loguea warning. En producción: lanza ForbiddenException.
  */
 export function useTenantQueryAuditMiddleware(prisma: { $use: (fn: (params: any, next: (params: any) => Promise<any>) => Promise<any>) => void }) {
   const logger = new Logger('TenantQueryAudit');
+  const isProd = process.env.NODE_ENV === 'production';
 
   prisma.$use(async (params, next) => {
     if (!ACTIONS_TO_CHECK.has(params.action) || !TENANT_SCOPED_MODELS.has(params.model)) {
@@ -64,9 +65,13 @@ export function useTenantQueryAuditMiddleware(prisma: { $use: (fn: (params: any,
     }
 
     if (!hasTenantIdInWhere(params.args)) {
-      logger.warn(
-        `Query sin tenantId: model=${params.model} action=${params.action} requestTenantId=${requestTenantId} requestId=${ctx?.requestId ?? 'n/a'}. Revisar aislamiento multi-tenant.`,
-      );
+      const msg = `Query sin tenantId: model=${params.model} action=${params.action} requestTenantId=${requestTenantId} requestId=${ctx?.requestId ?? 'n/a'}`;
+      if (isProd) {
+        throw new ForbiddenException(
+          'Operación no permitida: falta alcance por tenant.',
+        );
+      }
+      logger.warn(`${msg}. Revisar aislamiento multi-tenant.`);
     }
 
     return next(params);

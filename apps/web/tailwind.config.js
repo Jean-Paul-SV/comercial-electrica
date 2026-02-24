@@ -83,6 +83,22 @@ module.exports = {
           from: { opacity: "0", transform: "translateY(8px)" },
           to: { opacity: "1", transform: "translateY(0)" },
         },
+        "page-enter": {
+          from: { opacity: "0", transform: "translateY(8px)" },
+          to: { opacity: "1", transform: "translateY(0)" },
+        },
+        "modal-in": {
+          from: { opacity: "0", transform: "scale(0.98)" },
+          to: { opacity: "1", transform: "scale(1)" },
+        },
+        "dropdown-in": {
+          from: { opacity: "0", transform: "translateY(-4px)" },
+          to: { opacity: "1", transform: "translateY(0)" },
+        },
+        "row-enter": {
+          from: { backgroundColor: "hsl(var(--primary) / 0.08)" },
+          to: { backgroundColor: "transparent" },
+        },
         "slide-in-right": {
           from: { transform: "translateX(100%)" },
           to: { transform: "translateX(0)" },
@@ -95,13 +111,20 @@ module.exports = {
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
-        "fade-in": "fade-in 0.3s ease-out",
-        "fade-in-up": "fade-in-up 0.4s ease-out",
+        "fade-in": "fade-in 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
+        "fade-in-up": "fade-in-up 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
+        "page-enter": "page-enter 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
+        "modal-in": "modal-in 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
+        "dropdown-in": "dropdown-in 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
+        "row-enter": "row-enter 0.3s ease-out",
         "slide-in-right": "slide-in-right 0.25s ease-out",
         "slide-out-right": "slide-out-right 0.2s ease-out",
       },
       transitionDuration: {
         400: "400ms",
+      },
+      transitionTimingFunction: {
+        "out-apple": "cubic-bezier(0.16, 1, 0.3, 1)",
       },
     },
   },

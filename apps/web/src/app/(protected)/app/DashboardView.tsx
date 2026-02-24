@@ -91,7 +91,7 @@ export default function DashboardView() {
 
   return (
     <div className="space-y-10 sm:space-y-12">
-      <header className="pt-1 pb-2">
+      <header className="pt-1 pb-2 animate-fade-in">
         <h1 className="text-2xl font-light tracking-tight text-foreground sm:text-3xl">
           Dashboard
         </h1>
@@ -101,7 +101,7 @@ export default function DashboardView() {
       </header>
 
       {d?.inventory?.lowStockCount != null && d.inventory.lowStockCount > 0 && (
-        <div className="relative overflow-hidden rounded-2xl border border-border/50 bg-muted/30 dark:bg-warning/5 px-6 py-4 shadow-sm">
+        <div className="relative overflow-hidden rounded-2xl border border-border/50 bg-muted/30 dark:bg-warning/5 px-6 py-4 shadow-sm animate-fade-in">
           <div className="absolute left-0 top-0 bottom-0 w-1 bg-warning/60 rounded-l-2xl" aria-hidden />
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between pl-4">
             <div className="flex items-start gap-4 min-w-0 flex-1">
@@ -127,7 +127,7 @@ export default function DashboardView() {
       )}
 
       {operationalState.data?.alerts && operationalState.data.alerts.length > 0 && (
-        <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] overflow-hidden dark:border-[#1F2937]">
+        <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] overflow-hidden dark:border-[#1F2937] animate-fade-in">
           <div className="p-6 pb-3">
             <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground flex items-center gap-2">
               <AlertTriangle className="h-4 w-4" />
@@ -171,7 +171,7 @@ export default function DashboardView() {
       )}
 
       {showProgressPanel && onboardingData && (
-        <div className="rounded-2xl border border-border/50 bg-muted/20 p-5 shadow-sm dark:bg-[#111827] dark:border-[#1F2937] sm:p-6">
+        <div className="rounded-2xl border border-border/50 bg-muted/20 p-5 shadow-sm dark:bg-[#111827] dark:border-[#1F2937] sm:p-6 animate-fade-in">
           <div className="pb-2">
             <div className="flex items-center justify-between">
               <p className="text-sm font-medium text-muted-foreground">
@@ -253,7 +253,7 @@ export default function DashboardView() {
       )}
 
       {trendingProducts.data?.items && trendingProducts.data.items.length > 0 && (
-        <div className="flex h-[320px] min-h-[280px] w-full flex-col overflow-hidden rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] dark:border-[#1F2937]">
+        <div className="flex h-[320px] min-h-[280px] w-full flex-col overflow-hidden rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] dark:border-[#1F2937] animate-fade-in">
           <div className="shrink-0 p-6 pb-2">
             <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground flex items-center gap-2">
               <TrendingUp className="h-4 w-4 text-primary" />
@@ -291,7 +291,7 @@ export default function DashboardView() {
       )}
 
       {d && (
-        <div className="grid grid-cols-2 gap-6 md:grid-cols-4">
+        <div className="grid grid-cols-2 gap-6 md:grid-cols-4 animate-fade-in">
           {d.sales?.today?.total != null && (
             <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] dark:border-[#1F2937]">
               <div className="pb-1 pt-6 px-6">
@@ -393,7 +393,7 @@ export default function DashboardView() {
       )}
 
       {d && (d.inventory?.lowStockCount != null || d.cash?.openSessions != null || d.quotes?.pending != null) && (
-        <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] overflow-visible dark:border-[#1F2937]">
+        <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] overflow-visible dark:border-[#1F2937] animate-fade-in">
           <div className="pb-2 pt-6 px-6">
             <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
               Indicadores
@@ -419,7 +419,7 @@ export default function DashboardView() {
         </div>
       )}
       {!dashboardSummary.isLoading && dashboardSummary.data?.summary && (
-        <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] overflow-hidden dark:border-[#1F2937]">
+        <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] overflow-hidden dark:border-[#1F2937] animate-fade-in">
           <div className="pb-2 pt-6 px-6">
             <div className="flex items-center justify-between gap-2">
               <p className="text-xs font-medium uppercase tracking-wider text-foreground">
@@ -465,7 +465,7 @@ export default function DashboardView() {
       )}
 
       {enabledModules.includes('advanced_reports') && actionable.data !== undefined && (
-        <section className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 dark:bg-primary/10">
+        <section className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 dark:bg-primary/10 animate-fade-in">
           <h2 className="text-sm font-medium text-foreground flex items-center gap-2">
             <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/15 text-primary">
               <Lightbulb className="h-4 w-4" />
@@ -539,87 +539,33 @@ export default function DashboardView() {
       )}
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        <Link href="/sales">
-          <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] hover:shadow-md transition-shadow duration-200 cursor-pointer h-full p-6 dark:border-[#1F2937]">
-            <p className="flex items-center gap-2 text-base font-medium text-foreground">
-              <ShoppingCart className="h-4 w-4" />
-              Ventas
-            </p>
-            <p className="text-sm text-muted-foreground mt-1">Listado y creación de ventas</p>
-          </div>
-        </Link>
-        <Link href="/products">
-          <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] hover:shadow-md transition-shadow duration-200 cursor-pointer h-full p-6 dark:border-[#1F2937]">
-            <p className="flex items-center gap-2 text-base font-medium text-foreground">
-              <Package className="h-4 w-4" />
-              Productos
-            </p>
-            <p className="text-sm text-muted-foreground mt-1">Catálogo y categorías</p>
-          </div>
-        </Link>
-        <Link href="/customers">
-          <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] hover:shadow-md transition-shadow duration-200 cursor-pointer h-full p-6 dark:border-[#1F2937]">
-            <p className="flex items-center gap-2 text-base font-medium text-foreground">
-              <Users className="h-4 w-4" />
-              Clientes
-            </p>
-            <p className="text-sm text-muted-foreground mt-1">Gestión de clientes</p>
-          </div>
-        </Link>
-        <Link href="/cash">
-          <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] hover:shadow-md transition-shadow duration-200 cursor-pointer h-full p-6 dark:border-[#1F2937]">
-            <p className="flex items-center gap-2 text-base font-medium text-foreground">
-              <Wallet className="h-4 w-4" />
-              Caja
-            </p>
-            <p className="text-sm text-muted-foreground mt-1">Sesiones y movimientos</p>
-          </div>
-        </Link>
-        <Link href="/quotes">
-          <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] hover:shadow-md transition-shadow duration-200 cursor-pointer h-full p-6 dark:border-[#1F2937]">
-            <p className="flex items-center gap-2 text-base font-medium text-foreground">
-              <FileText className="h-4 w-4" />
-              Cotizaciones
-            </p>
-            <p className="text-sm text-muted-foreground mt-1">Crear y convertir cotizaciones</p>
-          </div>
-        </Link>
-        <Link href="/inventory">
-          <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] hover:shadow-md transition-shadow duration-200 cursor-pointer h-full p-6 dark:border-[#1F2937]">
-            <p className="flex items-center gap-2 text-base font-medium text-foreground">
-              <Boxes className="h-4 w-4" />
-              Inventario
-            </p>
-            <p className="text-sm text-muted-foreground mt-1">Movimientos de stock</p>
-          </div>
-        </Link>
-        <Link href="/suppliers">
-          <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] hover:shadow-md transition-shadow duration-200 cursor-pointer h-full p-6 dark:border-[#1F2937]">
-            <p className="flex items-center gap-2 text-base font-medium text-foreground">
-              <Truck className="h-4 w-4" />
-              Proveedores
-            </p>
-            <p className="text-sm text-muted-foreground mt-1">Gestión de proveedores</p>
-          </div>
-        </Link>
-        <Link href="/supplier-invoices">
-          <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] hover:shadow-md transition-shadow duration-200 cursor-pointer h-full p-6 dark:border-[#1F2937]">
-            <p className="flex items-center gap-2 text-base font-medium text-foreground">
-              <FileCheck className="h-4 w-4" />
-              Facturas proveedor
-            </p>
-            <p className="text-sm text-muted-foreground mt-1">Cuentas por pagar</p>
-          </div>
-        </Link>
-        <Link href="/reports">
-          <div className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] hover:shadow-md transition-shadow duration-200 cursor-pointer h-full p-6 dark:border-[#1F2937]">
-            <p className="flex items-center gap-2 text-base font-medium text-foreground">
-              <LayoutDashboard className="h-4 w-4" />
-              Reportes
-            </p>
-            <p className="text-sm text-muted-foreground mt-1">Ventas, inventario, caja, clientes</p>
-          </div>
-        </Link>
+        {[
+          { href: '/sales', icon: ShoppingCart, label: 'Ventas', desc: 'Listado y creación de ventas' },
+          { href: '/products', icon: Package, label: 'Productos', desc: 'Catálogo y categorías' },
+          { href: '/customers', icon: Users, label: 'Clientes', desc: 'Gestión de clientes' },
+          { href: '/cash', icon: Wallet, label: 'Caja', desc: 'Sesiones y movimientos' },
+          { href: '/quotes', icon: FileText, label: 'Cotizaciones', desc: 'Crear y convertir cotizaciones' },
+          { href: '/inventory', icon: Boxes, label: 'Inventario', desc: 'Movimientos de stock' },
+          { href: '/suppliers', icon: Truck, label: 'Proveedores', desc: 'Gestión de proveedores' },
+          { href: '/supplier-invoices', icon: FileCheck, label: 'Facturas proveedor', desc: 'Cuentas por pagar' },
+          { href: '/reports', icon: LayoutDashboard, label: 'Reportes', desc: 'Ventas, inventario, caja, clientes' },
+        ].map((item, idx) => {
+          const Icon = item.icon;
+          return (
+            <Link key={item.href} href={item.href}>
+              <div
+                className="rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] hover:shadow-md transition-shadow duration-200 cursor-pointer h-full p-6 dark:border-[#1F2937] animate-fade-in-up"
+                style={{ animationDelay: `${idx * 40}ms`, animationFillMode: 'backwards' } as React.CSSProperties}
+              >
+                <p className="flex items-center gap-2 text-base font-medium text-foreground">
+                  <Icon className="h-4 w-4" />
+                  {item.label}
+                </p>
+                <p className="text-sm text-muted-foreground mt-1">{item.desc}</p>
+              </div>
+            </Link>
+          );
+        })}
       </div>
     </div>
   );

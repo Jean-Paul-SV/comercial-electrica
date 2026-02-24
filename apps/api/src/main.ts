@@ -300,19 +300,22 @@ async function bootstrap() {
     .addTag('health', 'Health check y estado del sistema')
     .build();
 
-  const document = SwaggerModule.createDocument(app, swaggerConfig);
-  SwaggerModule.setup('api/docs', app, document, {
-    swaggerOptions: {
-      persistAuthorization: true, // Mantener el token después de recargar
-    },
-  });
+  // Swagger solo en no producción para no exponer estructura de la API
+  if (process.env.NODE_ENV !== 'production') {
+    const document = SwaggerModule.createDocument(app, swaggerConfig);
+    SwaggerModule.setup('api/docs', app, document, {
+      swaggerOptions: {
+        persistAuthorization: true, // Mantener el token después de recargar
+      },
+    });
+    console.log(
+      `📚 Documentación Swagger: http://localhost:${process.env.PORT ?? 3000}/api/docs`,
+    );
+  }
 
   await app.listen(process.env.PORT ?? 3000);
   console.log(
     `🚀 API corriendo en: http://localhost:${process.env.PORT ?? 3000}`,
-  );
-  console.log(
-    `📚 Documentación Swagger: http://localhost:${process.env.PORT ?? 3000}/api/docs`,
   );
 }
 void bootstrap();

@@ -6,6 +6,11 @@ import { getMe } from '@features/auth/api';
 
 const TOKEN_KEY = 'ce_access_token';
 
+function getStorage(remember: boolean): Storage {
+  if (typeof window === 'undefined') return localStorage;
+  return remember ? localStorage : sessionStorage;
+}
+
 /** Email del admin de plataforma; si coincide, se trata como isPlatformAdmin aunque la API no lo indique. */
 const PLATFORM_ADMIN_EMAIL = 'platform@proveedor.local';
 
@@ -28,7 +33,7 @@ export type AuthState = {
   /** Si true, el usuario debe cambiar la contraseña (ej. temporal). */
   mustChangePassword: boolean;
   isAuthenticated: boolean;
-  login: (token: string, mustChangePassword?: boolean) => void;
+  login: (token: string, mustChangePassword?: boolean, rememberMe?: boolean) => void;
   logout: () => void;
   clearMustChangePassword: () => void;
   refreshMe: () => Promise<void>;
@@ -38,12 +43,12 @@ const AuthContext = createContext<AuthState | null>(null);
 
 function readStoredToken(): string | null {
   if (typeof window === 'undefined') return null;
-  const stored = localStorage.getItem(TOKEN_KEY);
-  if (!stored || isJwtExpired(stored)) {
-    if (stored) localStorage.removeItem(TOKEN_KEY);
-    return null;
+  for (const storage of [localStorage, sessionStorage]) {
+    const stored = storage.getItem(TOKEN_KEY);
+    if (stored && !isJwtExpired(stored)) return stored;
+    if (stored) storage.removeItem(TOKEN_KEY);
   }
-  return stored;
+  return null;
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -143,6 +148,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Errores de red o 5xx no deben sacar al usuario.
         if (err?.status === 401) {
           localStorage.removeItem(TOKEN_KEY);
+          sessionStorage.removeItem(TOKEN_KEY);
           setToken(null);
           setUser(null);
           setPermissions([]);
@@ -169,13 +175,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isPlatformAdmin,
       mustChangePassword,
       isAuthenticated: Boolean(token && user),
-      login: (newToken: string, mustChange = false) => {
-        localStorage.setItem(TOKEN_KEY, newToken);
+      login: (newToken: string, mustChange = false, rememberMe = true) => {
+        localStorage.removeItem(TOKEN_KEY);
+        sessionStorage.removeItem(TOKEN_KEY);
+        getStorage(rememberMe).setItem(TOKEN_KEY, newToken);
         setToken(newToken);
         setMustChangePassword(mustChange);
       },
       logout: () => {
         localStorage.removeItem(TOKEN_KEY);
+        sessionStorage.removeItem(TOKEN_KEY);
         setToken(null);
         setUser(null);
         setPermissions([]);

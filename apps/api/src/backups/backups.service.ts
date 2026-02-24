@@ -591,20 +591,22 @@ export class BackupsService {
   /**
    * Obtiene un backup por ID. Si tenantId está definido, solo si pertenece a ese tenant.
    * Solo devuelve backups activos (no eliminados con soft delete).
+   * Defensa en profundidad: filtra por tenantId en la query para no cargar datos de otro tenant.
    */
   async getBackup(id: string, tenantId?: string | null) {
-    const backup = await this.prisma.backupRun.findFirst({
-      where: { id, deletedAt: null },
-    });
+    const where: {
+      id: string;
+      deletedAt: null;
+      tenantId?: string;
+      scope?: 'TENANT';
+    } = { id, deletedAt: null };
+    if (typeof tenantId === 'string' && tenantId.trim() !== '') {
+      where.tenantId = tenantId;
+      where.scope = 'TENANT';
+    }
+    const backup = await this.prisma.backupRun.findFirst({ where });
     if (!backup) {
       throw new NotFoundException(`Backup ${id} no encontrado`);
-    }
-    if (typeof tenantId === 'string' && tenantId.trim() !== '') {
-      if (backup.scope !== 'TENANT' || backup.tenantId !== tenantId) {
-        throw new ForbiddenException(
-          'No tienes permiso para acceder a este backup.',
-        );
-      }
     }
     return backup;
   }

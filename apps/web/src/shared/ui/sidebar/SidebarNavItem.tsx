@@ -40,7 +40,14 @@ export function SidebarNavItem({ item, collapsed = false, isActive: isActiveProp
         aria-disabled
       >
         {Icon && <Icon className="h-4 w-4 shrink-0" />}
-        {!collapsed && item.label}
+        <span
+          className={cn(
+            'truncate transition-opacity duration-200 ease-out',
+            collapsed && 'opacity-0 max-w-0 overflow-hidden'
+          )}
+        >
+          {item.label}
+        </span>
       </span>
     );
   }
@@ -52,7 +59,14 @@ export function SidebarNavItem({ item, collapsed = false, isActive: isActiveProp
       aria-current={active ? 'page' : undefined}
     >
       {Icon && <Icon className="h-4 w-4 shrink-0" />}
-      {!collapsed && <span className="truncate">{item.label}</span>}
+      <span
+        className={cn(
+          'truncate transition-opacity duration-200 ease-out',
+          collapsed && 'opacity-0 max-w-0 overflow-hidden'
+        )}
+      >
+        {item.label}
+      </span>
     </Link>
   );
 }

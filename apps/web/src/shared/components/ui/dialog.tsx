@@ -130,7 +130,7 @@ const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps>(
     return createPortal(
       <>
         <div
-          className="fixed inset-0 z-50 bg-black/30 backdrop-blur-md animate-fade-in"
+          className="fixed inset-0 z-50 bg-black/30 backdrop-blur-sm transition-opacity duration-200 animate-fade-in"
           aria-hidden
           onPointerDown={handleOverlayPointerDown}
         />
@@ -139,7 +139,7 @@ const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps>(
           role="dialog"
           aria-modal
           className={cn(
-            'fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg max-h-[90vh] overflow-y-auto translate-x-[-50%] translate-y-[-50%] gap-4 rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] p-6 dark:border-[#1F2937] animate-fade-in-up',
+            'fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg max-h-[90vh] overflow-y-auto translate-x-[-50%] translate-y-[-50%] gap-4 rounded-2xl border border-border/50 bg-card shadow-sm shadow-black/[0.03] p-6 dark:border-[#1F2937] animate-modal-in [animation-fill-mode:backwards]',
             className
           )}
           onClick={(e) => e.stopPropagation()}
