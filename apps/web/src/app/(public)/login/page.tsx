@@ -112,7 +112,7 @@ export default function LoginPage() {
                 </Label>
                 <Link
                   href="/forgot-password"
-                  className="text-xs text-muted-foreground hover:text-primary transition-colors underline underline-offset-2"
+                  className="text-xs text-muted-foreground hover:text-primary transition-colors underline underline-offset-2 px-1 py-1 -mx-1 -my-1 rounded"
                 >
                   ¿Olvidaste tu contraseña?
                 </Link>
@@ -173,13 +173,13 @@ export default function LoginPage() {
               {loginMutation.isPending ? 'Accediendo…' : 'Iniciar sesión'}
             </Button>
           </form>
-          <div className="mt-6 pt-4 border-t border-border/60 text-center text-xs text-muted-foreground space-y-1">
-            <p className="font-medium text-foreground/80">¿Aún no eres cliente de Orion?</p>
+          <div className="mt-6 pt-4 border-t border-border/60 text-center text-xs text-foreground/80 space-y-1">
+            <p className="font-medium text-foreground/90">¿Aún no eres cliente de Orion?</p>
             <p>
               Conoce cómo adquirir nuestros servicios escribiendo a{' '}
               <a
                 href="mailto:soporte@orion-app.cloud?subject=Quiero%20adquirir%20Orion"
-                className="text-primary hover:underline underline-offset-2"
+                className="text-primary underline hover:underline underline-offset-2"
               >
                 soporte@orion-app.cloud
               </a>
@@ -189,7 +189,7 @@ export default function LoginPage() {
         </div>
         </div>
 
-        <footer className="w-full text-center mt-8 pb-4 text-xs text-muted-foreground/80">
+        <footer className="w-full text-center mt-8 pb-4 text-xs text-foreground/70">
           © {new Date().getFullYear()} {authorName ? `Orion by ${authorName}.` : 'Orion.'} Todos los derechos reservados.
         </footer>
       </div>
