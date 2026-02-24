@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -15,7 +16,10 @@ import { Input } from '@shared/components/ui/input';
 import { Label } from '@shared/components/ui/label';
 import { OrionLogo } from '@shared/ui/OrionLogo';
 
-import { LoginVideoBackground } from './LoginVideoBackground';
+const LoginVideoBackground = dynamic(
+  () => import('./LoginVideoBackground').then((m) => m.LoginVideoBackground),
+  { ssr: false, loading: () => null },
+);
 
 const loginSchema = z.object({
   email: z.string().email('Email inválido'),
@@ -76,7 +80,7 @@ export default function LoginPage() {
               Orion
             </p>
           </div>
-          <p className="text-center text-muted-foreground text-sm">
+          <p className="text-center text-foreground/90 text-sm">
             Acceso al sistema de gestión
           </p>
         </div>

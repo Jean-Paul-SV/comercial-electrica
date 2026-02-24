@@ -21,7 +21,7 @@ export function LoginVideoBackground() {
   }, []);
 
   return (
-    <div className="absolute inset-0 z-0 overflow-hidden" aria-hidden>
+    <div className="absolute inset-0 z-0 overflow-hidden hidden sm:block" aria-hidden>
       {/* Video de fondo: muteado + playsInline para que los navegadores permitan autoplay */}
       {!videoError && (
         <video
