@@ -8,15 +8,13 @@ import './globals.css';
 export const metadata = {
   title: 'Orion',
   description: 'Gestión comercial: ventas, inventario, facturación electrónica.',
+  applicationName: 'Orion',
+  manifest: '/manifest.json',
   icons: {
-    icon: [
-      { url: '/icon.svg', type: 'image/svg+xml' },
-    ],
-    apple: [
-      { url: '/icon.svg', type: 'image/svg+xml' },
-    ],
+    icon: [{ url: '/icon.svg', type: 'image/svg+xml' }],
+    apple: [{ url: '/icon.svg', type: 'image/svg+xml' }],
   },
-  // Mejor experiencia en móvil: pantalla completa y barra de estado
+  // Mejor experiencia en móvil / PWA: pantalla completa y barra de estado
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',

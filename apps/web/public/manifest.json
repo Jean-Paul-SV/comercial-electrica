@@ -1,0 +1,112 @@
+{
+  "id": "/?pwa=orion",
+  "name": "Orion \u2014 Gestión Comercial",
+  "short_name": "Orion",
+  "description": "Gestión comercial: ventas, inventario, facturación electrónica.",
+  "start_url": "/?pwa=orion",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone"],
+  "orientation": "portrait",
+  "theme_color": "#0B0F1A",
+  "background_color": "#0B0F1A",
+  "categories": ["business", "productivity"],
+  "lang": "es",
+  "dir": "ltr",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Ventas",
+      "short_name": "Ventas",
+      "description": "Ir al módulo de ventas.",
+      "url": "/sales",
+      "icons": [
+        {
+          "src": "/icons/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png",
+          "purpose": "any"
+        }
+      ]
+    },
+    {
+      "name": "Inventario",
+      "short_name": "Inventario",
+      "description": "Ver el inventario de productos.",
+      "url": "/inventory",
+      "icons": [
+        {
+          "src": "/icons/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png",
+          "purpose": "any"
+        }
+      ]
+    },
+    {
+      "name": "Facturación",
+      "short_name": "Facturación",
+      "description": "Ver facturas y documentos electrónicos.",
+      "url": "/invoices",
+      "icons": [
+        {
+          "src": "/icons/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png",
+          "purpose": "any"
+        }
+      ]
+    },
+    {
+      "name": "Caja",
+      "short_name": "Caja",
+      "description": "Consultar movimientos de caja.",
+      "url": "/cash",
+      "icons": [
+        {
+          "src": "/icons/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png",
+          "purpose": "any"
+        }
+      ]
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshots/dashboard-1280x720.png",
+      "sizes": "1280x720",
+      "type": "image/png"
+    },
+    {
+      "src": "/screenshots/sales-list-750x1334.png",
+      "sizes": "750x1334",
+      "type": "image/png"
+    },
+    {
+      "src": "/screenshots/inventory-750x1334.png",
+      "sizes": "750x1334",
+      "type": "image/png"
+    }
+  ],
+  "prefer_related_applications": false
+}
