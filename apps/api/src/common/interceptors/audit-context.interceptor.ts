@@ -19,7 +19,7 @@ export class AuditContextInterceptor implements NestInterceptor {
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     const req = context
       .switchToHttp()
-      .getRequest<Request & { user?: { tenantId?: string | null } }>();
+      .getRequest<Request & { user?: { tenantId?: string | null; isPlatformAdmin?: boolean } }>();
     const requestId = (req.headers['x-request-id'] as string) || randomUUID();
     const ip =
       (req.ip as string) ||
@@ -28,8 +28,9 @@ export class AuditContextInterceptor implements NestInterceptor {
       undefined;
     const userAgent = (req.headers['user-agent'] as string)?.slice(0, 500);
     const tenantId = req.user?.tenantId ?? undefined;
+    const isPlatformAdmin = req.user?.isPlatformAdmin === true;
 
-    const auditContext = { requestId, ip, userAgent, tenantId };
+    const auditContext = { requestId, ip, userAgent, tenantId, isPlatformAdmin };
 
     return new Observable((subscriber) => {
       runWithAuditContext(auditContext, () => {

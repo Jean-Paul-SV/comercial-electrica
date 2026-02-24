@@ -1,15 +1,16 @@
 import { AsyncLocalStorage } from 'async_hooks';
 
 /**
- * Contexto de auditoría por request: requestId, ip, userAgent, tenantId.
- * Se establece en AuditContextInterceptor y se lee en AuditService.
- * tenantId se rellena cuando el request es autenticado (tras TenantContextInterceptor).
+ * Contexto de auditoría por request: requestId, ip, userAgent, tenantId, isPlatformAdmin.
+ * Se establece en AuditContextInterceptor y se lee en AuditService y en el middleware de tenant.
+ * isPlatformAdmin permite que el middleware de tenant permita queries sin tenantId (panel proveedor).
  */
 export interface AuditContextData {
   requestId: string;
   ip?: string;
   userAgent?: string;
   tenantId?: string | null;
+  isPlatformAdmin?: boolean;
 }
 
 const auditStorage = new AsyncLocalStorage<AuditContextData>();

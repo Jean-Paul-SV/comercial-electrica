@@ -59,7 +59,11 @@ export function useTenantQueryAuditMiddleware(prisma: { $use: (fn: (params: any,
 
     const ctx = getAuditContext();
     const requestTenantId = ctx?.tenantId;
-    // Si no hay tenant en el contexto, puede ser platform admin o request no autenticado: no auditar
+    // Admins de plataforma pueden hacer queries sin tenantId (panel proveedor: listar todos los backups, etc.)
+    if (ctx?.isPlatformAdmin === true) {
+      return next(params);
+    }
+    // Si no hay tenant en el contexto, puede ser request no autenticado: no auditar
     if (requestTenantId == null || requestTenantId === '') {
       return next(params);
     }
