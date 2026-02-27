@@ -56,9 +56,14 @@ export default function LoginPage() {
     });
   };
 
-  const authorName = typeof process.env.NEXT_PUBLIC_ORION_AUTHOR === 'string' && process.env.NEXT_PUBLIC_ORION_AUTHOR.trim()
-    ? process.env.NEXT_PUBLIC_ORION_AUTHOR.trim()
-    : null;
+  const authorName =
+    typeof process.env.NEXT_PUBLIC_ORION_AUTHOR === 'string' && process.env.NEXT_PUBLIC_ORION_AUTHOR.trim()
+      ? process.env.NEXT_PUBLIC_ORION_AUTHOR.trim()
+      : null;
+  const authorContact =
+    typeof process.env.NEXT_PUBLIC_ORION_AUTHOR_CONTACT === 'string' && process.env.NEXT_PUBLIC_ORION_AUTHOR_CONTACT.trim()
+      ? process.env.NEXT_PUBLIC_ORION_AUTHOR_CONTACT.trim()
+      : null;
 
   return (
     <main className="relative min-h-screen flex items-center justify-center p-6 overflow-hidden">
@@ -189,8 +194,25 @@ export default function LoginPage() {
         </div>
         </div>
 
-        <footer className="w-full text-center mt-8 pb-4 text-xs text-foreground/70">
-          © {new Date().getFullYear()} {authorName ? `Orion by ${authorName}.` : 'Orion.'} Todos los derechos reservados.
+        <footer className="w-full text-center mt-8 pb-4 text-xs text-foreground/70 space-y-1">
+          <p>
+            © {new Date().getFullYear()}{' '}
+            {authorName ? (
+              <>Orion by {authorName}. Todos los derechos reservados.</>
+            ) : (
+              <>Orion. Todos los derechos reservados.</>
+            )}
+          </p>
+          {authorContact && (
+            <p>
+              <a
+                href={authorContact.startsWith('mailto:') ? authorContact : `mailto:${authorContact}`}
+                className="text-primary underline hover:underline underline-offset-2"
+              >
+                {authorContact.replace(/^mailto:/i, '')}
+              </a>
+            </p>
+          )}
         </footer>
       </div>
     </main>
