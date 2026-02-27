@@ -118,6 +118,11 @@ const withPWA = require('@ducanh2912/next-pwa').default({
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // Variables públicas para el footer de login (derechos reservados)
+  env: {
+    NEXT_PUBLIC_ORION_AUTHOR: process.env.NEXT_PUBLIC_ORION_AUTHOR ?? '',
+    NEXT_PUBLIC_ORION_AUTHOR_CONTACT: process.env.NEXT_PUBLIC_ORION_AUTHOR_CONTACT ?? '',
+  },
   // Reduce bundle: solo importar iconos usados de lucide-react
   experimental: {
     optimizePackageImports: ['lucide-react'],
